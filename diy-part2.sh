@@ -18,21 +18,29 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/HinLink_H29K/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts > target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts
 
 # 3. 在 Makefile 中注册 H29K 设备
+# 定义文件路径
 RK35XX_MK="target/linux/rockchip/image/rk35xx.mk"
+
+# 检查文件是否存在，防止路径变更导致报错
 if [ -f "$RK35XX_MK" ]; then
+    echo "正在向 $RK35XX_MK 注册 H29K 设备..."
     cat >> "$RK35XX_MK" <<EOF
 
 define Device/hinlink_h29k
   DEVICE_VENDOR := HinLink
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
+  # 基础软件包，包含驱动、中文支持、USB等
   DEVICE_PACKAGES := kmod-usb3 kmod-usb-dwc3-rockchip \
-    kmod-usb-serial kmod-usb-serial-option kmod-usb-serial-wwan \
-    kmod-usb-net-rtl8152 kmod-usb-net-qmi-wwan kmod-usb-net-cdc-ether \
-    usbutils uqmi luci-i18n-base-zh-cn kmod-fb kmod-drm-rockchip kmod-console-font
+    kmod-usb-net-rtl8152 kmod-usb-net-qmi-wwan \
+    kmod-usb-serial-option uqmi \
+    luci-i18n-base-zh-cn luci-i18n-qmodem-next-zh-cn \
+    kmod-fb kmod-drm-rockchip
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
+else
+    echo "错误: 找不到 $RK35XX_MK，请确认官方源码的 RK3528 路径是否正确。"
 fi
 
 # 4. 修改主机名为 H29K
