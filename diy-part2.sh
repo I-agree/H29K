@@ -10,27 +10,40 @@
 # See /LICENSE for more information.
 #
 
-#!/bin/bash
-
 # 1. 创建目标目录（如果不存在）
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
-# 2. 下载你的 dts 文件到指定位置
-# 注意：这里使用 raw 链接直接下载
-curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/HinLink_H29K/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
-    -o target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts
+# 2. 下载 H29K 的设备树文件 (DTS)
+mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
+curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/HinLink_H29K/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts > target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts
 
-# 3. 修正 Makefile 以便内核识别新设备 (非常重要)
-# 这一步将设备型号加入到 rockchip 平台的内核编译列表中
-sed -i '/rk3528/a \ \ \ \ \ \ \ \ rk3528-opc-h29k.dtb \\' target/linux/rockchip/image/arm64.mk
-
-cat >> target/linux/rockchip/image/rk35xx.mk <<EOF
+# 3. 在 Makefile 中注册 H29K 设备
+RK35XX_MK="target/linux/rockchip/image/rk35xx.mk"
+if [ -f "$RK35XX_MK" ]; then
+    cat >> "$RK35XX_MK" <<EOF
 
 define Device/hinlink_h29k
   DEVICE_VENDOR := HinLink
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  DEVICE_PACKAGES := kmod-usb3 kmod-usb-dwc3-rockchip wpad-basic-mbedtls
+  DEVICE_PACKAGES := kmod-usb3 kmod-usb-dwc3-rockchip \
+    kmod-usb-serial kmod-usb-serial-option kmod-usb-serial-wwan \
+    kmod-usb-net-rtl8152 kmod-usb-net-qmi-wwan kmod-usb-net-cdc-ether \
+    usbutils uqmi luci-i18n-base-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
+fi
+
+# 4. 修改主机名为 H29K
+sed -i 's/OpenWrt/H29K/g' package/base-files/files/bin/config_generate
+
+# 5. 修改默认 SSID 为 H29K
+sed -i 's/OpenWrt/H29K/g' package/kernel/mac80211/files/lib/wifi/mac80211.sh
+
+# 6. 设置默认时区为北京时间 (CST-8)
+sed -i "s/timezone='UTC'/timezone='CST-8'/g" package/base-files/files/bin/config_generate
+sed -i "/timezone='CST-8'/a \ \ \ \ \ \ \ \ set system.@system[-1].zonename='Asia/Shanghai'" package/base-files/files/bin/config_generate
+
+# 7. 强制默认语言为中文 (如果已经编译了中文包)
+sed -i 's/auto/zh_cn/g' feeds/luci/modules/luci-base/root/etc/config/luci
