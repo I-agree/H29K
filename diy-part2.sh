@@ -24,8 +24,3 @@ curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/Hin
 # 这一步将设备型号加入到 rockchip 平台的内核编译列表中
 sed -i '/rk3528/a \ \ \ \ \ \ \ \ rk3528-opc-h29k.dtb \\' target/linux/rockchip/image/arm64.mk
 
-# Modify default theme
-#sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
-
-# Modify hostname
-#sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
