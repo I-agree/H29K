@@ -24,3 +24,13 @@ curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/Hin
 # 这一步将设备型号加入到 rockchip 平台的内核编译列表中
 sed -i '/rk3528/a \ \ \ \ \ \ \ \ rk3528-opc-h29k.dtb \\' target/linux/rockchip/image/arm64.mk
 
+cat >> target/linux/rockchip/image/rk35xx.mk <<EOF
+
+define Device/hinlink_h29k
+  DEVICE_VENDOR := HinLink
+  DEVICE_MODEL := H29K
+  DEVICE_DTS := rk3528-opc-h29k
+  DEVICE_PACKAGES := kmod-usb3 kmod-usb-dwc3-rockchip wpad-basic-mbedtls
+endef
+TARGET_DEVICES += hinlink_h29k
+EOF
