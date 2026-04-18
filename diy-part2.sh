@@ -19,12 +19,12 @@ curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/Hin
 
 # 3. 在 Makefile 中注册 H29K 设备
 # 定义文件路径
-RK35XX_MK="target/linux/rockchip/image/rk35xx.mk"
+armv8_MK="target/linux/rockchip/image/armv8.mk"
 
 # 检查文件是否存在，防止路径变更导致报错
-if [ -f "$RK35XX_MK" ]; then
-    echo "正在向 $RK35XX_MK 注册 H29K 设备..."
-    cat >> "$RK35XX_MK" <<EOF
+if [ -f "$armv8_MK" ]; then
+    echo "正在向 $armv8_MK 注册 H29K 设备..."
+    cat >> "$armv8_MK" <<EOF
 
 define Device/hinlink_h29k
   DEVICE_VENDOR := HinLink
@@ -40,7 +40,7 @@ endef
 TARGET_DEVICES += hinlink_h29k
 EOF
 else
-    echo "错误: 找不到 $RK35XX_MK，请确认官方源码的 RK3528 路径是否正确。"
+    echo "错误: 找不到 $armv8_MK，请确认官方源码的 RK3528 路径是否正确。"
 fi
 
 # 4. 修改主机名为 H29K
