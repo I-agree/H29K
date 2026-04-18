@@ -29,7 +29,7 @@ define Device/hinlink_h29k
   DEVICE_PACKAGES := kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-serial kmod-usb-serial-option kmod-usb-serial-wwan \
     kmod-usb-net-rtl8152 kmod-usb-net-qmi-wwan kmod-usb-net-cdc-ether \
-    usbutils uqmi luci-i18n-base-zh-cn
+    usbutils uqmi luci-i18n-base-zh-cn kmod-fb kmod-drm-rockchip kmod-console-font
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
@@ -47,3 +47,12 @@ sed -i "/timezone='CST-8'/a \ \ \ \ \ \ \ \ set system.@system[-1].zonename='Asi
 
 # 7. 强制默认语言为中文 (如果已经编译了中文包)
 sed -i 's/auto/zh_cn/g' feeds/luci/modules/luci-base/root/etc/config/luci
+
+# 8. 开启内核 Framebuffer 驱动支持 (针对 Rockchip)
+# 这会修改 OpenWrt 的内核通用配置，确保显示驱动被编译
+echo "CONFIG_DRM_ROCKCHIP=y" >> target/linux/rockchip/config-default
+echo "CONFIG_PACKAGE_kmod-drm-rockchip=y" >> target/linux/rockchip/config-default
+echo "CONFIG_DRM_FBDEV_EMULATION=y" >> target/linux/rockchip/config-default
+echo "CONFIG_FB=y" >> target/linux/rockchip/config-default
+echo "CONFIG_VT=y" >> target/linux/rockchip/config-default
+echo "CONFIG_FRAMEBUFFER_CONSOLE=y" >> target/linux/rockchip/config-default
