@@ -18,13 +18,17 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/HinLink_H29K/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts > target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts
 
 # 3. 在 Makefile 中注册 H29K 设备
-# 定义文件路径
-armv8_MK="target/linux/rockchip/image/armv8.mk"
+# 1. 自动定位正确的 Makefile (优先查找 rk35xx.mk)
+TARGET_MK=$(find target/linux/rockchip/image -name "rk35xx.mk" -o -name "armv8.mk" | head -n 1)
 
-# 检查文件是否存在，防止路径变更导致报错
-if [ -f "$armv8_MK" ]; then
-    echo "正在向 $armv8_MK 注册 H29K 设备..."
- cat >> "$armv8_MK" <<EOF
+if [ -n "$TARGET_MK" ]; then
+    echo "发现目标 Makefile: $TARGET_MK"
+    
+    # 检查是否已经注册过，避免重复追加导致编译失败
+    if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
+        echo "正在注册 H29K 设备..."
+        # 必须使用 'EOF' 带单引号，防止 Shell 错误解析 Makefile 语法
+        cat >> "$TARGET_MK" <<'EOF'
 
 define Device/hinlink_h29k
   $(Device/rk3528)
@@ -33,13 +37,16 @@ define Device/hinlink_h29k
   DEVICE_ALT0_VENDOR := LinkStar
   DEVICE_ALT0_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  UBOOT_DEVICE_NAME := hinlink_h29k
+  UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip
 endef
-TARGET_DEVICES += hinlink_h29k
+TARGET_DEVICES += hinlink_h28k
 EOF
+    else
+        echo "H29K 设备已存在，跳过注册。"
+    fi
 else
-    echo "错误: 找不到 $armv8_MK，请确认官方源码的 RK3528 路径是否正确。"
+    echo "错误: 找不到 rockchip 镜像 Makefile，请检查源码目录结构。"
 fi
 
 # 开启 MHI 总线支持，这是很多 5G 模块（如移远 RM500Q）的依赖
