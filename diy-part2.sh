@@ -39,7 +39,9 @@ define Device/hinlink_h29k
   DEVICE_DTS := rk3528-opc-h29k
   UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
-    kmod-usb3 kmod-usb-dwc3-rockchip kmod-usb-serial-option uqmi \
+    kmod-usb3 kmod-usb-dwc3-rockchip \
+    kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
+    kmod-usb-serial-option uqmi \
     luci-i18n-base-zh-cn luci-i18n-qmodem-next-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
@@ -54,3 +56,14 @@ fi
 # 开启 MHI 总线支持，这是很多 5G 模块（如移远 RM500Q）的依赖
 echo "CONFIG_MHI_BUS=y" >> target/linux/rockchip/config-default
 echo "CONFIG_MHI_BUS_PCI_GENERIC=y" >> target/linux/rockchip/config-default
+
+KERNEL_CONF="target/linux/rockchip/config-default"
+if [ -f "$KERNEL_CONF" ]; then
+    echo "注入 FM350-GL USB-RNDIS 所需的内核支持..."
+    cat >> "$KERNEL_CONF" <<EOF
+CONFIG_USB_NET_DRIVERS=y
+CONFIG_USB_NET_RNDIS_WCE=y
+CONFIG_USB_NET_RNDIS_HOST=y
+CONFIG_USB_NET_CDCETHER=y
+EOF
+fi
