@@ -10,9 +10,6 @@
 # See /LICENSE for more information.
 #
 
-./scripts/feeds update -a
-./scripts/feeds install -a
-
 # 1. 创建目标目录（如果不存在）
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
