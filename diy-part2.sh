@@ -27,15 +27,17 @@ if [ -f "$armv8_MK" ]; then
     cat >> "$armv8_MK" <<EOF
 
 define Device/hinlink_h29k
-  DEVICE_VENDOR := HinLink
+  $(Device/rk3528)
+  DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
-  DEVICE_VARIANT := OPC
+  DEVICE_ALT0_VENDOR := LinkStar
+  DEVICE_ALT0_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  # 强制打包的组件：Framebuffer支持
-  DEVICE_PACKAGES := kmod-fb kmod-drm-rockchip kmod-console-font \
+  UBOOT_DEVICE_NAME := hinlink_h29k
+  DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font
 endef
 TARGET_DEVICES += hinlink_h29k
-EOF
+
 else
     echo "错误: 找不到 $armv8_MK，请确认官方源码的 RK3528 路径是否正确。"
 fi
