@@ -24,7 +24,7 @@ armv8_MK="target/linux/rockchip/image/armv8.mk"
 # 检查文件是否存在，防止路径变更导致报错
 if [ -f "$armv8_MK" ]; then
     echo "正在向 $armv8_MK 注册 H29K 设备..."
-    cat >> "$armv8_MK" <<EOF
+ cat >> "$armv8_MK" <<EOF
 
 define Device/hinlink_h29k
   $(Device/rk3528)
