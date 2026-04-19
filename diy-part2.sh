@@ -40,7 +40,7 @@ define Device/hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip
 endef
-TARGET_DEVICES += hinlink_h28k
+TARGET_DEVICES += hinlink_h29k
 EOF
     else
         echo "H29K 设备已存在，跳过注册。"
