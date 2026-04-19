@@ -37,7 +37,7 @@ define Device/hinlink_h29k
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font
 endef
 TARGET_DEVICES += hinlink_h29k
-
+EOF
 else
     echo "错误: 找不到 $armv8_MK，请确认官方源码的 RK3528 路径是否正确。"
 fi
