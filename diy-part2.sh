@@ -36,25 +36,3 @@ EOF
 else
     echo "错误: 找不到 $armv8_MK，请确认官方源码的 RK3528 路径是否正确。"
 fi
-
-# 4. 修改主机名为 H29K
-sed -i 's/OpenWrt/H29K/g' package/base-files/files/bin/config_generate
-
-# 5. 修改默认 SSID 为 H29K
-sed -i 's/OpenWrt/H29K/g' package/kernel/mac80211/files/lib/wifi/mac80211.sh
-
-# 6. 设置默认时区为北京时间 (CST-8)
-sed -i "s/timezone='UTC'/timezone='CST-8'/g" package/base-files/files/bin/config_generate
-sed -i "/timezone='CST-8'/a \ \ \ \ \ \ \ \ set system.@system[-1].zonename='Asia/Shanghai'" package/base-files/files/bin/config_generate
-
-# 7. 强制默认语言为中文 (如果已经编译了中文包)
-sed -i 's/auto/zh_cn/g' feeds/luci/modules/luci-base/root/etc/config/luci
-
-# 8. 开启内核 Framebuffer 驱动支持 (针对 Rockchip)
-# 这会修改 OpenWrt 的内核通用配置，确保显示驱动被编译
-echo "CONFIG_DRM_ROCKCHIP=y" >> target/linux/rockchip/config-default
-echo "CONFIG_PACKAGE_kmod-drm-rockchip=y" >> target/linux/rockchip/config-default
-echo "CONFIG_DRM_FBDEV_EMULATION=y" >> target/linux/rockchip/config-default
-echo "CONFIG_FB=y" >> target/linux/rockchip/config-default
-echo "CONFIG_VT=y" >> target/linux/rockchip/config-default
-echo "CONFIG_FRAMEBUFFER_CONSOLE=y" >> target/linux/rockchip/config-default
