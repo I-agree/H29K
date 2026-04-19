@@ -10,6 +10,9 @@
 # See /LICENSE for more information.
 #
 
+./scripts/feeds update -a
+./scripts/feeds install -a
+
 # 1. 创建目标目录（如果不存在）
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
@@ -61,3 +64,7 @@ if [ -f "$KERNEL_CONF" ]; then
 else
     echo "警告：未找到内核配置文件 $KERNEL_CONF"
 fi
+
+# 开启 MHI 总线支持，这是很多 5G 模块（如移远 RM500Q）的依赖
+echo "CONFIG_MHI_BUS=y" >> target/linux/rockchip/config-default
+echo "CONFIG_MHI_BUS_PCI_GENERIC=y" >> target/linux/rockchip/config-default
