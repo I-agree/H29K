@@ -10,24 +10,17 @@
 # See /LICENSE for more information.
 #
 
-# 1. 创建目标目录（如果不存在）
-mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
+# 1. 准备 DTS 目录并下载文件
+DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+mkdir -p "$DTS_PATH"
+curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/HinLink_H29K/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
-# 2. 下载 H29K 的设备树文件 (DTS)
-mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
-curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/HinLink_H29K/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts > target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts
-
-# 3. 在 Makefile 中注册 H29K 设备
-# 1. 自动定位正确的 Makefile (优先查找 rk35xx.mk)
+# 2. 在 Makefile 中注册设备
 TARGET_MK=$(find target/linux/rockchip/image -name "rk35xx.mk" -o -name "armv8.mk" | head -n 1)
 
 if [ -n "$TARGET_MK" ]; then
-    echo "发现目标 Makefile: $TARGET_MK"
-    
-    # 检查是否已经注册过，避免重复追加导致编译失败
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
-        echo "正在注册 H29K 设备..."
-        # 必须使用 'EOF' 带单引号，防止 Shell 错误解析 Makefile 语法
+        echo "正在向 $TARGET_MK 注册 H29K 设备..."
         cat >> "$TARGET_MK" <<'EOF'
 
 define Device/hinlink_h29k
@@ -37,7 +30,7 @@ define Device/hinlink_h29k
   DEVICE_ALT0_VENDOR := LinkStar
   DEVICE_ALT0_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
+  UBOOT_DEVICE_NAME := hinlink-h29k
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
@@ -46,24 +39,28 @@ define Device/hinlink_h29k
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
-    else
-        echo "H29K 设备已存在，跳过注册。"
     fi
-else
-    echo "错误: 找不到 rockchip 镜像 Makefile，请检查源码目录结构。"
 fi
 
-# 开启 MHI 总线支持，这是很多 5G 模块（如移远 RM500Q）的依赖
-echo "CONFIG_MHI_BUS=y" >> target/linux/rockchip/config-default
-echo "CONFIG_MHI_BUS_PCI_GENERIC=y" >> target/linux/rockchip/config-default
-
+# 3. 注入 5G 模块 (FM350-GL) 及 Framebuffer 所需的内核配置
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
-    echo "注入 FM350-GL USB-RNDIS 所需的内核支持..."
+    echo "正在注入内核驱动配置..."
+    # 移除可能重复的配置项 (去重)
+    sed -i '/CONFIG_USB_NET_RNDIS/d' "$KERNEL_CONF"
+    
     cat >> "$KERNEL_CONF" <<EOF
+# 5G MHI & RNDIS Support
+CONFIG_MHI_BUS=y
+CONFIG_MHI_BUS_PCI_GENERIC=y
 CONFIG_USB_NET_DRIVERS=y
 CONFIG_USB_NET_RNDIS_WCE=y
 CONFIG_USB_NET_RNDIS_HOST=y
 CONFIG_USB_NET_CDCETHER=y
+# Framebuffer Support
+CONFIG_FB=y
+CONFIG_DRM_ROCKCHIP=y
+CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
 EOF
 fi
