@@ -30,12 +30,6 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HinLink
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  # 基础软件包，包含驱动、中文支持、USB等
-  DEVICE_PACKAGES := kmod-usb3 kmod-usb-dwc3-rockchip \
-    kmod-usb-net-rtl8152 kmod-usb-net-qmi-wwan \
-    kmod-usb-serial-option uqmi \
-    luci-i18n-base-zh-cn luci-i18n-qmodem-next-zh-cn \
-    kmod-fb kmod-drm-rockchip
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
