@@ -16,5 +16,5 @@
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
-# 添加 QModem 软件源
-sed -i '$a src-git qmodem https://github.com/FUjr/QModem.git;main' feeds.conf.default
+echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
+echo 'src-git quectel_cm_5G https://github.com/aaaol/OpenWrt/tree/master/Files/Modem/quectel_cm_5G' >> feeds.conf.default
