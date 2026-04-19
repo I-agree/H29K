@@ -64,3 +64,7 @@ CONFIG_DRM_FBDEV_EMULATION=y
 CONFIG_FRAMEBUFFER_CONSOLE=y
 EOF
 fi
+
+# 重新同步 feeds 以识别新开启的内核模块包
+./scripts/feeds update -i
+./scripts/feeds install -a
