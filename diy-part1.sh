@@ -16,5 +16,5 @@
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
-echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
+#echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 #echo 'src-git quectel_cm_5G https://github.com/I-agree/quectel_cm_5G.git' >> feeds.conf.default
