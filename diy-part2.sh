@@ -29,7 +29,10 @@ if [ -f "$armv8_MK" ]; then
 define Device/hinlink_h29k
   DEVICE_VENDOR := HinLink
   DEVICE_MODEL := H29K
+  DEVICE_VARIANT := OPC
   DEVICE_DTS := rk3528-opc-h29k
+  # 强制打包的组件：Framebuffer支持
+  DEVICE_PACKAGES := kmod-fb kmod-drm-rockchip kmod-console-font \
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
