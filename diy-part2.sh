@@ -13,9 +13,17 @@
 # 1. 准备 DTS 目录并下载文件
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
-curl -fsSL https://raw.githubusercontent.com/aaaol/OpenWrt/master/Files/LEDE/HinLink_H29K/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
+curl -fsSL https://github.com/I-agree/H29K/blob/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
-# 2. 在 Makefile 中注册设备
+# 2. 准备 U-Boot 目录并下载文件
+STAGING_IMAGE_DIR="staging_dir/target-aarch64_generic_musl/image"
+mkdir -p "$STAGING_IMAGE_DIR"
+curl -fsSL https://github.com/I-agree/H29K/blob/main/H29K-Boot-Loader.bin > "$STAGING_IMAGE_DIR/hinlink-h29k-u-boot-rockchip.bin"
+
+# 在 Makefile 中保持正确的 UBOOT_DEVICE_NAME 命名
+# 确保这一行是：UBOOT_DEVICE_NAME := hinlink-h29k
+
+# 3. 在 Makefile 中注册设备(需要人工找到OpenWrt源代码库中 mk 文件正确的位置和文件名并补充 DEVICE_PACKAGES )
 TARGET_MK=$(find target/linux/rockchip/image -name "rk35xx.mk" -o -name "armv8.mk" | head -n 1)
 
 if [ -n "$TARGET_MK" ]; then
@@ -30,7 +38,7 @@ define Device/hinlink_h29k
   DEVICE_ALT0_VENDOR := LinkStar
   DEVICE_ALT0_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  UBOOT_DEVICE_NAME := generic-rk3528
+  UBOOT_DEVICE_NAME := hinlink-h29k
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
@@ -42,7 +50,7 @@ EOF
     fi
 fi
 
-# 3. 注入 5G 模块 (FM350-GL) 及 Framebuffer 所需的内核配置
+# 4. 注入 5G 模块 (FM350-GL) 及 Framebuffer 所需的内核配置
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
     echo "正在注入内核驱动配置..."
@@ -65,6 +73,6 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
 EOF
 fi
 
-# 重新同步 feeds 以识别新开启的内核模块包
+# 5. 重新同步 feeds 以识别新开启的内核模块包
 ./scripts/feeds update -i
 ./scripts/feeds install -a
