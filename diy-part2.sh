@@ -10,10 +10,6 @@
 # See /LICENSE for more information.
 #
 
-#!/bin/bash
-
-#!/bin/bash
-
 # 1. 准备 DTS 目录
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
