@@ -101,6 +101,6 @@ make defconfig
 find package/feeds/qmodem/ -name "qmodem_init" | xargs -I {} sed -i 's|/lib/functions.sh|/usr/share/libubox/functions.sh|g' {} 2>/dev/null
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config 2>/dev/null
 
-# 9. 在 diy-part2.sh 末尾添加，确保 .config 不会覆盖脚本设置
+# 10. 在 diy-part2.sh 末尾添加，确保 .config 不会覆盖脚本设置
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=512/g' .config
