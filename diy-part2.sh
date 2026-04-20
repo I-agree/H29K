@@ -130,3 +130,6 @@ sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_g
 
 # 12. 设置默认无线配置中的 SSID 为 H29K
 sed -i 's/ssid=".*"/ssid="H29K"/g' package/kernel/mac80211/files/lib/wifi/mac80211.sh
+
+# 13. 强制设置 Argon 为默认 LuCI 主题
+sed -i 's/luci-theme-bootstrap/luci-theme-argon/g' feeds/luci/collections/luci/Makefile
