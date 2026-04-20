@@ -15,7 +15,7 @@ DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
 curl -fsSL https://github.com/I-agree/H29K/blob/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
-# 2. 准备 U-Boot 目录并下载文件
+# 2. 准备 U-Boot 目录并下载文件( 源代码编译 U-Boot 没有这个步骤，非源代码编译必须在rk3528-opc-h29k.config里面关闭 U-Boot 相关选项，反之开启 )
 STAGING_IMAGE_DIR="staging_dir/target-aarch64_generic_musl/image"
 mkdir -p "$STAGING_IMAGE_DIR"
 curl -fsSL https://github.com/I-agree/H29K/blob/main/H29K-Boot-Loader.bin > "$STAGING_IMAGE_DIR/hinlink-h29k-u-boot-rockchip.bin"
@@ -23,7 +23,7 @@ curl -fsSL https://github.com/I-agree/H29K/blob/main/H29K-Boot-Loader.bin > "$ST
 # 在 Makefile 中保持正确的 UBOOT_DEVICE_NAME 命名
 # 确保这一行是：UBOOT_DEVICE_NAME := hinlink-h29k
 
-# 3. 在 Makefile 中注册设备(需要人工找到OpenWrt源代码库中 mk 文件正确的位置和文件名并补充 DEVICE_PACKAGES )
+# 3. 在 Makefile 中注册设备( 需要人工找到OpenWrt源代码库中 mk 文件正确的位置和文件名并补充 DEVICE_PACKAGES )
 TARGET_MK=$(find target/linux/rockchip/image -name "rk35xx.mk" -o -name "armv8.mk" | head -n 1)
 
 if [ -n "$TARGET_MK" ]; then
