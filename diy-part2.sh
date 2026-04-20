@@ -10,17 +10,23 @@
 # See /LICENSE for more information.
 #
 
-# 准备 DTS 目录
+# 准备 DTS 文件
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
-# 在 Makefile 中注册设备 (强制跳过 U-Boot 拼接逻辑)
+# 准备 Loader 文件
+LOADER_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
+LOADER_DEST="staging_dir/target-aarch64_generic_musl/image"
+mkdir -p "$LOADER_DEST"
+curl -fsSL "$LOADER_URL" > "$LOADER_DEST/hinlink_h29k-u-boot-rockchip.bin"
+
+# 在 Makefile 中注册设备
 TARGET_MK=$(find target/linux/rockchip/image -name "*.mk" | xargs grep -l "Device/rk3528" | head -n 1)
 
 if [ -n "$TARGET_MK" ]; then
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
-        echo "正在向 $TARGET_MK 注册 H29K 设备 (跳过 U-Boot 封装)..."
+        echo "正在向 $TARGET_MK 注册 H29K 设备..."
         cat >> "$TARGET_MK" <<'EOF'
 
 define Device/hinlink_h29k
@@ -28,10 +34,11 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  # 关键：置空 UBOOT 变量，彻底避开 dd 找不到文件的报错
-  UBOOT_DEVICE_NAME := 
-  # 主流方式：使用 rockchip-combined 生成带 GPT 分区表的完整镜像
-  IMAGE/sysupgrade.img.gz := rockchip-combined | append-metadata
+  UBOOT_DEVICE_NAME := hinlink_h29k
+  IMAGE/sysupgrade.img.gz := rockchip-combined | rockchip-u-boot
+  # 保持分区偏移与参考一致
+  KERNEL_SIZE := 32M
+  BOARD_ROOTFS_PARTSIZE := 512
   # 插件包
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
@@ -88,10 +95,6 @@ make defconfig
 # 修复 QModem 脚本
 find package/feeds/qmodem/ -name "qmodem_init" | xargs -I {} sed -i 's|/lib/functions.sh|/usr/share/libubox/functions.sh|g' {} 2>/dev/null
 mkdir -p package/base-files/files/lib/
-
-
-# 如果是缺少核心库
-touch staging_dir/target-aarch64_generic_musl/image/-u-boot-rockchip.bin
 
 # 主机名与SSID
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
