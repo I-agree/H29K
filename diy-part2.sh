@@ -24,7 +24,7 @@ TARGET_MK=$(find target/linux/rockchip/image -name "*.mk" | xargs grep -l "Devic
 
 if [ -n "$TARGET_MK" ]; then
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
-        echo "正在向 $TARGET_MK 注册 H29K 设备 (物理跳过 U-Boot 封装)..."
+        echo "正在向 $TARGET_MK 注册 H29K 设备 (跳过 U-Boot 封装)..."
         cat >> "$TARGET_MK" <<'EOF'
 
 define Device/hinlink_h29k
@@ -32,10 +32,12 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
+  # 1. 关键：置空 UBOOT 变量，彻底避开 dd 找不到文件的报错
   UBOOT_DEVICE_NAME := 
-  # 关键修改：改用最基础的打包方式，避开 jffs2-tar 报错
-  # 这将生成包含内核和根文件系统的 sysupgrade 镜像，且不触发 dd 写入 U-Boot 的逻辑
-  IMAGE/sysupgrade.img.gz := append-rootfs
+  # 2. 主流方式：使用 rockchip-combined 生成带 GPT 分区表的完整镜像
+  # 关键修改：移除 append-metadata！这是为了让 WinRAR 识别为标准 Gzip，解压后直接得到 .img
+  IMAGE/combined.img.gz := rockchip-combined
+  # 3. 插件包
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
