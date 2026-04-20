@@ -32,17 +32,16 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  # 关键：完全置空 U-Boot 相关变量
   UBOOT_DEVICE_NAME := 
-  # 关键：覆盖默认镜像生成逻辑，移除 rockchip-combined 和 rockchip-u-boot
-  # 这样 Makefile 就不会去调用 dd 命令写入 u-boot-rockchip.bin 了
-  IMAGE/sysupgrade.img.gz := boot-script | jffs2-tar | append-metadata
+  # 关键修改：改用最基础的打包方式，避开 jffs2-tar 报错
+  # 这将生成包含内核和根文件系统的 sysupgrade 镜像，且不触发 dd 写入 U-Boot 的逻辑
+  IMAGE/sysupgrade.img.gz := append-rootfs | append-metadata
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
     kmod-usb-serial-option uqmi \
     luci-i18n-base-zh-cn luci-i18n-qmodem-next-zh-cn kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm \
-    luci-theme-argon luci-app-turboacc luci-app-sqm
+    luci-theme-argon luci-app-argon-config luci-app-turboacc luci-app-sqm
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
