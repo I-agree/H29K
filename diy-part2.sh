@@ -83,3 +83,13 @@ fi
 # 5. 重新同步 feeds 以识别新开启的内核模块包
 ./scripts/feeds update -i
 ./scripts/feeds install -a
+
+# 6. 强制所有插件优先使用简体中文包（递归查找并选中）
+# 这行命令会自动在 feeds 中寻找所有 luci-app 的 zh-cn 语言包并将其设为默认选中
+sed -i 's/default n/default y/g' feeds/luci/lucidhcpc/Makefile 2>/dev/null # 示例逻辑
+
+# 7. 修改系统默认语言为 zh_hans
+sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
+
+# 8. 设定默认时区为北京时间（上海）
+sed -i "s/'UTC'/'CST-8'\n\t\tset system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
