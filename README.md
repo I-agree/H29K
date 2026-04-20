@@ -1,3 +1,8 @@
+适配设备：hinlink_h29k
+兼容5G模块：FM350-GL
+插件汉化以及性能优化（BBR + Irqbalance）
+直接使用OpenWrt官方最新稳定版源码库
+一个不含 U-Boot 引导头的纯系统镜像，非常适合配合手动刷入 H29K-Boot-Loader.bin 使用。
 
 ## Credits
 
