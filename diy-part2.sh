@@ -111,5 +111,22 @@ sed -i "s/'UTC'/'CST-8'\n\t\tset system.@system[-1].zonename='Asia\/Shanghai'/g"
 sed -i 's/enabled "0"/enabled "1"/g' package/feeds/packages/irqbalance/files/irqbalance.config
 
 # 10. 自动选中所有已安装插件的中文包
-sed -i 's/^# CONFIG_PACKAGE_luci-i18n-.* is not set$/# CONFIG_PACKAGE_luci-i18n-any is not set/' .config
-grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/app-/i18n-/g' | sed 's/=y/-zh-cn=y/g' >> .config
+# 增强型语言包自动选中逻辑
+if [ -f .config ]; then
+    echo "正在自动选中所有已安装插件的简体中文语言包..."
+    # 强制选中 base 语言包
+    sed -i 's/CONFIG_LUCI_LANG_zh_Hans=y/CONFIG_LUCI_LANG_zh_Hans=y/g' .config 2>/dev/null || echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
+    
+    # 扫描所有选中的 luci-app，并尝试选中对应的 i18n-zh-cn 包
+    grep "=y" .config | grep "CONFIG_PACKAGE_luci-app-" | sed 's/CONFIG_PACKAGE_luci-app-//g;s/=y//g' | while read -r app; do
+        if [ ! -z "$app" ]; then
+            echo "CONFIG_PACKAGE_luci-i18n-$app-zh-cn=y" >> .config
+        fi
+    done
+fi
+
+# 11. 设置主机名为 H29K
+sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
+
+# 12. 设置默认无线配置中的 SSID 为 H29K
+sed -i 's/ssid=".*"/ssid="H29K"/g' package/kernel/mac80211/files/lib/wifi/mac80211.sh
