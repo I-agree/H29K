@@ -31,8 +31,7 @@ define Device/hinlink_h29k
   # 关键：置空 UBOOT 变量，彻底避开 dd 找不到文件的报错
   UBOOT_DEVICE_NAME := 
   # 主流方式：使用 rockchip-combined 生成带 GPT 分区表的完整镜像
-  # 关键修改：移除 append-metadata！这是为了让 WinRAR 识别为标准 Gzip，解压后直接得到 .img
-  IMAGE/combined.img.gz := rockchip-combined
+  IMAGE/sysupgrade.img.gz := rockchip-combined | append-metadata
   # 插件包
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
@@ -92,3 +91,14 @@ make defconfig
 
 # 7. 强制移除 .config 中可能残留的 jffs2 生成选项
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config 2>/dev/null
+
+# 8. 修复 QModem 初始化脚本找不到 functions.sh 的问题
+# 我们在编译目录中强制寻找并确保路径正确
+find build_dir/target-aarch64_generic_musl/ -name "qmodem_init" | xargs -I {} sed -i 's|/lib/functions.sh|/usr/share/libubox/functions.sh|g' {} 2>/dev/null
+
+# 9. 如果是缺少核心库，直接从 package 目录中提取并放入 rootfs
+mkdir -p build_dir/target-aarch64_generic_musl/root-rockchip/lib/
+cp -n package/base-files/files/lib/functions.sh build_dir/target-aarch64_generic_musl/root-rockchip/lib/ 2>/dev/null
+
+# 10. 如果是缺少核心库
+touch staging_dir/target-aarch64_generic_musl/image/-u-boot-rockchip.bin
