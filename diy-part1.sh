@@ -17,4 +17,7 @@
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
-#echo 'src-git quectel_cm_5G https://github.com/I-agree/quectel_cm_5G.git' >> feeds.conf.default
+# 添加 Argon 主题源
+echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon' >> feeds.conf.default
+# 添加其他常用主题源
+echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config' >> feeds.conf.default
