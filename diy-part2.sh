@@ -16,7 +16,14 @@ mkdir -p "$DTS_PATH"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
 # 2. 准备 U-Boot 目录并下载文件( 源代码编译 U-Boot 没有这个步骤，非源代码编译必须在rk3528-opc-h29k.config里面关闭 U-Boot 相关选项，反之开启 )
-STAGING_IMAGE_DIR="staging_dir/target-aarch64_generic_musl/image"
+# 自动查找包含 musl 的 staging 目录下的 image 文件夹
+STAGING_IMAGE_DIR=$(find staging_dir -name "image" -type d | grep "target-aarch64" | head -n 1)
+
+# 如果找不到（比如还没生成），则手动创建默认路径
+if [ -z "$STAGING_IMAGE_DIR" ]; then
+    STAGING_IMAGE_DIR="staging_dir/target-aarch64_generic_musl/image"
+fi
+
 mkdir -p "$STAGING_IMAGE_DIR"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin > "$STAGING_IMAGE_DIR/hinlink-h29k-u-boot-rockchip.bin"
 
