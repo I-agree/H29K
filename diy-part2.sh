@@ -10,28 +10,29 @@
 # See /LICENSE for more information.
 #
 
-# 准备 DTS 文件
+# 1. 动态查找目标 Makefile (先定义变量)
+TARGET_MK=$(find target/linux/rockchip/image -name "*.mk" | xargs grep -l "Device/rk3528" | head -n 1)
+
+# 2. 准备 DTS 文件
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
-# 准备 Loader 部分
-LOADER_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
-mkdir -p dl
-curl -fsSL "$LOADER_URL" > dl/hinlink_h29k-u-boot-rockchip.bin
+# 3. 准备 Loader 文件并注入编译指令
+if [ -n "$TARGET_MK" ]; then
+    LOADER_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
+    mkdir -p dl
+    curl -fsSL "$LOADER_URL" > dl/hinlink_h29k-u-boot-rockchip.bin
 
-# 增加一个 Makefile 注入，确保编译时将 Loader 拷贝到正确位置
-# 这样即便编译过程中清空了 staging_dir，Loader 也会被重新拷入
-echo '
+    # 注入 Makefile 依赖逻辑，确保 Loader 能够被自动拷贝到 staging_dir
+    # 注意：这里使用了单引号避免变量在 shell 阶段被提前解析
+    echo '
 $(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-rockchip.bin
 	mkdir -p $(dir $@)
 	cp $< $@
 ' >> "$TARGET_MK"
 
-# 在 Makefile 中注册设备
-TARGET_MK=$(find target/linux/rockchip/image -name "*.mk" | xargs grep -l "Device/rk3528" | head -n 1)
-
-if [ -n "$TARGET_MK" ]; then
+    # 4. 在 Makefile 中注册设备 (移除 append-metadata 确保 WinRAR 兼容性)
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
         echo "正在向 $TARGET_MK 注册 H29K 设备..."
         cat >> "$TARGET_MK" <<'EOF'
@@ -42,11 +43,11 @@ define Device/hinlink_h29k
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
+  # 关键： rockchip-combined 生成 GPT 分区，rockchip-u-boot 注入 Loader
+  # 不添加 append-metadata 以确保 WinRAR 直接解压出单个 .img
   IMAGE/sysupgrade.img.gz := rockchip-combined | rockchip-u-boot
-  # 保持分区偏移与参考一致
   KERNEL_SIZE := 32M
   BOARD_ROOTFS_PARTSIZE := 512
-  # 插件包
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
@@ -59,15 +60,12 @@ EOF
     fi
 fi
 
-# 注入直播优化内核配置
+# 5. 内核直播优化 (BBR + 5G)
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
-    # 先清理可能存在的冲突项
     sed -i '/CONFIG_MHI/d' "$KERNEL_CONF"
     sed -i '/CONFIG_TCP_CONG_BBR/d' "$KERNEL_CONF"
-    
     cat >> "$KERNEL_CONF" <<EOF
-# 5G Support
 CONFIG_PCI=y
 CONFIG_PCIE_ROCKCHIP=y
 CONFIG_MHI_BUS=y
@@ -75,39 +73,30 @@ CONFIG_MHI_BUS_PCI_GENERIC=y
 CONFIG_MHI_NET=y
 CONFIG_MHI_WWAN_CTRL=y
 CONFIG_WWAN=y
-# BBR for stable streaming
 CONFIG_TCP_CONG_BBR=y
 CONFIG_DEFAULT_TCP_CONG="bbr"
 EOF
 fi
 
-# 默认语言与时区
+# 6. 系统设置
 sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 sed -i "s/'UTC'/'CST-8'\n\t\tset system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
+sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
 
-# 语言包自动选中逻辑 (执行前先展开依赖)
+# 7. SSID 兼容性修改
+WIFI_SH=$(find package -name "mac80211.sh" | head -n 1)
+[ -n "$WIFI_SH" ] && sed -i 's/ssid=".*"/ssid="H29K"/g' "$WIFI_SH"
+
+# 8. 语言包与依赖处理
 if [ -f .config ]; then
-    echo "正在执行依赖展开并匹配中文包..."
-    # 强制开启核心中文支持
     echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
-    # 遍历已选插件并开启对应中文包
     grep "=y" .config | grep "CONFIG_PACKAGE_luci-app-" | sed 's/CONFIG_PACKAGE_luci-app-//g;s/=y//g' | while read -r app; do
         echo "CONFIG_PACKAGE_luci-i18n-$app-zh-cn=y" >> .config
     done
 fi
 
-# 强制生成完整依赖配置，确保语言包扫描完整
 make defconfig
 
-# 修复 QModem 脚本
+# 9. 插件与残留清理
 find package/feeds/qmodem/ -name "qmodem_init" | xargs -I {} sed -i 's|/lib/functions.sh|/usr/share/libubox/functions.sh|g' {} 2>/dev/null
-mkdir -p package/base-files/files/lib/
-
-# 修改主机名
-sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
-
-# 动态查找并修改 SSID
-WIFI_SH=$(find package -name "mac80211.sh" | head -n 1)
-if [ -n "$WIFI_SH" ]; then
-    sed -i 's/ssid=".*"/ssid="H29K"/g' "$WIFI_SH"
-fi
+sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config 2>/dev/null
