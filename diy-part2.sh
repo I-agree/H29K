@@ -30,7 +30,7 @@ define Device/hinlink_h29k
   DEVICE_ALT0_VENDOR := LinkStar
   DEVICE_ALT0_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  UBOOT_DEVICE_NAME := hinlink-h29k
+  UBOOT_DEVICE_NAME := generic-rk3528
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
