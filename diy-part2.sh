@@ -85,3 +85,6 @@ if [ -f .config ]; then
         echo "CONFIG_PACKAGE_luci-i18n-$app-zh-cn=y" >> .config
     done
 fi
+
+# 强制生成完整依赖配置，确保语言包扫描完整
+make defconfig
