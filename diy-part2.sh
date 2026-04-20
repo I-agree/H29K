@@ -93,3 +93,6 @@ sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 
 # 8. 设定默认时区为北京时间（上海）
 sed -i "s/'UTC'/'CST-8'\n\t\tset system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
+
+# 9. 设置 irqbalance 默认开启
+sed -i 's/enabled "0"/enabled "1"/g' package/feeds/packages/irqbalance/files/irqbalance.config
