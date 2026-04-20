@@ -15,11 +15,18 @@ DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
-# 准备 Loader 文件
+# 准备 Loader 部分
 LOADER_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
-LOADER_DEST="staging_dir/target-aarch64_generic_musl/image"
-mkdir -p "$LOADER_DEST"
-curl -fsSL "$LOADER_URL" > "$LOADER_DEST/hinlink_h29k-u-boot-rockchip.bin"
+mkdir -p dl
+curl -fsSL "$LOADER_URL" > dl/hinlink_h29k-u-boot-rockchip.bin
+
+# 增加一个 Makefile 注入，确保编译时将 Loader 拷贝到正确位置
+# 这样即便编译过程中清空了 staging_dir，Loader 也会被重新拷入
+echo '
+$(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-rockchip.bin
+	mkdir -p $(dir $@)
+	cp $< $@
+' >> "$TARGET_MK"
 
 # 在 Makefile 中注册设备
 TARGET_MK=$(find target/linux/rockchip/image -name "*.mk" | xargs grep -l "Device/rk3528" | head -n 1)
@@ -96,6 +103,11 @@ make defconfig
 find package/feeds/qmodem/ -name "qmodem_init" | xargs -I {} sed -i 's|/lib/functions.sh|/usr/share/libubox/functions.sh|g' {} 2>/dev/null
 mkdir -p package/base-files/files/lib/
 
-# 主机名与SSID
+# 修改主机名
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
-sed -i 's/ssid=".*"/ssid="H29K"/g' package/kernel/mac80211/files/lib/wifi/mac80211.sh
+
+# 动态查找并修改 SSID
+WIFI_SH=$(find package -name "mac80211.sh" | head -n 1)
+if [ -n "$WIFI_SH" ]; then
+    sed -i 's/ssid=".*"/ssid="H29K"/g' "$WIFI_SH"
+fi
