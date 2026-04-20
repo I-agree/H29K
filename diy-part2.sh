@@ -19,12 +19,12 @@ DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
-# 2. 在 Makefile 中注册设备 (解耦 U-Boot)
+# 2. 在 Makefile 中注册设备 (强制跳过 U-Boot 拼接逻辑)
 TARGET_MK=$(find target/linux/rockchip/image -name "*.mk" | xargs grep -l "Device/rk3528" | head -n 1)
 
 if [ -n "$TARGET_MK" ]; then
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
-        echo "正在向 $TARGET_MK 注册 H29K 设备..."
+        echo "正在向 $TARGET_MK 注册 H29K 设备 (物理跳过 U-Boot 封装)..."
         cat >> "$TARGET_MK" <<'EOF'
 
 define Device/hinlink_h29k
@@ -32,7 +32,11 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
+  # 关键：完全置空 U-Boot 相关变量
   UBOOT_DEVICE_NAME := 
+  # 关键：覆盖默认镜像生成逻辑，移除 rockchip-combined 和 rockchip-u-boot
+  # 这样 Makefile 就不会去调用 dd 命令写入 u-boot-rockchip.bin 了
+  IMAGE/sysupgrade.img.gz := boot-script | jffs2-tar | append-metadata
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
