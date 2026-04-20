@@ -28,12 +28,12 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  # 1. 关键：置空 UBOOT 变量，彻底避开 dd 找不到文件的报错
+  # 关键：置空 UBOOT 变量，彻底避开 dd 找不到文件的报错
   UBOOT_DEVICE_NAME := 
-  # 2. 主流方式：使用 rockchip-combined 生成带 GPT 分区表的完整镜像
+  # 主流方式：使用 rockchip-combined 生成带 GPT 分区表的完整镜像
   # 关键修改：移除 append-metadata！这是为了让 WinRAR 识别为标准 Gzip，解压后直接得到 .img
   IMAGE/combined.img.gz := rockchip-combined
-  # 3. 插件包
+  # 插件包
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
@@ -87,5 +87,8 @@ if [ -f .config ]; then
     done
 fi
 
-# 强制生成完整依赖配置，确保语言包扫描完整
+# 6. 强制生成完整依赖配置，确保语言包扫描完整
 make defconfig
+
+# 7. 强制移除 .config 中可能残留的 jffs2 生成选项
+sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config 2>/dev/null
