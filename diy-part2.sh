@@ -35,7 +35,7 @@ define Device/hinlink_h29k
   UBOOT_DEVICE_NAME := 
   # 关键修改：改用最基础的打包方式，避开 jffs2-tar 报错
   # 这将生成包含内核和根文件系统的 sysupgrade 镜像，且不触发 dd 写入 U-Boot 的逻辑
-  IMAGE/sysupgrade.img.gz := append-rootfs | append-metadata
+  IMAGE/sysupgrade.img.gz := append-rootfs
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
