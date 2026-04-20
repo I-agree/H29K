@@ -50,29 +50,42 @@ define Device/hinlink_h29k
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
     kmod-usb-serial-option uqmi \
-    luci-i18n-base-zh-cn luci-i18n-qmodem-next-zh-cn
+    luci-i18n-base-zh-cn luci-i18n-qmodem-next-zh-cn kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
     fi
 fi
 
-# 4. 注入 5G 模块 (FM350-GL) 及 Framebuffer 所需的内核配置
+# 4. 注入 5G 模块 (FM350-GL) 及 Framebuffer 等等所需的内核配置
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
     echo "正在注入内核驱动配置..."
-    # 移除可能重复的配置项 (去重)
+    # 移除可能冲突的旧项
     sed -i '/CONFIG_USB_NET_RNDIS/d' "$KERNEL_CONF"
+    sed -i '/CONFIG_MHI/d' "$KERNEL_CONF"
     
     cat >> "$KERNEL_CONF" <<EOF
-# 5G MHI & RNDIS Support
+# PCI & PCIE Support
+CONFIG_PCI=y
+CONFIG_PCIE_ROCKCHIP=y
+
+# 5G MHI & Modem Support
 CONFIG_MHI_BUS=y
 CONFIG_MHI_BUS_PCI_GENERIC=y
+CONFIG_MHI_NET=y
+CONFIG_MHI_WWAN_CTRL=y
+CONFIG_WWAN=y
+
+# Network Drivers
 CONFIG_USB_NET_DRIVERS=y
 CONFIG_USB_NET_RNDIS_WCE=y
 CONFIG_USB_NET_RNDIS_HOST=y
 CONFIG_USB_NET_CDCETHER=y
-# Framebuffer Support
+CONFIG_USB_NET_CDC_MBIM=y
+CONFIG_USB_NET_CDC_NCM=y
+
+# Framebuffer & Display Support
 CONFIG_FB=y
 CONFIG_DRM_ROCKCHIP=y
 CONFIG_DRM_FBDEV_EMULATION=y
@@ -96,3 +109,7 @@ sed -i "s/'UTC'/'CST-8'\n\t\tset system.@system[-1].zonename='Asia\/Shanghai'/g"
 
 # 9. 设置 irqbalance 默认开启
 sed -i 's/enabled "0"/enabled "1"/g' package/feeds/packages/irqbalance/files/irqbalance.config
+
+# 10. 自动选中所有已安装插件的中文包
+sed -i 's/^# CONFIG_PACKAGE_luci-i18n-.* is not set$/# CONFIG_PACKAGE_luci-i18n-any is not set/' .config
+grep "CONFIG_PACKAGE_luci-app-" .config | grep "=y" | sed 's/app-/i18n-/g' | sed 's/=y/-zh-cn=y/g' >> .config
