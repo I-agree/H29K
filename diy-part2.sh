@@ -4,120 +4,100 @@
 # File name: diy-part2.sh
 # Description: OpenWrt DIY script part 2 (After Update feeds)
 #
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
-#
 
-# --- 第一部分：环境补丁与内核模块定义 ---
-# 1. 解决宿主机脚本依赖
+# --- 第一部分：基础环境补丁 ---
 if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     sudo mkdir -p /lib
     sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 fi
 
-# 2. 【核心修复】补齐 kmod-fb-tft-st7789v 缺失的内核符号依赖
-# 这解决了上一个日志中提到的 fb_sys_fops 等符号丢失问题
-VIDEO_MK="package/kernel/linux/modules/video.mk"
-if [ -f "$VIDEO_MK" ] && ! grep -q "fb-tft-st7789v" "$VIDEO_MK"; then
-    echo "正在定义 kmod-fb-tft-st7789v 并补齐内核符号..."
-    cat >> "$VIDEO_MK" <<EOF
+# --- 第二部分：源码注入 (设备支持与 5G 模块) ---
 
-define KernelPackage/fb-tft-st7789v
-  SUBMENU:=Video Support
-  TITLE:=ST7789V LCD FB driver
-  KCONFIG:=CONFIG_FB_TFT CONFIG_FB_TFT_ST7789V
-  FILES:=\$(LINUX_DIR)/drivers/staging/fbtft/fb_st7789v.ko \\
-         \$(LINUX_DIR)/drivers/staging/fbtft/fbtft.ko
-  AUTOLOAD:=\$(confvar,CONFIG_FB_TFT_ST7789V)
-  DEPENDS:=+kmod-fb +kmod-fb-cfb-fillrect +kmod-fb-cfb-copyarea +kmod-fb-cfb-imgblt
-endef
-
-\$(eval \$(call KernelPackage,fb-tft-st7789v))
-EOF
-fi
-
-# --- 第二部分：源码注入 (适配官方 OpenWrt 标准) ---
-
+# 1. H29K 设备树与引导逻辑
 TARGET_MK=$(find target/linux/rockchip/image -name "armv8.mk")
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
 if [ -n "$TARGET_MK" ]; then
-    # 3. 准备 Loader 文件 (修正下载顺序与目录逻辑)
-    LOADER_FILE="hinlink_h29k-u-boot-rockchip.bin"
-    LOADER_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
-    
-    # 关键：先创建目录再下载
-    mkdir -p dl
-    STAGING_IMAGE_DIR="staging_dir/target-aarch64_generic_musl/image"
-    mkdir -p "$STAGING_IMAGE_DIR"
-
-    echo "正在下载 Loader 文件..."
-    if curl -fsSL "$LOADER_URL" -o "dl/$LOADER_FILE"; then
-        cp "dl/$LOADER_FILE" "$STAGING_IMAGE_DIR/$LOADER_FILE"
-        echo "Loader 文件已就绪并同步至 $STAGING_IMAGE_DIR"
-    else
-        echo "错误：Loader 下载失败，请检查网络或 URL！"
-        # 尝试备用下载路径直接到目标目录
-        curl -fsSL "$LOADER_URL" -o "$STAGING_IMAGE_DIR/$LOADER_FILE"
-    fi
-
-    # 4. 注入设备定义 (使用官方 boot-common 流水线)
-    if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
-        echo "正在注入 H29K 设备定义..."
+    curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.txt > H29K-Boot-Loader.txt
+    if ! grep -q "hinlink_h29k" "$TARGET_MK"; then
+        cat H29K-Boot-Loader.txt >> "$TARGET_MK"
         cat >> "$TARGET_MK" <<EOF
-
 define Device/hinlink_h29k
-  \$(Device/rk3528)
-  DEVICE_VENDOR := HINLINK
+  DEVICE_VENDOR := Hinlink
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  UBOOT_DEVICE_NAME := hinlink_h29k
-  IMAGES := sysupgrade.img.gz
-  IMAGE/sysupgrade.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
-  DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-fb-tft-st7789v \\
-    kmod-fb-cfb-fillrect kmod-fb-cfb-copyarea kmod-fb-cfb-imgblt \\
-    kmod-aic8800-sdio wpad-openssl -wpad-basic-mbedtls -wpad-basic -urngd \\
-    kmod-usb3 kmod-usb-dwc3-rockchip kmod-usb-net-rtl8152 \\
-    luci-i18n-base-zh-cn luci-theme-argon luci-app-argon-config luci-app-turboacc
+  DEVICE_PACKAGES := kmod-r8125 kmod-usb3 uboot-rockchip-v8
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
     fi
 fi
 
-# --- 第三部分：内核强制配置 (Staging + BBR) ---
+# 2. 注入 quectel-CM-5G 源码 (解决依赖包不存在问题)
+mkdir -p package/custom
+git clone --depth 1 https://github.com/I-agree/quectel_cm_5G.git package/custom/quectel-CM-5G
+
+# --- 第三部分：内核配置与优化 (核心修复) ---
 
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
+    # 开启屏幕支持与 BBR
     cat >> "$KERNEL_CONF" <<EOF
-CONFIG_STAGING=y
-CONFIG_FB_TFT=m
-CONFIG_FB_TFT_ST7789V=m
+# 基础 TCP 优化
 CONFIG_TCP_CONG_BBR=y
 CONFIG_DEFAULT_TCP_CONG="bbr"
+
+# 修复屏幕驱动 ST7789V 缺失依赖 (fb_sys_fops 等)
+CONFIG_FB=y
+CONFIG_FB_SYS_FILLRECT=y
+CONFIG_FB_SYS_COPYAREA=y
+CONFIG_FB_SYS_IMAGEBLT=y
+CONFIG_FB_SYS_FOPS=y
+CONFIG_FB_DEFERRED_IO=y
+CONFIG_FB_TFT=m
+CONFIG_FB_TFT_ST7789V=m
+
+# 5G/MHI 驱动基础内核支持
+CONFIG_MHI_BUS=y
+CONFIG_MHI_BUS_PCI_GENERIC=y
+CONFIG_WWAN=y
+CONFIG_MHI_WWAN_CTRL=m
+CONFIG_MHI_WWAN_MBIM=m
+
+# 其他图形支持
+CONFIG_DRM_ROCKCHIP=y
+CONFIG_ROCKCHIP_DW_HDMI=y
 EOF
 fi
 
-# 修正主机名与语言
+# --- 第四部分：个性化设置 ---
+
+# 设置默认中文和主机名
 sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
 
-# --- 第四部分：配置锁定与生成 ---
+# --- 第五部分：.config 锁定与依赖补全 ---
 
-echo "CONFIG_TARGET_rockchip=y" >> .config
-echo "CONFIG_TARGET_rockchip_armv8=y" >> .config
-echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
+# 强制注入目标设备配置
+cat >> .config <<EOF
+CONFIG_TARGET_rockchip=y
+CONFIG_TARGET_rockchip_armv8=y
+CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 
+# 选中 5G 驱动包
+CONFIG_PACKAGE_quectel-CM-5G=y
+CONFIG_PACKAGE_kmod-mhi-wwan=y
+
+# 选中屏幕驱动包
+CONFIG_PACKAGE_kmod-fb-tft-st7789v=y
+EOF
+
+# 运行 defconfig 刷新依赖关系
 make defconfig
 
-# 锁定分区大小
-sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
-sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/g' .config
-
-# 禁用其他设备，确保唯一产出
-sed -i 's/CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_.*=y/# & is not set/g' .config
-echo "CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
+# 验证注入结果
+if ! grep -q "DEVICE_hinlink_h29k=y" .config; then
+    echo "警告：H29K 设备注入可能不完全，请检查 .config！"
+fi
