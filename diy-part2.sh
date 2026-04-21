@@ -31,7 +31,7 @@ fi
 
 echo "硬件支持文件下载成功。"
 
-# --- 3. 屏幕驱动编译环境补全 (修正 video.mk) ---
+# --- 3. 屏幕驱动编译环境补全 (修正 video.mk 以支持 ST7789V) ---
 VIDEO_MK="package/kernel/linux/modules/video.mk"
 if [ -f "$VIDEO_MK" ] && ! grep -q "fb-tft-st7789v" "$VIDEO_MK"; then
     cat >> "$VIDEO_MK" <<EOF
@@ -80,12 +80,12 @@ TARGET_DEVICES += hinlink_h29k
 EOF
 fi
 
-# --- 5. 核心配置预注入 (BBR + 网卡底层) ---
+# --- 5. 核心内核配置注入 (已修正 BBR 拼写) ---
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
     cat >> "$KERNEL_CONF" <<EOF
 CONFIG_TCP_CONG_BBR=y
-CONFIG_DEFAULT_TCP_CONG="b情绪br"
+CONFIG_DEFAULT_TCP_CONG="bbr"
 CONFIG_FB_TFT=m
 CONFIG_FB_TFT_ST7789V=m
 CONFIG_DRM_ROCKCHIP=y
@@ -151,7 +151,7 @@ sed -i '/quectel/d' .config
 sed -i '/meig/d' .config
 sed -i '/qmodem/d' .config
 
-# 强制单选机型并校验
+# 强制单选机型
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_/d' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
