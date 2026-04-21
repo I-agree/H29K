@@ -41,10 +41,12 @@ $(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-ro
 	cp $< $@
 ' >> "$TARGET_MK"
 
-    # 4. 在 Makefile 中注册设备 (KERNEL_SIZE 使用纯字节数以消除歧义)
-    if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
-        echo "正在向 $TARGET_MK 注册 H29K 设备..."
-        cat >> "$TARGET_MK" <<'EOF'
+# 4. 在 Makefile 中注册设备 (优化插入位置)
+if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
+    echo "正在精准注入 H29K 设备定义..."
+    
+    # 创建一个临时文件存放设备定义
+    cat > h29k_device.txt <<'EOF'
 
 define Device/hinlink_h29k
   $(Device/rk3528)
@@ -63,8 +65,13 @@ define Device/hinlink_h29k
     luci-theme-argon luci-app-argon-config luci-app-turboacc luci-app-sqm
 endef
 TARGET_DEVICES += hinlink_h29k
+
 EOF
-    fi
+
+    # 寻找第一个 "define Device" 出现的位置，并在其上方插入
+    # 这样可以确保我们的定义位于 Makefile 的核心逻辑区
+    sed -i '/define Device/r h29k_device.txt' "$TARGET_MK"
+    rm h29k_device.txt
 fi
 
 # 5. 内核直播优化 (BBR + 5G驱动强制注入)
