@@ -88,6 +88,9 @@ CONFIG_MHI_WWAN_CTRL=y
 CONFIG_WWAN=y
 CONFIG_TCP_CONG_BBR=y
 CONFIG_DEFAULT_TCP_CONG="bbr"
+CONFIG_DRM_ROCKCHIP=y
+CONFIG_ROCKCHIP_DW_HDMI=y
+CONFIG_DRM_PANEL_SIMPLE=y
 EOF
 fi
 
@@ -111,6 +114,12 @@ echo "CONFIG_TARGET_rockchip_armv8=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
 make defconfig
+
+# 检查是否真的选中了 H29K，如果没有，强制报错停止编译，省去等待时间
+if ! grep -q "CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y" .config; then
+    echo "错误：未能成功锁定 H29K 设备，编译中止！"
+    exit 1
+fi
 
 # 9. 处理语言包与残留项
 if [ -f .config ]; then
