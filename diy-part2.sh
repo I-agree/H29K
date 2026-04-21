@@ -11,7 +11,6 @@
 #
 
 # --- 第一部分：编译环境补丁 (环境先行) ---
-# 解决 GitHub Actions 宿主机缺失 functions.sh 导致的脚本执行报错
 if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     sudo mkdir -p /lib
     sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
@@ -41,12 +40,10 @@ $(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-ro
 	cp $< $@
 ' >> "$TARGET_MK"
 
-# 4. 在 Makefile 中注册设备 (优化插入位置)
-if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
-    echo "正在精准注入 H29K 设备定义..."
-    
-    # 创建一个临时文件存放设备定义
-    cat > h29k_device.txt <<'EOF'
+    # 4. 在 Makefile 中注册设备 (优化插入位置)
+    if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
+        echo "正在精准注入 H29K 设备定义到 $TARGET_MK ..."
+        cat > h29k_device.txt <<'EOF'
 
 define Device/hinlink_h29k
   $(Device/rk3528)
@@ -67,12 +64,11 @@ endef
 TARGET_DEVICES += hinlink_h29k
 
 EOF
-
-    # 寻找第一个 "define Device" 出现的位置，并在其上方插入
-    # 这样可以确保我们的定义位于 Makefile 的核心逻辑区
-    sed -i '/define Device/r h29k_device.txt' "$TARGET_MK"
-    rm h29k_device.txt
-fi
+        # 寻找第一个 "define Device" 出现的位置，并在其上方插入
+        sed -i '/define Device/r h29k_device.txt' "$TARGET_MK"
+        rm h29k_device.txt
+    fi
+fi  # <--- 这里是补全的第 3 步闭合符号
 
 # 5. 内核直播优化 (BBR + 5G驱动强制注入)
 KERNEL_CONF="target/linux/rockchip/config-default"
@@ -94,18 +90,18 @@ fi
 
 # --- 第三部分：系统 UI 与个性化设置 ---
 
-# 6. 系统设置 (语言、时区、主机名)
+# 6. 系统设置
 sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 sed -i "s/'UTC'/'CST-8'\n\t\tset system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
 
-# 7. SSID 默认名修改
+# 7. SSID 默认名
 WIFI_SH=$(find package -name "mac80211.sh" | head -n 1)
 [ -n "$WIFI_SH" ] && sed -i 's/ssid=".*"/ssid="H29K"/g' "$WIFI_SH"
 
-# --- 第四部分：配置生成与终极锁定 (锁定收尾) ---
+# --- 第四部分：配置生成与终极锁定 ---
 
-# 8. 刷新 .config 并处理语言包依赖
+# 8. 刷新 .config
 make defconfig
 if [ -f .config ]; then
     echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
@@ -114,9 +110,9 @@ if [ -f .config ]; then
     done
 fi
 
-# 9. 移除残留的 JFFS2 任务
+# 9. 移除残留的 JFFS2
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config 2>/dev/null
 
-# 10. 锁定分区大小 (放在最后确保覆盖 defconfig 的默认设置)
+# 10. 锁定分区大小
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/g' .config
