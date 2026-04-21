@@ -11,6 +11,7 @@
 #
 
 # --- 第一部分：编译环境补丁 (环境先行) ---
+# 解决 GitHub Actions 宿主机缺失 functions.sh 导致的脚本执行报错
 if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     sudo mkdir -p /lib
     sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
@@ -19,8 +20,8 @@ fi
 
 # --- 第二部分：源码级修改 (设备与驱动注入) ---
 
-# 1. 动态查找目标 Makefile
-TARGET_MK=$(find target/linux/rockchip/image -name "*.mk" | xargs grep -l "Device/rk3528" | head -n 1)
+# 1. 动态查找目标 armv8.mk 文件
+TARGET_MK=$(find target/linux/rockchip/image -name "armv8.mk")
 
 # 2. 准备 DTS 文件
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
@@ -33,19 +34,22 @@ if [ -n "$TARGET_MK" ]; then
     mkdir -p dl
     curl -fsSL "$LOADER_URL" > dl/hinlink_h29k-u-boot-rockchip.bin
 
-    # 注入 Makefile 依赖逻辑
+    # 注入 Makefile 依赖逻辑，确保 Loader 能够被正确拷贝
     echo '
 $(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-rockchip.bin
 	mkdir -p $(dir $@)
 	cp $< $@
 ' >> "$TARGET_MK"
 
-    # 4. 在 Makefile 中注册设备 (优化插入位置)
+    # 4. 在 Makefile 中精准注册设备
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
         echo "正在精准注入 H29K 设备定义到 $TARGET_MK ..."
-        cat > h29k_device.txt <<'EOF'
+        
+        # 创建临时块，注意保留 $(Device/rk3528) 以继承 SOC 和 KERNEL_LOADADDR 
+        cat > h29k_block.txt <<'EOF'
 
 define Device/hinlink_h29k
+  $(Device/rk3528)
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
@@ -61,13 +65,13 @@ define Device/hinlink_h29k
     luci-theme-argon luci-app-argon-config luci-app-turboacc luci-app-sqm
 endef
 TARGET_DEVICES += hinlink_h29k
-
 EOF
-        # 寻找第一个 "define Device" 出现的位置，并在其上方插入
-        sed -i '/define Device/r h29k_device.txt' "$TARGET_MK"
-        rm h29k_device.txt
+
+        # 核心注入：定位到 Device/rk3528 块的 endef 之后插入我们的 H29K 定义 
+        sed -i '/define Device\/rk3528/,/endef/ { /endef/ r h29k_block.txt' -e '}' "$TARGET_MK"
+        rm h29k_block.txt
     fi
-fi  # <--- 这里是补全的第 3 步闭合符号
+fi
 
 # 5. 内核直播优化 (BBR + 5G驱动强制注入)
 KERNEL_CONF="target/linux/rockchip/config-default"
@@ -89,29 +93,38 @@ fi
 
 # --- 第三部分：系统 UI 与个性化设置 ---
 
-# 6. 系统设置
+# 6. 系统设置 (语言、时区、主机名)
 sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 sed -i "s/'UTC'/'CST-8'\n\t\tset system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
 
-# 7. SSID 默认名
+# 7. SSID 默认名修改
 WIFI_SH=$(find package -name "mac80211.sh" | head -n 1)
 [ -n "$WIFI_SH" ] && sed -i 's/ssid=".*"/ssid="H29K"/g' "$WIFI_SH"
 
 # --- 第四部分：配置生成与终极锁定 ---
 
-# 8. 刷新 .config
+# 8. 刷新 .config 并在之前强制注入目标设备
+# 这能防止系统在执行 defconfig 时因为空位自动抓取 armsom_sige7 
+echo "CONFIG_TARGET_rockchip=y" >> .config
+echo "CONFIG_TARGET_rockchip_armv8=y" >> .config
+echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
+
 make defconfig
+
+# 9. 处理语言包与残留项
 if [ -f .config ]; then
     echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
     grep "=y" .config | grep "CONFIG_PACKAGE_luci-app-" | sed 's/CONFIG_PACKAGE_luci-app-//g;s/=y//g' | while read -r app; do
         echo "CONFIG_PACKAGE_luci-i18n-$app-zh-cn=y" >> .config
     done
 fi
-
-# 9. 移除残留的 JFFS2
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config 2>/dev/null
 
-# 10. 锁定分区大小
+# 10. 终极参数锁定 (防止被 armsom_sige7 等设备覆盖) 
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/g' .config
+
+# 锁定设备为 H29K，取消所有其他 rockchip 设备的选中状态
+sed -i 's/CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_.*=y/# & is not set/g' .config
+echo "CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
