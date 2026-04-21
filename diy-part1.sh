@@ -21,3 +21,5 @@ echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.defa
 echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon' >> feeds.conf.default
 # 添加其他常用主题源
 echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config' >> feeds.conf.default
+# 无线网卡驱动
+echo 'src-git aic8800 https://github.com/coolsnowwolf/lede/tree/master/package/kernel/aic8800' >> feeds.conf.default
