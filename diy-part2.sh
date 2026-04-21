@@ -10,14 +10,14 @@
 # See /LICENSE for more information.
 #
 
-# --- 第一部分：环境与内核模块定义 ---
+# --- 第一部分：环境补丁与内核模块定义 ---
 # 解决宿主机脚本依赖
 if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     sudo mkdir -p /lib
     sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 fi
 
-# 核心：在官方源码中手动定义缺失的 kmod-fb-tft-st7789v 软件包
+# 【核心修复】在官方源码中手动定义缺失的 kmod-fb-tft-st7789v 软件包实体
 VIDEO_MK="package/kernel/linux/modules/video.mk"
 if [ -f "$VIDEO_MK" ] && ! grep -q "fb-tft-st7789v" "$VIDEO_MK"; then
     echo "正在定义 kmod-fb-tft-st7789v 软件包实体..."
@@ -37,7 +37,7 @@ endef
 EOF
 fi
 
-# --- 第二部分：源码注入 (针对 OpenWrt 官方源) ---
+# --- 第二部分：源码注入 (适配官方 OpenWrt 标准) ---
 
 TARGET_MK=$(find target/linux/rockchip/image -name "armv8.mk")
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
@@ -68,7 +68,7 @@ define Device/hinlink_h29k
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
-  # 官方构建流水线：替代已失效的 rockchip-combined
+  # 关键修复：官方构建流水线，解决 Missing Build/rockchip-combined 报错
   IMAGES := sysupgrade.img.gz
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-fb-tft-st7789v \\
@@ -85,7 +85,7 @@ fi
 
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
-    echo "正在强化内核配置..."
+    echo "正在强化内核配置以支持屏幕与网络性能..."
     cat >> "$KERNEL_CONF" <<EOF
 CONFIG_STAGING=y
 CONFIG_FB_TFT=m
@@ -100,12 +100,13 @@ CONFIG_ROCKCHIP_DW_HDMI=y
 EOF
 fi
 
-# 系统基本设置
+# 系统基本设置 (语言、主机名)
 sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
 
-# --- 第四部分：智能锁定与 .config 刷新 ---
+# --- 第四部分：智能锁定与配置生成 ---
 
+# 预写设备选择，引导 defconfig
 echo "CONFIG_TARGET_rockchip=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
@@ -114,11 +115,11 @@ make defconfig
 
 # 智能检查设备锁定情况
 if ! grep -q "DEVICE_hinlink_h29k=y" .config; then
-    echo "错误：未能锁定 H29K 设备，请检查注入逻辑！"
+    echo "错误：未能成功锁定 H29K 设备，请检查注入逻辑！"
     exit 1
 fi
 
-# 语言包自动补全
+# 语言包自动补齐
 if [ -f .config ]; then
     echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
     grep "=y" .config | grep "CONFIG_PACKAGE_luci-app-" | sed 's/CONFIG_PACKAGE_luci-app-//g;s/=y//g' | while read -r app; do
@@ -126,10 +127,11 @@ if [ -f .config ]; then
     done
 fi
 
-# 物理分区锁定
+# 分区锁定
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/g' .config
 
-# 禁用其他设备，确保唯一产出
+# 剔除其他设备干扰
 sed -i 's/CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_.*=y/# & is not set/g' .config
 echo "CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
+sed -i 's/CONFIG_TARGET_ARCH_PACKAGES=.*/CONFIG_TARGET_ARCH_PACKAGES="aarch64_generic"/g' .config
