@@ -17,12 +17,5 @@
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
-
-# 添加 Argon 主题源
-echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon' >> feeds.conf.default
-
-# 添加其他常用主题源
-echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config' >> feeds.conf.default
-
 # 无线网卡驱动
-echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800git;main' >> feeds.conf.default
+echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.conf.default
