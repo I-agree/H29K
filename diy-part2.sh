@@ -10,8 +10,6 @@
 # See /LICENSE for more information.
 #
 
-#!/bin/bash
-
 # --- 第一部分：环境补丁与内核模块定义 ---
 # 1. 解决宿主机脚本依赖
 if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
