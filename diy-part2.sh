@@ -11,13 +11,14 @@
 #
 
 # --- 第一部分：环境补丁与内核模块定义 ---
-# 解决宿主机脚本依赖
+# 1. 解决宿主机脚本依赖
 if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     sudo mkdir -p /lib
     sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 fi
 
-# 【核心修复】在官方源码中手动定义缺失的 kmod-fb-tft-st7789v 软件包实体
+# 2. 【核心修复】在官方源码中手动定义缺失的 kmod-fb-tft-st7789v 软件包实体
+# 官方源码虽然有驱动代码，但没有打包成可安装的 kmod 包，此处进行补全
 VIDEO_MK="package/kernel/linux/modules/video.mk"
 if [ -f "$VIDEO_MK" ] && ! grep -q "fb-tft-st7789v" "$VIDEO_MK"; then
     echo "正在定义 kmod-fb-tft-st7789v 软件包实体..."
@@ -45,19 +46,30 @@ mkdir -p "$DTS_PATH"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
 if [ -n "$TARGET_MK" ]; then
-    # 准备 Loader
-    curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin > dl/hinlink_h29k-u-boot-rockchip.bin
+    # 3. 准备 Loader 文件
+    LOADER_FILE="hinlink_h29k-u-boot-rockchip.bin"
+    LOADER_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
+    curl -fsSL "$LOADER_URL" > "dl/$LOADER_FILE"
     
-    # 注入 Loader 编译逻辑
-    if ! grep -q "hinlink_h29k-u-boot-rockchip.bin" "$TARGET_MK"; then
-        echo '
-$(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-rockchip.bin
-	mkdir -p $(dir $@)
-	cp $< $@
-' >> "$TARGET_MK"
+    # 【修复关键点】：直接把 Loader 复制到构建系统预期的 staging 目录下
+    # 防止打包函数报错：No such file or directory
+    STAGING_IMAGE_DIR="staging_dir/target-aarch64_generic_musl/image"
+    mkdir -p "$STAGING_IMAGE_DIR"
+    cp "dl/$LOADER_FILE" "$STAGING_IMAGE_DIR/$LOADER_FILE"
+    echo "已手动同步 Loader 至 $STAGING_IMAGE_DIR"
+
+    # 4. 注入 Loader 编译依赖逻辑
+    if ! grep -q "$LOADER_FILE" "$TARGET_MK"; then
+        echo "正在修正 $TARGET_MK 中的 Loader 依赖..."
+        cat >> "$TARGET_MK" <<EOF
+
+\$(STAGING_DIR_IMAGE)/$LOADER_FILE: dl/$LOADER_FILE
+	mkdir -p \$(dir \$@)
+	cp \$< \$@
+EOF
     fi
 
-    # 注入设备定义 (使用官方标准的 boot-common | pine64-img 打包函数)
+    # 5. 注入设备定义 (使用官方 boot-common 流水线)
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
         echo "正在向官方 armv8.mk 注入 H29K 定义..."
         cat >> "$TARGET_MK" <<EOF
@@ -68,7 +80,7 @@ define Device/hinlink_h29k
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
-  # 关键修复：官方构建流水线，解决 Missing Build/rockchip-combined 报错
+  # 官方构建流水线：解决 Missing Build/rockchip-combined 报错
   IMAGES := sysupgrade.img.gz
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-fb-tft-st7789v \\
@@ -104,18 +116,18 @@ fi
 sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
 
-# --- 第四部分：智能锁定与配置生成 ---
+# --- 第四部分：配置锁定与生成 ---
 
-# 预写设备选择，引导 defconfig
+# 引导配置
 echo "CONFIG_TARGET_rockchip=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
 make defconfig
 
-# 智能检查设备锁定情况
+# 锁定检查
 if ! grep -q "DEVICE_hinlink_h29k=y" .config; then
-    echo "错误：未能成功锁定 H29K 设备，请检查注入逻辑！"
+    echo "错误：未能锁定 H29K 设备，请检查注入逻辑！"
     exit 1
 fi
 
@@ -127,11 +139,11 @@ if [ -f .config ]; then
     done
 fi
 
-# 分区锁定
+# 分区锁定 (内核32M，Rootfs 1024M)
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/g' .config
 
-# 剔除其他设备干扰
+# 强制剔除干扰，产出唯一固件
 sed -i 's/CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_.*=y/# & is not set/g' .config
 echo "CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 sed -i 's/CONFIG_TARGET_ARCH_PACKAGES=.*/CONFIG_TARGET_ARCH_PACKAGES="aarch64_generic"/g' .config
