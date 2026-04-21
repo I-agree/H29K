@@ -46,7 +46,7 @@ define Device/hinlink_h29k
   # 关键： rockchip-combined 生成 GPT 分区，rockchip-u-boot 注入 Loader
   # 不添加 append-metadata 以确保 WinRAR 直接解压出单个 .img
   IMAGE/sysupgrade.img.gz := rockchip-combined | rockchip-u-boot
-  KERNEL_SIZE := 32M
+  KERNEL_SIZE := 32768
   BOARD_ROOTFS_PARTSIZE := 512
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
