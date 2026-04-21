@@ -17,11 +17,11 @@ if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 fi
 
-# 2. 【核心修复】重新定义 kmod-fb-tft-st7789v，解决内核符号缺失报错
-# 增加了对 fb_sys_fops, syscopyarea 等符号所属包的依赖
+# 2. 【核心修复】补齐 kmod-fb-tft-st7789v 缺失的内核符号依赖
+# 这解决了上一个日志中提到的 fb_sys_fops 等符号丢失问题
 VIDEO_MK="package/kernel/linux/modules/video.mk"
 if [ -f "$VIDEO_MK" ] && ! grep -q "fb-tft-st7789v" "$VIDEO_MK"; then
-    echo "正在定义 kmod-fb-tft-st7789v 并补齐符号依赖..."
+    echo "正在定义 kmod-fb-tft-st7789v 并补齐内核符号..."
     cat >> "$VIDEO_MK" <<EOF
 
 define KernelPackage/fb-tft-st7789v
@@ -46,23 +46,23 @@ mkdir -p "$DTS_PATH"
 curl -fsSL https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts > "$DTS_PATH/rk3528-opc-h29k.dts"
 
 if [ -n "$TARGET_MK" ]; then
-    # 3. 准备 Loader 文件 (修正下载顺序与路径)
+    # 3. 准备 Loader 文件 (修正下载顺序与目录逻辑)
     LOADER_FILE="hinlink_h29k-u-boot-rockchip.bin"
     LOADER_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
     
-    # 确保 dl 目录存在
+    # 关键：先创建目录再下载
     mkdir -p dl
-    echo "正在下载 Loader 文件..."
-    curl -fsSL "$LOADER_URL" -o "dl/$LOADER_FILE"
-    
-    # 确保同步到 staging 目录，解决打包时 No such file 的问题
     STAGING_IMAGE_DIR="staging_dir/target-aarch64_generic_musl/image"
     mkdir -p "$STAGING_IMAGE_DIR"
-    if [ -f "dl/$LOADER_FILE" ]; then
+
+    echo "正在下载 Loader 文件..."
+    if curl -fsSL "$LOADER_URL" -o "dl/$LOADER_FILE"; then
         cp "dl/$LOADER_FILE" "$STAGING_IMAGE_DIR/$LOADER_FILE"
-        echo "成功同步 Loader 至 $STAGING_IMAGE_DIR"
+        echo "Loader 文件已就绪并同步至 $STAGING_IMAGE_DIR"
     else
-        echo "错误：Loader 下载失败！"
+        echo "错误：Loader 下载失败，请检查网络或 URL！"
+        # 尝试备用下载路径直接到目标目录
+        curl -fsSL "$LOADER_URL" -o "$STAGING_IMAGE_DIR/$LOADER_FILE"
     fi
 
     # 4. 注入设备定义 (使用官方 boot-common 流水线)
@@ -89,7 +89,7 @@ EOF
     fi
 fi
 
-# --- 第三部分：内核强制配置 ---
+# --- 第三部分：内核强制配置 (Staging + BBR) ---
 
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
@@ -102,23 +102,22 @@ CONFIG_DEFAULT_TCP_CONG="bbr"
 EOF
 fi
 
-# 修正主机名与默认语言
+# 修正主机名与语言
 sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
 
-# --- 第四部分：配置生成与锁定 ---
+# --- 第四部分：配置锁定与生成 ---
 
-# 引导配置到 .config
 echo "CONFIG_TARGET_rockchip=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
 make defconfig
 
-# 强制分区大小锁定
+# 锁定分区大小
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/g' .config
 
-# 禁用其他设备干扰
+# 禁用其他设备，确保唯一产出
 sed -i 's/CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_.*=y/# & is not set/g' .config
 echo "CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
