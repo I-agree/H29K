@@ -10,8 +10,6 @@
 # See /LICENSE for more information.
 #
 
-#!/bin/bash
-
 # --- 第一部分：编译环境补丁 (环境先行) ---
 # 解决 GitHub Actions 宿主机缺失 functions.sh 导致的脚本执行报错
 if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
