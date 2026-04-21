@@ -46,7 +46,7 @@ $(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-ro
         cat > h29k_device.txt <<'EOF'
 
 define Device/hinlink_h29k
-  $(Device/rk3528)
+  $(Device/armv8)
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
