@@ -18,6 +18,16 @@ if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     echo "成功建立宿主机 /lib/functions.sh 软链接"
 fi
 
+#!/bin/bash
+
+# --- 第一部分：编译环境补丁 (环境先行) ---
+# 解决 GitHub Actions 宿主机缺失 functions.sh 导致的脚本执行报错
+if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
+    sudo mkdir -p /lib
+    sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
+    echo "成功建立宿主机 /lib/functions.sh 软链接"
+fi
+
 # --- 第二部分：源码级修改 (设备与驱动注入) ---
 
 # 1. 动态查找目标 armv8.mk 文件
@@ -41,15 +51,13 @@ $(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-ro
 	cp $< $@
 ' >> "$TARGET_MK"
 
-    # 4. 在 Makefile 中精准注册设备
+    # 4. 在 Makefile 末尾追加设备定义 (避开 sed 语法错误，最稳健的方式)
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
-        echo "正在精准注入 H29K 设备定义到 $TARGET_MK ..."
-        
-        # 创建临时块，注意保留 $(Device/rk3528) 以继承 SOC 和 KERNEL_LOADADDR 
-        cat > h29k_block.txt <<'EOF'
+        echo "正在向 $TARGET_MK 追加 H29K 设备定义..."
+        cat >> "$TARGET_MK" <<EOF
 
 define Device/hinlink_h29k
-  $(Device/rk3528)
+  \$(Device/rk3528)
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
@@ -62,14 +70,10 @@ define Device/hinlink_h29k
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
     kmod-usb-serial-option uqmi \
     luci-i18n-base-zh-cn luci-i18n-qmodem-next-zh-cn kmod-usb-net-cdc-mbim kmod-usb-net-cdc-ncm \
-    luci-theme-argon luci-app-argon-config luci-app-turboacc luci-app-sqm
+    luci-theme-argon luci-app-argon-config luci-app-turboacc luci-app-sqm kmod-aic8800-sdio kmod-fb-tft-st7789v wpad-openssl -urngd
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
-
-        # 核心注入：定位到 Device/rk3528 块的 endef 之后插入我们的 H29K 定义 
-        sed -i '/define Device\/rk3528/,/endef/ { /endef/ r h29k_block.txt' -e '}' "$TARGET_MK"
-        rm h29k_block.txt
     fi
 fi
 
@@ -108,16 +112,15 @@ WIFI_SH=$(find package -name "mac80211.sh" | head -n 1)
 # --- 第四部分：配置生成与终极锁定 ---
 
 # 8. 刷新 .config 并在之前强制注入目标设备
-# 这能防止系统在执行 defconfig 时因为空位自动抓取 armsom_sige7 
 echo "CONFIG_TARGET_rockchip=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8=y" >> .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
 make defconfig
 
-# 检查是否真的选中了 H29K，如果没有，强制报错停止编译，省去等待时间
+# 检查是否成功锁定 H29K，避免无效编译
 if ! grep -q "CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y" .config; then
-    echo "错误：未能成功锁定 H29K 设备，编译中止！"
+    echo "错误：未能成功锁定 H29K 设备，检查 Makefile 注入是否成功！"
     exit 1
 fi
 
@@ -130,13 +133,11 @@ if [ -f .config ]; then
 fi
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config 2>/dev/null
 
-# 10. 终极参数锁定 (防止被 armsom_sige7 等设备覆盖) 
+# 10. 终极参数锁定
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/g' .config
 
-# 锁定设备为 H29K，取消所有其他 rockchip 设备的选中状态
+# 锁定设备并禁用其他设备
 sed -i 's/CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_.*=y/# & is not set/g' .config
 echo "CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
-
-# 确保架构标识强制为 armv8
 sed -i 's/CONFIG_TARGET_ARCH_PACKAGES=.*/CONFIG_TARGET_ARCH_PACKAGES="aarch64_generic"/g' .config
