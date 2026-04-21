@@ -105,6 +105,10 @@ sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=512/g' .config
 
 # 11. 暴力解决编译环境缺失 functions.sh 的问题
-# 将源码中的 functions.sh 链接到系统目录，彻底堵住报错
-sudo mkdir -p /lib
-sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
+if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
+    sudo mkdir -p /lib
+    sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
+    echo "成功建立 /lib/functions.sh 软链接"
+else
+    echo "警告: 未找到源码中的 functions.sh，跳过链接建立"
+fi
