@@ -2,7 +2,7 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 # File name: diy-part2.sh
-# Description: OpenWrt DIY script part 2 (针对 H29K + FM350-GL + aic8800 优化版)
+# Description: OpenWrt DIY script part 2 (H29K 最终完美版)
 #
 
 # --- 1. 环境与设备树补丁 ---
@@ -32,7 +32,7 @@ EOF
     fi
 fi
 
-# --- 2. 内核配置注入 (核心修复) ---
+# --- 2. 内核配置注入 (解决依赖与总线支持) ---
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
     cat >> "$KERNEL_CONF" <<EOF
@@ -40,7 +40,7 @@ if [ -f "$KERNEL_CONF" ]; then
 CONFIG_TCP_CONG_BBR=y
 CONFIG_DEFAULT_TCP_CONG="bbr"
 
-# 修复屏幕驱动 ST7789V 缺失依赖 (fb_sys_fops 等)
+# 修复屏幕驱动 ST7789V 缺失依赖
 CONFIG_FB=y
 CONFIG_FB_SYS_FILLRECT=y
 CONFIG_FB_SYS_COPYAREA=y
@@ -59,15 +59,20 @@ CONFIG_PCIE_DW=y
 CONFIG_PCIE_DW_HOST=y
 CONFIG_PCI_ROCKCHIP=y
 
-# aic8800 无线网卡基础内核框架
+# 板载 aic8800 Wi-Fi 核心支持 (SDIO 总线 + 无线框架)
 CONFIG_WLAN=y
 CONFIG_CFG80211=m
 CONFIG_MAC80211=m
 CONFIG_CFG80211_WEXT=y
+CONFIG_MMC=y
+CONFIG_MMC_SDHCI=y
+CONFIG_MMC_SDHCI_PLTFM=y
+CONFIG_MMC_SDHCI_ROCKCHIP=y
+CONFIG_AIC8800_WLAN=m
 EOF
 fi
 
-# --- 3. 清理冗余并强制锁定软件包 ---
+# --- 3. 清理冗余并锁定软件包 ---
 
 # 移除会导致报错的移远(Quectel)私有包条目
 sed -i '/quectel-CM-5G/d' .config
@@ -80,20 +85,20 @@ CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 
-# 5G 模块 FM350-GL (MTK T700)
+# 5G 模块：Fibocom FM350-GL
 CONFIG_PACKAGE_kmod-mtk_t7xx=y
 CONFIG_PACKAGE_kmod-wwan=y
 CONFIG_PACKAGE_wwan=y
 
-# 无线网卡 aic8800 (Radxa 源)
+# Wi-Fi：板载 aic8800
 CONFIG_PACKAGE_kmod-aic8800=y
 CONFIG_PACKAGE_aic8800-firmware=y
 
-# 保留您要求的通用 USB 驱动
+# 保留通用 USB 驱动
 CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
 CONFIG_PACKAGE_kmod-usb-serial-option=y
 
-# 屏幕驱动包
+# 屏幕驱动
 CONFIG_PACKAGE_kmod-fb-tft-st7789v=y
 
 # 界面主题与工具
