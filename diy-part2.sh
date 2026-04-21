@@ -44,7 +44,7 @@ define Device/hinlink_h29k
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
-  IMAGE/sysupgrade.img.gz := rockchip-combined | rockchip-u-boot
+  IMAGE/sysupgrade.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
   KERNEL_SIZE := 33554432
   BOARD_ROOTFS_PARTSIZE := 1024
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip \\
