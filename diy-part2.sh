@@ -10,7 +10,19 @@
 # See /LICENSE for more information.
 #
 
-# 1. 动态查找目标 Makefile (先定义变量)
+#!/bin/bash
+
+# --- 第一部分：编译环境补丁 (环境先行) ---
+# 解决 GitHub Actions 宿主机缺失 functions.sh 导致的脚本执行报错
+if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
+    sudo mkdir -p /lib
+    sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
+    echo "成功建立宿主机 /lib/functions.sh 软链接"
+fi
+
+# --- 第二部分：源码级修改 (设备与驱动注入) ---
+
+# 1. 动态查找目标 Makefile
 TARGET_MK=$(find target/linux/rockchip/image -name "*.mk" | xargs grep -l "Device/rk3528" | head -n 1)
 
 # 2. 准备 DTS 文件
@@ -24,15 +36,14 @@ if [ -n "$TARGET_MK" ]; then
     mkdir -p dl
     curl -fsSL "$LOADER_URL" > dl/hinlink_h29k-u-boot-rockchip.bin
 
-    # 注入 Makefile 依赖逻辑，确保 Loader 能够被自动拷贝到 staging_dir
-    # 注意：这里使用了单引号避免变量在 shell 阶段被提前解析
+    # 注入 Makefile 依赖逻辑
     echo '
 $(STAGING_DIR_IMAGE)/hinlink_h29k-u-boot-rockchip.bin: dl/hinlink_h29k-u-boot-rockchip.bin
 	mkdir -p $(dir $@)
 	cp $< $@
 ' >> "$TARGET_MK"
 
-    # 4. 在 Makefile 中注册设备 (移除 append-metadata 确保 WinRAR 兼容性)
+    # 4. 在 Makefile 中注册设备 (KERNEL_SIZE 使用纯字节数以消除歧义)
     if ! grep -q "Device/hinlink_h29k" "$TARGET_MK"; then
         echo "正在向 $TARGET_MK 注册 H29K 设备..."
         cat >> "$TARGET_MK" <<'EOF'
@@ -43,11 +54,9 @@ define Device/hinlink_h29k
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
-  # 关键： rockchip-combined 生成 GPT 分区，rockchip-u-boot 注入 Loader
-  # 不添加 append-metadata 以确保 WinRAR 直接解压出单个 .img
   IMAGE/sysupgrade.img.gz := rockchip-combined | rockchip-u-boot
   KERNEL_SIZE := 33554432
-  BOARD_ROOTFS_PARTSIZE := 512
+  BOARD_ROOTFS_PARTSIZE := 1024
   DEVICE_PACKAGES := kmod-r8169 kmod-fb kmod-drm-rockchip kmod-console-font \
     kmod-usb3 kmod-usb-dwc3-rockchip \
     kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-rtl8152 \
@@ -60,7 +69,7 @@ EOF
     fi
 fi
 
-# 5. 内核直播优化 (BBR + 5G)
+# 5. 内核直播优化 (BBR + 5G驱动强制注入)
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
     sed -i '/CONFIG_MHI/d' "$KERNEL_CONF"
@@ -78,16 +87,21 @@ CONFIG_DEFAULT_TCP_CONG="bbr"
 EOF
 fi
 
-# 6. 系统设置
+# --- 第三部分：系统 UI 与个性化设置 ---
+
+# 6. 系统设置 (语言、时区、主机名)
 sed -i 's/auto/zh_hans/g' package/base-files/files/bin/config_generate
 sed -i "s/'UTC'/'CST-8'\n\t\tset system.@system[-1].zonename='Asia\/Shanghai'/g" package/base-files/files/bin/config_generate
 sed -i 's/hostname=".*"/hostname="H29K"/g' package/base-files/files/bin/config_generate
 
-# 7. SSID 兼容性修改
+# 7. SSID 默认名修改
 WIFI_SH=$(find package -name "mac80211.sh" | head -n 1)
 [ -n "$WIFI_SH" ] && sed -i 's/ssid=".*"/ssid="H29K"/g' "$WIFI_SH"
 
-# 8. 语言包与依赖处理
+# --- 第四部分：配置生成与终极锁定 (锁定收尾) ---
+
+# 8. 刷新 .config 并处理语言包依赖
+make defconfig
 if [ -f .config ]; then
     echo "CONFIG_LUCI_LANG_zh_Hans=y" >> .config
     grep "=y" .config | grep "CONFIG_PACKAGE_luci-app-" | sed 's/CONFIG_PACKAGE_luci-app-//g;s/=y//g' | while read -r app; do
@@ -95,20 +109,9 @@ if [ -f .config ]; then
     done
 fi
 
-make defconfig
-
-# 9. 插件与残留清理
+# 9. 移除残留的 JFFS2 任务
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config 2>/dev/null
 
-# 10. 在 diy-part2.sh 末尾添加，确保 .config 不会覆盖脚本设置
+# 10. 锁定分区大小 (放在最后确保覆盖 defconfig 的默认设置)
 sed -i 's/CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/g' .config
 sed -i 's/CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=512/g' .config
-
-# 11. 暴力解决编译环境缺失 functions.sh 的问题
-if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
-    sudo mkdir -p /lib
-    sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
-    echo "成功建立 /lib/functions.sh 软链接"
-else
-    echo "警告: 未找到源码中的 functions.sh，跳过链接建立"
-fi
