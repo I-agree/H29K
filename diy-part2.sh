@@ -6,7 +6,7 @@ if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 fi
 
-# --- 2. 硬件支持文件下载与强制断言 (下载失败则立即停止编译) ---
+# --- 2. 硬件支持文件下载与强制断言 ---
 DTS_URL="https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts"
 BOOT_BIN_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
@@ -14,39 +14,38 @@ DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_PATH"
 echo "正在下载 H29K 硬件支持文件..."
 
-# 下载并检查 DTS (大小不为0)
 curl -fsSL "$DTS_URL" > "$DTS_PATH/rk3528-opc-h29k.dts"
 if [ $? -ne 0 ] || [ ! -s "$DTS_PATH/rk3528-opc-h29k.dts" ]; then
-    echo "FATAL ERROR: rk3528-opc-h29k.dts 下载失败或为空，编译终止！"
+    echo "FATAL ERROR: rk3528-opc-h29k.dts 下载失败，编译终止！"
     exit 1
 fi
 
-# 下载并检查 Boot Loader
 curl -fsSL "$BOOT_BIN_URL" > hinlink_h29k-u-boot-rockchip.bin
 if [ $? -ne 0 ] || [ ! -s "hinlink_h29k-u-boot-rockchip.bin" ]; then
-    echo "FATAL ERROR: H29K-Boot-Loader.bin 下载失败或为空，编译终止！"
+    echo "FATAL ERROR: H29K-Boot-Loader.bin 下载失败，编译终止！"
     exit 1
 fi
 
-# 关键：将引导文件分发到打包搜索路径，确保 rockchip-img 工具能找到
 mkdir -p bin/targets/rockchip/armv8
 cp hinlink_h29k-u-boot-rockchip.bin bin/targets/rockchip/armv8/
 echo "硬件支持文件准备就绪。"
 
-# --- 3. 动态注入 video.mk (路径补丁与路径自适应) ---
-# 备忘录：官方源码路径为 package/kernel/linux/modules/video.mk
+# --- 3. 动态注入 video.mk (适配 6.12 内核路径并移除非法字符) ---
 VIDEO_MK="package/kernel/linux/modules/video.mk"
 
-if [ -f "$VIDEO_MK" ] && ! grep -q "h29k-fb-st7789v" "$VIDEO_MK"; then
-    echo "正在注入屏幕驱动定义到 $VIDEO_MK..."
-    cat >> "$VIDEO_MK" <<EOF
+# 清理旧的错误定义
+sed -i '/KernelPackage\/h29k-fb-tft-core/,/eval $(call KernelPackage,h29k-fb-tft-core)/d' "$VIDEO_MK"
+sed -i '/KernelPackage\/h29k-fb-st7789v/,/eval $(call KernelPackage,h29k-fb-st7789v)/d' "$VIDEO_MK"
+
+echo "正在注入修复后的屏幕驱动定义到 $VIDEO_MK..."
+cat >> "$VIDEO_MK" <<EOF
 
 define KernelPackage/h29k-fb-tft-core
   SUBMENU:=\$(VIDEO_MENU)
   TITLE:=Support for small TFT LCD display modules (H29K)
   KCONFIG:=CONFIG_FB_TFT
-  FILES:=\$(LINUX_DIR)/drivers/video/fbdev/core/fb_tft.ko@core
-  AUTOLOAD:=\$(conf_set_symbols,CONFIG_FB_TFT,fb_tft)
+  FILES:=\$(LINUX_DIR)/drivers/video/fbdev/fbtft/fbtft.ko
+  AUTOLOAD:=\$(call AutoProbe,fbtft)
 endef
 \$(eval \$(call KernelPackage,h29k-fb-tft-core))
 
@@ -55,19 +54,30 @@ define KernelPackage/h29k-fb-st7789v
   TITLE:=ST7789V LCD display support (H29K)
   DEPENDS:=+kmod-h29k-fb-tft-core
   KCONFIG:=CONFIG_FB_TFT_ST7789V
-  FILES:=\$(LINUX_DIR)/drivers/video/fbdev/core/fb_st7789v.ko@core
-  AUTOLOAD:=\$(conf_set_symbols,CONFIG_FB_TFT_ST7789V,fb_st7789v)
+  FILES:=\$(LINUX_DIR)/drivers/video/fbdev/fbtft/fb_st7789v.ko
+  AUTOLOAD:=\$(call AutoProbe,fb_st7789v)
 endef
 \$(eval \$(call KernelPackage,h29k-fb-st7789v))
 EOF
 
-    # BUG 预防：针对 6.12/6.6+ 内核可能出现的路径扁平化问题进行自动修正
-    # 如果 core 目录下没有 ko，打包脚本会尝试在父目录 fbdev 下寻找
-    sed -i 's|drivers/video/fbdev/core/fb_tft.ko|drivers/video/fbdev/fb_tft.ko|g' "$VIDEO_MK"
-    sed -i 's|drivers/video/fbdev/core/fb_st7789v.ko|drivers/video/fbdev/fb_st7789v.ko|g' "$VIDEO_MK"
+# --- 4. 强制开启内核 TFT 帧缓冲支持 (核心修复项) ---
+# 针对 Rockchip 平台的 6.12 配置文件进行物理注入
+KCONFIG_612="target/linux/rockchip/armv8/config-6.12"
+if [ -f "$KCONFIG_612" ]; then
+    echo "正在强制开启内核 TFT 帧缓冲配置..."
+    # 确保基础 FB 支持开启 (y 表示内置，m 表示模块)
+    sed -i '/CONFIG_FB/d' "$KCONFIG_612"
+    echo "CONFIG_FB=y" >> "$KCONFIG_612"
+    echo "CONFIG_FB_CFB_FILLRECT=y" >> "$KCONFIG_612"
+    echo "CONFIG_FB_CFB_COPYAREA=y" >> "$KCONFIG_612"
+    echo "CONFIG_FB_CFB_IMAGEBLIT=y" >> "$KCONFIG_612"
+    # 开启 TFT 核心支持
+    echo "CONFIG_FB_TFT=m" >> "$KCONFIG_612"
+    echo "CONFIG_FB_TFT_FBTFT_DEVICE=m" >> "$KCONFIG_612"
+    echo "CONFIG_FB_TFT_ST7789V=m" >> "$KCONFIG_612"
 fi
 
-# --- 4. 注册设备到 Makefile (含 0x00200000 内存地址) ---
+# --- 5. 注册设备到 Makefile (维持 0x00200000 内存地址) ---
 TARGET_MK=$(find target/linux/rockchip/image -name "armv8.mk")
 if [ -n "$TARGET_MK" ] && ! grep -q "hinlink_h29k" "$TARGET_MK"; then
     echo "正在注册 H29K 设备到 $TARGET_MK..."
@@ -90,7 +100,7 @@ TARGET_DEVICES += hinlink_h29k
 EOF
 fi
 
-# --- 5. 核心配置注入 (BBR + WLAN 底层) ---
+# --- 6. 核心配置注入 (BBR + WLAN 底层) ---
 KERNEL_CONF="target/linux/rockchip/config-default"
 if [ -f "$KERNEL_CONF" ]; then
     cat >> "$KERNEL_CONF" <<EOF
@@ -102,7 +112,7 @@ CONFIG_CFG80211_WEXT=y
 EOF
 fi
 
-# --- 6. 软件包注入与 Argon 主题锁定 ---
+# --- 7. 软件包注入与 Argon 主题锁定 ---
 cat >> .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
@@ -119,16 +129,14 @@ CONFIG_PACKAGE_luci-theme-argon=y
 CONFIG_PACKAGE_luci-app-argon-config=y
 EOF
 
-# --- 7. 系统默认值初始化 (uci-defaults 方案) ---
+# --- 8. 系统默认值初始化 ---
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k-custom <<EOF
 #!/bin/sh
-# 强制锁定主题与主机名
 uci set luci.main.mediaurlbase='/luci-static/argon'
 uci set system.@system[0].hostname='H29K'
 uci set system.@system[0].timezone='CST-8'
 uci set system.@system[0].zonename='Asia/Shanghai'
-# 开启无线并设置 SSID
 uci set wireless.default_radio0.ssid='H29K'
 uci set wireless.radio0.country='CN'
 uci set wireless.radio0.disabled='0'
@@ -138,22 +146,15 @@ uci commit wireless
 exit 0
 EOF
 
-# --- 8. 执行生成配置 ---
+# --- 9. 最终配置生成与分区清理 ---
 make defconfig
 
-# --- 9. 最终分区清理与干扰规避 ---
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
 sed -i 's/^CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/' .config
 sed -i 's/^CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/' .config
-
-# 移除会导致循环依赖的 5G 冗余包
-sed -i '/kmod-mhi-wwan/d' .config
-sed -i '/quectel/d' .config
-sed -i '/qmodem/d' .config
 
 # 确保单选 H29K 机型
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_/d' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
-# 最终刷新确认
 make defconfig
