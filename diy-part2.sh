@@ -1,30 +1,29 @@
 #!/bin/bash
 
 # --- 1. 环境与底层基础修复 ---
-# 某些脚本依赖 /lib/functions.sh，但在编译环境中可能缺失，此处做软链接修复
+# 解决某些脚本找不到 /lib/functions.sh 的兼容性问题
 if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
     sudo mkdir -p /lib
     sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 fi
 
 # --- 2. 硬件支持文件下载与强制断言 ---
-# 下载 H29K 专属的设备树(DTS)和引导程序(Boot Loader)，下载失败则立即停止编译防止产出错误固件
+# 下载 H29K 专属 DTS 和引导程序，若下载失败（文件为空或请求出错）则终止编译，防止产生坏件
 DTS_URL="https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts"
 BOOT_BIN_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
 DTS_PATH="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 
 mkdir -p "$DTS_PATH"
 echo "正在下载 H29K 硬件支持文件..."
-
 curl -fsSL "$DTS_URL" > "$DTS_PATH/rk3528-opc-h29k.dts" || { echo "DTS下载失败"; exit 1; }
 curl -fsSL "$BOOT_BIN_URL" > hinlink_h29k-u-boot-rockchip.bin || { echo "Boot下载失败"; exit 1; }
 
-# 将引导程序放入预设目录，供后续镜像打包使用
+# 将引导程序放入预设目录，供固件打包工具调用
 mkdir -p bin/targets/rockchip/armv8
 cp hinlink_h29k-u-boot-rockchip.bin bin/targets/rockchip/armv8/
 
-# --- 3. 动态注入 video.mk (核心：解决TFT驱动路径写死问题) ---
-# 使用通配符同时检查标准目录和 Staging 目录，确保无论内核版本如何变动都能找到 .ko 文件
+# --- 3. 动态注入 video.mk (适配 TFT 驱动路径) ---
+# 使用通配符寻找 .ko 路径，确保在不同版本的内核（标准或 Staging）中都能正确打包
 VIDEO_MK="package/kernel/linux/modules/video.mk"
 sed -i '/KernelPackage\/h29k-fb-tft-core/,/eval $(call KernelPackage,h29k-fb-tft-core)/d' "$VIDEO_MK"
 sed -i '/KernelPackage\/h29k-fb-st7789v/,/eval $(call KernelPackage,h29k-fb-st7789v)/d' "$VIDEO_MK"
@@ -52,13 +51,13 @@ endef
 \$(eval \$(call KernelPackage,h29k-fb-st7789v))
 EOF
 
-# --- 4. 自动适配所有内核配置 (核心：开启 Staging 和 TFT 深度依赖) ---
-# 必须开启 CONFIG_STAGING 才能编译位于暂存区的驱动，并补全 FB 绘图引擎依赖
-echo "正在扫描并修补所有内核版本的配置文件以支持 TFT 帧缓冲..."
+# --- 4. 内核配置补丁 (强制开启 STAGING、BBR、SPI 及 5G 模块支持) ---
+# 开启 CONFIG_STAGING 是编译 fbtft 的前提；同时注入 BBR 算法和 SPI 控制器
+echo "正在修补所有内核版本的 config 配置..."
 find target/linux/rockchip/armv8/ -name "config-*" | while read CONF; do
     sed -i '/CONFIG_STAGING/d' "$CONF"
     sed -i '/CONFIG_FB_TFT/d' "$CONF"
-    sed -i '/CONFIG_FB_ST7789V/d' "$CONF"
+    sed -i '/CONFIG_TCP_CONG_BBR/d' "$CONF"
     {
         echo "CONFIG_STAGING=y"
         echo "CONFIG_FB=y"
@@ -66,23 +65,24 @@ find target/linux/rockchip/armv8/ -name "config-*" | while read CONF; do
         echo "CONFIG_FB_CFB_COPYAREA=y"
         echo "CONFIG_FB_CFB_IMAGEBLIT=y"
         echo "CONFIG_FB_DEFERRED_IO=y"
-        echo "CONFIG_FB_SYS_FILLRECT=y"
-        echo "CONFIG_FB_SYS_COPYAREA=y"
-        echo "CONFIG_FB_SYS_IMAGEBLIT=y"
         echo "CONFIG_FB_SYS_FOPS=y"
         echo "CONFIG_FB_BACKLIGHT=y"
         echo "CONFIG_SPI=y"
         echo "CONFIG_FB_TFT=m"
         echo "CONFIG_FB_TFT_ST7789V=m"
         echo "CONFIG_FB_TFT_FBTFT_DEVICE=m"
+        echo "CONFIG_TCP_CONG_BBR=y"
+        echo "CONFIG_DEFAULT_TCP_CONG=\"bbr\""
+        # 显式确保 5G 模块 MTK T7XX 驱动开启
+        echo "CONFIG_MTK_T7XX=m"
     } >> "$CONF"
 done
 
-# --- 5. 注册设备并完善 DEVICE_PACKAGES (确保固件集成驱动) ---
-# 必须在 DEVICE_PACKAGES 中列出 kmod-h29k-fb-tft-core 及其依赖包
+# --- 5. 注册设备并完善 DEVICE_PACKAGES (包含 TFT、5G、Irqbalance、中文包) ---
+# 这里集成了你要求的所有插件和驱动包
 TARGET_MK=$(find target/linux/rockchip/image -name "armv8.mk")
 if [ -n "$TARGET_MK" ] && ! grep -q "hinlink_h29k" "$TARGET_MK"; then
-    echo "正在注册 H29K 设备到 $TARGET_MK..."
+    echo "正在向 $TARGET_MK 注册 H29K 设备包..."
     cat >> "$TARGET_MK" <<EOF
 
 define Device/hinlink_h29k
@@ -96,34 +96,57 @@ define Device/hinlink_h29k
   KERNEL_SIZE := 33554432
   KERNEL_LOADADDR := 0x00200000
   BOARD_ROOTFS_PARTSIZE := 1024
-  DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-r8169 kmod-usb-net-rtl8152 kmod-aic8800 aic8800-firmware kmod-mtk_t7xx \
-	kmod-fb kmod-fb-cfb-fillrect kmod-fb-cfb-copyarea kmod-fb-cfb-imgblt \
-	kmod-h29k-fb-tft-core kmod-h29k-fb-st7789v
+  DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-r8169 kmod-usb-net-rtl8152 kmod-aic8800 aic8800-firmware \\
+	kmod-mtk_t7xx kmod-fb kmod-fb-cfb-fillrect kmod-fb-cfb-copyarea kmod-fb-cfb-imgblt \\
+	kmod-h29k-fb-tft-core kmod-h29k-fb-st7789v \\
+	irqbalance luci-app-irqbalance luci-i18n-irqbalance-zh-cn \\
+	luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
 fi
 
-# --- 6. 核心配置注入与机型锁定 ---
-# 强制选中机型并包含自定义内核模块
+# --- 6. 全局 .config 强制设置 (锁定中文优先、主题和机型) ---
+# 通过追加到 .config 确保简体中文相关的界面包被正确选中
+echo "正在注入全局软件选中项 (简体中文、BBR、5G)..."
 cat >> .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
+# 屏幕与硬件驱动
 CONFIG_PACKAGE_kmod-h29k-fb-tft-core=y
 CONFIG_PACKAGE_kmod-h29k-fb-st7789v=y
+CONFIG_PACKAGE_kmod-mtk_t7xx=y
+# 中断均衡与界面
+CONFIG_PACKAGE_irqbalance=y
+CONFIG_PACKAGE_luci-app-irqbalance=y
+CONFIG_PACKAGE_luci-i18n-irqbalance-zh-cn=y
+# 语言环境：强制简体中文
+CONFIG_LUCI_LANG_zh_Hans=y
+CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
+CONFIG_PACKAGE_luci-i18n-opkg-zh-cn=y
+# 主题与美化
 CONFIG_PACKAGE_luci-theme-argon=y
+CONFIG_PACKAGE_luci-app-argon-config=y
+CONFIG_PACKAGE_luci-i18n-argon-config-zh-cn=y
 EOF
 
 # --- 7. 系统默认值初始化 (UCI 方案) ---
-# 设置 Argon 为默认主题，并修改主机名
+# 强制设置时区、主机名、无线名称以及默认主题
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k-custom <<EOF
 #!/bin/sh
 uci set luci.main.mediaurlbase='/luci-static/argon'
+uci set luci.main.lang='zh_hans'
 uci set system.@system[0].hostname='H29K'
+uci set system.@system[0].timezone='CST-8'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci set wireless.default_radio0.ssid='H29K'
+uci set wireless.radio0.country='CN'
+uci set wireless.radio0.disabled='0'
 uci commit luci
 uci commit system
+uci commit wireless
 exit 0
 EOF
 
@@ -138,9 +161,9 @@ sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
 sed -i 's/^CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/' .config
 sed -i 's/^CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/' .config
 
-# 确保单选 H29K 机型并刷新：清理所有机型选中项，强制只保留 H29K
+# 确保单选 H29K 机型并刷新
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_/d' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
-# 第二次 defconfig 刷新依赖关系并锁定配置
+# 第二次刷新以应用所有依赖修改
 make defconfig
