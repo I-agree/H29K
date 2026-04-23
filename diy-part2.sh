@@ -141,6 +141,7 @@ EOF
 sed -i 's/CONFIG_PACKAGE_dnsmasq=y/# CONFIG_PACKAGE_dnsmasq is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-basic=y/# CONFIG_PACKAGE_wpad-basic is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-mini=y/# CONFIG_PACKAGE_wpad-mini is not set/' .config
+sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
 
 # ==============================================
 # 🔥 修复4：只清理一次tmp，只执行一次defconfig
