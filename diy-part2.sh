@@ -48,8 +48,8 @@ done
 # =========================================================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 if [ -f "$TARGET_MK" ]; then
-    # 【修改注释】：在追加前显式清理可能存在的重复定义，确保 Actions 环境下 target 唯一且有效
-    sed -i '/Device\/hinlink_h29k/,/eval $(call Device,hinlink_h29k)/d' "$TARGET_MK"
+    # 【修改注释】：先彻底清理可能干扰的旧定义
+    sed -i '/define Device\/hinlink_h29k/,/eval $(call Device,hinlink_h29k)/d' "$TARGET_MK"
 
     cat >> "$TARGET_MK" <<EOF
 
@@ -63,8 +63,9 @@ define Device/hinlink_h29k
   KERNEL_SIZE := 33554432
   KERNEL_LOADADDR := 0x00200000
   BOARD_ROOTFS_PARTSIZE := 1024
+  # 【关键修改】：显式声明支持格式，强制覆盖全局设置
+  SUPPORTED_DEVICES += hinlink_h29k
   IMAGES := sysupgrade.img.gz
-  # --- 保持用户要求的原始对齐流水线 ---
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | append-rootfs | pad-to 1M | pad-extra 128k | gzip
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
 	kmod-aic8800-sdio wpad-openssl -wpad-basic -wpad-mini -wpad \\
@@ -81,7 +82,6 @@ fi
 # =========================================================
 # 第四部分：屏幕联动脚本与自启动 (全中文环境)
 # =========================================================
-# (此部分无改动，略)
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
@@ -140,18 +140,23 @@ EOF
 
 make defconfig
 
+# 【修改注释】：禁用所有导致生成多个冗余文件的 RootFS 格式，只保留 sysupgrade 逻辑
+sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
+sed -i 's/CONFIG_TARGET_ROOTFS_SQUASHFS=y/# CONFIG_TARGET_ROOTFS_SQUASHFS is not set/' .config
+sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
+
+# 【修改注释】：清理组件冲突
 sed -i 's/CONFIG_PACKAGE_dnsmasq=y/# CONFIG_PACKAGE_dnsmasq is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-basic=y/# CONFIG_PACKAGE_wpad-basic is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-mini=y/# CONFIG_PACKAGE_wpad-mini is not set/' .config
-sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
 
 # 【修改注释】：将所有 H28K 的内核/镜像索引强制重定向为 H29K，这是识别有效目标的关键补丁
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
-# 【修改注释】：在 Actions 脚本最后增加 rm -rf tmp，确保 Makefile 修改被系统重新扫描识别
+# 【重要】：清理 Actions 缓存索引，强制重新扫描 Makefile
 rm -rf tmp
 make defconfig
 
-echo "✅ 修复完成。H29K 有效目标已锁定，分区大小 1024M 已同步。"
+echo "✅ 修复完成。已强制关闭 ext4/squashfs 冗余生成，锁定 1024M 单一镜像路径。"
