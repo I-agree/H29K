@@ -60,8 +60,9 @@ define Device/hinlink_h29k
   DEVICE_DTS := rk3528-opc-h29k
   BOARD_NAME := hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
-  IMAGE_SIZE := 1024
   KERNEL_SIZE := 33554432
+  KERNEL_LOADADDR := 0x00200000
+  BOARD_ROOTFS_PARTSIZE := 1024
   IMAGES := sysupgrade.img.gz
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | append-rootfs | pad-to 1M | pad-extra 128k | gzip
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
