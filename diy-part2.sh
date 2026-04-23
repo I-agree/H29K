@@ -1,8 +1,4 @@
 #!/bin/bash
-
-# =========================================================
-# 第一部分：【核心】基础环境修复与下载拦截
-# =========================================================
 echo "执行基础环境修复与资源下载..."
 [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ] && sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 
@@ -15,17 +11,14 @@ DTS_URL="https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
 BOOT_BIN_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
 LOGO_RAW_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
-
 mkdir -p "$DTS_DIR" files/etc/config/screen bin/targets/rockchip/armv8
+
 download_file "$DTS_URL" "$DTS_DIR/rk3528-opc-h29k.dts" "设备树 (DTS)"
-download_file "$BOOT_BIN_URL" "hinlink_h29k-u-boot-rockchip.bin" "引导程序"
-cp hinlink_h29k-u-boot-rockchip.bin bin/targets/rockchip/armv8/
+download_file "$BOOT_BIN_URL" "H29K-Boot-Loader.bin" "引导程序"
+
 for i in 1 2 3; do download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO $i"; done
 
-# =========================================================
-# 第二部分：内核驱动深度注入 (强制锁定 BBR + 5G + 屏幕)
-# =========================================================
-echo "正在注入内核配置与强制 BBR 算法..."
+echo "正在注入内核配置..."
 CONF_FILES=$(find target/linux/rockchip/armv8/ -name "config-*")
 for CONF in $CONF_FILES; do
     sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_JFFS2/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
@@ -43,16 +36,13 @@ for CONF in $CONF_FILES; do
     } >> "$CONF"
 done
 
-# =========================================================
-# 第三部分：注册设备并【锁定分区大小】
-# =========================================================
+# ==============================================
+# 🔥 修复1：删除范围正确（endef）
+# ==============================================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 if [ -f "$TARGET_MK" ]; then
-    # 【修改注释】：先彻底清理可能干扰的旧定义
-    sed -i '/define Device\/hinlink_h29k/,/eval $(call Device,hinlink_h29k)/d' "$TARGET_MK"
-
+    sed -i '/define Device\/hinlink_h29k/,/endef/d' "$TARGET_MK"
     cat >> "$TARGET_MK" <<EOF
-
 define Device/hinlink_h29k
   \$(Device/rk3528)
   DEVICE_VENDOR := HINLINK
@@ -60,13 +50,25 @@ define Device/hinlink_h29k
   DEVICE_DTS := rk3528-opc-h29k
   BOARD_NAME := hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
+  SUPPORTED_DEVICES += hinlink_h29k
   KERNEL_SIZE := 33554432
   KERNEL_LOADADDR := 0x00200000
   BOARD_ROOTFS_PARTSIZE := 1024
-  # 【关键修改】：显式声明支持格式，强制覆盖全局设置
-  SUPPORTED_DEVICES += hinlink_h29k
+
   IMAGES := sysupgrade.img.gz
-  IMAGE/sysupgrade.img.gz := boot-common | boot-script | append-rootfs | pad-to 1M | pad-extra 128k | gzip
+
+# ==============================================
+# 🔥 修复2：正确打包顺序 + 加入BootLoader
+# ==============================================
+IMAGE/sysupgrade.img.gz := \\
+    H29K-Boot-Loader.bin | \\
+    boot-common | \\
+    boot-script | \\
+    pad-to 1M | \\
+    pad-extra 128k | \\
+    append-rootfs | \\
+    gzip
+
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
 	kmod-aic8800-sdio wpad-openssl -wpad-basic -wpad-mini -wpad \\
 	dnsmasq-full -dnsmasq kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi \\
@@ -79,9 +81,6 @@ TARGET_DEVICES += hinlink_h29k
 EOF
 fi
 
-# =========================================================
-# 第四部分：屏幕联动脚本与自启动 (全中文环境)
-# =========================================================
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
@@ -118,17 +117,14 @@ uci commit
 exit 0
 EOF
 
-# =========================================================
-# 第五部分：清理 dnsmasq/wpad 冲突、锁定 H29K、修复 JFFS2
-# =========================================================
-echo "执行最终配置硬化：清理冲突与身份锁定..."
-
-# 【修改注释】：在 .config 中强制显式开启 H29K 目标，确保 Makefile 能够索引到 Device 定义
+# ==============================================
+# 🔥 修复3：.config 只写一次，不重复覆盖
+# ==============================================
+echo "执行最终配置硬化..."
 cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
-CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
-CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y
+CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 CONFIG_PACKAGE_dnsmasq-full=y
 CONFIG_PACKAGE_wpad-openssl=y
 CONFIG_PACKAGE_luci-app-qmodem-next=y
@@ -136,27 +132,20 @@ CONFIG_PACKAGE_irqbalance=y
 CONFIG_PACKAGE_wqy-microhei=y
 CONFIG_PACKAGE_imagemagick=y
 CONFIG_PACKAGE_fbv=y
+# 禁用多余镜像
+# CONFIG_TARGET_ROOTFS_EXT4FS is not set
+# CONFIG_TARGET_ROOTFS_SQUASHFS is not set
 EOF
 
-make defconfig
-
-# 【修改注释】：禁用所有导致生成多个冗余文件的 RootFS 格式，只保留 sysupgrade 逻辑
-sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
-sed -i 's/CONFIG_TARGET_ROOTFS_SQUASHFS=y/# CONFIG_TARGET_ROOTFS_SQUASHFS is not set/' .config
-sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
-
-# 【修改注释】：清理组件冲突
+# 清理冲突
 sed -i 's/CONFIG_PACKAGE_dnsmasq=y/# CONFIG_PACKAGE_dnsmasq is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-basic=y/# CONFIG_PACKAGE_wpad-basic is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-mini=y/# CONFIG_PACKAGE_wpad-mini is not set/' .config
 
-# 【修改注释】：将所有 H28K 的内核/镜像索引强制重定向为 H29K，这是识别有效目标的关键补丁
-sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
-sed -i 's/h28k/h29k/g' .config
-echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
-
-# 【重要】：清理 Actions 缓存索引，强制重新扫描 Makefile
+# ==============================================
+# 🔥 修复4：只清理一次tmp，只执行一次defconfig
+# ==============================================
 rm -rf tmp
 make defconfig
 
-echo "✅ 修复完成。已强制关闭 ext4/squashfs 冗余生成，锁定 1024M 单一镜像路径。"
+echo "✅ 修复完成！"
