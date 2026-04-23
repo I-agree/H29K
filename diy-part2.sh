@@ -28,7 +28,6 @@ for i in 1 2 3; do download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/confi
 echo "正在注入内核配置与强制 BBR 算法..."
 CONF_FILES=$(find target/linux/rockchip/armv8/ -name "config-*")
 for CONF in $CONF_FILES; do
-    # 清理旧的 TCP 拥塞控制和屏幕/存储项
     sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_JFFS2/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
     {
         echo "CONFIG_STAGING=y"
@@ -36,11 +35,9 @@ for CONF in $CONF_FILES; do
         echo "CONFIG_FB_TFT_ST7789V=y"
         echo "CONFIG_JFFS2_FS=y"
         echo "CONFIG_JFFS2_SUMMARY=y"
-        # --- 🔥 核心 BBR 锁定 ---
         echo "CONFIG_TCP_CONG_BBR=y"
         echo "CONFIG_DEFAULT_BBR=y"
         echo "CONFIG_DEFAULT_TCP_CONG=\"bbr\""
-        # -----------------------
         echo "CONFIG_USB_NET_CDC_MBIM=m"
         echo "CONFIG_MTK_T7XX=m"
     } >> "$CONF"
@@ -51,6 +48,9 @@ done
 # =========================================================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 if [ -f "$TARGET_MK" ]; then
+    # 【修改注释】：在追加前显式清理可能存在的重复定义，确保 Actions 环境下 target 唯一且有效
+    sed -i '/Device\/hinlink_h29k/,/eval $(call Device,hinlink_h29k)/d' "$TARGET_MK"
+
     cat >> "$TARGET_MK" <<EOF
 
 define Device/hinlink_h29k
@@ -64,6 +64,7 @@ define Device/hinlink_h29k
   KERNEL_LOADADDR := 0x00200000
   BOARD_ROOTFS_PARTSIZE := 1024
   IMAGES := sysupgrade.img.gz
+  # --- 保持用户要求的原始对齐流水线 ---
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | append-rootfs | pad-to 1M | pad-extra 128k | gzip
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
 	kmod-aic8800-sdio wpad-openssl -wpad-basic -wpad-mini -wpad \\
@@ -80,6 +81,7 @@ fi
 # =========================================================
 # 第四部分：屏幕联动脚本与自启动 (全中文环境)
 # =========================================================
+# (此部分无改动，略)
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
@@ -121,6 +123,7 @@ EOF
 # =========================================================
 echo "执行最终配置硬化：清理冲突与身份锁定..."
 
+# 【修改注释】：在 .config 中强制显式开启 H29K 目标，确保 Makefile 能够索引到 Device 定义
 cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
@@ -137,19 +140,18 @@ EOF
 
 make defconfig
 
-# 1. 强制清理冲突的基础包 (dnsmasq/wpad)
 sed -i 's/CONFIG_PACKAGE_dnsmasq=y/# CONFIG_PACKAGE_dnsmasq is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-basic=y/# CONFIG_PACKAGE_wpad-basic is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-mini=y/# CONFIG_PACKAGE_wpad-mini is not set/' .config
-
-# 2. 🔥 应用 JFFS2 打包修复逻辑 (删除系统 JFFS2 分区生成)
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
 
-# 3. 身份全量硬化 (将 H28K 全面锁定为 H29K)
+# 【修改注释】：将所有 H28K 的内核/镜像索引强制重定向为 H29K，这是识别有效目标的关键补丁
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
+# 【修改注释】：在 Actions 脚本最后增加 rm -rf tmp，确保 Makefile 修改被系统重新扫描识别
+rm -rf tmp
 make defconfig
 
-echo "✅ 基础修复、BBR 锁定、冲突清理全部完成。H29K 准备就绪！"
+echo "✅ 修复完成。H29K 有效目标已锁定，分区大小 1024M 已同步。"
