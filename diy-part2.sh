@@ -17,7 +17,7 @@ curl -fsSL "$BOOT_BIN_URL" > hinlink_h29k-u-boot-rockchip.bin || exit 1
 mkdir -p bin/targets/rockchip/armv8
 cp hinlink_h29k-u-boot-rockchip.bin bin/targets/rockchip/armv8/
 
-# --- 3. 动态注入 video.mk (定义静态驱动包) ---
+# --- 3. 动态注入 video.mk (ST7789V 静态内核包) ---
 VIDEO_MK="package/kernel/linux/modules/video.mk"
 sed -i '/KernelPackage\/h29k-fb-st7789v/,/eval $(call KernelPackage,h29k-fb-st7789v)/d' "$VIDEO_MK"
 cat >> "$VIDEO_MK" <<EOF
@@ -32,30 +32,31 @@ endef
 \$(eval \$(call KernelPackage,h29k-fb-st7789v))
 EOF
 
-# --- 4. 强制内核配置 (全静态编译驱动 & BBR & 5G 物理支持) ---
+# --- 4. 内核配置硬修改 (针对 FM350-GL USB 优化) ---
 find target/linux/rockchip/armv8/ -name "config-*" | while read CONF; do
     sed -i '/CONFIG_STAGING/d' "$CONF"
     sed -i '/CONFIG_FB_TFT/d' "$CONF"
     sed -i '/CONFIG_TCP_CONG/d' "$CONF"
     {
+        # 屏幕与 BBR
         echo "CONFIG_STAGING=y"
         echo "CONFIG_FB=y"
         echo "CONFIG_FB_TFT=y"
         echo "CONFIG_FB_TFT_ST7789V=y"
         echo "CONFIG_SPI=y"
-        echo "CONFIG_TCP_CONG_ADVANCED=y"
         echo "CONFIG_TCP_CONG_BBR=y"
         echo "CONFIG_DEFAULT_BBR=y"
         echo "CONFIG_DEFAULT_TCP_CONG=\"bbr\""
-        # FM350-GL 物理层支持
-        echo "CONFIG_MTK_T7XX=m"
+        # 5G USB 模式核心驱动：MBIM 是 FM350 在 USB 下的灵魂
         echo "CONFIG_USB_NET_CDC_MBIM=m"
+        echo "CONFIG_USB_NET_CDC_NCM=m"
         echo "CONFIG_USB_NET_RNDIS_HOST=m"
         echo "CONFIG_USB_SERIAL_OPTION=m"
+        echo "CONFIG_MTK_T7XX=m"
     } >> "$CONF"
 done
 
-# --- 5. 注册 H29K 设备并补全依赖 (基于 H28K 逻辑) ---
+# --- 5. 注册 H29K 设备 (继承 H28K 特性并叠加 USB 网络包) ---
 TARGET_MK=$(find target/linux/rockchip/image -name "armv8.mk")
 if [ -n "$TARGET_MK" ]; then
     cat >> "$TARGET_MK" <<EOF
@@ -85,22 +86,27 @@ TARGET_DEVICES += hinlink_h29k
 EOF
 fi
 
-# --- 6. 注入官方 H28K 种子配置并“克隆”为 H29K ---
+# --- 6. 注入官方 H28K 种子并克隆 ---
 cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
 CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y
-# 满血包选中
+# 核心网络功能
 CONFIG_PACKAGE_wpad-openssl=y
 CONFIG_PACKAGE_dnsmasq-full=y
+# 强制 USB 拨号组件
+CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
+CONFIG_PACKAGE_kmod-usb-serial-option=y
+CONFIG_PACKAGE_uqmi=y
+# Qmodem-Next
 CONFIG_PACKAGE_luci-app-qmodem-next=y
 CONFIG_PACKAGE_luci-i18n-qmodem-next-zh-cn=y
 CONFIG_PACKAGE_kmod-h29k-fb-st7789v=y
 CONFIG_LUCI_LANG_zh_Hans=y
 EOF
 
-# --- 7. 系统默认值与冲突预警 ---
+# --- 7. 系统默认值 (静默处理) ---
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k-custom <<EOF
 #!/bin/sh
@@ -116,17 +122,21 @@ uci commit
 exit 0
 EOF
 
-# --- 8. 暴力锁定与配置刷新 ---
+# --- 8. 暴力锁定与配置刷新 (解决冲突 & 锁定文件名) ---
 make defconfig
-# 抹除所有 h28k 的痕迹，确保文件名正确
+
+# A. 身份替换：继承 H28K 地基给 H29K
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
 
-# 再次清理可能被 defconfig 重新勾选的冲突包
+# B. 精确打击：屏蔽除 H29K 以外的所有机型，确保文件名产出正确
+sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k/! s/CONFIG_TARGET_rockchip_armv8_DEVICE_.*=y/# & is not set/' .config
+echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
+
+# C. 彻底清理冲突包
 sed -i '/CONFIG_PACKAGE_wpad-basic/d' .config
 sed -i '/CONFIG_PACKAGE_dnsmasq=/d' .config
 sed -i '/CONFIG_PACKAGE_modemmanager/d' .config
-sed -i '/CONFIG_PACKAGE_luci-app-qmodem=/d' .config
 {
     echo "# CONFIG_PACKAGE_wpad-basic is not set"
     echo "# CONFIG_PACKAGE_dnsmasq is not set"
@@ -135,11 +145,7 @@ sed -i '/CONFIG_PACKAGE_luci-app-qmodem=/d' .config
     echo "CONFIG_PACKAGE_dnsmasq-full=y"
 } >> .config
 
-# 锁定单机型编译，杀掉 armsom_sige7 等
-sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_.*=y/# & is not set/' .config
-echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
-
-# 分区校准
+# D. 分区调整
 sed -i 's/^CONFIG_TARGET_KERNEL_PARTSIZE=.*/CONFIG_TARGET_KERNEL_PARTSIZE=32/' .config
 sed -i 's/^CONFIG_TARGET_ROOTFS_PARTSIZE=.*/CONFIG_TARGET_ROOTFS_PARTSIZE=1024/' .config
 
