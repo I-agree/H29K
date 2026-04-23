@@ -1,27 +1,14 @@
 #!/bin/bash
 
 # =========================================================
-# 第一部分：【生命线】基础环境修复
+# 第一部分：【核心】基础环境修复与下载拦截
 # =========================================================
-echo "执行 functions.sh 环境修复..."
-if [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ]; then
-    sudo mkdir -p /lib
-    sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
-    echo "✅ 基础环境修复完成"
-fi
+echo "执行基础环境修复与资源下载..."
+[ -f "$(pwd)/package/base-files/files/lib/functions.sh" ] && sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 
-# =========================================================
-# 第二部分：资源下载与【严苛拦截】
-# =========================================================
 download_file() {
     local url=$1; local path=$2; local name=$3
-    echo "正在下载 $name..."
-    if curl -fsSL "$url" > "$path"; then
-        echo "✅ $name 下载成功"
-    else
-        echo "❌ 错误: $name 下载失败！熔断编译流程。"
-        exit 1
-    fi
+    if curl -fsSL "$url" > "$path"; then echo "✅ $name 下载成功"; else echo "❌ $name 下载失败！"; exit 1; fi
 }
 
 DTS_URL="https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts"
@@ -33,36 +20,37 @@ mkdir -p "$DTS_DIR" files/etc/config/screen bin/targets/rockchip/armv8
 download_file "$DTS_URL" "$DTS_DIR/rk3528-opc-h29k.dts" "设备树 (DTS)"
 download_file "$BOOT_BIN_URL" "hinlink_h29k-u-boot-rockchip.bin" "引导程序"
 cp hinlink_h29k-u-boot-rockchip.bin bin/targets/rockchip/armv8/
-
-for i in 1 2 3; do
-    download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO $i"
-done
+for i in 1 2 3; do download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO $i"; done
 
 # =========================================================
-# 第三部分：内核驱动深度注入 (BBR/5G/屏幕/JFFS2加速)
+# 第二部分：内核驱动深度注入 (强制锁定 BBR + 5G + 屏幕)
 # =========================================================
+echo "正在注入内核配置与强制 BBR 算法..."
 CONF_FILES=$(find target/linux/rockchip/armv8/ -name "config-*")
 for CONF in $CONF_FILES; do
-    sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_JFFS2/d; /CONFIG_TCP_CONG/d' "$CONF"
+    # 清理旧的 TCP 拥塞控制和屏幕/存储项
+    sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_JFFS2/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
     {
         echo "CONFIG_STAGING=y"
         echo "CONFIG_FB_TFT=y"
         echo "CONFIG_FB_TFT_ST7789V=y"
         echo "CONFIG_JFFS2_FS=y"
         echo "CONFIG_JFFS2_SUMMARY=y"
+        # --- 🔥 核心 BBR 锁定 ---
         echo "CONFIG_TCP_CONG_BBR=y"
+        echo "CONFIG_DEFAULT_BBR=y"
         echo "CONFIG_DEFAULT_TCP_CONG=\"bbr\""
+        # -----------------------
         echo "CONFIG_USB_NET_CDC_MBIM=m"
         echo "CONFIG_MTK_T7XX=m"
     } >> "$CONF"
 done
 
 # =========================================================
-# 第四部分：注册 H29K 并【锁定分区大小】
+# 第三部分：注册设备并【锁定分区大小】
 # =========================================================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 if [ -f "$TARGET_MK" ]; then
-    echo "注入 H29K 设备定义并硬锁定分区..."
     cat >> "$TARGET_MK" <<EOF
 
 define Device/hinlink_h29k
@@ -72,10 +60,8 @@ define Device/hinlink_h29k
   DEVICE_DTS := rk3528-opc-h29k
   BOARD_NAME := hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
-  # --- 锁定分区大小 ---
   IMAGE_SIZE := 1024M
   KERNEL_SIZE := 32M
-  # --------------------
   IMAGES := sysupgrade.img.gz
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | append-rootfs | pad-to 1M | pad-extra 128k | gzip
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
@@ -91,7 +77,7 @@ EOF
 fi
 
 # =========================================================
-# 第五部分：屏幕联动脚本与自启动 (含全中文)
+# 第四部分：屏幕联动脚本与自启动 (全中文环境)
 # =========================================================
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
@@ -130,17 +116,15 @@ exit 0
 EOF
 
 # =========================================================
-# 第六部分：【重点】处理冲突、锁定 H29K 身份、修复 JFFS2
+# 第五部分：清理 dnsmasq/wpad 冲突、锁定 H29K、修复 JFFS2
 # =========================================================
-echo "正在清理冲突包并锁定 H29K 种子配置..."
+echo "执行最终配置硬化：清理冲突与身份锁定..."
 
-# 1. 预设核心种子配置
 cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
 CONFIG_TARGET_DEVICE_rockchip_armv8_DEVICE_hinlink_h29k=y
-# 显式勾选高级包
 CONFIG_PACKAGE_dnsmasq-full=y
 CONFIG_PACKAGE_wpad-openssl=y
 CONFIG_PACKAGE_luci-app-qmodem-next=y
@@ -150,26 +134,21 @@ CONFIG_PACKAGE_imagemagick=y
 CONFIG_PACKAGE_fbv=y
 EOF
 
-# 2. 第一次 defconfig 展开依赖
 make defconfig
 
-# 3. 【核心动作】清理 dnsmasq 和 wpad 冲突项
-echo "正在强制剔除冲突的基础版 dnsmasq 和 wpad..."
+# 1. 强制清理冲突的基础包 (dnsmasq/wpad)
 sed -i 's/CONFIG_PACKAGE_dnsmasq=y/# CONFIG_PACKAGE_dnsmasq is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-basic=y/# CONFIG_PACKAGE_wpad-basic is not set/' .config
 sed -i 's/CONFIG_PACKAGE_wpad-mini=y/# CONFIG_PACKAGE_wpad-mini is not set/' .config
 
-# 4. 【核心动作】应用你提供的 JFFS2 修复逻辑
-echo "正在应用 JFFS2 镜像打包修复..."
+# 2. 🔥 应用 JFFS2 打包修复逻辑 (删除系统 JFFS2 分区生成)
 sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
 
-# 5. 【核心动作】身份全量替换 (H28K -> H29K)
-echo "正在执行 H29K 身份锁定替换..."
+# 3. 身份全量硬化 (将 H28K 全面锁定为 H29K)
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
-# 6. 第二次 defconfig 锁定状态
 make defconfig
 
-echo "✅ 冲突已清理，分区已锁定，身份已硬化。准备编译！"
+echo "✅ 基础修复、BBR 锁定、冲突清理全部完成。H29K 准备就绪！"
