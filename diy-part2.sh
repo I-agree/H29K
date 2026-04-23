@@ -43,21 +43,17 @@ sed -i '/define Device\/hinlink_h29k/,/endef/d' "$TARGET_MK"
 
 cat >> "$TARGET_MK" <<EOF
 define Device/hinlink_h29k
-  DEVICE_VENDOR := HINLINK
-  DEVICE_MODEL := H29K
-  DEVICE_DTS := rk3528-opc-h29k
-  BOARD_NAME := hinlink_h29k
-  UBOOT_DEVICE_NAME := hinlink_h29k
-  SUPPORTED_DEVICES := hinlink_h29k
-
-  KERNEL_NAME := Image
-  KERNEL_SIZE := 33554432
-  KERNEL_LOADADDR := 0x00200000
-  BOARD_ROOTFS_PARTSIZE := 1024
-
-  IMAGES := sysupgrade.img.gz
-  IMAGE/sysupgrade.img.gz := boot-common | boot-script | pad-to 1M | pad-extra 128k | append-rootfs | gzip
-
+   DEVICE_VENDOR := HINLINK
+   DEVICE_MODEL := H29K
+   DEVICE_DTS := rk3528-opc-h29k
+   BOARD_NAME := hinlink_h29k
+   UBOOT_DEVICE_NAME := hinlink_h29k
+   SUPPORTED_DEVICES := hinlink_h29k
+   KERNEL_SIZE := 33554432
+   KERNEL_LOADADDR := 0x00200000
+   BOARD_ROOTFS_PARTSIZE := 1024
+   IMAGES := sysupgrade.img
+   IMAGE/sysupgrade.img := boot-common | boot-script | pad-to 1M | pad-extra 128k | append-rootfs
 DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
 kmod-aic8800-sdio wpad-openssl -wpad-basic -wpad-mini -wpad \\
 dnsmasq-full -dnsmasq kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi \\
