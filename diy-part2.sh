@@ -5,7 +5,7 @@ set -e
 echo "执行基础环境修复与资源下载..."
 
 # 已删除：软链接 functions.sh （BUG已修复）
-# 强制禁用，无视任何选择
+# 强制删除
 sed -i '/kmod-drm-client-lib/d' .config
 
 download_file() {
@@ -122,7 +122,13 @@ EOF
 make defconfig
 
 echo "===== 切换为 H29K 纯净配置 ====="
+
+# 1. 清除配置缓存（必须！）
+rm -rf tmp/
+
+# 2. 删除冲突驱动
 sed -i '/CONFIG_PACKAGE_kmod-drm-client-lib/d' .config
+
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
