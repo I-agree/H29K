@@ -1,4 +1,6 @@
 #!/bin/bash
+
+# ======================== 【第一部分：资源准备】 ========================
 echo "执行基础环境修复与资源下载..."
 [ -f "$(pwd)/package/base-files/files/lib/functions.sh" ] && sudo ln -sf $(pwd)/package/base-files/files/lib/functions.sh /lib/functions.sh
 
@@ -7,40 +9,31 @@ download_file() {
     if curl -fsSL "$url" > "$path"; then echo "✅ $name 下载成功"; else echo "❌ $name 下载失败！"; exit 1; fi
 }
 
-DTS_URL="https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts"
-BOOT_BIN_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
-LOGO_RAW_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_DIR" files/etc/config/screen bin/targets/rockchip/armv8
 
-download_file "$DTS_URL" "$DTS_DIR/rk3528-opc-h29k.dts" "设备树 (DTS)"
-download_file "$BOOT_BIN_URL" "hinlink_h29k-u-boot-rockchip.bin" "引导程序"
+download_file "https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts" "$DTS_DIR/rk3528-opc-h29k.dts" "设备树"
+download_file "https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin" "hinlink_h29k-u-boot-rockchip.bin" "引导程序"
 cp hinlink_h29k-u-boot-rockchip.bin bin/targets/rockchip/armv8/
 
-for i in 1 2 3; do download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO $i"; done
-
-echo "正在注入内核配置..."
+# ======================== 【第二部分：内核与驱动定义】 ========================
 CONF_FILES=$(find target/linux/rockchip/armv8 -name "config-*")
 for CONF in $CONF_FILES; do
-sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_JFFS2/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
-cat >> "$CONF" <<EOF
+    sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
+    cat >> "$CONF" <<EOF
 CONFIG_STAGING=y
 CONFIG_FB_TFT=y
 CONFIG_FB_TFT_ST7789V=y
-CONFIG_JFFS2_FS=y
-CONFIG_JFFS2_SUMMARY=y
 CONFIG_TCP_CONG_BBR=y
 CONFIG_DEFAULT_BBR=y
 CONFIG_DEFAULT_TCP_CONG="bbr"
-CONFIG_USB_NET_CDC_MBIM=m
-CONFIG_MTK_T7XX=m
 EOF
 done
 
-# ======================== 【终极修复：强制覆盖 RK3528 镜像规则】========================
+# ======================== 【第三部分：解决“死穴”——重写设备规则】 ========================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
-# 彻底清理旧定义，确保没有任何 H29K 的残留逻辑
-sed -i '/Device\/hinlink_h29k/,/eval $(call Device,hinlink_h29k)/d' "$TARGET_MK"
+# 1. 彻底物理删除旧注册，包括 eval 行
+sed -i '/define Device\/hinlink_h29k/,/eval \$(call Device,hinlink_h29k)/d' "$TARGET_MK"
 
 cat >> "$TARGET_MK" <<EOF
 define Device/hinlink_h29k
@@ -54,9 +47,10 @@ define Device/hinlink_h29k
   KERNEL_SIZE := 33554432
   KERNEL_LOADADDR := 0x00200000
   BOARD_ROOTFS_PARTSIZE := 1024
-  # 🔥 强制覆盖 IMAGES 变量，不再追加，确保唯一性
-  IMAGES := sysupgrade.img.gz
-  IMAGE/sysupgrade.img.gz := boot-common | boot-script | pad-to 1M | pad-extra 128k | append-rootfs | gzip
+  # 🔥 核心修正 1：这里绝对不能带 .gz！
+  IMAGES := sysupgrade.img
+  # 🔥 核心修正 2：流水线末尾绝对不能有 | gzip，由系统自动完成
+  IMAGE/sysupgrade.img := boot-common | boot-script | pad-to 1M | pad-extra 128k | append-rootfs
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
 	kmod-aic8800-sdio wpad-openssl -wpad-basic -wpad-mini -wpad \\
 	dnsmasq-full -dnsmasq kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi \\
@@ -65,13 +59,12 @@ define Device/hinlink_h29k
 	luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance \\
 	luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
-TARGET_DEVICES += hinlink_h29k
+\$(eval \$(call Device,hinlink_h29k))
 EOF
 
-# ... (前面下载部分保持不变) ...
-
+# ======================== 【第四部分：系统初始化与屏幕脚本】 ========================
+# 屏幕脚本与系统配置 (保留 <<'EOF' 以防变量丢失)
 mkdir -p files/usr/bin
-# 注意：这里使用 <<'EOF' (带单引号) 防止变量在写入前被当前 shell 解析
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
 FONT="/usr/share/fonts/ttf/wqy-microhei.ttc"
@@ -107,8 +100,8 @@ uci commit
 exit 0
 EOF
 
-# ======================== 【H28K → H29K 配置流程 100% 保留】========================
-echo "执行最终配置硬化：先生成H28K配置，再切换为H29K..."
+# ======================== 【第五部分：.config 最终锁定】 ========================
+echo "执行最终配置锁定..."
 cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
@@ -118,30 +111,15 @@ EOF
 
 make defconfig
 
-# 关闭无用文件系统
+# 强制开启自动压缩标志，让系统在 IMAGES 生成 .img 后自动转成 .img.gz
+echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
-sed -i '/CONFIG_TARGET_ROOTFS_JFFS2/d' .config
-
-# 必须开启：用于生成rootfs
 sed -i 's/# CONFIG_TARGET_ROOTFS_SQUASHFS is not set/CONFIG_TARGET_ROOTFS_SQUASHFS=y/' .config
-echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 
-# 清理冲突软件包
-sed -i 's/CONFIG_PACKAGE_dnsmasq=y/# CONFIG_PACKAGE_dnsmasq is not set/' .config
-sed -i 's/CONFIG_PACKAGE_wpad-basic=y/# CONFIG_PACKAGE_wpad-basic is not set/' .config
-sed -i 's/CONFIG_PACKAGE_wpad-mini=y/# CONFIG_PACKAGE_wpad-mini is not set/' .config
-
-# 关键：全部替换为 H29K
+# 身份全量替换并清理缓存
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
-echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
-
 rm -rf tmp
 make defconfig
 
-echo "====================================="
-echo "✅ 脚本执行完成！"
-echo "✅ RK3528 镜像冲突已彻底修复"
-echo "✅ 只会生成：sysupgrade.img.gz"
-echo "✅ 固件大小正常，可直接刷机"
-echo "====================================="
+echo "✅ 修复完成！IMAGES 已回归标准流程，等待系统自动压缩。"
