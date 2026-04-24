@@ -30,9 +30,8 @@ CONFIG_DEFAULT_TCP_CONG="bbr"
 EOF
 done
 
-# ======================== 【第三部分：解决“死穴”——重写设备规则】 ========================
+# ======================== 【第三部分：重写设备规则】 ========================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
-# 1. 彻底物理删除旧注册，包括 eval 行
 sed -i '/define Device\/hinlink_h29k/,/eval \$(call Device,hinlink_h29k)/d' "$TARGET_MK"
 
 cat >> "$TARGET_MK" <<EOF
@@ -47,10 +46,10 @@ define Device/hinlink_h29k
   KERNEL_SIZE := 33554432
   KERNEL_LOADADDR := 0x00200000
   BOARD_ROOTFS_PARTSIZE := 1024
-  # 🔥 核心修正 1：这里绝对不能带 .gz！
+
   IMAGES := sysupgrade.img
-  # 🔥 核心修正 2：流水线末尾绝对不能有 | gzip，由系统自动完成
   IMAGE/sysupgrade.img := boot-common | boot-script | pad-to 1M | pad-extra 128k | append-rootfs
+
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
 	kmod-aic8800-sdio wpad-openssl -wpad-basic -wpad-mini -wpad \\
 	dnsmasq-full -dnsmasq kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi \\
@@ -63,7 +62,6 @@ endef
 EOF
 
 # ======================== 【第四部分：系统初始化与屏幕脚本】 ========================
-# 屏幕脚本与系统配置 (保留 <<'EOF' 以防变量丢失)
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
@@ -111,15 +109,15 @@ EOF
 
 make defconfig
 
-# 强制开启自动压缩标志，让系统在 IMAGES 生成 .img 后自动转成 .img.gz
 echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
 sed -i 's/# CONFIG_TARGET_ROOTFS_SQUASHFS is not set/CONFIG_TARGET_ROOTFS_SQUASHFS=y/' .config
+echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 
-# 身份全量替换并清理缓存
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
+
 rm -rf tmp
 make defconfig
 
-echo "✅ 修复完成！IMAGES 已回归标准流程，等待系统自动压缩。"
+echo "✅ 全部修复完成！直接编译即可生成完整 sysupgrade.img.gz 固件！"
