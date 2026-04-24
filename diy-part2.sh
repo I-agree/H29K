@@ -7,7 +7,6 @@ echo "执行基础环境修复与资源下载..."
 # 已删除：软链接 functions.sh （BUG已修复）
 # 强制禁用，无视任何选择
 sed -i '/kmod-drm-client-lib/d' .config
-echo "CONFIG_PACKAGE_kmod-drm-client-lib=n" >> .config
 
 download_file() {
     local url="$1"
@@ -119,9 +118,6 @@ CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
 
-# 强制禁用
-CONFIG_PACKAGE_kmod-drm-client-lib=n
-
 EOF
 make defconfig
 
@@ -136,10 +132,6 @@ echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_SQUASHFS=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
-
-# 启用
-sed -i '/CONFIG_PACKAGE_kmod-drm-client-lib=n/d' .config
-echo "CONFIG_PACKAGE_kmod-drm-client-lib=y" >> .config
 
 rm -rf tmp
 make defconfig
