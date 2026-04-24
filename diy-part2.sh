@@ -138,6 +138,7 @@ echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
 
 # 启用
+sed -i '/CONFIG_PACKAGE_kmod-drm-client-lib=n/d' .config
 echo "CONFIG_PACKAGE_kmod-drm-client-lib=y" >> .config
 
 rm -rf tmp
