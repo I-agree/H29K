@@ -3,7 +3,8 @@ set -e
 
 # ======================== 【第一部分：资源准备 100% 完整还原】 ========================
 echo "执行基础环境修复与资源下载..."
-[ -f "$(pwd)/package/base-files/files/lib/functions.sh" ] && sudo ln -sf "$(pwd)/package/base-files/files/lib/functions.sh" /lib/functions.sh
+
+# 已删除：软链接 functions.sh （BUG已修复）
 
 download_file() {
     local url="$1"
@@ -62,7 +63,7 @@ define Device/hinlink_h29k
   BOARD_ROOTFS_PARTSIZE := 1024
 
   IMAGES := sysupgrade.img
-  IMAGE/sysupgrade.img := boot-common | boot-script | sdcard-img | append-metadata
+  IMAGE/sysupgrade.img := boot-common | boot-script | append-rootfs | pad-rootfs | pad-to 1M | pad-extra 128k
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
