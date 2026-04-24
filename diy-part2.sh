@@ -60,16 +60,15 @@ define Device/hinlink_h29k
   IMAGES += sysupgrade.img
   IMAGE/sysupgrade.img := boot-common | boot-script | pad-to 1M | pad-extra 128k
 
-  DEVICE_PACKAGES := \
-	kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \
-	kmod-aic8800-sdio wpad-openssl dnsmasq-full \
-	kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host \
-	kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next \
-	luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick \
-	wqy-microhei curl irqbalance luci-i18n-base-zh-cn \
-	luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
+  DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \\
+	kmod-aic8800-sdio wpad-openssl -wpad-basic -wpad-mini -wpad \\
+	dnsmasq-full -dnsmasq kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi \\
+	kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v \\
+	luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn -modemmanager \\
+	luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance \\
+	luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
-$(eval $(call Device,hinlink_h29k))
+TARGET_DEVICES += hinlink_h29k
 EOF
 
 # ======================== 【第四部分：屏幕脚本 + 系统配置 完整】 ========================
