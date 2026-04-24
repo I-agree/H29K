@@ -2,7 +2,7 @@
 兼容5G模块：FM350-GL
 插件汉化以及性能优化（BBR + Irqbalance）
 直接使用OpenWrt官方最新稳定版源码库
-含 U-Boot 引导头的完整系统镜像
+含小屏幕显示的完整系统镜像
 
 ## Credits
 
