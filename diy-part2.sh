@@ -129,6 +129,7 @@ echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_SQUASHFS=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
+sed -i 's/CONFIG_PACKAGE_kmod-drm-client-lib=y/# CONFIG_PACKAGE_kmod-drm-client-lib is not set/' .config
 
 rm -rf tmp
 make defconfig
