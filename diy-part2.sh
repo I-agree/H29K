@@ -40,8 +40,10 @@ done
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 
 # 彻底清空旧配置，防止冲突
-sed -i '/hinlink_h2/d' $TARGET_MK
-sed -i '/eval.*hinlink/d' $TARGET_MK
+# 彻底删除原版H28K整段定义（第183行报错源头）
+sed -i '/define Device\/hinlink_h28k/,/TARGET_DEVICES += hinlink_h28k/d' "$TARGET_MK"
+# 同时删除旧H29K
+sed -i '/define Device\/hinlink_h29k/,/TARGET_DEVICES += hinlink_h29k/d' "$TARGET_MK"
 
 # 🔥 关键修复：
 # 1. DEVICE_PACKAGES 拆分成多行（避免单行过长导致解析错误）
