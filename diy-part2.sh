@@ -43,7 +43,10 @@ TARGET_MK="target/linux/rockchip/image/armv8.mk"
 sed -i '/hinlink_h2/d' $TARGET_MK
 sed -i '/eval.*hinlink/d' $TARGET_MK
 
-# 🔥 关键修复：DEVICE_PACKAGES 无换行错误、无空变量、Makefile 100% 合法
+# 🔥 关键修复：
+# 1. DEVICE_PACKAGES 拆分成多行（避免单行过长导致解析错误）
+# 2. 移除所有行尾空格，确保 Makefile 语法严格
+# 3. 变量赋值后无多余符号/空格
 cat >> $TARGET_MK <<'EOF'
 define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
@@ -57,7 +60,12 @@ define Device/hinlink_h29k
   BOARD_ROOTFS_PARTSIZE := 1024
   IMAGES := sysupgrade.img
   IMAGE/sysupgrade.img := boot-common | boot-script | pad-to 1M | pad-extra 128k
-  DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
+  DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 \
+    kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim \
+    uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v \
+    luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick \
+    wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn \
+    luci-i18n-firewall-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
