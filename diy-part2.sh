@@ -119,6 +119,11 @@ EOF
 make defconfig
 
 echo "===== 切换为 H29K 纯净配置 ====="
+
+# 🔥 强制修复递归依赖
+sed -i '/kmod-drm-client-lib/d' .config
+echo "CONFIG_PACKAGE_kmod-drm-client-lib=n" >> .config
+
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
@@ -129,7 +134,6 @@ echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_SQUASHFS=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
-sed -i 's/CONFIG_PACKAGE_kmod-drm-client-lib=y/# CONFIG_PACKAGE_kmod-drm-client-lib is not set/' .config
 
 rm -rf tmp
 make defconfig
