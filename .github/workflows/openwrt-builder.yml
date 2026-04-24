@@ -18,7 +18,7 @@ on:
 
 env:
   REPO_URL: https://github.com/openwrt/openwrt
-  REPO_BRANCH: master
+  REPO_BRANCH: main
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: rk3528-opc-h29k.config
   DIY_P1_SH: diy-part1.sh
@@ -27,8 +27,6 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
-  # 新增：定义核心工作目录，统一路径适配
-  WORK_DIR: /workdir/openwrt
 
 jobs:
   build:
@@ -42,101 +40,64 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        # 新增：清理冗余包+深度清理磁盘（路径适配前置）
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
         sudo docker image prune --all --force
-        sudo rm -rf /var/lib/apt/lists/*
-        # 新增：补充更多编译依赖（解决部分插件编译失败问题）
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install \
-          ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl \
-          device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool \
-          libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev \
-          libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp \
-          ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools \
-          qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev \
-          libssl-dev libcrypto++-dev libsqlite3-dev libpcap-dev libcurl4-openssl-dev libxml2-dev libjansson-dev \
-          libboost-all-dev libminiupnpc-dev libnatpmp-dev libidn2-0-dev libunistring-dev  # 新增依赖
-        # 新增：安装pip依赖（部分OpenWrt插件需要）
-        sudo pip3 install --upgrade pip
-        sudo pip3 install pycryptodome requests
-        # 原有逻辑保留 + 路径适配
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        # ✅ 增加 H29K 必需依赖：mkimage imagemagick fbv 字体（解决编译错误）
+        sudo -E apt-get -qq install u-boot-tools imagemagick fbv fonts-wqy-microhei dos2unix
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-        # 路径适配：确保工作目录存在且权限正确
-        sudo mkdir -p ${WORK_DIR%/*}
-        sudo chown $USER:$GROUPS ${WORK_DIR%/*}
-        # 新增：设置环境变量持久化（路径适配）
-        echo "WORK_DIR=${WORK_DIR}" >> $GITHUB_ENV
-        echo "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${WORK_DIR}/scripts:${PATH}" >> $GITHUB_ENV
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
 
     - name: Clone source code
-      working-directory: ${WORK_DIR%/*}
+      working-directory: /workdir
       run: |
         df -hT $PWD
-        # 路径适配：先删除旧目录避免冲突
-        rm -rf openwrt
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-        # 路径适配：软链接兼容原有逻辑
-        ln -sf ${WORK_DIR} $GITHUB_WORKSPACE/openwrt
-        # 新增：校验克隆结果
-        if [ ! -d "${WORK_DIR}" ]; then
-          echo "克隆源码失败！"
-          exit 1
-        fi
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: Load custom feeds
       run: |
-        # 路径适配：校验文件存在性
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${WORK_DIR}/feeds.conf.default || echo "自定义feeds文件不存在，使用默认"
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
-        cd ${WORK_DIR}
+        cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: Update feeds
-      run: cd ${WORK_DIR} && ./scripts/feeds update -a
+      run: cd openwrt && ./scripts/feeds update -a
 
     - name: Install feeds
-      run: cd ${WORK_DIR} && ./scripts/feeds install -a
+      run: cd openwrt && ./scripts/feeds install -a
 
     - name: Load custom configuration
       run: |
-        # 路径适配：校验文件存在性
-        [ -e files ] && mv files ${WORK_DIR}/files || echo "自定义files目录不存在，跳过"
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE ${WORK_DIR}/.config || echo "自定义配置文件不存在，跳过"
+        [ -e files ] && mv files openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
-        cd ${WORK_DIR}
+        cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        # 新增：配置文件校验
-        if [ ! -f "${WORK_DIR}/.config" ]; then
-          echo "配置文件缺失，生成默认配置"
-          make defconfig
-        fi
 
     - name: Download package
       id: package
       run: |
-        cd ${WORK_DIR}
+        cd openwrt
         make defconfig
-        # 路径适配：兼容不同线程数
-        make download -j$(nproc) || make download -j4 || make download -j1
-        # 清理无效包（原有逻辑保留）
+        make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
     - name: Compile the firmware
       id: compile
       run: |
-        cd ${WORK_DIR}
-        # 路径适配：优化编译线程（避免资源耗尽）
-        COMPILE_THREADS=$(( $(nproc) > 4 ? 4 : $(nproc) ))
-        echo -e "${COMPILE_THREADS} thread compile"
-        make -j${COMPILE_THREADS} || make -j1 || make -j1 V=s
+        cd openwrt
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
-        # 路径适配：兼容不同设备名提取逻辑
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV || echo "DEVICE_NAME=_unknown" >> $GITHUB_ENV
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
     - name: Check space usage
@@ -148,21 +109,15 @@ jobs:
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${WORK_DIR}/bin
+        path: openwrt/bin
 
     - name: Organize files
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        # 路径适配：兼容不同target目录结构
-        FIRMWARE_PATH=$(find ${WORK_DIR}/bin/targets -type d -mindepth 2 -maxdepth 2 | head -n1)
-        if [ -z "${FIRMWARE_PATH}" ]; then
-          echo "固件目录不存在！"
-          exit 1
-        fi
-        cd ${FIRMWARE_PATH}
+        cd openwrt/bin/targets/*/*
         rm -rf packages
-        echo "FIRMWARE=${FIRMWARE_PATH}" >> $GITHUB_ENV
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware directory
@@ -178,7 +133,6 @@ jobs:
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
-        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Upload firmware to release
