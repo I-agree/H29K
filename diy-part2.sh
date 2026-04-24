@@ -21,7 +21,6 @@ DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_DIR" files/etc/config/screen bin/targets/rockchip/armv8
 
 download_file "https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts" "$DTS_DIR/rk3528-opc-h29k.dts" "设备树"
-download_file "https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin" "bin/targets/rockchip/armv8/hinlink_h29k-u-boot-rockchip.bin" "引导程序"
 
 LOGO_RAW_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 for i in 1 2 3; do
