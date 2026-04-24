@@ -42,19 +42,20 @@ CONFIG_DEFAULT_TCP_CONG="bbr"
 EOF
 done
 
-# ======================== 【第三部分：设备定义 —— 100% 无错版】 ========================
+# ======================== 【第三部分：设备定义 —— 修复核心报错（最小修改）】 ========================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 
 # 彻底删除原版 H28K（解决第183行报错）
 sed -i '/define Device\/hinlink_h28k/,/TARGET_DEVICES += hinlink_h28k/d' "$TARGET_MK"
 sed -i '/define Device\/hinlink_h29k/,/TARGET_DEVICES += hinlink_h29k/d' "$TARGET_MK"
 
-# 写入最终无错误设备配置
+# 写入修复后的设备配置（仅新增核心镜像构建规则，其余保留原样）
 cat >> "$TARGET_MK" <<'EOF'
 define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
+  DEVICE_DTS_DIR := $(DTS_DIR)/rockchip  # 新增：指定DTS目录
   BOARD_NAME := hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
   SUPPORTED_DEVICES := hinlink_h29k
@@ -62,8 +63,10 @@ define Device/hinlink_h29k
   KERNEL_SIZE := 33554432
   BOARD_ROOTFS_PARTSIZE := 1024
 
+  # 修复核心：补充sysupgrade.img完整构建规则（替代原有简化规则）
+  KERNEL := kernel-bin | gzip | fit gzip $$(KDIR)/image-$$(DEVICE_DTS).dtb
   IMAGES := sysupgrade.img
-  IMAGE/sysupgrade.img := boot-common | boot-script | pad-to 1M | pad-extra 128k
+  IMAGE/sysupgrade.img := boot-img | sdcard-img | append-metadata | pad-to 1M | pad-extra 128k
 
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
@@ -130,6 +133,9 @@ echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_SQUASHFS=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
+
+# 新增：清理旧的临时镜像文件（避免构建冲突）
+rm -rf build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/tmp/*
 
 rm -rf tmp
 make defconfig
