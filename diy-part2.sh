@@ -122,6 +122,7 @@ EOF
 make defconfig
 
 echo "===== 切换为 H29K 纯净配置 ====="
+sed -i '/CONFIG_PACKAGE_kmod-drm-client-lib/d' .config
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
