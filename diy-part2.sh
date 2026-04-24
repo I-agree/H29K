@@ -9,12 +9,16 @@ download_file() {
     if curl -fsSL "$url" > "$path"; then echo "✅ $name 下载成功"; else echo "❌ $name 下载失败！"; exit 1; fi
 }
 
+DTS_URL="https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts"
+BOOT_BIN_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
+LOGO_RAW_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
-mkdir -p "$DTS_DIR" files/etc/config/screen bin/targets/rockchip/armv8
 
-download_file "https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts" "$DTS_DIR/rk3528-opc-h29k.dts" "设备树"
-download_file "https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin" "hinlink_h29k-u-boot-rockchip.bin" "引导程序"
+mkdir -p "$DTS_DIR" files/etc/config/screen bin/targets/rockchip/armv8
+download_file "$DTS_URL" "$DTS_DIR/rk3528-opc-h29k.dts" "设备树 (DTS)"
+download_file "$BOOT_BIN_URL" "hinlink_h29k-u-boot-rockchip.bin" "引导程序"
 cp hinlink_h29k-u-boot-rockchip.bin bin/targets/rockchip/armv8/
+for i in 1 2 3; do download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO $i"; done
 
 # ======================== 【内核配置】 ========================
 CONF_FILES=$(find target/linux/rockchip/armv8 -name "config-*")
