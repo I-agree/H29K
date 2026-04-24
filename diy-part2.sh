@@ -5,6 +5,9 @@ set -e
 echo "执行基础环境修复与资源下载..."
 
 # 已删除：软链接 functions.sh （BUG已修复）
+# 强制禁用，无视任何选择
+sed -i '/kmod-drm-client-lib/d' .config
+echo "CONFIG_PACKAGE_kmod-drm-client-lib=n" >> .config
 
 download_file() {
     local url="$1"
@@ -109,10 +112,6 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# 强制禁用，无视任何选择
-sed -i '/kmod-drm-client-lib/d' .config
-echo "CONFIG_PACKAGE_kmod-drm-client-lib=n" >> .config
-
 # ======================== 【第六部分：先 H28K → 纯净 H29K .config】 ========================
 echo "===== 生成 H28K 基准配置 ====="
 cat > .config <<EOF
@@ -138,8 +137,7 @@ echo "CONFIG_TARGET_ROOTFS_SQUASHFS=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
 
-# 强制启用，无视任何选择
-sed -i '/kmod-drm-client-lib/d' .config
+# 启用
 echo "CONFIG_PACKAGE_kmod-drm-client-lib=y" >> .config
 
 rm -rf tmp
