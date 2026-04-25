@@ -163,7 +163,6 @@ make -s package/boot/uboot-rockchip/prepare
 
 echo "====================================================================="
 echo " ✅ U-Boot 配置完成：hinlink-h29k"
-echo " ✅ 自动生成：CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y"
 echo " ✅ 已删除旧 H28K uboot 配置，无残留、无冲突"
 echo "====================================================================="
 
@@ -172,6 +171,11 @@ echo "===== 切换为 H29K 纯净配置 ====="
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
+
+# 删除所有旧的 uboot 配置（H28K 全部清理）
+sed -i '/CONFIG_PACKAGE_uboot-rockchip/d' .config
+# 强制添加 H29K 专用 U-Boot
+echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
 # 【步骤1】删除旧分区配置（无视数字，最合理）
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
