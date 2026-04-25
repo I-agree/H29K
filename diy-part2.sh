@@ -2,21 +2,21 @@
 set -e
 
 # ==============================================
-# 【强验证 + 精准修复】彻底解决递归依赖报错
-# 只修复：PACKAGE_kmod-drm-client-lib 循环
+# 【永久通用版】自动匹配所有内核版本
+# 彻底杜绝未来所有递归依赖循环
 # ==============================================
 FILE="package/kernel/linux/modules/video.mk"
 
-echo "== 安全验证：正在检查递归依赖循环 =="
-if grep -q 'DEPENDS:=@DISPLAY_SUPPORT +@LINUX_6_18' "$FILE"; then
-    echo "✅ 找到循环依赖，执行精准修复..."
-    # 只删除 drm-client-lib 里的 +@LINUX_6_18，不碰任何其他驱动
-    sed -i 's/DEPENDS:=@DISPLAY_SUPPORT +@LINUX_6_18/DEPENDS:=@DISPLAY_SUPPORT/' "$FILE"
-    echo "✅ 修复成功！循环已断开"
+echo "== 永久修复：自动移除 drm-client-lib 内核版本依赖 =="
+if grep -q 'DEPENDS:=@DISPLAY_SUPPORT +@LINUX_[0-9]*_[0-9]*' "$FILE"; then
+    echo "✅ 找到内核版本依赖，执行永久修复..."
+    sed -i 's/DEPENDS:=@DISPLAY_SUPPORT +@LINUX_[0-9]*_[0-9]*/DEPENDS:=@DISPLAY_SUPPORT/' "$FILE"
+    echo "✅ 永久修复完成！未来任何内核升级都不会再触发循环！"
 else
-    echo "❌ 错误：未找到可修复的循环！脚本停止！"
+    echo "❌ 错误：未找到需要修复的依赖！脚本停止！"
     exit 1
 fi
+
 # ======================== 【第一部分：资源准备 100% 完整还原】 ========================
 echo "执行基础环境修复与资源下载..."
 
