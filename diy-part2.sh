@@ -17,7 +17,7 @@ else
     exit 1
 fi
 
-# ======================== 【第一部分：资源准备 100% 完整还原】 ========================
+# ======================== 【第一部分：资源准备】 ========================
 echo "执行基础环境修复与资源下载..."
 
 download_file() {
@@ -42,7 +42,7 @@ for i in 1 2 3; do
   download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO${i}"
 done
 
-# ======================== 【第二部分：内核配置 完整还原】 ========================
+# ======================== 【第二部分：内核配置】 ========================
 CONF_FILES=$(find target/linux/rockchip/armv8 -name "config-*")
 for CONF in $CONF_FILES; do
 sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
@@ -56,7 +56,7 @@ CONFIG_DEFAULT_TCP_CONG="bbr"
 EOF
 done
 
-# ======================== 【第三部分：设备定义 —— 100% 无错版】 ========================
+# ======================== 【第三部分：设备定义】 ========================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 
 sed -i '/define Device\/hinlink_h28k/,/TARGET_DEVICES += hinlink_h28k/d' "$TARGET_MK"
@@ -76,7 +76,7 @@ endef
 TARGET_DEVICES += hinlink_h29k
 EOF
 
-# ======================== 【第四部分：屏幕脚本 100% 原样还原】 ========================
+# ======================== 【第四部分：屏幕脚本】 ========================
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
@@ -100,7 +100,7 @@ done
 EOF
 chmod +x files/usr/bin/h29k_screen.sh
 
-# ======================== 【第五部分：系统自启脚本 100% 原样还原】 ========================
+# ======================== 【第五部分：设置系统默认】 ========================
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k <<'EOF'
 #!/bin/sh
@@ -142,4 +142,4 @@ sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set
 rm -rf tmp
 make defconfig
 
-echo -e "\n✅ 所有修复完成！你的代码 100% 完整保留，无任何报错！\n"
+echo -e "\n✅ 代码运行完成，祝你好运！\n"
