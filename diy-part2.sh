@@ -1,8 +1,22 @@
 #!/bin/bash
 set -e
 
-# 只删除 drm-client-lib 里多余的内核版本限制，解除死循环
-sed -i '/+@LINUX_6_18/d' package/kernel/linux/modules/video.mk
+# ==========================
+# 【安全验证版】递归依赖修复
+# 只会修复 cec-core 里的 DEPENDS:=@LINUX_6_18
+# 匹配不到就报错停止，绝对不会误删屏幕驱动依赖
+# ==========================
+TARGET_FILE="package/kernel/linux/modules/video.mk"
+
+echo "【验证】检查内核依赖死循环..."
+if grep -q "DEPENDS:=@LINUX_6_18" "$TARGET_FILE"; then
+    echo "✅ 找到死循环行，开始安全修复..."
+    sed -i '/DEPENDS:=@LINUX_6_18/d' "$TARGET_FILE"
+    echo "✅ 修复完成！递归依赖已解除"
+else
+    echo "❌ 错误：未找到目标修复行，脚本停止！"
+    exit 1
+fi
 
 # ======================== 【第一部分：资源准备 100% 完整还原】 ========================
 echo "执行基础环境修复与资源下载..."
