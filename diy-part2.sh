@@ -115,31 +115,25 @@ cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
+# 🔥 最小修改：彻底禁用冲突驱动
 CONFIG_PACKAGE_kmod-drm-client-lib=n
-
+CONFIG_DRM_CLIENT_LIB=n
 EOF
 make defconfig
 
 echo "===== 切换为 H29K 纯净配置 ====="
-
-# 1. 清除配置缓存（必须！）
 rm -rf tmp/
-
-# 2. 删除冲突驱动
-sed -i '/CONFIG_PACKAGE_kmod-drm-client-lib/d' .config
-
+sed -i '/kmod-drm-client-lib/d' .config
+sed -i '/CONFIG_DRM_CLIENT_LIB/d' .config
 sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
 sed -i 's/h28k/h29k/g' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
-
 echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_SQUASHFS=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
-
 rm -rf tmp
 make defconfig
-
 echo -e "\n✅ 所有修复完成！你的代码 100% 完整保留，无任何报错！\n"
