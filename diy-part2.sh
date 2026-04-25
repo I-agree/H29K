@@ -2,7 +2,7 @@
 set -e
 
 # ======================== 【仅加这 1 行：彻底斩断递归依赖 BUG】最小修改 ========================
-sed -i '/select DRM_CLIENT_LIB/d' package/kernel/linux/modules/video.mk  # 🔥 唯一修复行
+sed -i '/^  select DRM_CLIENT_LIB/d' package/kernel/linux/modules/video.mk
 
 # ======================== 【第一部分：资源准备 100% 完整还原】 ========================
 echo "执行基础环境修复与资源下载..."
