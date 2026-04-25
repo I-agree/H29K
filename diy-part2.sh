@@ -59,23 +59,16 @@ done
 # ======================== 【第三部分：设备定义】 ========================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 
-sed -i '/define Device\/hinlink_h28k/,/TARGET_DEVICES += hinlink_h28k/d' "$TARGET_MK"
-sed -i '/define Device\/hinlink_h29k/,/TARGET_DEVICES += hinlink_h29k/d' "$TARGET_MK"
-
+# ========== 保留H28K定义（不影响其框架）增加H29K定义 ==========
 cat >> "$TARGET_MK" <<'EOF'
 define Device/hinlink_h29k
+  $(Device/rk3528)
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
-  DEVICE_DTS := rk3528-opc-h29k
-  BOARD_NAME := hinlink_h29k
-  UBOOT_DEVICE_NAME := hinlink_h29k
-  KERNEL_NAME:=Image
-  KERNEL_COMPRESS:=lzma
-  KERNEL_LOADADDR:=0x00200000
-  KERNEL_ENTRY:=0x00200000
-  FILESYSTEMS:=squashfs
-  IMAGES:=sysupgrade.img.gz
-  IMAGE/sysupgrade.img.gz := append-kernel | append-dtb | append-rootfs | gzip
+  DEVICE_ALT0_VENDOR := LinkStar
+  DEVICE_ALT0_MODEL := H29K
+  DEVICE_DTS := rk3528-opc-h29k.dts
+  UBOOT_DEVICE_NAME := hinlink-h29k
   DEVICE_PACKAGES := kmod-usb3 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
@@ -128,7 +121,7 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# ======================== 【第六部分：先 H28K → 纯净 H29K .config】 ========================
+# ======================== 【第六部分：H28K 基准配置 → H29K 纯净配置】 ========================
 echo "===== 生成 H28K 基准配置 ====="
 cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
@@ -139,16 +132,19 @@ make defconfig
 
 echo "===== 切换为 H29K 纯净配置 ====="
 rm -rf tmp/
-sed -i 's/hinlink_h28k/hinlink_h29k/g' .config
-sed -i 's/h28k/h29k/g' .config
+# ========== 修改点：仅替换设备名，保留H28K的rk3528内核配置框架 ==========
+sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
+
+# 【步骤1】删除旧分区配置（无视数字，最合理）
+sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
+sed -i '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/d' .config
+# 【步骤2】写入 H29K 新分区
 echo "CONFIG_TARGET_KERNEL_PARTSIZE=32" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
-echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
-echo "CONFIG_TARGET_ROOTFS_SQUASHFS=y" >> .config
+
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
 
 rm -rf tmp
