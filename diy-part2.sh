@@ -135,7 +135,6 @@ rm -rf tmp/
 # ========== 修改点：仅替换设备名，保留H28K的rk3528内核配置框架 ==========
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
-echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
 
 # 【步骤1】删除旧分区配置（无视数字，最合理）
