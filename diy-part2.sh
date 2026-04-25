@@ -145,6 +145,15 @@ sed -i '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/d' .config
 echo "CONFIG_TARGET_KERNEL_PARTSIZE=32" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 
+# 写入防冲突：dnsmasq-full + wpad-openssl
+sed -i '/CONFIG_PACKAGE_dnsmasq/d' .config
+sed -i '/CONFIG_PACKAGE_wpad/d' .config
+echo "CONFIG_PACKAGE_wpad-basic-wolfssl=n" >> .config
+echo "CONFIG_PACKAGE_wpad-basic-mbedtls=n" >> .config
+echo "CONFIG_PACKAGE_wpad-openssl=y" >> .config
+echo "CONFIG_PACKAGE_dnsmasq=n" >> .config
+echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
+
 sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
 
 rm -rf tmp
