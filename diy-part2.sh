@@ -1,23 +1,22 @@
 #!/bin/bash
 set -e
 
-# ==========================
-# 【安全验证版】递归依赖修复
-# 只会修复 cec-core 里的 DEPENDS:=@LINUX_6_18
-# 匹配不到就报错停止，绝对不会误删屏幕驱动依赖
-# ==========================
-TARGET_FILE="package/kernel/linux/modules/video.mk"
+# ==============================================
+# 【强验证 + 精准修复】彻底解决递归依赖报错
+# 只修复：PACKAGE_kmod-drm-client-lib 循环
+# ==============================================
+FILE="package/kernel/linux/modules/video.mk"
 
-echo "【验证】检查内核依赖死循环..."
-if grep -q "DEPENDS:=@LINUX_6_18" "$TARGET_FILE"; then
-    echo "✅ 找到死循环行，开始安全修复..."
-    sed -i '/DEPENDS:=@LINUX_6_18/d' "$TARGET_FILE"
-    echo "✅ 修复完成！递归依赖已解除"
+echo "== 安全验证：正在检查递归依赖循环 =="
+if grep -q 'DEPENDS:=@DISPLAY_SUPPORT +@LINUX_6_18' "$FILE"; then
+    echo "✅ 找到循环依赖，执行精准修复..."
+    # 只删除 drm-client-lib 里的 +@LINUX_6_18，不碰任何其他驱动
+    sed -i 's/DEPENDS:=@DISPLAY_SUPPORT +@LINUX_6_18/DEPENDS:=@DISPLAY_SUPPORT/' "$FILE"
+    echo "✅ 修复成功！循环已断开"
 else
-    echo "❌ 错误：未找到目标修复行，脚本停止！"
+    echo "❌ 错误：未找到可修复的循环！脚本停止！"
     exit 1
 fi
-
 # ======================== 【第一部分：资源准备 100% 完整还原】 ========================
 echo "执行基础环境修复与资源下载..."
 
