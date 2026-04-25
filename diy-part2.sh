@@ -71,7 +71,7 @@ define Device/hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
   IMAGES:=sysupgrade.img.gz
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | gzip | append-metadata
-  DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
+  DEVICE_PACKAGES := kmod-usb3 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
@@ -85,17 +85,24 @@ TMP_IMG="/tmp/screen_final.jpg"
 LOGO_DIR="/etc/config/screen"
 sleep 12
 for i in 1 2 3; do [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -f "$LOGO_DIR/LOGO$i.jpg" && sleep 0.8; done
+
 while true; do
-RSRP=$(uqmi -d /dev/cdc-wdm0 --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}')
-[ -z "$RSRP" ] && RSRP="Search"
-QUOTE=$(curl -s --connect-timeout 2 "https://v1.hitokoto.cn/?encode=text&charset=utf-8" | cut -c 1-25)
-convert "$LOGO_DIR/LOGO3.jpg" -fill "rgba(0,0,0,0.7)" -draw "rectangle 0 60 240 240" \
--font "$FONT" -fill "#00FF00" -pointsize 45 -annotate +35+130 "$RSRP" \
--fill white -pointsize 15 -annotate +160+130 "dB" \
--fill "#222222" -draw "rectangle 0 195 240 240" \
--fill "#CCCCCC" -pointsize 14 -annotate +10+225 "${QUOTE:-H29K Ready}" "$TMP_IMG"
-fbv -f "$TMP_IMG"
-sleep 25
+    # ==============================
+    # 动态获取 cdc-wdm 设备
+    # ==============================
+    WDM_DEV=$(ls /dev/cdc-wdm* 2>/dev/null | head -n1)
+    WDM_DEV=${WDM_DEV:-/dev/cdc-wdm0}
+    RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}')
+    [ -z "$RSRP" ] && RSRP="Search"
+
+    QUOTE=$(curl -s --connect-timeout 2 "https://v1.hitokoto.cn/?encode=text" | cut -c 1-25)
+    convert "$LOGO_DIR/LOGO3.jpg" -fill "rgba(0,0,0,0.7)" -draw "rectangle 0 60 240 240" \
+    -font "$FONT" -fill "#00FF00" -pointsize 45 -annotate +35+130 "$RSRP" \
+    -fill white -pointsize 15 -annotate +160+130 "dB" \
+    -fill "#222222" -draw "rectangle 0 195 240 240" \
+    -fill "#CCCCCC" -pointsize 14 -annotate +10+225 "${QUOTE:-H29K Ready}" "$TMP_IMG"
+    fbv -f "$TMP_IMG"
+    sleep 25
 done
 EOF
 chmod +x files/usr/bin/h29k_screen.sh
@@ -132,6 +139,7 @@ sed -i 's/h28k/h29k/g' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
 echo "CONFIG_TARGET_KERNEL_PARTSIZE=32" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
