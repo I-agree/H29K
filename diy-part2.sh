@@ -70,10 +70,6 @@ define Device/hinlink_h29k
   BOARD_NAME := hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink_h29k
   SUPPORTED_DEVICES := hinlink_h29k
-  KERNEL_LOADADDR := 0x00200000
-  KERNEL_SIZE := 33554432
-  ROOTFS_PARTSIZE:=1024
-
   IMAGES:=sysupgrade.img.gz
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | gzip | append-metadata
   DEVICE_PACKAGES := kmod-usb3 uboot-rockchip-v8 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
@@ -137,7 +133,8 @@ sed -i 's/h28k/h29k/g' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
-
+echo "CONFIG_TARGET_KERNEL_PARTSIZE=32" >> .config
+echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 echo "CONFIG_TARGET_IMAGES_GZIP=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_SQUASHFS=y" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
