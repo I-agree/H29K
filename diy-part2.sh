@@ -115,6 +115,7 @@ cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
+CONFIG_PACKAGE_kmod-drm-client-lib=n
 
 EOF
 make defconfig
