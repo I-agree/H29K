@@ -5,8 +5,6 @@ set -e
 echo "执行基础环境修复与资源下载..."
 
 # 已删除：软链接 functions.sh （BUG已修复）
-# 强制删除
-sed -i '/kmod-drm-client-lib/d' .config
 
 download_file() {
     local url="$1"
