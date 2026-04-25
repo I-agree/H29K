@@ -132,6 +132,41 @@ CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
 EOF
 make defconfig
 
+# ==============================================
+# 【官方标准】U-Boot 自动配置：先删 H28K → 再加 H29K
+# 路径：package/boot/uboot-rockchip/Makefile
+# ==============================================
+UBOOT_MAKEFILE="package/boot/uboot-rockchip/Makefile"
+
+# ###########################################################################
+# 步骤 1：删除 .config 中 所有旧的 uboot 配置（含 H28K）
+# ###########################################################################
+echo " → 清理旧 uboot 配置（H28K 等）"
+sed -i '/CONFIG_PACKAGE_uboot-rockchip/d' .config
+
+# ###########################################################################
+# 步骤 2：向 uboot-rockchip/Makefile 注册 H29K（官方格式）
+# ###########################################################################
+sed -i '/^UBOOT_DEVICES/a\
+define U-Boot/hinlink-h29k\
+  BUILD_DEVICES := hinlink_h29k\
+  UBOOT_CONFIG := hinlink-h29k_defconfig\
+endef\
+' "$UBOOT_MAKEFILE"
+
+# ###########################################################################
+# 步骤 3：刷新 uboot 包定义 → 自动生成 CONFIG
+# ###########################################################################
+echo " → 刷新 uboot 包索引，自动生成新 CONFIG"
+make -s package/boot/uboot-rockchip/clean
+make -s package/boot/uboot-rockchip/prepare
+
+echo "====================================================================="
+echo " ✅ U-Boot 配置完成：hinlink-h29k"
+echo " ✅ 自动生成：CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y"
+echo " ✅ 已删除旧 H28K uboot 配置，无残留、无冲突"
+echo "====================================================================="
+
 echo "===== 切换为 H29K 纯净配置 ====="
 # ========== 修改点：仅替换设备名，保留H28K的rk3528内核配置框架 ==========
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
@@ -142,7 +177,7 @@ echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
 sed -i '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/d' .config
 # 【步骤2】写入 H29K 新分区
-echo "CONFIG_TARGET_KERNEL_PARTSIZE=32" >> .config
+echo "CONFIG_TARGET_KERNEL_PARTSIZE=128" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 
 # 写入防冲突：dnsmasq-full + wpad-openssl
@@ -153,8 +188,6 @@ echo "CONFIG_PACKAGE_wpad-basic-mbedtls=n" >> .config
 echo "CONFIG_PACKAGE_wpad-openssl=y" >> .config
 echo "CONFIG_PACKAGE_dnsmasq=n" >> .config
 echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
-
-sed -i 's/CONFIG_TARGET_ROOTFS_EXT4FS=y/# CONFIG_TARGET_ROOTFS_EXT4FS is not set/' .config
 
 echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-base-zh-cn=y" >> .config
