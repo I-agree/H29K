@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-# ======================== 【仅加这 1 行：彻底斩断递归依赖 BUG】最小修改 ========================
-sed -i '/DEPENDS:=@LINUX_6_18/d' package/kernel/linux/modules/video.mk
+# 只删除 drm-client-lib 里多余的内核版本限制，解除死循环
+sed -i '/+@LINUX_6_18/d' package/kernel/linux/modules/video.mk
 
 # ======================== 【第一部分：资源准备 100% 完整还原】 ========================
 echo "执行基础环境修复与资源下载..."
