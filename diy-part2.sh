@@ -68,7 +68,7 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
-  UBOOT_DEVICE_NAME := hinlink-h29k
+  UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   DEVICE_PACKAGES := kmod-usb3 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
@@ -131,49 +131,41 @@ EOF
 make defconfig
 
 # ==========================================================================
-# 自动配置 U-Boot for H29K（确保输出：hinlink-h29k-u-boot-rockchip.bin）
+# 官方格式插入 U-Boot for H29K —— 完全匹配原版 Makefile
 # ==========================================================================
 UBOOT_MAKEFILE="package/boot/uboot-rockchip/Makefile"
 
-echo "== 自动配置 u-boot for hinlink-h29k =="
+echo "== 按官方格式添加 U-Boot hinlink-h29k-rk3528"
 
-# 1. 删除旧的 H29K 配置（彻底清理）
-sed -i '/define U-Boot\/hinlink-h29k/,/endef/d' "$UBOOT_MAKEFILE"
-sed -i '/hinlink-h29k/d' "$UBOOT_MAKEFILE" # 额外清理UBOOT_TARGETS中的旧条目
-
-# 2. 添加 define U-Boot/hinlink-h29k（核心：指定输出文件名）
+# 1. 在 hinlink-h28k-rk3528 下方插入（官方格式、空行、对齐）
 sed -i '/hinlink-h28k-rk3528/a\
-define U-Boot/hinlink-h29k\
+\
+define U-Boot/hinlink-h29k-rk3528\
   $(U-Boot/rk3528/Default)\
   NAME:=HINLINK H29K\
-  BUILD_DEVICES := hinlink_h29k\
-  # 强制指定输出文件名：hinlink-h29k-u-boot-rockchip.bin\
-  UBOOT_IMAGE:=hinlink-h29k-u-boot-rockchip.bin\
-  # 传递编译参数，确保设备名匹配\
-  UBOOT_MAKE_FLAGS:=DEVICE=hinlink-h29k\
-endef\
-' "$UBOOT_MAKEFILE"
+  BUILD_DEVICES:= \\\
+    hinlink_h29k\
+endef' "$UBOOT_MAKEFILE"
 
-# 3. 加入 UBOOT_TARGETS（必须！否则不编译）
-# 修正匹配规则：改用更通用的rk3528，避免H28K命名变动导致插入失败
-# 安全追加 hinlink-h29k 到 UBOOT_TARGETS 列表（只加一次，不乱插）
-sed -i '/^UBOOT_TARGETS :=/,/^$/ { /rock-2-rk3528/a\  hinlink-h29k }' $UBOOT_MAKEFILE
+# 2. 按官方格式加入 UBOOT_TARGETS
+sed -i '/hinlink-h28k-rk3528/a\
+  hinlink-h29k-rk3528 \\' "$UBOOT_MAKEFILE"
 
-# 4. 清理旧 uboot 配置，强制添加 H29K（确保编译开关生效）
+# 3. 必须勾选的 U-Boot 配置
 sed -i '/CONFIG_PACKAGE_uboot-rockchip/d' .config
-# 包名规则：uboot-rockchip-<BUILD_DEVICES> → 即 hinlink_h29k
+echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
 echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
-# 5. 额外验证：确保 UBOOT_TARGETS 中无重复条目
-sed -i '/hinlink-h29k/!b;n;/hinlink-h29k/d' "$UBOOT_MAKEFILE"
-
-echo "✅ u-boot 配置完成！将生成 hinlink-h29k-u-boot-rockchip.bin"
+echo "✅ 官方格式 U-Boot 配置完成"
 
 echo "===== 切换为 H29K 纯净配置 ====="
 # ========== 修改点：仅替换设备名，保留H28K的rk3528内核配置框架 ==========
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
 echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
 # 【步骤1】删除旧分区配置（无视数字，最合理）
