@@ -61,7 +61,7 @@ done
 # ======================== 【第三部分：设备定义】 ========================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 
-# ========== 保留H28K定义（不影响其框架）增加H29K定义 ==========
+# ========== 保留H28K定义 → 增加H29K定义（使用你自己的DTS） ==========
 cat >> "$TARGET_MK" <<'EOF'
 define Device/hinlink_h29k
   $(Device/rk3528)
@@ -85,9 +85,6 @@ sleep 12
 for i in 1 2 3; do [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -f "$LOGO_DIR/LOGO$i.jpg" && sleep 0.8; done
 
 while true; do
-    # ==============================
-    # 动态获取 cdc-wdm 设备
-    # ==============================
     WDM_DEV=$(ls /dev/cdc-wdm* 2>/dev/null | head -n1)
     WDM_DEV=${WDM_DEV:-/dev/cdc-wdm0}
     RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}')
@@ -105,7 +102,7 @@ done
 EOF
 chmod +x files/usr/bin/h29k_screen.sh
 
-# ======================== 【第五部分：设置系统默认】 ========================
+# ======================== 【第五部分：系统默认设置】 ========================
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k <<'EOF'
 #!/bin/sh
@@ -121,7 +118,7 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# ======================== 【第六部分：H28K 基准配置 → H29K 纯净配置】 ========================
+# ======================== 【第六部分：H28K基准 → 切换H29K】 ========================
 echo "===== 生成 H28K 基准配置 ====="
 cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
@@ -131,13 +128,36 @@ EOF
 make defconfig
 
 # ==========================================================================
-# 官方格式插入 U-Boot for H29K —— 完全匹配原版 Makefile
+# 【这里开始是新增：U-Boot H29K 支持】
+# 功能：
+# 1. 从 LEDE 复制 U-Boot 补丁
+# 2. 自动跳过 LEDE 自带的 rk3528-opc-h29k.dts，不覆盖你的文件
+# 3. 官方格式添加 U-Boot/hinlink-h29k-rk3528
 # ==========================================================================
+echo "== 从 Lean LEDE 复制 H29K U-Boot 补丁（不含DTS）"
+git clone --depth 1 https://github.com/coolsnowwolf/lede.git /tmp/lede
+mkdir -p package/boot/uboot-rockchip/patches
+
+# 只复制不含 DTS 的补丁，确保使用你自己的设备树
+cd /tmp/lede/package/boot/uboot-rockchip/patches
+for f in *hinlink*h29k*.patch; do
+  if [ -f "$f" ] && ! grep -q "rk3528-opc-h29k.dts" "$f"; then
+    cp -f "$f" /workdir/openwrt/package/boot/uboot-rockchip/patches/
+    echo "✅ 复制 U-Boot 补丁：$f"
+  fi
+done
+
+rm -rf /tmp/lede
+cd /workdir/openwrt
+
+# ===================== U-Boot Makefile 最小修改 =====================
 UBOOT_MAKEFILE="package/boot/uboot-rockchip/Makefile"
 
-echo "== 按官方格式添加 U-Boot hinlink-h29k-rk3528"
+# 删除旧配置
+sed -i '/define U-Boot\/hinlink-h29k-rk3528/,/endef/d' "$UBOOT_MAKEFILE"
+sed -i '/hinlink-h29k-rk3528/d' "$UBOOT_MAKEFILE"
 
-# 1. 在 hinlink-h28k-rk3528 下方插入（官方格式、空行、对齐）
+# 官方格式插入 H29K U-Boot 定义
 sed -i '/hinlink-h28k-rk3528/a\
 \
 define U-Boot/hinlink-h29k-rk3528\
@@ -147,35 +167,33 @@ define U-Boot/hinlink-h29k-rk3528\
     hinlink_h29k\
 endef' "$UBOOT_MAKEFILE"
 
-# 2. 按官方格式加入 UBOOT_TARGETS
+# 加入 UBOOT_TARGETS
 sed -i '/hinlink-h28k-rk3528/a\
   hinlink-h29k-rk3528 \\' "$UBOOT_MAKEFILE"
 
-# 3. 必须勾选的 U-Boot 配置
+# ===================== 自动开启 U-Boot 编译 =====================
 sed -i '/CONFIG_PACKAGE_uboot-rockchip/d' .config
 echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
 echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
 echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
-echo "✅ 官方格式 U-Boot 配置完成"
+# ==========================================================================
+# 以下完全保持你原来的配置不动
+# ==========================================================================
 
 echo "===== 切换为 H29K 纯净配置 ====="
-# ========== 修改点：仅替换设备名，保留H28K的rk3528内核配置框架 ==========
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
-# 【步骤1】删除旧分区配置（无视数字，最合理）
+# 【步骤1】删除旧分区配置
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
 sed -i '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/d' .config
 # 【步骤2】写入 H29K 新分区
 echo "CONFIG_TARGET_KERNEL_PARTSIZE=128" >> .config
 echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
 
-# 写入防冲突：dnsmasq-full + wpad-openssl
+# dnsmasq-full + wpad-openssl
 sed -i '/CONFIG_PACKAGE_dnsmasq/d' .config
 sed -i '/CONFIG_PACKAGE_wpad/d' .config
 echo "CONFIG_PACKAGE_wpad-basic-wolfssl=n" >> .config
@@ -184,11 +202,11 @@ echo "CONFIG_PACKAGE_wpad-openssl=y" >> .config
 echo "CONFIG_PACKAGE_dnsmasq=n" >> .config
 echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config
 
+# 中文 + 插件
 echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-base-zh-cn=y" >> .config
 echo "CONFIG_PACKAGE_luci-app-irqbalance=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-irqbalance-zh-cn=y" >> .config
-
 echo "CONFIG_PACKAGE_dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-app-dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
@@ -196,4 +214,8 @@ echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
 rm -rf tmp
 make defconfig
 
-echo -e "\n✅ 代码运行完成，祝你好运！\n"
+echo -e "\n========================================================"
+echo "✅ 脚本执行完成！"
+echo "✅ 使用你自己的 DTS：rk3528-opc-h29k.dts"
+echo "✅ U-Boot 自动编译：hinlink-h29k-rk3528-u-boot-rockchip.bin"
+echo "========================================================"
