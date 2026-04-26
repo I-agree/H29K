@@ -156,8 +156,8 @@ endef\
 
 # 3. 加入 UBOOT_TARGETS（必须！否则不编译）
 # 修正匹配规则：改用更通用的rk3528，避免H28K命名变动导致插入失败
-sed -i '/rk3528/ s/$/\
-  hinlink-h29k/' "$UBOOT_MAKEFILE"
+# 安全追加 hinlink-h29k 到 UBOOT_TARGETS 列表（只加一次，不乱插）
+sed -i '/^UBOOT_TARGETS :=/,/^$/ { /rock-2-rk3528/a\  hinlink-h29k }' $UBOOT_MAKEFILE
 
 # 4. 清理旧 uboot 配置，强制添加 H29K（确保编译开关生效）
 sed -i '/CONFIG_PACKAGE_uboot-rockchip/d' .config
