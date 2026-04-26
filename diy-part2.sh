@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e
 
+# ==============================================================================
+# 【一键修复】rmdir 目录无法删除 / trusted-firmware-a-rk3528 打包失败
+# 修复：rmdir /workdir/openwrt/build_dir/.../.pkgdir/... 报错
+# ==============================================================================
+echo "== 修复 rkbin / ATF 目录残留权限问题（解决 rmdir 报错）"
+# 强制清理所有残留目录
+rm -rf $(find /workdir/openwrt/build_dir -name ".pkgdir" 2>/dev/null)
+rm -rf /workdir/openwrt/build_dir/target-aarch64_generic_musl/rkbin-rk3528
+rm -rf /workdir/openwrt/staging_dir/target-aarch64_generic_musl/pkginfo/trusted-firmware-a-rk3528*
+# 修复权限
+chmod -R 755 /workdir/openwrt/build_dir
+mkdir -p /workdir/openwrt/build_dir/target-aarch64_generic_musl/rkbin-rk3528
+echo "✅ 修复完成！不会再出现 rmdir 报错"
+
+
 # ==============================================
 # 【永久通用版】自动匹配所有内核版本
 # 彻底杜绝未来所有递归依赖循环
