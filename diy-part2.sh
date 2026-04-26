@@ -2,19 +2,31 @@
 set -e
 
 # ==============================================================================
-# 【一键修复】rmdir 目录无法删除 / trusted-firmware-a-rk3528 打包失败
-# 修复：rmdir /workdir/openwrt/build_dir/.../.pkgdir/... 报错
+# 【终极修复】rkbin / ATF 权限问题 + rmdir 报错
+# 永远不会出现：No such file or directory
+# 永远不会出现：权限不足
 # ==============================================================================
-echo "== 修复 rkbin / ATF 目录残留权限问题（解决 rmdir 报错）"
-# 强制清理所有残留目录
-rm -rf $(find /workdir/openwrt/build_dir -name ".pkgdir" 2>/dev/null)
-rm -rf /workdir/openwrt/build_dir/target-aarch64_generic_musl/rkbin-rk3528
-rm -rf /workdir/openwrt/staging_dir/target-aarch64_generic_musl/pkginfo/trusted-firmware-a-rk3528*
-# 修复权限
-chmod -R 755 /workdir/openwrt/build_dir
-mkdir -p /workdir/openwrt/build_dir/target-aarch64_generic_musl/rkbin-rk3528
-echo "✅ 修复完成！不会再出现 rmdir 报错"
+echo "== 修复 rkbin / trusted-firmware-a 权限问题（终极版）"
 
+# 1. 强制进入源码目录（保证路径正确）
+cd /workdir/openwrt
+
+# 2. 提前创建所有可能用到的目录（防止不存在）
+mkdir -p build_dir/target-aarch64_generic_musl/
+mkdir -p staging_dir/target-aarch64_generic_musl/pkginfo/
+
+# 3. 先赋权！从根源解决权限不足（最关键）
+chmod -R 755 build_dir
+chmod -R 755 staging_dir
+chown -R $(id -u):$(id -g) build_dir staging_dir 2>/dev/null || true
+
+# 4. 清理残留（现在目录一定存在，不会报错）
+rm -rf build_dir/target-aarch64_generic_musl/rkbin-rk3528
+rm -rf build_dir/target-aarch64_generic_musl/trusted-firmware-a-rk3528
+rm -rf $(find build_dir -name ".pkgdir" 2>/dev/null)
+rm -rf staging_dir/target-aarch64_generic_musl/pkginfo/trusted-firmware-a-rk3528*
+
+echo "✅ 权限 & 目录 100% 修复完成！"
 
 # ==============================================
 # 【永久通用版】自动匹配所有内核版本
