@@ -131,39 +131,49 @@ EOF
 make defconfig
 
 # ==========================================================================
-# 自动配置 U-Boot for H29K
+# 自动配置 U-Boot for H29K（确保输出：hinlink-h29k-u-boot-rockchip.bin）
 # ==========================================================================
 UBOOT_MAKEFILE="package/boot/uboot-rockchip/Makefile"
 
-echo "== 自动 u-boot for hinlink-h29k"
+echo "== 自动配置 u-boot for hinlink-h29k =="
 
-# 1. 删除旧的 H29K 配置
+# 1. 删除旧的 H29K 配置（彻底清理）
 sed -i '/define U-Boot\/hinlink-h29k/,/endef/d' "$UBOOT_MAKEFILE"
+sed -i '/hinlink-h29k/d' "$UBOOT_MAKEFILE" # 额外清理UBOOT_TARGETS中的旧条目
 
-# 2. 添加define U-Boot
+# 2. 添加 define U-Boot/hinlink-h29k（核心：指定输出文件名）
 sed -i '/hinlink-h28k-rk3528/a\
 define U-Boot/hinlink-h29k\
   $(U-Boot/rk3528/Default)\
   NAME:=HINLINK H29K\
   BUILD_DEVICES := hinlink_h29k\
+  # 强制指定输出文件名：hinlink-h29k-u-boot-rockchip.bin\
+  UBOOT_IMAGE:=hinlink-h29k-u-boot-rockchip.bin\
+  # 传递编译参数，确保设备名匹配\
+  UBOOT_MAKE_FLAGS:=DEVICE=hinlink-h29k\
 endef\
 ' "$UBOOT_MAKEFILE"
 
 # 3. 加入 UBOOT_TARGETS（必须！否则不编译）
-sed -i '/rock-2-rk3528/a\  hinlink-h29k' "$UBOOT_MAKEFILE"
+# 修正匹配规则：改用更通用的rk3528，避免H28K命名变动导致插入失败
+sed -i '/rk3528/ s/$/\
+  hinlink-h29k/' "$UBOOT_MAKEFILE"
 
-# 4. 清理旧 uboot 配置，强制添加 H29K
+# 4. 清理旧 uboot 配置，强制添加 H29K（确保编译开关生效）
 sed -i '/CONFIG_PACKAGE_uboot-rockchip/d' .config
+# 包名规则：uboot-rockchip-<BUILD_DEVICES> → 即 hinlink_h29k
 echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
-echo "✅ u-boot 自动配置完成！"
+# 5. 额外验证：确保 UBOOT_TARGETS 中无重复条目
+sed -i '/hinlink-h29k/!b;n;/hinlink-h29k/d' "$UBOOT_MAKEFILE"
+
+echo "✅ u-boot 配置完成！将生成 hinlink-h29k-u-boot-rockchip.bin"
 
 echo "===== 切换为 H29K 纯净配置 ====="
 # ========== 修改点：仅替换设备名，保留H28K的rk3528内核配置框架 ==========
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
 # 【步骤1】删除旧分区配置（无视数字，最合理）
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
