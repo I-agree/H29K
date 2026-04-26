@@ -65,7 +65,7 @@ TARGET_MK="target/linux/rockchip/image/armv8.mk"
 cat >> "$TARGET_MK" <<'EOF'
 define Device/hinlink_h29k
   $(Device/rk3528)
-  DEVICE_VENDOR := 深圳华强北DIY
+  DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-opc-h29k
   UBOOT_DEVICE_NAME := hinlink-h29k
