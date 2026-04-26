@@ -184,6 +184,10 @@ echo "CONFIG_PACKAGE_luci-i18n-base-zh-cn=y" >> .config
 echo "CONFIG_PACKAGE_luci-app-irqbalance=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-irqbalance-zh-cn=y" >> .config
 
+echo "CONFIG_PACKAGE_dnscrypt-proxy=y" >> .config
+echo "CONFIG_PACKAGE_luci-app-dnscrypt-proxy=y" >> .config
+echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
+
 rm -rf tmp
 make defconfig
 
