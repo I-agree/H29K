@@ -197,7 +197,6 @@ rm -rf tmp
 make defconfig
 
 # 强制提前编译 H28K U-Boot，解决打包找不到文件问题
-make package/boot/uboot-rockchip/host/compile V=s
-make package/boot/uboot-rockchip/compile V=s
+make defconfig
 
 echo -e "\n✅ 代码运行完成，祝你好运！\n"
