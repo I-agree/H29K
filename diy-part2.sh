@@ -184,6 +184,7 @@ CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 CONFIG_PACKAGE_uboot-rockchip=y
 CONFIG_PACKAGE_uboot-rockchip-v8=y
 CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
+CONFIG_TARGET_DEVICE_PACKAGES_rockchip_armv8_DEVICE_hinlink_h29k="uboot-rockchip-hinlink_h29k"
 EOF
 
 echo -e "\n✅ diy-part2.sh 执行完成！"
