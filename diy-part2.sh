@@ -125,6 +125,8 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
+make clean
+
 # ======================== 【第六部分：H28K 基准配置 → H29K 纯净配置】 ========================
 echo "===== 生成 H28K 基准配置 ====="
 cat > .config <<EOF
@@ -132,6 +134,7 @@ CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
 EOF
+
 make defconfig
 
 # ==========================================================================
@@ -193,6 +196,8 @@ echo "CONFIG_PACKAGE_luci-i18n-irqbalance-zh-cn=y" >> .config
 echo "CONFIG_PACKAGE_dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-app-dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
+
+make defconfig
 
 make defconfig
 
