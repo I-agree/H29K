@@ -13,12 +13,16 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-###########################################################
-# 1. 下载：让 OpenWRT 编译 U‑Boot 的补丁（正确位置）
-###########################################################
+# 创建补丁目录（唯一正确目录）
 mkdir -p package/boot/uboot-rockchip/patches/
+
+# 补丁 1：让 OpenWRT 识别 H29K
 wget -O package/boot/uboot-rockchip/patches/001-add-h29k-uboot-target.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/001-add-h29k-uboot-target.patch
+
+# 补丁 2：H29K 设备代码（DTS + board + defconfig）
+wget -O package/boot/uboot-rockchip/patches/108-board-rockchip-add-HINLINK-H29K.patch \
+https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
 
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
