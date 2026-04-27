@@ -1,19 +1,18 @@
---- a/package/boot/uboot-rockchip/Makefile
-+++ b/package/boot/uboot-rockchip/Makefile
-@@ -126,6 +126,11 @@ endef
- define U-Boot/hinlink-h28k-rk3528
+--- a/Makefile
++++ b/Makefile
+@@ -126,6 +126,11 @@ define U-Boot/hinlink-h28k-rk3528
    $(U-Boot/rk3528/Default)
    NAME:=HINLINK H28K
    BUILD_DEVICES:=hinlink_h28k
  endef
-
+ 
 +define U-Boot/hinlink-h29k-rk3528
 +  $(U-Boot/rk3528/Default)
 +  NAME:=HINLINK H29K
 +  BUILD_DEVICES:=hinlink_h29k
 +endef
 +
-@@ -380,6 +385,7 @@ UBOOT_TARGETS := \
+@@ -381,6 +386,7 @@ UBOOT_TARGETS := \
         rock-pi-e-v3-rk3328 \
         hinlink-h28k-rk3528 \
 +       hinlink-h29k-rk3528 \
