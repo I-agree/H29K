@@ -13,6 +13,31 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
+# 功能：自动下载 HINLINK H29K 设备完整补丁（内置DTS+设备配置）
+# 无需单独处理 DTS 文件，补丁全包
+#
+
+#==================== 下载 H29K 完整补丁 ====================
+echo "============================================="
+echo " 开始下载 HINLINK H29K 设备补丁（内置DTS）"
+echo "============================================="
+
+# 替换为你补丁的真实 Raw 地址（GitHub 打开补丁 → 点 Raw → 复制链接）
+wget -O 108-board-rockchip-add-HINLINK-H29K.patch \
+https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
+
+# 校验下载结果
+if [ -f "108-board-rockchip-add-HINLINK-H29K.patch" ]; then
+    echo "✅ 补丁下载成功，准备应用"
+else
+    echo "❌ 补丁下载失败，请检查下载地址"
+    exit 1
+fi
+
+echo "======================================================="
+echo " 下载108-board-rockchip-add-HINLINK-H29K.patch行完成"
+echo "======================================================="
+
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
