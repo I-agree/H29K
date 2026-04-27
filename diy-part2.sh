@@ -32,11 +32,6 @@ download_file() {
     fi
 }
 
-DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
-mkdir -p "$DTS_DIR" files/etc/config/screen bin/targets/rockchip/armv8
-
-download_file "https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts" "$DTS_DIR/rk3528-opc-h29k.dts" "设备树"
-
 LOGO_RAW_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 for i in 1 2 3; do
   download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO${i}"
@@ -67,8 +62,8 @@ define Device/hinlink_h29k
   $(Device/rk3528)
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
-  DEVICE_DTS := rk3528-opc-h29k
-  UBOOT_DEVICE_NAME := hinlink-h28k-rk3528
+  DEVICE_DTS := rk3528-opc-h29k  # DTS由108补丁内置，此处仅保留引用
+  UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   DEVICE_PACKAGES := kmod-usb3 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
@@ -130,14 +125,42 @@ CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
 EOF
 make defconfig
 
+# ==========================================================================
+# 官方格式插入 U-Boot for H29K —— 完全匹配原版 Makefile
+# ==========================================================================
+UBOOT_MAKEFILE="package/boot/uboot-rockchip/Makefile"
+
+echo "== 按官方格式添加 U-Boot hinlink-h29k-rk3528"
+
+# 1. 在 hinlink-h28k-rk3528 下方插入（官方格式、空行、对齐）
+sed -i '/hinlink-h28k-rk3528/a\
+\
+define U-Boot/hinlink-h29k-rk3528\
+  $(U-Boot/rk3528/Default)\
+  NAME:=HINLINK H29K\
+  BUILD_DEVICES:= \\\
+    hinlink_h29k\
+endef' "$UBOOT_MAKEFILE"
+
+# 2. 按官方格式加入 UBOOT_TARGETS
+sed -i '/hinlink-h28k-rk3528/a\
+  hinlink-h29k-rk3528 \\' "$UBOOT_MAKEFILE"
+
+# 3. 必须勾选的 U-Boot 配置
+sed -i '/CONFIG_PACKAGE_uboot-rockchip/d' .config
+echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
+
+echo "✅ 官方格式 U-Boot 配置完成"
+
+make clean
+
 echo "===== 切换为 H29K 纯净配置 ====="
 # ========== 修改点：仅替换设备名，保留H28K的rk3528内核配置框架 ==========
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h28k=y" >> .config
 
 # 【步骤1】删除旧分区配置（无视数字，最合理）
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
@@ -164,10 +187,7 @@ echo "CONFIG_PACKAGE_dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-app-dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
 
-rm -rf tmp
+make clean
 make defconfig
 
-# 强制提前编译 H28K U-Boot，解决打包找不到文件问题
-make defconfig
-
-echo -e "\n✅ 代码运行完成，祝你好运！\n"
+echo -e "\n✅ 代码运行完成，DTS相关代码已删除（由108-board-rockchip-add-HINLINK-H29K.patch内置），祝你好运！\n"
