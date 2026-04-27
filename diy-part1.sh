@@ -13,31 +13,41 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-# 功能：自动下载 HINLINK H29K 设备完整补丁（内置DTS+设备配置）
-# 无需单独处理 DTS 文件，补丁全包
-#
+# 1. 下载U-Boot补丁到指定目录
+# 2. 下载内核DTS文件到指定目录
 
 echo "============================================="
-echo " 开始下载 HINLINK H29K 设备补丁"
+echo " 开始下载 HINLINK H29K 设备补丁（U-Boot）"
 echo "============================================="
 
-# 1. 创建 U-Boot 补丁目录（OpenWrt 标准路径）
+# ==========================
+# 1. 下载补丁到你指定的正确位置
+# ==========================
 mkdir -p package/boot/uboot-rockchip/patches/
-
-# 2. 下载补丁到【正确位置】，和 107-H28K.patch 平级
-wget -P package/boot/uboot-rockchip/patches/ \
+wget -O package/boot/uboot-rockchip/patches/108-board-rockchip-add-HINLINK-H29K.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
 
-# 3. 校验下载结果
-if [ -f "package/boot/uboot-rockchip/patches/108-board-rockchip-add-HINLINK-H29K.patch" ]; then
-    echo "✅ 补丁已放到 OpenWrt U-Boot 标准目录，编译时自动应用"
+# ==========================
+# 2. 直接下载 DTS 给内核用
+# ==========================
+echo "============================================="
+echo " 下载内核设备树 DTS 文件"
+echo "============================================="
+DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+mkdir -p "$DTS_DIR"
+wget -O "$DTS_DIR/rk3528-opc-h29k.dts" \
+https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
+
+# 校验
+if [ -f "$DTS_DIR/rk3528-opc-h29k.dts" ]; then
+    echo "✅ DTS 文件已下载到内核正确路径"
 else
-    echo "❌ 补丁下载失败，请检查地址"
+    echo "❌ DTS 下载失败"
     exit 1
 fi
 
 echo "============================================="
-echo " 补丁放置完成！"
+echo " 补丁 + DTS 全部处理完成！"
 echo "============================================="
 
 # Add a feed source
