@@ -135,34 +135,7 @@ EOF
 
 make defconfig
 
-# ==========================================================================
-# 官方格式插入 U-Boot for H29K —— 完全匹配原版 Makefile
-# ==========================================================================
-UBOOT_MAKEFILE="package/boot/uboot-rockchip/Makefile"
-
-echo "== 按官方格式添加 U-Boot hinlink-h29k-rk3528"
-
-# 1. 在 hinlink-h28k-rk3528 下方插入（官方格式、空行、对齐）
-sed -i '/hinlink-h28k-rk3528/a\
-\
-define U-Boot/hinlink-h29k-rk3528\
-  $(U-Boot/rk3528/Default)\
-  NAME:=HINLINK H29K\
-  BUILD_DEVICES:= \\\
-    hinlink_h29k\
-endef' "$UBOOT_MAKEFILE"
-
-# 2. 按官方格式加入 UBOOT_TARGETS
-sed -i '/hinlink-h28k-rk3528/a\
-  hinlink-h29k-rk3528 \\' "$UBOOT_MAKEFILE"
-
-# 3. 必须勾选的 U-Boot 配置
-sed -i '/CONFIG_PACKAGE_uboot-rockchip/d' .config
-echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
-
-echo "✅ 官方格式 U-Boot 配置完成"
+echo "✅ H28K 基准配置完成"
 
 echo "===== 切换为 H29K 纯净配置 ====="
 # ==============================================
