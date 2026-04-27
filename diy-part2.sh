@@ -208,6 +208,11 @@ cat >> .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
+# ===== 新增U-Boot核心配置 =====
+CONFIG_UBOOT_TARGET="hinlink-h29k-rk3528"
+CONFIG_PACKAGE_uboot=y
+CONFIG_PACKAGE_uboot-rockchip-bin=y
+# ==============================
 CONFIG_PACKAGE_uboot-rockchip=y
 CONFIG_PACKAGE_uboot-rockchip-v8=y
 CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
@@ -216,5 +221,18 @@ CONFIG_TARGET_DEVICE_HINLINK_H29K=y
 CONFIG_UBOOT_HINLINK_H29K=y
 CONFIG_rockchip_h29k=y
 EOF
+
+# 脚本最后添加：强制检查并编译 U-Boot
+echo "===== 强制编译 U-Boot for H29K ====="
+make package/uboot-rockchip/compile V=s CONFIG_UBOOT_TARGET=hinlink-h29k-rk3528
+# 验证文件是否生成
+if [ ! -f "staging_dir/target-aarch64_generic_musl/image/hinlink-h29k-rk3528-u-boot-rockchip.bin" ]; then
+    echo "❌ U-Boot 编译失败！检查 uboot-rockchip.mk 配置"
+    # 打印 U-Boot 编译日志，便于排查
+    cat build_dir/target-aarch64_generic_musl/uboot-rockchip-hinlink-h29k-rk3528/build.log
+    exit 1
+else
+    echo "✅ U-Boot 二进制文件已生成！"
+fi
 
 echo -e "\n✅ diy-part2.sh 执行完成！"
