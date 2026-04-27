@@ -194,7 +194,6 @@ echo "CONFIG_PACKAGE_dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-app-dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
 
-make clean
 make defconfig
 
 echo -e "\n✅ diy-part2.sh 执行完成！"
