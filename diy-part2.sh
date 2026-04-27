@@ -125,8 +125,6 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-make clean
-
 # ======================== 【第六部分：H28K 基准配置 → H29K 纯净配置】 ========================
 echo "===== 生成 H28K 基准配置 ====="
 cat > .config <<EOF
