@@ -154,8 +154,6 @@ echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
 echo "✅ 官方格式 U-Boot 配置完成"
 
-make clean
-
 echo "===== 切换为 H29K 纯净配置 ====="
 # ========== 修改点：仅替换设备名，保留H28K的rk3528内核配置框架 ==========
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
