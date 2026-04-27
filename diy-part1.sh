@@ -60,3 +60,7 @@ echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.co
 echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon.git;master' >> feeds.conf.default
 # 添加 Argon 配置插件源
 echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;master' >> feeds.conf.default
+
+# Actions 环境必须清理，确保补丁重新应用
+make package/uboot-rockchip/clean V=s
+make package/uboot-rockchip/refresh V=s
