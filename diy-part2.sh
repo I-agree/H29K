@@ -201,7 +201,12 @@ echo "CONFIG_PACKAGE_dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-app-dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
 
+# ==============================
+# 写入：H29K 全部正确配置
+# ==============================
 cat >> .config <<EOF
+CONFIG_TARGET_rockchip=y
+CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 CONFIG_PACKAGE_uboot-rockchip=y
 CONFIG_PACKAGE_uboot-rockchip-v8=y
@@ -212,7 +217,4 @@ CONFIG_UBOOT_HINLINK_H29K=y
 CONFIG_rockchip_h29k=y
 EOF
 
-make defconfig
-
 echo -e "\n✅ diy-part2.sh 执行完成！"
-echo -e "✅ DTS 相关代码已全部删除（由 108-board-rockchip-add-HINLINK-H29K.patch 内置提供）\n"
