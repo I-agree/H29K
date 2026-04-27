@@ -195,9 +195,16 @@ echo "CONFIG_PACKAGE_dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-app-dnscrypt-proxy=y" >> .config
 echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
 
-echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
-echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
+cat >> .config <<EOF
+CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
+CONFIG_PACKAGE_uboot-rockchip=y
+CONFIG_PACKAGE_uboot-rockchip-v8=y
+CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
+CONFIG_PACKAGE_uboot-rockchip-h29k=y
+CONFIG_TARGET_DEVICE_HINLINK_H29K=y
+CONFIG_UBOOT_HINLINK_H29K=y
+CONFIG_rockchip_h29k=y
+EOF
 
 make defconfig
 
