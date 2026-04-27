@@ -169,6 +169,9 @@ echo "===== 切换为 H29K 纯净配置 ====="
 sed -i 's/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y/' .config
 sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip=y" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip-v8=y" >> .config
+echo "CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y" >> .config
 
 # 【步骤1】删除旧分区配置（无视数字，最合理）
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
