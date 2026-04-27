@@ -1,22 +1,6 @@
 #!/bin/bash
 set -e
 
-# ==============================================
-# 【永久通用版】自动匹配所有内核版本
-# 彻底杜绝未来所有递归依赖循环
-# ==============================================
-FILE="package/kernel/linux/modules/video.mk"
-
-echo "== 永久修复：自动移除 drm-client-lib 内核版本依赖 =="
-if grep -q 'DEPENDS:=@DISPLAY_SUPPORT +@LINUX_[0-9]*_[0-9]*' "$FILE"; then
-    echo "✅ 找到内核版本依赖，执行永久修复..."
-    sed -i 's/DEPENDS:=@DISPLAY_SUPPORT +@LINUX_[0-9]*_[0-9]*/DEPENDS:=@DISPLAY_SUPPORT/' "$FILE"
-    echo "✅ 永久修复完成！未来任何内核升级都不会再触发循环！"
-else
-    echo "❌ 错误：未找到需要修复的依赖！脚本停止！"
-    exit 1
-fi
-
 # ======================== 【第一部分：资源准备】 ========================
 echo "执行基础资源下载..."
 
