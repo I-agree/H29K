@@ -32,6 +32,15 @@ download_file() {
     fi
 }
 
+# ==============================================
+# 【已删除】DTS 相关代码
+# 原因：108-board-rockchip-add-HINLINK-H29K.patch 已完整内置 rk3528-opc-h29k.dts
+# ==============================================
+
+# 创建LOGO目录
+mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
+
+# 下载开机LOGO
 LOGO_RAW_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 for i in 1 2 3; do
   download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO${i}"
@@ -62,7 +71,7 @@ define Device/hinlink_h29k
   $(Device/rk3528)
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
-  DEVICE_DTS := rk3528-opc-h29k  # DTS由108补丁内置，此处仅保留引用
+  DEVICE_DTS := rk3528-opc-h29k
   UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   DEVICE_PACKAGES := kmod-usb3 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
 endef
@@ -188,4 +197,5 @@ echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
 make clean
 make defconfig
 
-echo -e "\n✅ 代码运行完成，DTS相关代码已删除（由108-board-rockchip-add-HINLINK-H29K.patch内置），祝你好运！\n"
+echo -e "\n✅ diy-part2.sh 执行完成！"
+echo -e "✅ DTS 相关代码已全部删除（由 108-board-rockchip-add-HINLINK-H29K.patch 内置提供）\n"
