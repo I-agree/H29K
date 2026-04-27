@@ -17,26 +17,28 @@
 # 无需单独处理 DTS 文件，补丁全包
 #
 
-#==================== 下载 H29K 完整补丁 ====================
 echo "============================================="
-echo " 开始下载 HINLINK H29K 设备补丁（内置DTS）"
+echo " 开始下载 HINLINK H29K 设备补丁"
 echo "============================================="
 
-# 替换为你补丁的真实 Raw 地址（GitHub 打开补丁 → 点 Raw → 复制链接）
-wget -O 108-board-rockchip-add-HINLINK-H29K.patch \
+# 1. 创建 U-Boot 补丁目录（OpenWrt 标准路径）
+mkdir -p package/boot/uboot-rockchip/patches/
+
+# 2. 下载补丁到【正确位置】，和 107-H28K.patch 平级
+wget -P package/boot/uboot-rockchip/patches/ \
 https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
 
-# 校验下载结果
-if [ -f "108-board-rockchip-add-HINLINK-H29K.patch" ]; then
-    echo "✅ 补丁下载成功，准备应用"
+# 3. 校验下载结果
+if [ -f "package/boot/uboot-rockchip/patches/108-board-rockchip-add-HINLINK-H29K.patch" ]; then
+    echo "✅ 补丁已放到 OpenWrt U-Boot 标准目录，编译时自动应用"
 else
-    echo "❌ 补丁下载失败，请检查下载地址"
+    echo "❌ 补丁下载失败，请检查地址"
     exit 1
 fi
 
-echo "======================================================="
-echo " 下载108-board-rockchip-add-HINLINK-H29K.patch行完成"
-echo "======================================================="
+echo "============================================="
+echo " 补丁放置完成！"
+echo "============================================="
 
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
