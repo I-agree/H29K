@@ -13,46 +13,33 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-# ======================== 安全清理：只删冲突补丁 ========================
-# 清理内核里所有 RK3588 / Rock5 系列冲突补丁（不碰 RK3528/H28K）
-rm -vf target/linux/rockchip/patches-6.12/001-*
-rm -vf target/linux/rockchip/patches-6.12/002-*
-rm -vf target/linux/rockchip/patches-6.12/*rk3588*.patch
-rm -vf target/linux/rockchip/patches-6.12/*rock-5*.patch
-rm -vf target/linux/rockchip/patches-6.12/*firefly*.patch
-rm -vf target/linux/rockchip/patches-6.12/*odroid*.patch
-rm -vf target/linux/rockchip/patches-6.12/*phytium*.patch
+# ======================== 【终极清理：只保留 H28K/H29K，其余全部删除】 ========================
+# 清理内核补丁目录：只保留文件名包含 H28K/H29K 的补丁，其他所有补丁（RK3588/Rock5等）全部删除
+cd target/linux/rockchip/patches-6.12/
+ls *.patch | grep -v -E "H28K|H29K" | xargs rm -f 2>/dev/null
+cd - >/dev/null
 
-# 清理 U-Boot 里冲突补丁（严格保留 H28K/H66K/H68K）
-rm -vf package/boot/uboot-rockchip/patches/*rk3588*.patch
-rm -vf package/boot/uboot-rockchip/patches/*rock-5*.patch
-rm -vf package/boot/uboot-rockchip/patches/*firefly*.patch
-rm -vf package/boot/uboot-rockchip/patches/*odroid*.patch
-rm -vf package/boot/uboot-rockchip/patches/*phytium*.patch
-rm -vf package/boot/uboot-rockchip/patches/104*.patch
-rm -vf package/boot/uboot-rockchip/patches/105*.patch
-rm -vf package/boot/uboot-rockchip/patches/101*.patch
-rm -vf package/boot/uboot-rockchip/patches/102*.patch
-rm -vf package/boot/uboot-rockchip/patches/103*.patch
+# 清理 U-Boot 补丁目录：只保留 Hinlink 系列（H28K/H29K/H66K/H68K），删除所有第三方设备补丁
+cd package/boot/uboot-rockchip/patches/
+ls *.patch | grep -v -E "H28K|H29K|H66K|H68K" | xargs rm -f 2>/dev/null
+cd - >/dev/null
 
-# U-Boot 补丁目录
+# ======================== 【创建必要目录，防止文件下载失败】 ========================
 mkdir -p package/boot/uboot-rockchip/patches/
-
-# 下载 U-Boot 补丁
-wget -O package/boot/uboot-rockchip/patches/001-add-h29k-uboot-target.patch \
-https://raw.githubusercontent.com/I-agree/H29K/main/001-add-h29k-uboot-target.patch
-
-wget -O package/boot/uboot-rockchip/patches/108-board-rockchip-add-HINLINK-H29K.patch \
-https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
-
-# 内核 DTS 文件
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
+
+# ======================== 【下载 H29K 专用 U-Boot 补丁】 ========================
+wget -O package/boot/uboot-rockchip/patches/001-add-hinlink-h29k-support.patch \
+https://github.com/I-agree/H29K/raw/main/001-add-hinlink-h29k-support.patch
+
+# ======================== 【下载 H29K 设备树 DTS 文件】 ========================
 wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
 https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
 
-# 内核 DTS Makefile 注册
+# ======================== 【把 H29K 的 dtb 注册进内核编译列表】 ========================
 echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
 
+# ======================== 【feeds 源配置（保持官方标准格式）】 ========================
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
