@@ -36,8 +36,8 @@ wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k
 https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
 
 # ======================== 【把 H29K 的 dtb 注册进内核编译列表】 ========================
-echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> \
-$(find build_dir/target-* -path "*/arch/arm64/boot/dts/rockchip/Makefile" | head -n 1)
+# ✅ 100% 生效！写入内核原版 Makefile
+echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/linux/arch/arm64/boot/dts/rockchip/Makefile
 
 # ======================== 【feeds 源配置（保持官方标准格式）】 ========================
 # Add a feed source
