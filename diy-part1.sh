@@ -21,6 +21,7 @@ PATCH_DIR=$(find target/linux/rockchip -name "patches-*" -type d | head -n 1)
 rm -f "${PATCH_DIR}"/*.patch
 
 # 清空 U-Boot 补丁目录：删除所有.patch文件，彻底干净
+rm -f package/boot/uboot-rockchip/patches/*.patch
 
 # ======================== 【创建必要目录，防止文件下载失败】 ========================
 mkdir -p package/boot/uboot-rockchip/patches/
