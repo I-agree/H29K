@@ -13,16 +13,22 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-# 创建补丁目录（唯一正确目录）
+# 创建 UBOOT 补丁目录
 mkdir -p package/boot/uboot-rockchip/patches/
 
-# 补丁 1：让 OpenWRT 识别 H29K
+# 下载两个正确补丁
 wget -O package/boot/uboot-rockchip/patches/001-add-h29k-uboot-target.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/001-add-h29k-uboot-target.patch
 
-# 补丁 2：H29K 设备代码（DTS + board + defconfig）
 wget -O package/boot/uboot-rockchip/patches/108-board-rockchip-add-HINLINK-H29K.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
+
+# ===================== 【关键！】=====================
+# 直接把你仓库的 DTS 文件 复制到 内核目录，让内核找到！
+mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
+wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
+https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
+# ===============================================================
 
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
