@@ -13,24 +13,25 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-# 创建U-Boot补丁目录
+# U-Boot 补丁目录
 mkdir -p package/boot/uboot-rockchip/patches/
 
-# 下载U-Boot补丁（你仓库里原有的两个，完全不动）
+# 下载 U-Boot 补丁（保留原有）
 wget -O package/boot/uboot-rockchip/patches/001-add-h29k-uboot-target.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/001-add-h29k-uboot-target.patch
 
 wget -O package/boot/uboot-rockchip/patches/108-board-rockchip-add-HINLINK-H29K.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
 
-# 下载内核DTS文件（你已经加过）
+# 内核 DTS 文件
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
 https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
 
-# 内核Makefile注册DTS（解决你最后报错）
-mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
-echo "dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
+# 内核 DTS Makefile 注册
+echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
+
+# feeds 配置（不动）
 
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
