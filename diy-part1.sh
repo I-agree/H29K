@@ -13,15 +13,27 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-# ======================== 【终极清理：删除所有冲突补丁】 ========================
-# 这些补丁在 RK3528 上编译必然冲突，全部安全删除
+# ======================== 安全清理：只删冲突补丁 ========================
+# 清理内核里所有 RK3588 / Rock5 系列冲突补丁（不碰 RK3528/H28K）
 rm -vf target/linux/rockchip/patches-6.12/001-*
 rm -vf target/linux/rockchip/patches-6.12/002-*
 rm -vf target/linux/rockchip/patches-6.12/*rk3588*.patch
-rm -vf target/linux/rockchip/patches-6.12/*rock-5a*.patch
+rm -vf target/linux/rockchip/patches-6.12/*rock-5*.patch
 rm -vf target/linux/rockchip/patches-6.12/*firefly*.patch
 rm -vf target/linux/rockchip/patches-6.12/*odroid*.patch
 rm -vf target/linux/rockchip/patches-6.12/*phytium*.patch
+
+# 清理 U-Boot 里冲突补丁（严格保留 H28K/H66K/H68K）
+rm -vf package/boot/uboot-rockchip/patches/*rk3588*.patch
+rm -vf package/boot/uboot-rockchip/patches/*rock-5*.patch
+rm -vf package/boot/uboot-rockchip/patches/*firefly*.patch
+rm -vf package/boot/uboot-rockchip/patches/*odroid*.patch
+rm -vf package/boot/uboot-rockchip/patches/*phytium*.patch
+rm -vf package/boot/uboot-rockchip/patches/104*.patch
+rm -vf package/boot/uboot-rockchip/patches/105*.patch
+rm -vf package/boot/uboot-rockchip/patches/101*.patch
+rm -vf package/boot/uboot-rockchip/patches/102*.patch
+rm -vf package/boot/uboot-rockchip/patches/103*.patch
 
 # U-Boot 补丁目录
 mkdir -p package/boot/uboot-rockchip/patches/
