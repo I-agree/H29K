@@ -35,18 +35,6 @@ https://github.com/I-agree/H29K/raw/main/001-add-hinlink-h29k-support.patch
 wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
 https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
 
-# ======================== 【终极正确：生成内核补丁，添加 DTS 到编译列表】 ========================
-# 【永远生效、永远不被重置、永远不被覆盖、永远适配 Actions】
-cat > "${PATCH_DIR}/001-add-h29k-dts.patch" <<'EOF'
---- a/arch/arm64/boot/dts/rockchip/Makefile
-+++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -70,6 +70,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-firefly-rk3528x.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-hinlink-h28k.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-orangepi-3b.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-rock-5-tplus.dtb
-+dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb
-EOF
-
 # ======================== 【✅ 关键：只编译 H29K，清空所有官方设备】 ========================
 sed -i '/^TARGET_DEVICES +=/d' target/linux/rockchip/image/armv8.mk
 
