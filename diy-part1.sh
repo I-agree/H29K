@@ -35,6 +35,9 @@ https://github.com/I-agree/H29K/raw/main/001-add-hinlink-h29k-support.patch
 wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
 https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
 
+# ======================== 【✅ 唯一添加：官方main分支 100% 不报错的 DTB 编译】 ========================
+echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
+
 # ======================== 【✅ 关键：只编译 H29K，清空所有官方设备】 ========================
 sed -i '/^TARGET_DEVICES +=/d' target/linux/rockchip/image/armv8.mk
 
