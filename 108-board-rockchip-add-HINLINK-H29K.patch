@@ -14,9 +14,10 @@ Features tested on HINLINK H29K:
 Signed-off-by: Chukun Pan <amadeus@jmu.edu.cn>
 ---
  arch/arm/dts/rk3528-hinlink-h29k-u-boot.dtsi     |  11 +
- configs/hinlink-h29k-rk3528_defconfig            |  64 ++++
- .../arm64/rockchip/rk3528-opc-h29k.dts           | 278 +++++++++++++++++++++
- 4 files changed, 353 insertions(+)
+ configs/hinlink-h29k-rk3528_defconfig            |  64 +++
+ dts/upstream/src/arm64/rockchip/rk3528-opc-h29k.dts | 278 ++++++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/Makefile           |   1 +
+ 4 files changed, 354 insertions(+)
 
 --- /dev/null
 +++ b/arch/arm/dts/rk3528-hinlink-h29k-u-boot.dtsi
