@@ -23,20 +23,22 @@ rm -f "${PATCH_DIR}"/*.patch
 # 清空 U-Boot 补丁目录：删除所有.patch文件，彻底干净
 rm -f package/boot/uboot-rockchip/patches/*.patch
 
-# ======================== 【创建必要目录，防止文件下载失败】 ========================
+# 创建必需目录
 mkdir -p package/boot/uboot-rockchip/patches/
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
+mkdir -p "${PATCH_DIR}"
 
-# ======================== 【下载 H29K 专用 U-Boot 补丁】 ========================
-wget -O package/boot/uboot-rockchip/patches/001-add-hinlink-h29k-support.patch \
-https://github.com/I-agree/H29K/raw/main/001-add-hinlink-h29k-support.patch
+# UBOOT 补丁
+wget -O package/boot/uboot-rockchip/patches/001-add-h29k-uboot-target.patch \
+https://github.com/I-agree/H29K/raw/main/001-add-h29k-uboot-target.patch
 
-# ======================== 【下载 H29K 设备树 DTS 文件】 ========================
+# 内核补丁（✅ 核心！自动把 DTB 加入内核 Makefile 编译）
+wget -O "${PATCH_DIR}/108-board-rockchip-add-HINLINK-H29K.patch" \
+https://github.com/I-agree/H29K/raw/main/108-board-rockchip-add-HINLINK-H29K.patch
+
+# DTS 设备树文件
 wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
 https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
-
-# ======================== 【✅ 唯一添加：官方main分支 100% 不报错的 DTB 编译】 ========================
-echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
 
 # ======================== 【✅ 关键：只编译 H29K，清空所有官方设备】 ========================
 sed -i '/^TARGET_DEVICES +=/d' target/linux/rockchip/image/armv8.mk
