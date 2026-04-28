@@ -383,11 +383,6 @@ Signed-off-by: Chukun Pan <amadeus@jmu.edu.cn>
 +};
 --- a/arch/arm64/boot/dts/rockchip/Makefile
 +++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -57,6 +57,7 @@ dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-rock-5-itx.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-rock-pi-5.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-rock-pi-5b.dtb
+@@ -* +* @@
  dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-hinlink-h28k.dtb
 +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3566-anbernic-rg353p.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3566-anbernic-rg353v.dtb
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3566-anbernic-rg503.dtb
