@@ -383,5 +383,6 @@ Signed-off-by: Chukun Pan <amadeus@jmu.edu.cn>
 +};
 --- a/arch/arm64/boot/dts/rockchip/Makefile
 +++ b/arch/arm64/boot/dts/rockchip/Makefile
-@@ -* +* @@
+@@ -1,0 +1,1 @@
 +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb
+
