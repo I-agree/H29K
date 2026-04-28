@@ -13,10 +13,20 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
+# ======================== 【终极清理：删除所有冲突补丁】 ========================
+# 这些补丁在 RK3528 上编译必然冲突，全部安全删除
+rm -vf target/linux/rockchip/patches-6.12/001-*
+rm -vf target/linux/rockchip/patches-6.12/002-*
+rm -vf target/linux/rockchip/patches-6.12/*rk3588*.patch
+rm -vf target/linux/rockchip/patches-6.12/*rock-5a*.patch
+rm -vf target/linux/rockchip/patches-6.12/*firefly*.patch
+rm -vf target/linux/rockchip/patches-6.12/*odroid*.patch
+rm -vf target/linux/rockchip/patches-6.12/*phytium*.patch
+
 # U-Boot 补丁目录
 mkdir -p package/boot/uboot-rockchip/patches/
 
-# 下载 U-Boot 补丁（保留原有）
+# 下载 U-Boot 补丁
 wget -O package/boot/uboot-rockchip/patches/001-add-h29k-uboot-target.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/001-add-h29k-uboot-target.patch
 
@@ -30,8 +40,6 @@ https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
 
 # 内核 DTS Makefile 注册
 echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
-
-# feeds 配置（不动）
 
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
