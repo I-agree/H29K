@@ -165,4 +165,38 @@ CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
 CONFIG_TARGET_DEVICE_PACKAGES_rockchip_armv8_DEVICE_hinlink_h29k="uboot-rockchip-hinlink_h29k"
 EOF
 
+# ======================== 【强制校验：H29K 必备文件检查 · 失败立即终止编译】 ========================
+set -e
+
+# 检查 1：DTS 文件必须存在
+DTS_FILE="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts"
+if [ ! -f "$DTS_FILE" ]; then
+    echo -e "\033[31m[ERROR] H29K DTS 文件不存在！编译终止！\033[0m"
+    echo "缺失文件：$DTS_FILE"
+    exit 1
+fi
+echo -e "\033[32m[OK] DTS 文件存在：$DTS_FILE\033[0m"
+
+# 检查 2：设备定义必须写入 armv8.mk
+DEVICE_NAME="hinlink_h29k"
+MK_FILE="target/linux/rockchip/image/armv8.mk"
+if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
+    echo -e "\033[31m[ERROR] H29K 设备定义未写入！编译终止！\033[0m"
+    exit 1
+fi
+echo -e "\033[32m[OK] 设备定义已写入：$DEVICE_NAME\033[0m"
+
+# 检查 3：内核必须开启 RK3528 支持
+if [ -f ".config" ]; then
+    if ! grep -E "(RK3528|MACH_ROCKCHIP)" .config | grep -v "^#" >/dev/null; then
+        echo -e "\033[31m[ERROR] 内核未启用 RK3528 平台！DTS 无法编译！\033[0m"
+        exit 1
+    fi
+    echo -e "\033[32m[OK] 内核 RK3528 支持已启用\033[0m"
+fi
+
+echo -e "\033[32m=====================================\033[0m"
+echo -e "\033[32m✅ 所有检查通过！开始编译 H29K...\033[0m"
+echo -e "\033[32m=====================================\033[0m"
+
 echo -e "\n✅ diy-part2.sh 执行完成！"
