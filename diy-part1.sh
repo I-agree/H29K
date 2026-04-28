@@ -28,17 +28,6 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
 https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
 
-# 内核设备定义（你已经加过）
-mkdir -p target/linux/rockchip/image/
-cat > target/linux/rockchip/image/armv8.mk <<'EOF'
-define Device/hinlink_h29k
-  $(call Device/rk3528)
-  DEVICE_TITLE := HINLINK H29K
-  DEVICE_DTS := rk3528-opc-h29k
-endef
-TARGET_DEVICES += hinlink_h29k
-EOF
-
 # 内核Makefile注册DTS（解决你最后报错）
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 echo "dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
