@@ -47,6 +47,9 @@ cat > "${PATCH_DIR}/001-add-h29k-dts.patch" <<'EOF'
 +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb
 EOF
 
+# ======================== 【✅ 关键：只编译 H29K，清空所有官方设备】 ========================
+sed -i '/^TARGET_DEVICES +=/d' target/linux/rockchip/image/armv8.mk
+
 # ======================== 【feeds 源配置（保持官方标准格式）】 ========================
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
