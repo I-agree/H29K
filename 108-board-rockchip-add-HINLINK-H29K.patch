@@ -384,5 +384,4 @@ Signed-off-by: Chukun Pan <amadeus@jmu.edu.cn>
 --- a/arch/arm64/boot/dts/rockchip/Makefile
 +++ b/arch/arm64/boot/dts/rockchip/Makefile
 @@ -* +* @@
- dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-hinlink-h28k.dtb
 +dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb
