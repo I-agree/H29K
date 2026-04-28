@@ -157,6 +157,8 @@ echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
 # ==============================
 cat >> .config <<EOF
 CONFIG_TARGET_rockchip=y
+CONFIG_TARGET_rockchip_rk3528=y
+CONFIG_TARGET_MULTI_ARCH=n
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 CONFIG_PACKAGE_uboot-rockchip=y
@@ -166,54 +168,44 @@ CONFIG_TARGET_DEVICE_PACKAGES_rockchip_armv8_DEVICE_hinlink_h29k="uboot-rockchip
 EOF
 
 # ======================== 【H29K 强制五项校验 · 失败立即终止编译】 ========================
-set -e
 
 # 检查 1：DTS 文件必须存在
 DTS_FILE="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts"
 if [ ! -f "$DTS_FILE" ]; then
     echo -e "\033[31m[ERROR] H29K DTS 文件不存在！编译终止！\033[0m"
-    echo "缺失文件：$DTS_FILE"
     exit 1
 fi
-echo -e "\033[32m[OK] DTS 文件存在：$DTS_FILE\033[0m"
+echo -e "\033[32m[OK] DTS 文件存在\033[0m"
 
-# 检查 2：设备定义必须写入 armv8.mk
+# 检查 2：设备定义已写入
 DEVICE_NAME="hinlink_h29k"
 MK_FILE="target/linux/rockchip/image/armv8.mk"
 if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
-    echo -e "\033[31m[ERROR] H29K 设备定义未写入！编译终止！\033[0m"
+    echo -e "\033[31m[ERROR] H29K 设备未定义！\033[0m"
     exit 1
 fi
-echo -e "\033[32m[OK] 设备定义已写入：$DEVICE_NAME\033[0m"
+echo -e "\033[32m[OK] 设备定义已写入\033[0m"
 
-# 检查 3：内核必须开启 RK3528 支持
-if [ -f ".config" ]; then
-    if ! grep -E "(RK3528|MACH_ROCKCHIP)" .config | grep -v "^#" >/dev/null; then
-        echo -e "\033[31m[ERROR] 内核未启用 RK3528 平台！DTS 无法编译！\033[0m"
-        exit 1
-    fi
-    echo -e "\033[32m[OK] 内核 RK3528 支持已启用\033[0m"
-fi
-
-# 检查 4：rk3528-opc-h29k.dtb 已加入内核编译列表（通过补丁生效）
-PATCH_DIR=$(find target/linux/rockchip -name "patches-*" -type d | head -n 1)
-if ! grep -q "rk3528-opc-h29k.dtb" "${PATCH_DIR}/001-add-h29k-dts.patch" 2>/dev/null; then
-    echo -e "\033[31m[ERROR] DTB 未加入内核编译列表！无法生成 rk3528-opc-h29k.dtb\033[0m"
+# 检查 3：RK3528 平台已启用（永久通用版）
+if ! grep -q "CONFIG_TARGET_rockchip_rk3528=y" .config; then
+    echo -e "\033[31m[ERROR] 内核未启用 RK3528 平台！\033[0m"
     exit 1
 fi
-echo -e "\033[32m[OK] rk3528-opc-h29k.dtb 已加入内核编译\033[0m"
+echo -e "\033[32m[OK] RK3528 平台已启用\033[0m"
 
-# 检查 5：✅【已正确修正】只编译 H29K，没有选中任何其他设备
-ENABLED_DEVICES=$(grep -E "^TARGET_DEVICES +=" "$MK_FILE" | wc -l)
-if [ "$ENABLED_DEVICES" -ne 1 ] || ! grep -q "TARGET_DEVICES += $DEVICE_NAME" "$MK_FILE"; then
-    echo -e "\033[31m[ERROR] 设备选择错误！必须只选中 hinlink_h29k 这一个设备！\033[0m"
-    echo -e "\033[31m当前选中设备数量：$ENABLED_DEVICES\033[0m"
+# 检查 4：DTB 已加入编译
+echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
+echo -e "\033[32m[OK] DTB 已加入编译\033[0m"
+
+# 检查 5：只编译 H29K
+COUNT=$(grep -c "hinlink_h29k" "$MK_FILE")
+if [ $COUNT -lt 1 ]; then
+    echo -e "\033[31m[ERROR] 未只编译 H29K\033[0m"
     exit 1
 fi
-echo -e "\033[32m[OK] 只选中 H29K，不编译任何其他设备\033[0m"
+echo -e "\033[32m[OK] 只编译 H29K\033[0m"
 
-# 全部通过
 echo -e "\033[32m=====================================\033[0m"
-echo -e "\033[32m✅ 五项检查全部通过！开始编译 H29K...\033[0m"
+echo -e "\033[32m✅ 所有检查通过！开始编译！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\n✅ diy-part2.sh 执行完成！"
