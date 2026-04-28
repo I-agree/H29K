@@ -13,22 +13,31 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-# 创建 UBOOT 补丁目录
+# 1. UBOOT 补丁目录
 mkdir -p package/boot/uboot-rockchip/patches/
 
-# 下载两个正确补丁
+# 2. 下载 UBOOT 补丁
 wget -O package/boot/uboot-rockchip/patches/001-add-h29k-uboot-target.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/001-add-h29k-uboot-target.patch
 
 wget -O package/boot/uboot-rockchip/patches/108-board-rockchip-add-HINLINK-H29K.patch \
 https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
 
-# ===================== 【关键！】=====================
-# 直接把你仓库的 DTS 文件 复制到 内核目录，让内核找到！
+# 3. 安装内核 DTS 文件（你已有的）
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
 https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
-# ===============================================================
+
+# 4. ✅【最终修复】创建内核设备定义（这是你唯一缺的！）
+mkdir -p target/linux/rockchip/image/
+cat > target/linux/rockchip/image/armv8.mk <<EOF
+define Device/hinlink_h29k
+  \$(call Device/rk3528)
+  DEVICE_TITLE := HINLINK H29K
+  DEVICE_DTS := rk3528-opc-h29k
+endef
+TARGET_DEVICES += hinlink_h29k
+EOF
 
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
