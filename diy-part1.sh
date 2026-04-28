@@ -13,19 +13,15 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-# ======================== 【终极清理：只保留H29K，其余全部删除】 ========================
-# 清理内核补丁目录：只保留文件名包含 H28K/H29K 的补丁，其他所有补丁（RK3588/Rock5等）全部删除
+# ======================== 【终极清理：只保留 H29K，其余全部删除】 ========================
+# 清理内核补丁目录：删除所有补丁，一个不留（只留我们自己的 H29K）
 cd target/linux/rockchip/patches-6.12/
-ls *.patch | grep -v -E "H28K|H29K" | xargs rm -f 2>/dev/null
-
-# 【关键修复】删除冲突的官方H28K补丁（因为我们已手动添加DTS，不需要它了）
-rm -f 101-arm64-dts-rockchip-Add-HINLINK-H28K.patch
-
+rm -f *.patch
 cd - >/dev/null
 
-# 清理 U-Boot 补丁目录：只保留 Hinlink 系列（H28K/H29K/H66K/H68K），删除所有第三方设备补丁
+# 清理 U-Boot 补丁目录：删除所有补丁，一个不留
 cd package/boot/uboot-rockchip/patches/
-ls *.patch | grep -v -E "H28K|H29K|H66K|H68K" | xargs rm -f 2>/dev/null
+rm -f *.patch
 cd - >/dev/null
 
 # ======================== 【创建必要目录，防止文件下载失败】 ========================
