@@ -13,16 +13,14 @@
 # Uncomment a feed source
 #sed -i 's/^#\(.*helloworld\)/\1/' feeds.conf.default
 
-# ======================== 【终极清理：只保留 H29K，其余全部删除】 ========================
-# 清理内核补丁目录：删除所有补丁，一个不留（只留我们自己的 H29K）
-cd target/linux/rockchip/patches-6.12/
-rm -f *.patch
-cd - >/dev/null
+# ======================== 【终极智能清理：自动识别内核版本，清空全部补丁，只保留 H29K】 ========================
+# 自动获取当前使用的内核补丁目录（支持 6.12 / 6.13 / 6.14 ... 任意版本）
+PATCH_DIR=$(find target/linux/rockchip -name "patches-*" -type d | head -n 1)
 
-# 清理 U-Boot 补丁目录：删除所有补丁，一个不留
-cd package/boot/uboot-rockchip/patches/
-rm -f *.patch
-cd - >/dev/null
+# 清空内核补丁目录：删除所有.patch文件，彻底干净
+rm -f "${PATCH_DIR}"/*.patch
+
+# 清空 U-Boot 补丁目录：删除所有.patch文件，彻底干净
 
 # ======================== 【创建必要目录，防止文件下载失败】 ========================
 mkdir -p package/boot/uboot-rockchip/patches/
