@@ -16,11 +16,6 @@ download_file() {
     fi
 }
 
-# ==============================================
-# 【已删除】DTS 相关代码
-# 原因：108-board-rockchip-add-HINLINK-H29K.patch 已完整内置 rk3528-opc-h29k.dts
-# ==============================================
-
 # 创建LOGO目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
 
@@ -49,7 +44,6 @@ done
 # ======================== 【第三部分：设备定义】 ========================
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 
-# ========== 保留H28K定义（不影响其框架）增加H29K定义 ==========
 cat >> "$TARGET_MK" <<'EOF'
 define Device/hinlink_h29k
   $(Device/rk3528)
