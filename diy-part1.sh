@@ -29,16 +29,13 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 mkdir -p "${PATCH_DIR}"
 
 # UBOOT 补丁
-wget -O package/boot/uboot-rockchip/patches/001-add-h29k-uboot-target.patch \
-https://raw.githubusercontent.com/I-agree/H29K/main/001-add-h29k-uboot-target.patch
+cp -f $GITHUB_WORKSPACE/H29K/001-add-h29k-uboot-target.patch package/boot/uboot-rockchip/patches/
 
-# 内核补丁（✅ 核心！自动把 DTB 加入内核 Makefile 编译）
-wget -O "${PATCH_DIR}/108-board-rockchip-add-HINLINK-H29K.patch" \
-https://raw.githubusercontent.com/I-agree/H29K/main/108-board-rockchip-add-HINLINK-H29K.patch
+# 内核补丁
+cp -f $GITHUB_WORKSPACE/H29K/108-board-rockchip-add-HINLINK-H29K.patch "${PATCH_DIR}/"
 
 # DTS 设备树文件
-wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts \
-https://raw.githubusercontent.com/I-agree/H29K/main/rk3528-opc-h29k.dts
+cp -f $GITHUB_WORKSPACE/H29K/rk3528-opc-h29k.dts target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
 # ======================== 【✅ 关键：只编译 H29K，清空所有官方设备】 ========================
 sed -i '/^TARGET_DEVICES +=/d' target/linux/rockchip/image/armv8.mk
