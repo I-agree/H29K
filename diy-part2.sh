@@ -31,6 +31,21 @@ for i in 1 2 3; do
   download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO${i}"
 done
 
+# ======================== 修复缺失 wqy-microhei.ttc 字体 ========================
+echo "[INFO] 自动下载并安装 wqy-microhei.ttc 字体文件"
+
+# 创建字体目录
+mkdir -p files/usr/share/fonts/truetype/
+
+# 下载字体（稳定源）
+curl -L -o files/usr/share/fonts/truetype/wqy-microhei.ttc \
+  https://raw.githubusercontent.com/I-am-Bot/OpenWrt-Fonts/main/wqy-microhei.ttc
+
+# 赋权
+chmod 644 files/usr/share/fonts/truetype/wqy-microhei.ttc
+
+echo "[OK] wqy-microhei.ttc 已安装到固件内"
+
 # ==============================================================================
 # 【U-Boot 支持注入】—— 严格遵循 OpenWrt 官方 Makefile 风格（高危修复区）
 # ✅ 修复点1：BusyBox sed 不支持 'a\' 多行追加 → 改用 POSIX 兼容写法
