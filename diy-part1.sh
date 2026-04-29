@@ -37,9 +37,6 @@ cp -f $GITHUB_WORKSPACE/H29K/108-board-rockchip-add-HINLINK-H29K.patch "${PATCH_
 # DTS 设备树文件
 cp -f $GITHUB_WORKSPACE/H29K/rk3528-opc-h29k.dts target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
-# ======================== 【✅ 关键：只编译 H29K，清空所有官方设备】 ========================
-sed -i '/^TARGET_DEVICES +=/d' target/linux/rockchip/image/armv8.mk
-
 # ======================== 【feeds 源配置（保持官方标准格式）】 ========================
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
