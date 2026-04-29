@@ -190,7 +190,7 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# ======================== 【H29K 强制五项校验 · 失败立即终止编译】 ========================
+# ======================== 【H29K 强制4项校验 · 失败立即终止编译】 ========================
 
 # 检查 1：DTS 文件必须存在
 DTS_FILE="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts"
@@ -216,11 +216,7 @@ if ! grep -q "CONFIG_TARGET_rockchip_rk3528=y" .config; then
 fi
 echo -e "\033[32m[OK] RK3528 平台已启用\033[0m"
 
-# 检查 4：DTB 已加入编译
-echo "dtb-\$(CONFIG_ARCH_ROCKCHIP) += rk3528-opc-h29k.dtb" >> target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/Makefile
-echo -e "\033[32m[OK] DTB 已加入编译\033[0m"
-
-# 检查 5：只编译 H29K
+# 检查 4：只编译 H29K
 COUNT=$(grep -c "hinlink_h29k" "$MK_FILE")
 if [ $COUNT -lt 1 ]; then
     echo -e "\033[31m[ERROR] 未只编译 H29K\033[0m"
