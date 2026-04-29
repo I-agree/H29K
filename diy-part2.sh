@@ -31,6 +31,20 @@ for i in 1 2 3; do
   download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO${i}"
 done
 
+# ==============================================================================
+# 【官方标准格式】添加 H29K 到 U-Boot
+# 完全匹配源码风格，不碰 H28K，不冲突、不覆盖
+# ==============================================================================
+makefile="package/boot/uboot-rockchip/Makefile"
+
+# 1. 在 hinlink-h28k-rk3528 后面追加 hinlink-h29k-rk3528 到 UBOOT_TARGETS
+sed -i '/hinlink-h28k-rk3528/a\  hinlink-h29k-rk3528 \\' "$makefile"
+
+# 2. 在 H28K 定义下面 添加 H29K 设备（完全官方格式）
+sed -i '/define U-Boot\/hinlink-h28k-rk3528/a\
+define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  NAME:=HINLINK H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
+' "$makefile"
+
 # ======================== 【第2部分：H28K 基准配置 】 ========================
 echo "===== 生成 H28K 基准配置 ====="
 cat > .config <<EOF
