@@ -6,8 +6,8 @@ echo "✅ 正在执行基础资源下载与初始化..."
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
 # 拷贝 H29K 设备树源文件（来自仓库根目录）
-# ⚠️ 注意：rk3528-opc-h29k.dts 应已由用户提前提交至仓库
-cp -f "$GITHUB_WORKSPACE/rk3528-opc-h29k.dts" target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts
+# ⚠️ 注意：rk3528-hinlink-h29k.dts 应已由用户提前提交至仓库
+cp -f "$GITHUB_WORKSPACE/rk3528-hinlink-h29k.dts" target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts
 
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
