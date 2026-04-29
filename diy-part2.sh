@@ -1,38 +1,4 @@
 #!/bin/bash
-# ============================================================
-# ✅【HINLINK H29K 专用 diy-part2.sh（OpenWrt 2026.04+ RK3528 官方兼容版）】
-# ⚠️ 本脚本专为 GitHub Actions 设计，依赖 $GITHUB_WORKSPACE 环境变量，不适用于本地手动执行
-# ============================================================
-
-set -e  # 遇错即停，保障构建链安全
-
-# ======================== 【第0部分：运行环境强校验】 ========================
-# 🔒 防止误在本地 shell 执行导致静默失败（高危）
-if [[ -z "${GITHUB_WORKSPACE:-}" ]]; then
-  echo -e "\033[31m❌ 错误：GITHUB_WORKSPACE 环境变量未设置。\033[0m"
-  echo "   此脚本仅支持在 GitHub Actions CI/CD 环境中运行。"
-  echo "   若需本地调试，请先执行：export GITHUB_WORKSPACE=."
-  exit 1
-fi
-
-# 🔍 检查必需工具是否可用（防御性编程）
-for cmd in curl sed make git; do
-  if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo -e "\033[31m❌ 错误：系统中未找到 '$cmd' 命令。\033[0m"
-    echo "   GitHub Actions ubuntu-22.04 应预装该工具，请检查 runner 状态。"
-    exit 1
-  fi
-done
-
-# 🧭 确认当前工作目录为 OpenWrt 源码根目录（防误执行）
-if [[ ! -f "include/version.mk" ]] || [[ ! -d "package" ]]; then
-  echo -e "\033[31m❌ 错误：当前目录不是 OpenWrt 源码根目录。\033[0m"
-  echo "   请确保 workflow 中已正确 checkout 并进入 openwrt/ 目录。"
-  exit 1
-fi
-
-echo "✅ 运行环境校验通过：GITHUB_WORKSPACE=$GITHUB_WORKSPACE，核心工具就绪。"
-
 # ======================== 【第1部分：资源准备】 ========================
 echo "✅ 正在执行基础资源下载与初始化..."
 
