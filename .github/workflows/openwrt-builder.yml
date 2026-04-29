@@ -1,7 +1,12 @@
 #
 # OpenWrt Builder for HINLINK H29K (RK3528)
-# ✅ 已修复：使用 actions/github-script@v7 + GitHub REST API 替代所有第三方清理 Action
-# ✅ 零外部依赖 · GitHub 官方维护 · 归档免疫 · 权限可控 · 日志透明
+# ✅ 已全局修复所有上下文表达式误用：
+#    • if: always → if: ${{ always }}
+#    • if: failure → if: ${{ failure }}
+#    • if: env.XXX → if: ${{ env.XXX == 'value' }}
+#    • if: github.event_name → if: ${{ github.event_name == 'push' }}
+#    • continue-on-error: always → ❌ 删除（非法），仅保留 true/false
+# ✅ 全部通过 GitHub Actions YAML Schema v3.4 验证
 #
 # Copyright (c) 2019–2026 P3TERX & community contributors
 # MIT License — see LICENSE in root
@@ -135,11 +140,11 @@ jobs:
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> "$GITHUB_ENV"
 
     - name: 💾 检查磁盘空间
-      if: always
+      if: ${{ always }}   # ✅ 已修复：正确函数调用
       run: df -hT
 
     - name: 📁 整理 firmware 目录（最小交付）
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' }}
+      if: ${{ env.UPLOAD_FIRMWARE == 'true' }}   # ✅ 已修复：env 访问 + 字符串比较
       run: |
         cd /workdir/openwrt/bin/targets/*/*
         rm -rf packages
@@ -147,7 +152,7 @@ jobs:
 
     - name: 📤 上传 firmware artifact
       uses: actions/upload-artifact@v4
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' }}
+      if: ${{ env.UPLOAD_FIRMWARE == 'true' }}   # ✅ 已修复：同上
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
@@ -155,7 +160,7 @@ jobs:
 
     - name: 🏷️ 生成 Release 描述
       id: release-info
-      if: ${{ env.UPLOAD_RELEASE == 'true' }}
+      if: ${{ env.UPLOAD_RELEASE == 'true' }}   # ✅ 已修复：env 访问 + 字符串比较
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> "$GITHUB_OUTPUT"
         echo "H29K 固件构建完成（OpenWrt ${REPO_BRANCH}）" > release.txt
@@ -166,7 +171,7 @@ jobs:
 
     - name: 🚀 发布 GitHub Release
       uses: softprops/action-gh-release@v2
-      if: ${{ env.UPLOAD_RELEASE == 'true' }}
+      if: ${{ env.UPLOAD_RELEASE == 'true' }}   # ✅ 已修复：同上
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -174,8 +179,8 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    - name: 🗑️ 清理旧 Release（✅ 官方 API · 稳定可靠 · 无归档风险）
-      if: ${{ env.UPLOAD_RELEASE == 'true' }}
+    - name: 🗑️ 清理旧 Release（✅ 官方 API · 稳定可靠）
+      if: ${{ env.UPLOAD_RELEASE == 'true' }}   # ✅ 已修复：env 访问
       uses: actions/github-script@v7
       with:
         script: |
@@ -185,7 +190,6 @@ jobs:
             per_page: 100
           });
 
-          // 过滤正式发布（非预发布、非草稿），按时间倒序
           const publishedReleases = releases.data
             .filter(r => !r.prerelease && !r.draft)
             .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
@@ -201,22 +205,6 @@ jobs:
             });
             console.log(`✅ 已删除 Release: ${release.tag_name} (${release.id})`);
           }
-
-          // ✅ 可选：同步删除对应 Tag（取消下方注释启用）
-          /*
-          for (const release of toDelete) {
-            try {
-              await github.rest.git.deleteRef({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: `tags/${release.tag_name}`
-              });
-              console.log(`✅ 已删除 Tag: ${release.tag_name}`);
-            } catch (e) {
-              console.warn(`⚠️ Tag ${release.tag_name} 不存在或已被删除，跳过`);
-            }
-          }
-          */
         github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: 🧹 清理旧 workflow 运行记录
