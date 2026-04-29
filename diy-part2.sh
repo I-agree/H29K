@@ -7,7 +7,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
 # 拷贝 H29K 设备树源文件（来自仓库根目录）
 # ⚠️ 注意：rk3528-hinlink-h29k.dts 应已由用户提前提交至仓库
-cp -f "$GITHUB_WORKSPACE/rk3528-hinlink-h29k.dts" target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts
+cp -f "$GITHUB_WORKSPACE/rk3528-hinlink-h29k.dts" target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
@@ -81,31 +81,13 @@ echo "✅ H28K 基准配置完成（后续将被 H29K 配置覆盖）"
 # =============== 【HINLINK H29K U-Boot 支持：自动注入 defconfig】 ===============
 echo "=== 🔧 注入 H29K 专用 U-Boot 配置（hinlink_h29k_defconfig）==="
 
-# ✅ 步骤 1：校验官方 hinlink_h28k_defconfig 是否存在（安全基线）
-if [ ! -f "package/boot/uboot-rockchip/configs/hinlink_h28k_defconfig" ]; then
-  echo -e "\033[31m❌ 错误：官方 hinlink_h28k_defconfig 文件缺失。\033[0m"
-  echo "   请确认 OpenWrt 源码已同步至 main 分支（2026.04+）。"
-  exit 1
-fi
+# ✅ 步骤 1：hinlink_h29k_defconfig（使用标准路径与命名）
+mkdir -p package/boot/uboot-rockchip/configs/
+# 拷贝hinlink_h29k_defconfig文件（来自仓库根目录）
+# ⚠️ 注意：hinlink_h29k_defconfig 应已由用户提前提交至仓库
+cp -f "$GITHUB_WORKSPACE/hinlink_h29k_defconfig" package/boot/uboot-rockchip/configs/
 
-# ✅ 步骤 2：派生 hinlink_h29k_defconfig（使用标准路径与命名）
-cp -f package/boot/uboot-rockchip/configs/hinlink_h28k_defconfig package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-
-# ✅ 步骤 3：精准替换 5 处关键字段（全部符合 OpenWrt 官方命名规范）
-#    🔴 修复点4：CONFIG_DEFAULT_DEVICE_NAME 必须为 "hinlink_h29k"（非 "hinlink-h29k-rk3528"）
-#    🔴 修复点5：CONFIG_DEFAULT_DEVICE_UBOOT_IMAGE 必须为 "u-boot-rockchip-hinlink_h29k.bin"
-sed -i 's/CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_HINLINK_H28K=y/CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_HINLINK_H29K=y/g' \
-       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-sed -i 's/CONFIG_DEFAULT_DEVICE_NAME="hinlink-h28k-rk3528"/CONFIG_DEFAULT_DEVICE_NAME="hinlink_h29k"/g' \
-       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-sed -i 's/CONFIG_DEFAULT_DEVICE_DTS="rk3528-opc-h28k"/CONFIG_DEFAULT_DEVICE_DTS="rk3528-hinlink-h29k"/g' \
-       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-sed -i 's/CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG="hinlink_h28k"/CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG="hinlink_h29k"/g' \
-       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-sed -i 's/CONFIG_DEFAULT_DEVICE_UBOOT_IMAGE="u-boot-rockchip-hinlink_h28k.bin"/CONFIG_DEFAULT_DEVICE_UBOOT_IMAGE="u-boot-rockchip-hinlink_h29k.bin"/g' \
-       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-
-# ✅ 步骤 4：五重校验（任一失败立即终止，防砖）
+# ✅ 步骤 2：五重校验（任一失败立即终止，防砖）
 if [ ! -f "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig" ]; then
   echo -e "\033[31m❌ 错误：hinlink_h29k_defconfig 文件未创建。\033[0m"
   exit 1
