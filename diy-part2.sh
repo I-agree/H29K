@@ -152,11 +152,11 @@ sed -i '/CONFIG_PACKAGE_uboot-rockchip-h28k/d' .config
 sed -i '/CONFIG_rockchip_h28k/d' .config
 echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
 
-# 【分区大小重置】—— 删除旧值，写入 H29K 推荐值（128MB kernel + 1024MB rootfs）
+# 【分区大小重置】—— 删除旧值，写入 H29K 推荐值（256MB kernel + 2048MB rootfs）
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
 sed -i '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/d' .config
-echo "CONFIG_TARGET_KERNEL_PARTSIZE=128" >> .config
-echo "CONFIG_TARGET_ROOTFS_PARTSIZE=1024" >> .config
+echo "CONFIG_TARGET_KERNEL_PARTSIZE=256" >> .config
+echo "CONFIG_TARGET_ROOTFS_PARTSIZE=2048" >> .config
 
 # 【网络服务配置】—— ✅ 修复点7：dnsmasq-full 自动拉取 dnsmasq，无需显式禁用
 #    （避免编译失败：Package dnsmasq-full depends on dnsmasq）
