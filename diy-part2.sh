@@ -75,51 +75,12 @@ cat > .config <<EOF
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
+CONFIG_PACKAGE_uboot-rockchip=y
 EOF
 
 make defconfig
-echo "✅ H28K 基准配置完成（后续将被 H29K 配置覆盖）"
 
-# =============== 【HINLINK H29K U-Boot 支持：自动注入 defconfig】 ===============
-echo "=== 🔧 注入 H29K 专用 U-Boot 配置（hinlink_h29k_defconfig）==="
-
-# ✅ 步骤 1：hinlink_h29k_defconfig（使用标准路径与命名）
-mkdir -p package/boot/uboot-rockchip/configs/
-# 拷贝hinlink_h29k_defconfig文件（来自仓库根目录）
-# ⚠️ 注意：hinlink_h29k_defconfig 应已由用户提前提交至仓库
-cp -f "$GITHUB_WORKSPACE/hinlink_h29k_defconfig" package/boot/uboot-rockchip/configs/
-
-# ✅ 步骤 2：五重校验（任一失败立即终止，防砖）
-if [ ! -f "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig" ]; then
-  echo -e "\033[31m❌ 错误：hinlink_h29k_defconfig 文件未创建。\033[0m"
-  exit 1
-fi
-
-if ! grep -q "CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_HINLINK_H29K=y" package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig; then
-  echo -e "\033[31m❌ 错误：CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_HINLINK_H29K=y 缺失。\033[0m"
-  exit 1
-fi
-
-if ! grep -q 'CONFIG_DEFAULT_DEVICE_DTS="rk3528-hinlink-h29k"' package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig; then
-  echo -e "\033[31m❌ 错误：CONFIG_DEFAULT_DEVICE_DTS=\"rk3528-hinlink-h29k\" 未设置。\033[0m"
-  exit 1
-fi
-
-if ! grep -q 'CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG="hinlink_h29k"' package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig; then
-  echo -e "\033[31m❌ 错误：CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG=\"hinlink_h29k\" 未设置。\033[0m"
-  exit 1
-fi
-
-if ! grep -q 'CONFIG_DEFAULT_DEVICE_UBOOT_IMAGE="u-boot-rockchip-hinlink_h29k.bin"' package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig; then
-  echo -e "\033[31m❌ 错误：CONFIG_DEFAULT_DEVICE_UBOOT_IMAGE=\"u-boot-rockchip-hinlink_h29k.bin\" 未设置。\033[0m"
-  exit 1
-fi
-
-echo "✅ hinlink_h29k_defconfig 成功生成并完成五重校验："
-echo "   → 路径：package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
-echo "   → DTS：rk3528-hinlink-h29k"
-echo "   → UBOOT_CONFIG：hinlink_h29k"
-echo "   → UBOOT_IMAGE：u-boot-rockchip-hinlink_h29k.bin"
+echo " ✅ H28K 基准配置完成（后续将被 H29K 配置覆盖）"
 
 # ======================== 【第3部分：内核配置】 ========================
 # 清理旧内核选项（避免冲突），注入 H29K 专属配置
@@ -317,11 +278,7 @@ if ! grep -q "hinlink-h29k-rk3528" "$UBOOT_MK"; then
   echo -e "\033[31m[错误] U-Boot 未添加 H29K 设备！编译终止！\033[0m"
   exit 1
 fi
-if ! grep -q "CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG=\"hinlink_h29k\"" package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig; then
-  echo -e "\033[31m[错误] U-Boot defconfig 中 CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG 错误！\033[0m"
-  exit 1
-fi
-echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile + defconfig 双校验）\033[0m"
+echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0m"
 
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！开始编译 H29K 固件！\033[0m"
