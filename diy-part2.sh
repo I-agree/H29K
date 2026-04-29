@@ -8,7 +8,7 @@ echo "执行基础资源下载..."
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
 # DTS 设备树文件
-cp -f $GITHUB_WORKSPACE/H29K/rk3528-opc-h29k.dts target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
+cp -f $GITHUB_WORKSPACE/rk3528-opc-h29k.dts target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 
 download_file() {
     local url="$1"
