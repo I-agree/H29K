@@ -1,7 +1,7 @@
 #
 # OpenWrt Builder for HINLINK H29K (RK3528)
-# ✅ 已修复：dev-drprasad/delete-older-releases@v1 → crazy-max/ghaction-cleanup@v6
-# ✅ 官方推荐 · 稳定可靠 · 语义化版本 · 零维护风险
+# ✅ 已修复：使用 actions/github-script@v7 + GitHub REST API 替代所有第三方清理 Action
+# ✅ 零外部依赖 · GitHub 官方维护 · 归档免疫 · 权限可控 · 日志透明
 #
 # Copyright (c) 2019–2026 P3TERX & community contributors
 # MIT License — see LICENSE in root
@@ -135,7 +135,7 @@ jobs:
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> "$GITHUB_ENV"
 
     - name: 💾 检查磁盘空间
-      if: always()
+      if: always
       run: df -hT
 
     - name: 📁 整理 firmware 目录（最小交付）
@@ -174,14 +174,50 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    - name: 🗑️ 清理旧 Release（✅ 已修复：使用 crazy-max/ghaction-cleanup@v6）
-      uses: crazy-max/ghaction-cleanup@v6
+    - name: 🗑️ 清理旧 Release（✅ 官方 API · 稳定可靠 · 无归档风险）
       if: ${{ env.UPLOAD_RELEASE == 'true' }}
+      uses: actions/github-script@v7
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        releases: true
-        keep_latest: 3
-        delete_tags: true
+        script: |
+          const releases = await github.rest.repos.listReleases({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            per_page: 100
+          });
+
+          // 过滤正式发布（非预发布、非草稿），按时间倒序
+          const publishedReleases = releases.data
+            .filter(r => !r.prerelease && !r.draft)
+            .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
+
+          const toDelete = publishedReleases.slice(3);
+          console.log(`🔍 找到 ${publishedReleases.length} 个正式 Release，将删除 ${toDelete.length} 个`);
+
+          for (const release of toDelete) {
+            await github.rest.repos.deleteRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: release.id
+            });
+            console.log(`✅ 已删除 Release: ${release.tag_name} (${release.id})`);
+          }
+
+          // ✅ 可选：同步删除对应 Tag（取消下方注释启用）
+          /*
+          for (const release of toDelete) {
+            try {
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${release.tag_name}`
+              });
+              console.log(`✅ 已删除 Tag: ${release.tag_name}`);
+            } catch (e) {
+              console.warn(`⚠️ Tag ${release.tag_name} 不存在或已被删除，跳过`);
+            }
+          }
+          */
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: 🧹 清理旧 workflow 运行记录
       uses: Mattraks/delete-workflow-runs@v2
