@@ -6,13 +6,9 @@ echo "执行基础资源下载..."
 
 # 创建必需目录
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
-mkdir -p target/package/boot/uboot-rockchip/files/configs/hinlink-h29k-rk3528_defconfig package/boot/uboot-rockchip/files/configs/
 
 # DTS 设备树文件
 cp -f $GITHUB_WORKSPACE/rk3528-opc-h29k.dts target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
-
-# ========== 【复制 U-Boot defconfig 到编译目录，让系统识别】 ==========
-cp -f $GITHUB_WORKSPACE/package/boot/uboot-rockchip/files/configs/hinlink-h29k-rk3528_defconfig package/boot/uboot-rockchip/files/configs/
 
 download_file() {
     local url="$1"
@@ -36,7 +32,7 @@ for i in 1 2 3; do
 done
 
 # ==============================================================================
-# 【官方标准格式】添加 H29K 到 U-Boot
+# 【官方标准格式】添加 H29K 到 U-Boot Makefile
 # 完全匹配源码风格，不碰 H28K，不冲突、不覆盖
 # ==============================================================================
 makefile="package/boot/uboot-rockchip/Makefile"
@@ -48,6 +44,21 @@ sed -i '/hinlink-h28k-rk3528/a\  hinlink-h29k-rk3528 \\' "$makefile"
 sed -i '/define U-Boot\/hinlink-h28k-rk3528/a\
 define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  NAME:=HINLINK H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
 ' "$makefile"
+
+# ======================== 【添加 H29K：armv8.mk设备定义】 ========================
+TARGET_MK="target/linux/rockchip/image/armv8.mk"
+
+cat >> "$TARGET_MK" <<'EOF'
+define Device/hinlink_h29k
+  $(Device/rk3528)
+  DEVICE_VENDOR := HINLINK
+  DEVICE_MODEL := H29K
+  DEVICE_DTS := rk3528-opc-h29k
+  UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
+  DEVICE_PACKAGES := kmod-usb3 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
+endef
+TARGET_DEVICES += hinlink_h29k
+EOF
 
 # ======================== 【第2部分：H28K 基准配置 】 ========================
 echo "===== 生成 H28K 基准配置 ====="
@@ -61,8 +72,58 @@ make defconfig
 
 echo "✅ H28K 基准配置完成"
 
-# ======================== 【✅ 关键：只编译 H29K，清空所有官方设备】 ========================
-sed -i '/^TARGET_DEVICES +=/d' target/linux/rockchip/image/armv8.mk
+# =============== 【HINLINK H29K U-Boot 支持：自动注入 defconfig】 ===============
+echo "=== 🔧 Injecting U-Boot hinlink_h29k_defconfig for RK3528 ==="
+
+# 步骤 1：确认 OpenWrt 官方源码中 hinlink_h28k_defconfig 存在（作为安全基线）
+if [ ! -f "package/boot/uboot-rockchip/configs/hinlink_h28k_defconfig" ]; then
+  echo "❌ ERROR: Official hinlink_h28k_defconfig not found in package/boot/uboot-rockchip/configs/"
+  echo "   Please ensure you're building against OpenWrt main branch (2026.04+)"
+  exit 1
+fi
+
+# 步骤 2：从官方 hinlink_h28k_defconfig 派生 hinlink_h29k_defconfig（正确路径 + 正确命名）
+cp -f package/boot/uboot-rockchip/configs/hinlink_h28k_defconfig package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
+
+# 步骤 3：精准替换两处关键字段（下划线命名 + DTS 名称），生成合法 H29K 配置
+sed -i 's/CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_HINLINK_H28K=y/CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_HINLINK_H29K=y/g' \
+       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
+sed -i 's/CONFIG_DEFAULT_DEVICE_NAME="hinlink-h28k-rk3528"/CONFIG_DEFAULT_DEVICE_NAME="hinlink-h29k-rk3528"/g' \
+       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
+sed -i 's/CONFIG_DEFAULT_DEVICE_DTS="rk3528-opc-h28k"/CONFIG_DEFAULT_DEVICE_DTS="rk3528-opc-h29k"/g' \
+       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
+sed -i 's/CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG="hinlink_h28k"/CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG="hinlink_h29k"/g' \
+       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
+sed -i 's/CONFIG_DEFAULT_DEVICE_UBOOT_IMAGE="u-boot-rockchip-hinlink_h28k.bin"/CONFIG_DEFAULT_DEVICE_UBOOT_IMAGE="u-boot-rockchip-hinlink_h29k.bin"/g' \
+       package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
+
+# 步骤 4：验证生成结果（强制校验，失败立即中断构建）
+if [ ! -f "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig" ]; then
+  echo "❌ ERROR: hinlink_h29k_defconfig was not created"
+  exit 1
+fi
+
+if ! grep -q "CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_HINLINK_H29K=y" package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig; then
+  echo "❌ ERROR: CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_HINLINK_H29K=y missing in hinlink_h29k_defconfig"
+  exit 1
+fi
+
+if ! grep -q 'CONFIG_DEFAULT_DEVICE_DTS="rk3528-opc-h29k"' package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig; then
+  echo "❌ ERROR: CONFIG_DEFAULT_DEVICE_DTS=\"rk3528-opc-h29k\" not set"
+  exit 1
+fi
+
+if ! grep -q 'CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG="hinlink_h29k"' package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig; then
+  echo "❌ ERROR: CONFIG_DEFAULT_DEVICE_UBOOT_CONFIG=\"hinlink_h29k\" not set"
+  exit 1
+fi
+
+echo "✅ hinlink_h29k_defconfig successfully generated and validated:"
+echo "   → Path: package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
+echo "   → DTS: rk3528-opc-h29k"
+echo "   → UBOOT_CONFIG: hinlink_h29k"
+echo "   → Ready for 'make package/uboot-rockchip/hinlink_h29k/compile'"
+# =============== 【HINLINK H29K U-Boot 支持：结束】 ===============
 
 # ======================== 【第3部分：内核配置】 ========================
 CONF_FILES=$(find target/linux/rockchip/armv8 -name "config-*")
@@ -79,21 +140,6 @@ CONFIG_IRQ_BALANCING=y
 CONFIG_IRQ_AFFINITY=y
 EOF
 done
-
-# ======================== 【第4部分：设备定义】 ========================
-TARGET_MK="target/linux/rockchip/image/armv8.mk"
-
-cat >> "$TARGET_MK" <<'EOF'
-define Device/hinlink_h29k
-  $(Device/rk3528)
-  DEVICE_VENDOR := HINLINK
-  DEVICE_MODEL := H29K
-  DEVICE_DTS := rk3528-opc-h29k
-  UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
-  DEVICE_PACKAGES := kmod-usb3 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option kmod-h29k-fb-st7789v luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn
-endef
-TARGET_DEVICES += hinlink_h29k
-EOF
 
 echo "===== ✅ 关键切换为 H29K 配置 ====="
 # ==============================================
