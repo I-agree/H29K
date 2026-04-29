@@ -190,7 +190,7 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# ======================== 【H29K 强制4项校验 · 失败立即终止编译】 ========================
+# ======================== 【H29K 强制5项校验 · 失败立即终止编译】 ========================
 
 # 检查 1：DTS 文件必须存在
 DTS_FILE="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-opc-h29k.dts"
@@ -223,6 +223,14 @@ if [ $COUNT -lt 1 ]; then
     exit 1
 fi
 echo -e "\033[32m[OK] 只编译 H29K\033[0m"
+
+# 检查 5：U-Boot 已添加 hinlink-h29k-rk3528
+UBOOT_MK="package/boot/uboot-rockchip/Makefile"
+if ! grep -q "hinlink-h29k-rk3528" "$UBOOT_MK"; then
+    echo -e "\033[31m[ERROR] U-Boot 未添加 H29K 设备！编译终止！\033[0m"
+    exit 1
+fi
+echo -e "\033[32m[OK] U-Boot 已添加 H29K 设备\033[0m"
 
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！开始编译！\033[0m"
