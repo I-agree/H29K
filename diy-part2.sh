@@ -190,6 +190,9 @@ CONFIG_PACKAGE_uboot-rockchip=y
 CONFIG_PACKAGE_uboot-rockchip-v8=y
 CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
 CONFIG_TARGET_DEVICE_PACKAGES_rockchip_armv8_DEVICE_hinlink_h29k="uboot-rockchip-hinlink_h29k"
+CONFIG_PACKAGE_luci-app-oaf=y
+CONFIG_PACKAGE_appfilter=y
+CONFIG_PACKAGE_luci-i18n-oaf-zh-cn=y
 EOF
 
 # ======================== 【第5部分：屏幕脚本（procd 服务化）】 ========================
