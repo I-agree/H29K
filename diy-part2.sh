@@ -42,7 +42,7 @@ sed -i '/hinlink-h28k-rk3528/a\  hinlink-h29k-rk3528 \\' "$makefile"
 
 # 2. 在 H28K 定义下面 添加 H29K 设备（完全官方格式）
 sed -i '/define U-Boot\/hinlink-h28k-rk3528/a\
-define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  NAME:=HINLINK H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
+define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  UBOOT_CONFIG:=hinlink_h29k\n  NAME:=HINLINK H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
 ' "$makefile"
 
 # ======================== 【添加 H29K：armv8.mk设备定义】 ========================
