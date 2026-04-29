@@ -1,214 +1,160 @@
 #
-# OpenWrt Builder for HINLINK H29K (RK3528)
-# ✅ 已全局修复所有上下文表达式误用：
-#    • if: always → if: ${{ always }}
-#    • if: failure → if: ${{ failure }}
-#    • if: env.XXX → if: ${{ env.XXX == 'value' }}
-#    • if: github.event_name → if: ${{ github.event_name == 'push' }}
-#    • continue-on-error: always → ❌ 删除（非法），仅保留 true/false
-# ✅ 全部通过 GitHub Actions YAML Schema v3.4 验证
+# https://github.com/P3TERX/Actions-OpenWrt
 #
-# Copyright (c) 2019–2026 P3TERX & community contributors
-# MIT License — see LICENSE in root
+# File: .github/workflows/openwrt-bulder.yml
+# Description: Build OpenWrt using GitHub Actions
+#
+# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
 #
 
-name: OpenWrt Builder (H29K-RK3528)
+name: OpenWrt Builder
 
 on:
+  repository_dispatch:
   workflow_dispatch:
-    inputs:
-      REPO_URL:
-        description: 'OpenWrt 源码仓库地址（默认官方）'
-        required: false
-        default: 'https://github.com/openwrt/openwrt'
-      REPO_BRANCH:
-        description: '分支名（如 main / openwrt-24.10）'
-        required: false
-        default: 'main'
-      CONFIG_FILE:
-        description: '配置文件名（如 rk3528-opc-h29k.config）'
-        required: false
-        default: 'rk3528-opc-h29k.config'
-      UPLOAD_FIRMWARE:
-        description: '是否上传 firmware 目录（推荐 true）'
-        required: false
-        default: 'true'
-        type: boolean
-      UPLOAD_RELEASE:
-        description: '是否创建 GitHub Release（推荐 true）'
-        required: false
-        default: 'true'
-        type: boolean
-
-  push:
-    paths:
-      - 'rk3528-opc-h29k.config'
-      - 'diy-part1.sh'
-      - 'diy-part2.sh'
-      - '.github/workflows/openwrt-builder.yml'
 
 env:
-  REPO_URL: ${{ github.event.inputs.REPO_URL || 'https://github.com/openwrt/openwrt' }}
-  REPO_BRANCH: ${{ github.event.inputs.REPO_BRANCH || 'main' }}
+  REPO_URL: https://github.com/coolsnowwolf/lede
+  REPO_BRANCH: master
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: ${{ github.event.inputs.CONFIG_FILE || 'rk3528-opc-h29k.config' }}
+  CONFIG_FILE: .config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
-  UPLOAD_FIRMWARE: ${{ github.event.inputs.UPLOAD_FIRMWARE || 'true' }}
-  UPLOAD_RELEASE: ${{ github.event.inputs.UPLOAD_RELEASE || 'true' }}
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 180
 
     steps:
-    - name: 🔍 环境自检（基础工具）
-      run: |
-        echo "=== OS & Toolchain ==="
-        uname -a
-        curl --version | head -n1
-        sed --version | head -n1
-        make --version | head -n1
-        git --version
+    - name: Checkout
+      uses: actions/checkout@main
 
-    - name: 📥 获取本仓库代码（含子模块）
-      uses: actions/checkout@v4
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - name: 🧰 初始化系统环境
+    - name: Initialization environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo apt-get -qq update
-        sudo apt-get -qq install -y \
-          build-essential asciidoc bash bison cmake curl device-tree-compiler \
-          flex gawk gettext git libncurses5-dev libssl-dev python3 python3-setuptools \
-          rsync subversion unzip wget xz-utils zlib1g-dev \
-          u-boot-tools imagemagick fonts-wqy-microhei dos2unix
-        sudo apt-get -qq autoremove --purge -y
-        sudo apt-get -qq clean
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
 
-    - name: 🌐 克隆 OpenWrt 源码
+    - name: Clone source code
+      working-directory: /workdir
       run: |
-        mkdir -p /workdir
-        git clone "$REPO_URL" -b "$REPO_BRANCH" /workdir/openwrt
-        ln -sf /workdir/openwrt "$GITHUB_WORKSPACE/openwrt"
-        cd /workdir/openwrt && git log -n 1 --oneline
+        df -hT $PWD
+        git clone $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 🧩 加载自定义 feeds（可选）
+    - name: Load custom feeds
       run: |
-        [ -e "$FEEDS_CONF" ] && mv "$FEEDS_CONF" /workdir/openwrt/feeds.conf.default
-        chmod +x "$DIY_P1_SH"
-        cd /workdir/openwrt && "$GITHUB_WORKSPACE/$DIY_P1_SH"
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: 📦 更新并安装 feeds
-      run: cd /workdir/openwrt && ./scripts/feeds update -a && ./scripts/feeds install -a
+    - name: Update feeds
+      run: cd openwrt && ./scripts/feeds update -a
 
-    - name: ⚙️ 加载配置与 DIY 补丁
+    - name: Install feeds
+      run: cd openwrt && ./scripts/feeds install -a
+
+    - name: Load custom configuration
       run: |
-        [ -e files ] && mv files /workdir/openwrt/files
-        [ -e "$CONFIG_FILE" ] && mv "$CONFIG_FILE" /workdir/openwrt/.config
-        chmod +x "$DIY_P2_SH"
-        cd /workdir/openwrt && "$GITHUB_WORKSPACE/$DIY_P2_SH"
+        [ -e files ] && mv files openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 📥 下载依赖（带重试）
+    - name: Download package
+      id: package
       run: |
-        cd /workdir/openwrt
+        cd openwrt
         make defconfig
-        make download -j8 || make download -j4 || {
-          echo "❌ 下载失败，请检查网络或手动填充 dl/"
-          exit 1
-        }
-        find dl -size -1024c -delete 2>/dev/null || true
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
 
-    - name: 🏗️ 编译固件（智能降级）
+    - name: Compile the firmware
+      id: compile
       run: |
-        cd /workdir/openwrt
-        echo "使用 $(nproc) 线程编译..."
-        if ! make -j$(nproc) V=s; then
-          echo "⚠️ 并行失败，降级为单线程..."
-          make -j1 V=s || { echo "❌ 编译失败"; exit 1; }
-        fi
-        echo "✅ 编译完成"
+        cd openwrt
+        echo -e "$(nproc) thread compile"
+        make -j$(nproc) || make -j1 || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> "$GITHUB_ENV"
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> "$GITHUB_ENV"
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    - name: 💾 检查磁盘空间
-      if: ${{ always }}   # ✅ 已修复：正确函数调用
+    - name: Check space usage
+      if: (!cancelled())
       run: df -hT
 
-    - name: 📁 整理 firmware 目录（最小交付）
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' }}   # ✅ 已修复：env 访问 + 字符串比较
-      run: |
-        cd /workdir/openwrt/bin/targets/*/*
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> "$GITHUB_ENV"
+    - name: Upload bin directory
+      uses: actions/upload-artifact@main
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      with:
+        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: openwrt/bin
 
-    - name: 📤 上传 firmware artifact
-      uses: actions/upload-artifact@v4
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' }}   # ✅ 已修复：同上
+    - name: Organize files
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      run: |
+        cd openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload firmware directory
+      uses: actions/upload-artifact@main
+      if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
-        retention-days: 7
 
-    - name: 🏷️ 生成 Release 描述
-      id: release-info
-      if: ${{ env.UPLOAD_RELEASE == 'true' }}   # ✅ 已修复：env 访问 + 字符串比较
+    - name: Generate release tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> "$GITHUB_OUTPUT"
-        echo "H29K 固件构建完成（OpenWrt ${REPO_BRANCH}）" > release.txt
-        echo "设备型号：HINLINK H29K（RK3528）" >> release.txt
-        echo "构建时间：$(date)" >> release.txt
-        echo "SHA256：" >> release.txt
-        sha256sum ${{ env.FIRMWARE }}/* >> release.txt
+        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        touch release.txt
+        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
+        echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: 🚀 发布 GitHub Release
-      uses: softprops/action-gh-release@v2
-      if: ${{ env.UPLOAD_RELEASE == 'true' }}   # ✅ 已修复：同上
+    - name: Upload firmware to release
+      uses: softprops/action-gh-release@master
+      if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.release-info.outputs.release_tag }}
+        tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    - name: 🗑️ 清理旧 Release（✅ 官方 API · 稳定可靠）
-      if: ${{ env.UPLOAD_RELEASE == 'true' }}   # ✅ 已修复：env 访问
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const releases = await github.rest.repos.listReleases({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            per_page: 100
-          });
-
-          const publishedReleases = releases.data
-            .filter(r => !r.prerelease && !r.draft)
-            .sort((a, b) => new Date(b.published_at) - new Date(a.published_at));
-
-          const toDelete = publishedReleases.slice(3);
-          console.log(`🔍 找到 ${publishedReleases.length} 个正式 Release，将删除 ${toDelete.length} 个`);
-
-          for (const release of toDelete) {
-            await github.rest.repos.deleteRelease({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              release_id: release.id
-            });
-            console.log(`✅ 已删除 Release: ${release.tag_name} (${release.id})`);
-          }
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: 🧹 清理旧 workflow 运行记录
-      uses: Mattraks/delete-workflow-runs@v2
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@main
       with:
         retain_days: 0
         keep_minimum_runs: 2
+
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@master
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      with:
+        keep_latest: 3
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
