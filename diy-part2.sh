@@ -6,9 +6,13 @@ echo "执行基础资源下载..."
 
 # 创建必需目录
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
+mkdir -p target/package/boot/uboot-rockchip/files/configs/hinlink-h29k-rk3528_defconfig package/boot/uboot-rockchip/files/configs/
 
 # DTS 设备树文件
 cp -f $GITHUB_WORKSPACE/rk3528-opc-h29k.dts target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
+
+# ========== 【复制 U-Boot defconfig 到编译目录，让系统识别】 ==========
+cp -f $GITHUB_WORKSPACE/package/boot/uboot-rockchip/files/configs/hinlink-h29k-rk3528_defconfig package/boot/uboot-rockchip/files/configs/
 
 download_file() {
     local url="$1"
