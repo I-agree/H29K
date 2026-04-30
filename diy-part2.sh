@@ -245,10 +245,10 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# ======================== 【H29K 强制5项校验 · 失败立即终止编译】 ========================
+# ======================== 【H29K 强制4项校验 · 失败立即终止编译】 ========================
 echo "🔍 开始 H29K 构建前置五重校验..."
 
-# ✅ 校验2：设备定义已写入 armv8.mk
+# ✅ 校验1：设备定义已写入 armv8.mk
 DEVICE_NAME="hinlink_h29k"
 MK_FILE="target/linux/rockchip/image/armv8.mk"
 if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
@@ -257,14 +257,14 @@ if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
 fi
 echo -e "\033[32m[通过] 设备定义已写入 armv8.mk\033[0m"
 
-# ✅ 校验3：RK3528 平台已启用（永久通用版）
+# ✅ 校验2：RK3528 平台已启用（永久通用版）
 if ! grep -q "CONFIG_TARGET_rockchip_rk3528=y" .config; then
   echo -e "\033[31m[错误] 内核未启用 RK3528 平台！\033[0m"
   exit 1
 fi
 echo -e "\033[32m[通过] RK3528 平台已启用\033[0m"
 
-# ✅ 校验4：只编译 H29K（防误启 H28K）
+# ✅ 校验3：只编译 H29K（防误启 H28K）
 COUNT=$(grep -c "hinlink_h29k" "$MK_FILE")
 if [ $COUNT -lt 1 ]; then
   echo -e "\033[31m[错误] 未检测到 hinlink_h29k 设备定义\033[0m"
@@ -272,7 +272,7 @@ if [ $COUNT -lt 1 ]; then
 fi
 echo -e "\033[32m[通过] H29K 设备定义数量：$COUNT\033[0m"
 
-# ✅ 校验5：U-Boot 已添加 hinlink-h29k-rk3528（Makefile & defconfig 双重确认）
+# ✅ 校验4：U-Boot 已添加 hinlink-h29k-rk3528（Makefile & defconfig 双重确认）
 UBOOT_MK="package/boot/uboot-rockchip/Makefile"
 if ! grep -q "hinlink-h29k-rk3528" "$UBOOT_MK"; then
   echo -e "\033[31m[错误] U-Boot 未添加 H29K 设备！编译终止！\033[0m"
