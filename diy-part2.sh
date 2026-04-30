@@ -98,10 +98,6 @@ done
 
 echo "===== ✅ 内核配置注入完成 ====="
 
-# ==============================================
-# 【强制清理配置，避免残留冲突】
-sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
-
 # 【分区大小重置】—— 删除旧值，写入 H29K 推荐值（256MB kernel + 2048MB rootfs）
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
 sed -i '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/d' .config
@@ -223,6 +219,11 @@ uci commit system
 exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
+
+# ==============================================
+# 【强制清理配置，避免残留冲突】
+sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
+echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
 # ======================== 【H29K 强制4项校验 · 失败立即终止编译】 ========================
 echo "🔍 开始 H29K 构建前置五重校验..."
