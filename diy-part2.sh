@@ -164,6 +164,9 @@ CONFIG_PACKAGE_appfilter=y
 CONFIG_PACKAGE_luci-i18n-oaf-zh-cn=y
 EOF
 
+sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
+echo 'CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y' >> .config
+
 # ======================== 【第5部分：屏幕脚本（procd 服务化）】 ========================
 # ✅ 修复点8：弃用 /etc/rc.local（OpenWrt 22.03+ 已废弃），改用 procd 服务管理
 #    优势：启动时机可控、日志可查、状态可监控、重启安全
