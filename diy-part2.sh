@@ -66,7 +66,7 @@ cat >> "$TARGET_MK" <<'EOF'
 #    - 遵循 OpenWrt 命名规范：rk3528-{vendor}-{model}
 #    - 使用官方 $(Device/rk3528) 宏保证内核与镜像一致性
 define Device/hinlink_h29k
-  SOC := rk3528
+  $(Device/rk3528)
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
