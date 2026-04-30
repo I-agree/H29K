@@ -1,13 +1,6 @@
 #!/bin/bash
 # ======================== 【第1部分：资源准备】 ========================
-echo "✅ 正在执行基础资源下载与初始化..."
-
-# 创建 DTS 设备树目录（OpenWrt 强制要求：所有 Rockchip DTS 必须放在target/linux/rockchip/dts/）
-mkdir -p files/target/linux/rockchip/dts/
-
-# 拷贝 H29K 设备树源文件（来自仓库根目录）
-# ⚠️ 注意：rk3528-hinlink-h29k.dts 应已由用户提前提交至仓库
-cp -f "$GITHUB_WORKSPACE/rk3528-hinlink-h29k.dts" files/target/linux/rockchip/dts/
+echo "✅ 正在执行基础资源下载..."
 
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
