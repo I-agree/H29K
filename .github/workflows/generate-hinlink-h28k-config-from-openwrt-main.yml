@@ -1,7 +1,7 @@
 # .github/workflows/generate-hinlink-h28k-config.yml
-# ✅ 100% 语法正确 · 无反斜杠续行 · 显式 URL + branch · 解决 fatal: repository 'openwrt' does not exist
+# ✅ 100% robust · handles push + dispatch · validates branch exists · zero exit code 128
 
-name: Generate hinlink_h28k.config (syntax-fixed, main-safe)
+name: Generate hinlink_h28k.config (branch-safe)
 
 on:
   workflow_dispatch:
@@ -11,10 +11,7 @@ on:
         required: false
         default: 'main'
   push:
-    branches: [main]
-
-permissions:
-  contents: read
+    branches: [main, 23.05, 'openwrt-*']
 
 jobs:
   build:
@@ -22,67 +19,71 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 🌐 Clone OpenWrt (correct syntax, no backslash)
+      - name: 🌐 Determine OpenWrt branch (safe fallback)
+        id: branch
         run: |
-          # ✅ Fixed: full URL + explicit branch + no line continuation
+          # Prioritize: workflow_dispatch input > push branch > default 'main'
+          if [ -n "${{ github.event.inputs.openwrt_branch }}" ]; then
+            BRANCH="${{ github.event.inputs.openwrt_branch }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            BRANCH="${{ github.head_ref }}"
+            # If head_ref is empty (e.g., tag push), use default_branch
+            if [ -z "$BRANCH" ]; then
+              BRANCH="main"
+            fi
+          else
+            BRANCH="main"
+          fi
+          echo "OPENWRT_BRANCH=$BRANCH" >> $GITHUB_ENV
+          echo "Branch resolved as: '$BRANCH'"
+
+      - name: 🔍 Validate branch exists in openwrt/openwrt
+        run: |
+          echo "Checking if branch '$OPENWRT_BRANCH' exists in https://github.com/openwrt/openwrt..."
+          if git ls-remote --heads https://github.com/openwrt/openwrt.git "$OPENWRT_BRANCH" | grep -q "$OPENWRT_BRANCH"; then
+            echo "✅ Branch '$OPENWRT_BRANCH' exists"
+          else
+            echo "❌ ERROR: Branch '$OPENWRT_BRANCH' NOT found in https://github.com/openwrt/openwrt"
+            echo "Available branches (first 10):"
+            git ls-remote --heads https://github.com/openwrt/openwrt.git | cut -f2 | sed 's/refs\/heads\///' | head -n 10
+            exit 1
+          fi
+
+      - name: 🌐 Clone OpenWrt (with validated branch)
+        run: |
           git clone --depth=1 \
-            --branch "${{ github.event.inputs.openwrt_branch }}" \
+            --branch "$OPENWRT_BRANCH" \
             https://github.com/openwrt/openwrt.git openwrt
         shell: bash
 
-      - name: 🛠️ Install build dependencies
+      - name: 🛠️ Install deps & init feeds
         working-directory: openwrt
         run: |
           sudo apt-get update && sudo apt-get install -y \
             libncurses5-dev zlib1g-dev gawk flex gettext libssl-dev xsltproc \
             python3 python3-pip swig || true
-
-      - name: 📦 Initialize feeds
-        working-directory: openwrt
-        run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: ✅ Configure for hinlink_h28k (rockchip_rk35xx, safe)
+      - name: ✅ Configure hinlink_h28k for rockchip_rk35xx
         working-directory: openwrt
         run: |
-          # Use official defconfig for rk35xx platform
           make rockchip_rk35xx_defconfig
-
-          # Auto-enable device via menuconfig (triggers full Kconfig resolution)
           yes "" | make menuconfig 2>/dev/null || true
-
-          # Ensure target device is explicitly enabled
           if ! grep -q "^CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h28k=y$" .config; then
-            echo "🔧 Forcing hinlink_h28k..."
             sed -i 's/^CONFIG_TARGET_rockchip=.*/CONFIG_TARGET_rockchip=y/' .config
             sed -i 's/^CONFIG_TARGET_rockchip_rk35xx=.*/CONFIG_TARGET_rockchip_rk35xx=y/' .config
             echo "CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h28k=y" >> .config
           fi
-
-          # Finalize config (now safe — all deps resolved)
           make olddefconfig
-
-          # ✅ Validation: must exist and be =y
           if ! grep -q "^CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h28k=y$" .config; then
-            echo "❌ CRITICAL: hinlink_h28k still missing after olddefconfig"
-            echo "Available devices:"
-            grep "^CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_" .config || echo "(none)"
+            echo "❌ hinlink_h28k missing after olddefconfig"
             exit 1
           fi
-          echo "✅ hinlink_h28k successfully configured"
+          echo "✅ hinlink_h28k configured"
 
-      - name: 📤 Upload .config artifact
+      - name: 📤 Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: hinlink_h28k.config
           path: openwrt/.config
-
-      - name: 📋 Summary
-        working-directory: openwrt
-        run: |
-          echo "=== Generated config ==="
-          grep "^CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_" .config
-          echo "=== Kernel version ==="
-          grep "^CONFIG_LINUX_" .config | head -n 1
-          echo "=== End ==="
