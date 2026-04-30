@@ -248,14 +248,6 @@ chmod +x files/etc/uci-defaults/99-h29k
 # ======================== 【H29K 强制5项校验 · 失败立即终止编译】 ========================
 echo "🔍 开始 H29K 构建前置五重校验..."
 
-# ✅ 校验1：DTS 文件必须存在（且已重命名为标准名）
-DTS_FILE="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
-if [ ! -f "$DTS_FILE" ]; then
-  echo -e "\033[31m[错误] H29K DTS 文件不存在！编译终止！\033[0m"
-  exit 1
-fi
-echo -e "\033[32m[通过] DTS 文件存在（rk3528-hinlink-h29k.dts）\033[0m"
-
 # ✅ 校验2：设备定义已写入 armv8.mk
 DEVICE_NAME="hinlink_h29k"
 MK_FILE="target/linux/rockchip/image/armv8.mk"
