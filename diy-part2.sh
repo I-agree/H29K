@@ -1,16 +1,4 @@
 #!/bin/bash
-# ======================== 【第1部分：H28K 基准配置】 ========================
-echo "===== ⚙️ 生成 H28K 基准配置（用于 make defconfig 初始化）====="
-cat >> .config <<'EOF'
-CONFIG_TARGET_rockchip=y
-CONFIG_TARGET_rockchip_armv8=y
-CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
-EOF
-
-make defconfig
-
-echo " ✅ H28K 基准配置完成（后续将被 H29K 配置覆盖）"
-
 # ======================== 【第2部分：资源准备】 ========================
 echo "✅ 正在执行基础资源下载..."
 
@@ -111,13 +99,7 @@ done
 echo "===== ✅ 内核配置注入完成 ====="
 
 # ==============================================
-# 【强制清理 H28K 专属配置，避免残留冲突】
-# ✅ 修复点6：删除无效的 CONFIG_TARGET_DEVICE_HINLINK_H28K（非标准变量名）
-# ==============================================
-sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
-sed -i '/CONFIG_PACKAGE_uboot-rockchip-hinlink_h28k/d' .config
-sed -i '/CONFIG_PACKAGE_uboot-rockchip-h28k/d' .config
-sed -i '/CONFIG_rockchip_h28k/d' .config
+# 【强制清理配置，避免残留冲突】
 sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
 
 # 【分区大小重置】—— 删除旧值，写入 H29K 推荐值（256MB kernel + 2048MB rootfs）
