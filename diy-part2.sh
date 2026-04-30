@@ -1,5 +1,17 @@
 #!/bin/bash
-# ======================== 【第1部分：资源准备】 ========================
+# ======================== 【第1部分：H28K 基准配置】 ========================
+echo "===== ⚙️ 生成 H28K 基准配置（用于 make defconfig 初始化）====="
+cat >> .config <<'EOF'
+CONFIG_TARGET_rockchip=y
+CONFIG_TARGET_rockchip_armv8=y
+CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
+EOF
+
+make defconfig
+
+echo " ✅ H28K 基准配置完成（后续将被 H29K 配置覆盖）"
+
+# ======================== 【第2部分：资源准备】 ========================
 echo "✅ 正在执行基础资源下载..."
 
 # 创建开机 LOGO 存放目录
@@ -77,19 +89,7 @@ endef
 TARGET_DEVICES += hinlink_h29k
 EOF
 
-# ======================== 【第2部分：H28K 基准配置（仅作参考，不启用）】 ========================
-echo "===== ⚙️ 生成 H28K 基准配置（用于 make defconfig 初始化）====="
-cat >> .config <<'EOF'
-CONFIG_TARGET_rockchip=y
-CONFIG_TARGET_rockchip_armv8=y
-CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
-EOF
-
-make defconfig
-
-echo " ✅ H28K 基准配置完成（后续将被 H29K 配置覆盖）"
-
-# ======================== 【第3部分：内核配置】 ========================
+# ======================== 【内核配置】 ========================
 # 清理旧内核选项（避免冲突），注入 H29K 专属配置
 CONF_FILES=$(find target/linux/rockchip/armv8 -name "config-*")
 for CONF in $CONF_FILES; do
@@ -161,7 +161,7 @@ CONFIG_PACKAGE_appfilter=y
 CONFIG_PACKAGE_luci-i18n-oaf-zh-cn=y
 EOF
 
-# ======================== 【第5部分：屏幕脚本（procd 服务化）】 ========================
+# ======================== 【第3部分：屏幕脚本（procd 服务化）】 ========================
 # ✅ 修复点8：弃用 /etc/rc.local（OpenWrt 22.03+ 已废弃），改用 procd 服务管理
 #    优势：启动时机可控、日志可查、状态可监控、重启安全
 mkdir -p files/etc/init.d
@@ -217,7 +217,7 @@ done
 EOF
 chmod +x files/usr/bin/h29k_screen.sh
 
-# ======================== 【第6部分：系统默认设置（UCI）】 ========================
+# ======================== 【第4部分：系统默认设置（UCI）】 ========================
 # ✅ 修复点9：启用 h29k-screen 服务（替代 rc.local）
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k <<'EOF'
@@ -269,7 +269,7 @@ if [ $COUNT -lt 1 ]; then
 fi
 echo -e "\033[32m[通过] H29K 设备定义数量：$COUNT\033[0m"
 
-# ✅ 校验4：U-Boot 已添加 hinlink-h29k-rk3528（Makefile & defconfig 双重确认）
+# ✅ 校验4：U-Boot 已添加 hinlink-h29k-rk3528（Makefile确认）
 UBOOT_MK="package/boot/uboot-rockchip/Makefile"
 if ! grep -q "hinlink-h29k-rk3528" "$UBOOT_MK"; then
   echo -e "\033[31m[错误] U-Boot 未添加 H29K 设备！编译终止！\033[0m"
