@@ -4,7 +4,7 @@ echo "✅ 正在执行基础资源下载..."
 # 创建必需目录（-p 确保嵌套路径安全）
 mkdir -p "target/linux/rockchip/dts"
 # 复制 DTS 文件（加引号防空格/特殊字符）
-cp -f "$GITHUB_WORKSPACE/rk3528-hinlink-h29k.dts" "target/linux/rockchip/dts/rk3528-hinlink-h29k.dts"
+cp -f "$GITHUB_WORKSPACE/rk3528-hinlink-h29k.dts" "target/linux/rockchip/dts/"
 
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
