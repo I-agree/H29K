@@ -119,7 +119,7 @@ sed -i '/CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k/d' .config
 sed -i '/CONFIG_PACKAGE_uboot-rockchip-hinlink_h28k/d' .config
 sed -i '/CONFIG_PACKAGE_uboot-rockchip-h28k/d' .config
 sed -i '/CONFIG_rockchip_h28k/d' .config
-echo "# CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k is not set" >> .config
+sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
 
 # 【分区大小重置】—— 删除旧值，写入 H29K 推荐值（256MB kernel + 2048MB rootfs）
 sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
@@ -163,9 +163,6 @@ CONFIG_PACKAGE_luci-app-oaf=y
 CONFIG_PACKAGE_appfilter=y
 CONFIG_PACKAGE_luci-i18n-oaf-zh-cn=y
 EOF
-
-sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
-echo 'CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y' >> .config
 
 # ======================== 【第5部分：屏幕脚本（procd 服务化）】 ========================
 # ✅ 修复点8：弃用 /etc/rc.local（OpenWrt 22.03+ 已废弃），改用 procd 服务管理
