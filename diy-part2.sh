@@ -79,11 +79,10 @@ EOF
 
 # ======================== 【第2部分：H28K 基准配置（仅作参考，不启用）】 ========================
 echo "===== ⚙️ 生成 H28K 基准配置（用于 make defconfig 初始化）====="
-cat > .config <<EOF
+cat >> .config <<'EOF'
 CONFIG_TARGET_rockchip=y
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h28k=y
-CONFIG_PACKAGE_uboot-rockchip=y
 EOF
 
 make defconfig
@@ -97,7 +96,7 @@ for CONF in $CONF_FILES; do
   # 移除可能冲突的 staging/fb/tcpc 配置（确保干净）
   sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
   # 注入 H29K 必需内核模块与算法（ST7789V 屏幕、BBR 拥塞控制、IRQ 平衡）
-  cat >> "$CONF" <<EOF
+  cat >> "$CONF" <<'EOF'
 CONFIG_STAGING=y
 CONFIG_FB_TFT=y
 CONFIG_FB_TFT_ST7789V=y
@@ -149,16 +148,14 @@ echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
 # 【最终写入：H29K 全量核心配置】
 # ✅ 严格匹配 OpenWrt 2026.04+ RK3528 官方要求
 # ==============================
-cat >> .config <<EOF
+cat >> .config <<'EOF'
 CONFIG_TARGET_rockchip=y
-CONFIG_TARGET_rockchip_rk3528=y
 CONFIG_TARGET_MULTI_ARCH=n
 CONFIG_TARGET_rockchip_armv8=y
 CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 CONFIG_PACKAGE_uboot-rockchip=y
 CONFIG_PACKAGE_uboot-rockchip-v8=y
 CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
-CONFIG_TARGET_DEVICE_PACKAGES_rockchip_armv8_DEVICE_hinlink_h29k="uboot-rockchip-hinlink_h29k"
 CONFIG_PACKAGE_luci-app-oaf=y
 CONFIG_PACKAGE_appfilter=y
 CONFIG_PACKAGE_luci-i18n-oaf-zh-cn=y
