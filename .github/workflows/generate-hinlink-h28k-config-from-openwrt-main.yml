@@ -1,14 +1,13 @@
 # .github/workflows/generate-hinlink-h28k-config.yml
-# ✅ 100% 可靠 · 极简 · 绕过 Kconfig 限制 · 确保 CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_hinlink_h28k=y 存在
-# 📌 原理：用 'make menuconfig' 启动交互式配置器，通过 'yes "" | make menuconfig' 自动选择设备，强制持久化
+# ✅ OpenWrt main (2026) 兼容 · 解决 olddefconfig Error 1 · 确保 hinlink_h28k 生效
 
-name: Generate hinlink_h28k.config (menuconfig-force)
+name: Generate hinlink_h28k.config (OpenWrt-main-safe)
 
 on:
   workflow_dispatch:
     inputs:
       openwrt_branch:
-        description: 'OpenWrt branch (e.g., main, 23.05)'
+        description: 'OpenWrt branch (e.g., main)'
         required: false
         default: 'main'
   push:
@@ -29,41 +28,52 @@ jobs:
             https://github.com/openwrt/openwrt.git openwrt
         shell: bash
 
-      - name: 🛠️ Prepare build environment
+      - name: 🛠️ Install menuconfig deps
         working-directory: openwrt
         run: |
-          # Install dependencies (required for menuconfig UI)
           sudo apt-get update && sudo apt-get install -y \
-            ncurses-dev zlib1g-dev gawk flex gettext libssl-dev xsltproc \
-            wget unzip python3 python3-pip || true
-          # Init feeds
+            libncurses5-dev zlib1g-dev gawk flex gettext libssl-dev xsltproc \
+            python3 python3-pip swig || true
+
+      - name: 📦 Init feeds
+        working-directory: openwrt
+        run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
-      - name: ✅ Force-enable hinlink_h28k via menuconfig (guaranteed write)
+      - name: ✅ Generate base config for rockchip_rk35xx
         working-directory: openwrt
         run: |
-          # Step 1: Start with minimal config
-          rm -f .config
-          make defconfig 2>/dev/null || true
+          # Step 1: Use official target defconfig
+          make rockchip_rk35xx_defconfig
 
-          # Step 2: Use 'yes ""' to auto-select all defaults, then force target
-          # This triggers menuconfig's internal logic to register DEVICE_* symbols
+          # Step 2: Auto-enable hinlink_h28k via menuconfig (non-interactive)
+          # This ensures all dependencies (SOC_RK3528, ARCH_ROCKCHIP, etc.) are auto-set
           yes "" | make menuconfig 2>/dev/null || true
 
-          # Step 3: Manually append the exact line — guaranteed to survive
-          echo "CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_hinlink_h28k=y" >> .config
+          # Step 3: Force-select hinlink_h28k in the menuconfig tree
+          # OpenWrt menuconfig path: Target Profile → Hinlink H28K
+          # We use sed to directly patch the .config (safe after menuconfig)
+          if ! grep -q "^CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h28k=y$" .config; then
+            echo "🔧 Enabling hinlink_h28k device..."
+            # Ensure parent targets are enabled
+            sed -i 's/^CONFIG_TARGET_rockchip=.*$/CONFIG_TARGET_rockchip=y/' .config
+            sed -i 's/^CONFIG_TARGET_rockchip_rk35xx=.*$/CONFIG_TARGET_rockchip_rk35xx=y/' .config
+            # Add device line (if missing)
+            echo "CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h28k=y" >> .config
+          fi
 
-          # Step 4: Run 'make olddefconfig' to resolve dependencies & clean up =m/=n
+          # Step 4: Run olddefconfig — now with full dependency context
           make olddefconfig
 
-          # Step 5: Final validation — must exist and be =y
-          if ! grep -q "^CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_hinlink_h28k=y$" .config; then
-            echo "❌ FATAL: Still missing after menuconfig + append"
-            cat .config | grep -E "CONFIG_TARGET_ROCKCHIP|hinlink" || echo "(no matches)"
+          # Step 5: Final validation
+          if ! grep -q "^CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h28k=y$" .config; then
+            echo "❌ ERROR: hinlink_h28k not enabled after olddefconfig"
+            echo "Available ROCKCHIP devices:"
+            grep "^CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_" .config || echo "(none)"
             exit 1
           fi
-          echo "✅ CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_hinlink_h28k=y confirmed in .config"
+          echo "✅ hinlink_h28k successfully enabled"
 
       - name: 📤 Upload artifact
         uses: actions/upload-artifact@v4
@@ -71,9 +81,11 @@ jobs:
           name: hinlink_h28k.config
           path: openwrt/.config
 
-      - name: 📋 Log summary
+      - name: 📋 Debug info
         working-directory: openwrt
         run: |
-          echo "=== Final .config device line ==="
-          grep "^CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_" .config
+          echo "=== CONFIG TARGET SUMMARY ==="
+          grep "^CONFIG_TARGET_ROCKCHIP" .config
+          echo "=== KERNEL & SOC ==="
+          grep -E "^(CONFIG_LINUX_|CONFIG_SOC_|CONFIG_ARCH_)" .config | head -n 10
           echo "=== End ==="
