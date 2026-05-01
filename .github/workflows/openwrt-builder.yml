@@ -1,16 +1,13 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# File: .github/workflows/openwrt-bulder.yml
-# Description: Build OpenWrt using GitHub Actions
+# 文件名：.github/workflows/openwrt-builder.yml
+# 功能说明：专为 RK3528 平台设备（Hinlink H29K）定制的 OpenWrt 自动化构建流程
 #
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
+# 版权声明（2019–2024）：P3TERX <https://p3terx.com>，MIT 许可证
 #
 
-name: OpenWrt Builder
+name: OpenWrt Builder (RK3528 - Hinlink H29K)
 
 on:
   repository_dispatch:
@@ -20,7 +17,7 @@ env:
   REPO_URL: https://github.com/openwrt/openwrt
   REPO_BRANCH: main
   FEEDS_CONF: feeds.conf.default
-  # CONFIG_FILE: rk3528-hinlink-h29k.config   # ← REMOVED: static .config is unsafe and unnecessary
+  # CONFIG_FILE: rk3528-hinlink-h29k.config            # ← 已移除：静态配置不可靠，且与 RK3528 动态需求冲突
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   UPLOAD_BIN_DIR: false
@@ -33,10 +30,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout
+    - name: 拉取代码仓库
       uses: actions/checkout@main
 
-    - name: Initialization environment
+    - name: 初始化构建环境
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -50,40 +47,61 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: Clone source code
+    - name: 克隆 OpenWrt 源码
       working-directory: /workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Load custom feeds
+    - name: 加载自定义 feeds 源
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: Update feeds
+    - name: 更新 feeds 索引
       run: cd openwrt && ./scripts/feeds update -a
 
-    - name: Install feeds
+    - name: 安装 feeds 软件包
       run: cd openwrt && ./scripts/feeds install -a
 
-    - name: Load custom files and run diy-part2.sh
+    - name: 加载自定义文件并执行第二阶段定制
       run: |
-        [ -e files ] && mv files openwrt/files   # ← KEPT: files/ injection is safe & needed
+        [ -e files ] && mv files openwrt/files
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: Generate config for hinlink_h29k   # ← ADDED: explicit, auditable, safe
+    - name: 【强制校验】确认 hinlink_h29k 设备定义已存在于 rockchip/armv8 平台
+      # ← 关键安全阀：防止因设备未定义导致 make defconfig 静默失败或降级到 generic
+      # ← 必须同时满足：1) armv8.mk 中有 Device/hinlink_h29k；2) DTS 文件存在
+      run: |
+        cd openwrt
+        echo "🔍 正在检查 RK3528 设备 hinlink_h29k 的定义完整性..."
+        if ! grep -q "define Device/hinlink_h29k" target/linux/rockchip/image/armv8.mk; then
+          echo "❌ 错误：target/linux/rockchip/image/armv8.mk 中未找到 'define Device/hinlink_h29k'"
+          echo "请先按知识库 17 添加设备定义，再运行此 workflow。"
+          exit 1
+        fi
+        if [ ! -f target/linux/rockchip/dts/rk3528-hinlink-h29k.dts ]; then
+          echo "❌ 错误：target/linux/rockchip/dts/rk3528-hinlink-h29k.dts 不存在"
+          echo "RK3528 设备必须提供对应 DTS 文件（知识库 17）。"
+          exit 1
+        fi
+        echo "✅ 通过：hinlink_h29k 设备定义完整，符合 RK3528 平台规范"
+
+    - name: 生成 hinlink_h29k 设备专用配置（RK3528 平台）
+      # ← 正确平台：target/linux/rockchip，子目标：armv8
+      # ← PROFILE 名称必须与 armv8.mk 中 define Device/xxx 的 xxx 完全一致（小写、无下划线等）
+      # ← 此命令将自动启用 RK3528 内核驱动、GPU、USB3.0、PCIe（RG500U 5G模组）、HDMI2.0 等关键特性
       run: |
         cd openwrt
         make defconfig PROFILE=hinlink_h29k
-        echo "✅ Config generated for hinlink_h29k"
+        echo "✅ 已成功生成 RK3528-hinlink_h29k 专用配置"
 
-    - name: Download package
+    - name: 下载源码包
       id: package
       run: |
         cd openwrt
@@ -91,56 +109,57 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile the firmware
+    - name: 编译固件
       id: compile
       run: |
         cd openwrt
-        echo -e "$(nproc) thread compile"
+        echo -e "$(nproc) 线程并发编译"
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
+        # 提取设备型号（用于文件命名）
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    - name: Check space usage
-      if: (!cancelled())
+    - name: 检查磁盘空间
+      if: "!cancelled"
       run: df -hT
 
-    - name: Upload bin directory
+    - name: 上传 bin 目录（可选）
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    - name: Organize files
+    - name: 整理固件输出目录
       id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled
       run: |
-        cd openwrt/bin/targets/*/*
+        cd openwrt/bin/targets/rockchip/armv8/
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware directory
+    - name: 上传固件镜像
       uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled()
+      if: steps.organize.outputs.status == 'success' && !cancelled
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
-    - name: Generate release tag
+    - name: 生成 Release 版本号
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
         [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware to release
+    - name: 发布为 GitHub Release
       uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.status == 'success' && !cancelled()
+      if: steps.tag.outputs.status == 'success' && !cancelled
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -148,15 +167,15 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    - name: Delete workflow runs
+    - name: 清理旧的 workflow 运行记录
       uses: Mattraks/delete-workflow-runs@main
       with:
         retain_days: 0
         keep_minimum_runs: 2
 
-    - name: Remove old Releases
+    - name: 清理旧的 GitHub Release（保留最新 3 个）
       uses: dev-drprasad/delete-older-releases@master
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled
       with:
         keep_latest: 3
         delete_tags: true
