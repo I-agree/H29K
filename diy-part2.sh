@@ -234,6 +234,12 @@ chmod +x files/etc/uci-defaults/99-h29k
 sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
 echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 
+# 👇 告诉 OpenWrt：“本次只配置并构建 H29K”
+make defconfig PROFILE=hinlink_h29k
+
+# 👇 告诉 OpenWrt：“本次只打包 H29K 的固件”
+make image PROFILE=hinlink_h29k -j$(nproc)
+
 # ======================== 【H29K 强制4项校验 · 失败立即终止编译】 ========================
 echo "🔍 开始 H29K 构建前置五重校验..."
 
