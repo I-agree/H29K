@@ -75,19 +75,57 @@ done
 
 printf '\n'
 # ======================== 修复缺失 wqy-microhei.ttc 字体 ========================
-echo "[INFO] 自动下载并安装 wqy-microhei.ttc 字体文件"
+# 🔹 源文件：仓库根目录下的字体（绝对路径，自动检测）
+SRC_FONT="$(git rev-parse --show-toplevel)/MiSans-Regular.ttf"
 
-# 创建字体目录
-mkdir -p files/usr/share/fonts/truetype/
+# 🔹 目标路径：OpenWrt 固件内标准字体位置
+DST_FONT="files/usr/share/fonts/truetype/MiSans-Regular.ttf"
 
-# 下载字体（稳定源，带超时）
-curl -fsSL --max-time 100 -o files/usr/share/fonts/truetype/MiSans-Regular.ttf \
-  https://raw.githubusercontent.com/I-agree/H29K/blob/main/MiSans-Regular.ttf
+# ======================== 【执行逻辑】 ========================
+echo "🔤 正在从本地仓库复制字体：MiSans-Regular.ttf..."
 
-# 赋权
-chmod 644 files/usr/share/fonts/truetype/wqy-microhei.ttc
+# 1️⃣ 创建目标目录
+mkdir -p "$(dirname "$DST_FONT")"
 
-echo "[OK] wqy-microhei.ttc 已安装到固件内"
+# 2️⃣ 验证源字体是否存在且可读
+if [[ ! -f "$SRC_FONT" ]]; then
+  echo -e "\033[31m❌ 错误：字体文件未找到！\033[0m"
+  echo "   请确认："
+  echo "   • 当前工作目录是 OpenWrt 源码根目录（含 .git）"
+  echo "   • 文件 '$SRC_FONT' 存在（即 MiSans-Regular.ttf 已提交到仓库根目录）"
+  echo "   • 运行 'ls -l \"$(git rev-parse --show-toplevel)\" | grep MiSans' 验证"
+  exit 1
+fi
+
+if [[ ! -r "$SRC_FONT" ]]; then
+  echo -e "\033[31m❌ 错误：字体文件不可读（权限问题）\033[0m"
+  exit 1
+fi
+
+# 3️⃣ 复制并校验
+cp -f "$SRC_FONT" "$DST_FONT"
+
+# 4️⃣ 验证目标文件非空且为合法字体（TTF/OTF Magic Number）
+if [[ ! -s "$DST_FONT" ]]; then
+  echo -e "\033[31m❌ 错误：复制后目标文件为空！\033[0m"
+  exit 1
+fi
+
+# 检查 TTF/OTF 签名（00010000 = TrueType, 4f54544f = OTF）
+MAGIC=$(head -c 4 "$DST_FONT" 2>/dev/null | xxd -p 2>/dev/null | tr -d '\n')
+if [[ "$MAGIC" != "00010000" ]] && [[ "$MAGIC" != "4f54544f" ]]; then
+  echo -e "\033[31m❌ 错误：'$DST_FONT' 不是有效的 TTF 或 OTF 字体文件（Magic Number 不匹配）\033[0m"
+  echo "   实际 Magic: $MAGIC (期望 00010000 或 4f54544f)"
+  exit 1
+fi
+
+# 5️⃣ 设置标准权限
+chmod 644 "$DST_FONT"
+
+echo "✅ 字体复制成功：$(realpath "$DST_FONT")"
+echo "   → 构建后路径：/usr/share/fonts/truetype/MiSans-Regular.ttf"
+
+echo "[OK] MiSans-Regular.ttf 已安装到固件内"
 
 # ==============================================================================
 # 【U-Boot 支持注入】—— 严格遵循 OpenWrt 官方 Makefile 风格（高危修复区）
