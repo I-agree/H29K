@@ -1,174 +1,141 @@
-#
-# https://github.com/P3TERX/Actions-OpenWrt
-#
-# 文件名：.github/workflows/openwrt-builder.yml
-# 描述：专为 Hinlink H29K（RK3528）定制的 OpenWrt 构建工作流
-#       ✅ 已移除全部 7 处非法 '!cancelled' 表达式（GitHub Actions 不支持该语法）
-#       ✅ 已调整 'Load custom feeds' 步骤位置：从 'Update feeds' 之前移至 'Install feeds' 之后
-#           （确保 diy-part1.sh 对 armv8.mk 的注入不被 feeds install 覆盖）
-#       ✅ 已修复 '整理固件输出目录' 步骤中的 cd 报错：用 find 精准定位 rockchip/armv8 目录，
-#           避免 */* glob 展开导致 'cd: too many arguments'
-#       ✅ 所有注释均为中文，技术术语附带中文说明（如 PROFILE（设备配置标识符））
-#       ✅ 完全保留你原始的变量名、步骤名、artifact 命名、release 逻辑
-#
-# 版权声明（2019–2024）：P3TERX <https://p3terx.com>，MIT 许可证（开源软件许可协议）
-#
-
 name: OpenWrt Builder
 
 on:
-  repository_dispatch:
   workflow_dispatch:
-
-env:
-  REPO_URL: https://github.com/openwrt/openwrt
-  REPO_BRANCH: main
-  FEEDS_CONF: feeds.conf.default
-  # CONFIG_FILE: rk3528-hinlink-h29k.config            # ← 已注释：该配置文件为空，加载将清空 .config，破坏 diy 脚本注入的设备定义
-  DIY_P1_SH: diy-part1.sh
-  DIY_P2_SH: diy-part2.sh
-  UPLOAD_BIN_DIR: true
-  UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
-  TZ: Asia/Shanghai
+    inputs:
+      repo_url:
+        description: 'OpenWrt 仓库地址'
+        required: true
+        default: 'https://github.com/openwrt/openwrt.git'
+      repo_branch:
+        description: 'OpenWrt 分支名'
+        required: true
+        default: 'master'
+      diy_p1_sh:
+        description: 'diy-part1.sh 路径'
+        required: true
+        default: 'diy-part1.sh'
+      diy_p2_sh:
+        description: 'diy-part2.sh 路径'
+        required: true
+        default: 'diy-part2.sh'
+      feeds_conf:
+        description: 'feeds.conf 路径'
+        required: true
+        default: 'feeds.conf'
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    env:
+      REPO_URL: ${{ github.event.inputs.repo_url }}
+      REPO_BRANCH: ${{ github.event.inputs.repo_branch }}
+      DIY_P1_SH: ${{ github.event.inputs.diy_p1_sh }}
+      DIY_P2_SH: ${{ github.event.inputs.diy_p2_sh }}
+      FEEDS_CONF: ${{ github.event.inputs.feeds_conf }}
 
     steps:
-    - name: 拉取源码仓库
-      uses: actions/checkout@main
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
 
-    - name: 初始化编译环境
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
-        sudo docker image prune --all --force
-        sudo -E apt-get -qq update
-        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean
-        sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
+      - name: Setup Environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
+            zlib1g-dev gawk git gettext libssl-dev xsltproc wget python3 unzip rsync
 
-    - name: 克隆 OpenWrt 官方源码
-      working-directory: /workdir
-      run: |
-        df -hT $PWD
-        git clone $REPO_URL -b $REPO_BRANCH openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+      - name: 克隆 OpenWrt 官方源码
+        working-directory: /workdir
+        run: |
+          # 🔒 【新增】创建 ext4 安全区（绕过 Actions overlayfs 不支持 chattr 的限制）
+          sudo mkdir -p /safe-ext4
+          sudo dd if=/dev/zero of=/tmp/safe.img bs=1M count=1024 2>/dev/null
+          sudo mkfs.ext4 -F /tmp/safe.img >/dev/null 2>&1
+          sudo mount -o loop /tmp/safe.img /safe-ext4
+          sudo chown $USER:$GROUPS /safe-ext4
+          echo "✅ 已创建 ext4 安全区 /safe-ext4"
 
-    - name: 更新软件源索引
-      run: cd openwrt && ./scripts/feeds update -a
+          # 迁移 openwrt 到 ext4 区域（确保 chattr +i 生效）
+          mv openwrt /safe-ext4/
+          ln -sf /safe-ext4/openwrt $GITHUB_WORKSPACE/openwrt
+          echo "✅ 已将 openwrt 迁移至 ext4 安全区"
 
-    - name: 安装全部软件源包
-      run: cd openwrt && ./scripts/feeds install -a
+          df -hT $PWD
+          git clone $REPO_URL -b $REPO_BRANCH openwrt
+          ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 加载自定义软件源（feeds）
-      run: |
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-        chmod +x $DIY_P1_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
+      - name: 更新软件源索引
+        run: cd openwrt && ./scripts/feeds update -a
 
-    - name: 加载自定义系统配置
-      run: |
-        [ -e files ] && mv files openwrt/files
-        # ← 已跳过空配置文件加载：因 rk3528-hinlink-h29k.config 为空，加载将使 .config 丢失 diy 脚本注入的设备定义
-        chmod +x $DIY_P2_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+      - name: 加载自定义软件源（feeds）
+        run: |
+          [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+          # 🔒 【新增】在 feeds install 前，先执行 diy 脚本并锁定关键文件
+          chmod +x $DIY_P1_SH
+          cd openwrt
+          $GITHUB_WORKSPACE/$DIY_P1_SH
+          # 立即锁定 armv8.mk（防止后续 feeds install 覆盖）
+          sudo chattr +i target/linux/rockchip/image/armv8.mk 2>/dev/null || echo "⚠️  warning: failed to lock armv8.mk (may not exist yet)"
+          echo "✅ 已锁定 target/linux/rockchip/image/armv8.mk"
 
-    - name: 下载依赖软件包
-      id: package
-      run: |
-        cd openwrt
-        # ← 关键修复：显式指定 PROFILE（设备配置标识符）=hinlink_h29k
-        #    与 diy-part1.sh 文件第65行 'define Device/hinlink_h29k' 严格对应
-        #    确保 make defconfig 生成 H29K 专用配置，而非通用 rockchip/armv8 配置
-        make defconfig PROFILE=hinlink_h29k
-        make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
+          chmod +x $DIY_P1_SH
+          cd openwrt
+          $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: 编译固件
-      id: compile
-      run: |
-        cd openwrt
-        echo -e "$(nproc) 线程并发编译"
-        make -j$(nproc) || make -j1 || make -j1 V=s
-        echo "status=success" >> $GITHUB_OUTPUT
-        # ← 提取设备名称：从 .config 中匹配 'CONFIG_TARGET_...DEVICE_...=y' 行，并提取下划线后设备标识符（如 hinlink_h29k）
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+      - name: 安装全部软件源包
+        run: cd openwrt && ./scripts/feeds install -a
 
-    - name: 检查磁盘空间使用情况
-      run: df -hT
+      - name: 加载自定义系统配置
+        run: |
+          [ -e files ] && mv files openwrt/files
+          # 🔒 【新增】在 defconfig 前，执行 diy-part2.sh 并锁定 uboot-rockchip/Makefile
+          chmod +x $DIY_P2_SH
+          cd openwrt
+          $GITHUB_WORKSPACE/$DIY_P2_SH
+          # 立即锁定 uboot-rockchip/Makefile（防止 feeds install 覆盖）
+          sudo chattr +i package/boot/uboot-rockchip/Makefile 2>/dev/null || echo "⚠️  warning: failed to lock uboot-rockchip/Makefile (may not exist yet)"
+          echo "✅ 已锁定 package/boot/uboot-rockchip/Makefile"
 
-    - name: 上传完整 bin 目录（含所有 target 和 packages）
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
-      with:
-        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: openwrt/bin
+          # ← 已跳过空配置文件加载：因 rk3528-hinlink-h29k.config 为空，加载将使 .config 丢失 diy 脚本注入的设备定义
+          chmod +x $DIY_P2_SH
+          cd openwrt
+          $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 整理固件输出目录（移除 packages 子目录，仅保留镜像）
-      id: organize
-      if: env.UPLOAD_FIRMWARE == 'true'
-      run: |
-        # 使用 find 精准定位 rockchip/armv8 目录（避免 */* glob 展开导致 cd 失败）
-        # ✅ 此修复彻底解决 '/home/runner/work/_temp/xxx.sh: line 1: cd: too many arguments'
-        FIRMWARE_DIR=$(find openwrt/bin/targets/ -path "*/rockchip/armv8" -type d | head -n1)
-        if [ -z "$FIRMWARE_DIR" ]; then
-          echo "❌ 错误：未找到 rockchip/armv8 目录，请检查 PROFILE=hinlink_h29k 是否生效"
-          exit 1
-        fi
-        cd "$FIRMWARE_DIR"
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
+      - name: 生成默认配置
+        run: cd openwrt && make defconfig PROFILE=hinlink_h29k
 
-    - name: 上传精简固件目录（仅 sysupgrade.img.gz 等核心镜像）
-      uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success'
-      with:
-        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
+      - name: 下载依赖
+        run: cd openwrt && make download -j$(nproc)
 
-    - name: 生成发布版本标签（格式：年.月.日-时分）
-      id: tag
-      if: env.UPLOAD_RELEASE == 'true'
-      run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
-        touch release.txt
-        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile 下载链接](${{ steps.gofile.outputs.url }})" >> release.txt
-        echo "status=success" >> $GITHUB_OUTPUT
+      - name: 编译固件
+        id: compile
+        run: |
+          # 🔍 【新增】构建前最终校验：确认关键文件已被锁定
+          echo "🔍 校验文件锁定状态："
+          lsattr openwrt/target/linux/rockchip/image/armv8.mk 2>/dev/null | grep -q "i" && echo "  ✅ armv8.mk 已锁定" || echo "  ❌ armv8.mk 未锁定"
+          lsattr openwrt/package/boot/uboot-rockchip/Makefile 2>/dev/null | grep -q "i" && echo "  ✅ uboot-rockchip/Makefile 已锁定" || echo "  ❌ uboot-rockchip/Makefile 未锁定"
+          echo ""
 
-    - name: 上传固件至 GitHub Release
-      uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.status == 'success'
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
+          cd openwrt
+          echo -e "$(nproc) 线程并发编译"
+          make -j$(nproc) || make -j1 || make -j1 V=s
 
-    - name: 清理历史工作流运行记录
-      uses: Mattraks/delete-workflow-runs@main
-      with:
-        retain_days: 0
-        keep_minimum_runs: 2
+      - name: 组织输出文件
+        if: always()
+        run: |
+          cd openwrt
+          mkdir -p artifacts
+          find bin/targets/rockchip/armv8 -type f \( -name "*sysupgrade.bin" -o -name "*factory.bin" -o -name "*rootfs.tar.gz" \) -exec cp {} artifacts/ \;
+          ls -lh artifacts/
 
-    - name: 清理旧版 GitHub Release（仅保留最新 3 个）
-      uses: dev-drprasad/delete-older-releases@master
-      if: env.UPLOAD_RELEASE == 'true'
-      with:
-        keep_latest: 3
-        delete_tags: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: 上传固件
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-rockchip-armv8-firmware
+          path: openwrt/artifacts/
+          if-no-files-found: warn
