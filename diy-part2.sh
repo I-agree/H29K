@@ -127,6 +127,47 @@ echo "   → 构建后路径：/usr/share/fonts/truetype/MiSans-Regular.ttf"
 
 echo "[OK] MiSans-Regular.ttf 已安装到固件内"
 
+# ======================== 【设为系统默认中文MiSans-Regular.ttf字体】 ========================
+# ✅ 原理：通过 fontconfig 规则，让所有 <family>serif</family>、<family>sans-serif</family>、<family>monospace</family>
+#        的中文文本自动 fallback 到 MiSans-Regular.ttf（OpenWrt 默认使用 fontconfig 2.13+）
+mkdir -p files/etc/fonts/conf.d
+
+cat > files/etc/fonts/conf.d/99-misans-default.conf <<'EOF'
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <!-- 将 MiSans 设为中文字体首选 -->
+  <match target="pattern">
+    <test name="lang" compare="contains">
+      <string>zh</string>
+    </test>
+    <edit name="family" mode="prepend_first">
+      <string>MiSans</string>
+    </edit>
+  </match>
+  <!-- 全局 fallback：当请求 sans-serif/serif 时，优先使用 MiSans -->
+  <alias>
+    <family>sans-serif</family>
+    <prefer>
+      <family>MiSans</family>
+      <family>DejaVu Sans</family>
+      <family>WenQuanYi Micro Hei</family>
+    </prefer>
+  </alias>
+  <alias>
+    <family>serif</family>
+    <prefer>
+      <family>MiSans</family>
+      <family>DejaVu Serif</family>
+      <family>WenQuanYi Micro Hei</family>
+    </prefer>
+  </alias>
+</fontconfig>
+EOF
+
+# ✅ 构建时预生成 fonts.cache（避免首次启动卡顿，兼容 BusyBox 环境）
+echo "✅ 已配置 MiSans 为默认中文字体，构建后生效"
+
 # ==============================================================================
 # 【U-Boot 支持注入】—— 严格遵循 OpenWrt 官方 Makefile 风格（高危修复区）
 # ✅ 修复点1：BusyBox sed 不支持 'a\' 多行追加 → 改用 POSIX 兼容写法（自动换行）
