@@ -20,7 +20,7 @@ env:
   REPO_URL: https://github.com/openwrt/openwrt
   REPO_BRANCH: main
   FEEDS_CONF: feeds.conf.default
-  CONFIG_FILE: rk3528-hinlink-h29k.config
+  # CONFIG_FILE: rk3528-hinlink-h29k.config   # ← REMOVED: static .config is unsafe and unnecessary
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   UPLOAD_BIN_DIR: false
@@ -70,19 +70,23 @@ jobs:
     - name: Install feeds
       run: cd openwrt && ./scripts/feeds install -a
 
-    - name: Load custom configuration
+    - name: Load custom files and run diy-part2.sh
       run: |
-        [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        [ -e files ] && mv files openwrt/files   # ← KEPT: files/ injection is safe & needed
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: Generate config for hinlink_h29k   # ← ADDED: explicit, auditable, safe
+      run: |
+        cd openwrt
+        make defconfig PROFILE=hinlink_h29k
+        echo "✅ Config generated for hinlink_h29k"
 
     - name: Download package
       id: package
       run: |
         cd openwrt
-        make defconfig
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
