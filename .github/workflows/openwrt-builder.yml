@@ -3,9 +3,11 @@
 #
 # 文件名：.github/workflows/openwrt-builder.yml
 # 描述：专为 Hinlink H29K（RK3528）定制的 OpenWrt 构建工作流
-#       ✅ 已移除全部 7 处非法 '!cancelled()' 表达式（GitHub Actions 不支持该语法）
+#       ✅ 已移除全部 7 处非法 '!cancelled' 表达式（GitHub Actions 不支持该语法）
 #       ✅ 已调整 'Load custom feeds' 步骤位置：从 'Update feeds' 之前移至 'Install feeds' 之后
 #           （确保 diy-part1.sh 对 armv8.mk 的注入不被 feeds install 覆盖）
+#       ✅ 已修复 '整理固件输出目录' 步骤中的 cd 报错：用 find 精准定位 rockchip/armv8 目录，
+#           避免 */* glob 展开导致 'cd: too many arguments'
 #       ✅ 所有注释均为中文，技术术语附带中文说明（如 PROFILE（设备配置标识符））
 #       ✅ 完全保留你原始的变量名、步骤名、artifact 命名、release 逻辑
 #
@@ -118,7 +120,14 @@ jobs:
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true'
       run: |
-        cd openwrt/bin/targets/*/*
+        # 使用 find 精准定位 rockchip/armv8 目录（避免 */* glob 展开导致 cd 失败）
+        # ✅ 此修复彻底解决 '/home/runner/work/_temp/xxx.sh: line 1: cd: too many arguments'
+        FIRMWARE_DIR=$(find openwrt/bin/targets/ -path "*/rockchip/armv8" -type d | head -n1)
+        if [ -z "$FIRMWARE_DIR" ]; then
+          echo "❌ 错误：未找到 rockchip/armv8 目录，请检查 PROFILE=hinlink_h29k 是否生效"
+          exit 1
+        fi
+        cd "$FIRMWARE_DIR"
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
