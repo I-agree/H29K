@@ -137,7 +137,4 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-echo "===== 选择为 H29K 机型 ====="
-sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
-echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
 printf '\n'
