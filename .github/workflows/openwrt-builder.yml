@@ -2,7 +2,7 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 #
 # 描述：专为 Hinlink H29K（RK3528）定制的 OpenWrt 构建工作流
-# 版权声明（2019–2024）：P3TERX <https://p3terx.com>，MIT 许可证
+# 版权声明（2019–2024）：P3TERX <https://p3terx.com>，MIT 许可证（开源软件许可协议）
 #
 
 name: OpenWrt Builder
@@ -15,7 +15,7 @@ env:
   REPO_URL: https://github.com/openwrt/openwrt
   REPO_BRANCH: main
   FEEDS_CONF: feeds.conf.default
-  # CONFIG_FILE: rk3528-hinlink-h29k.config            # ← 已移除：该文件为空，加载将清空 .config，破坏 diy 注入
+  # CONFIG_FILE: rk3528-hinlink-h29k.config            # ← 已注释：该配置文件为空，加载将清空 .config，破坏 diy 脚本注入的设备定义
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
   UPLOAD_BIN_DIR: true
@@ -28,10 +28,10 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: Checkout
+    - name: 拉取源码仓库
       uses: actions/checkout@main
 
-    - name: Initialization environment
+    - name: 初始化编译环境
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
@@ -45,68 +45,68 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: Clone source code
+    - name: 克隆 OpenWrt 官方源码
       working-directory: /workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: Load custom feeds
+    - name: 加载自定义软件源（feeds）
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: Update feeds
+    - name: 更新软件源索引
       run: cd openwrt && ./scripts/feeds update -a
 
-    - name: Install feeds
+    - name: 安装全部软件源包
       run: cd openwrt && ./scripts/feeds install -a
 
-    - name: Load custom configuration
+    - name: 加载自定义系统配置
       run: |
         [ -e files ] && mv files openwrt/files
-        # ← 已跳过 CONFIG_FILE 加载：因 rk3528-hinlink-h29k.config 为空，加载将使 .config 丢失 diy 注入的设备定义
+        # ← 已跳过空配置文件加载：因 rk3528-hinlink-h29k.config 为空，加载将使 .config 丢失 diy 脚本注入的设备定义
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: Download package
+    - name: 下载依赖软件包
       id: package
       run: |
         cd openwrt
-        # ← 关键修复：显式指定 PROFILE=hinlink_h29k（与 diy-part1.sh 第65行 'define Device/hinlink_h29k' 严格对应）
-        #    否则 make defconfig 将生成 generic rockchip/armv8 配置，导致 H29K 固件无法构建
+        # ← 关键修复：显式指定 PROFILE=hinlink_h29k（与 diy-part1.sh 文件第65行 'define Device/hinlink_h29k' 严格对应）
+        #    否则 make defconfig 将生成通用 rockchip/armv8 配置，导致 H29K 专用固件无法构建
         make defconfig PROFILE=hinlink_h29k
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: Compile the firmware
+    - name: 编译固件
       id: compile
       run: |
         cd openwrt
-        echo -e "$(nproc) thread compile"
+        echo -e "$(nproc) 线程并发编译"
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
-        # ← 提取 DEVICE_NAME：grep CONFIG_TARGET_...DEVICE_...=y 并提取下划线后名称（如 hinlink_h29k）
+        # ← 提取设备名称：从 .config 中匹配 'CONFIG_TARGET_...DEVICE_...=y' 行，并提取下划线后设备标识符（如 hinlink_h29k）
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    - name: Check space usage
+    - name: 检查磁盘空间使用情况
       run: df -hT
 
-    - name: Upload bin directory
+    - name: 上传完整 bin 目录（含所有 target 和 packages）
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    - name: Organize files
+    - name: 整理固件输出目录（移除 packages 子目录，仅保留镜像）
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true'
       run: |
@@ -115,23 +115,23 @@ jobs:
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware directory
+    - name: 上传精简固件目录（仅 sysupgrade.img.gz 等核心镜像）
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success'
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
-    - name: Generate release tag
+    - name: 生成发布版本标签（格式：年.月.日-时分）
       id: tag
       if: env.UPLOAD_RELEASE == 'true'
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
-        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
+        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile 下载链接](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Upload firmware to release
+    - name: 上传固件至 GitHub Release
       uses: softprops/action-gh-release@master
       if: steps.tag.outputs.status == 'success'
       env:
@@ -141,13 +141,13 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    - name: Delete workflow runs
+    - name: 清理历史工作流运行记录
       uses: Mattraks/delete-workflow-runs@main
       with:
         retain_days: 0
         keep_minimum_runs: 2
 
-    - name: Remove old Releases
+    - name: 清理旧版 GitHub Release（仅保留最新 3 个）
       uses: dev-drprasad/delete-older-releases@master
       if: env.UPLOAD_RELEASE == 'true'
       with:
