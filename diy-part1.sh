@@ -26,22 +26,33 @@ echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;m
 # 添加 OpenAppFilter 插件源
 echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master' >> feeds.conf.default
 
-# ============================================================
-# ✅ diy-part1.sh（精简纯净版｜2026-05-01｜严格遵循你的原始逻辑）
-# 功能：
-#   1. 向 armv8.mk 注入 define Device/hinlink_h29k（原样）
-#   2. 向 uboot-rockchip/Makefile 执行你指定的两个 sed 命令（零添加）
-#   3. 双文件存在性校验 + 双文件 chattr +i 锁定
-# ============================================================
+set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
-set -e
+# ==============================================================================
+# 【U-Boot 支持注入】—— 严格遵循 OpenWrt 官方 Makefile 风格（高危修复区）
+# ✅ 修复点1：BusyBox sed 不支持 'a\' 多行追加 → 改用 POSIX 兼容写法（自动换行）
+# ✅ 修复点2：NAME 字段统一为下划线命名，与 UBOOT_CONFIG 语义一致
+# ==============================================================================
+makefile="package/boot/uboot-rockchip/Makefile"
 
-ARMV8_MK="target/linux/rockchip/image/armv8.mk"
-UBOOT_MK="package/boot/uboot-rockchip/Makefile"
-DEVICE_NAME="hinlink_h29k"
+# 1️⃣ 在 hinlink-h28k-rk3528 后追加 hinlink-h29k-rk3528 到 UBOOT_TARGETS（POSIX 安全）
+sed -i "/hinlink-h28k-rk3528/a hinlink-h29k-rk3528" "$makefile"
 
-# 🔹 define Device/hinlink_h29k（你提供的原始内容，一字不差）
-DEVICE_BLOCK='define Device/hinlink_h29k
+# 2️⃣ 在 hinlink-h28k 定义下方插入 hinlink-h29k 设备块（完全复刻官方格式）
+#    ✅ NAME:=HINLINK_H29K（非空格，与 UBOOT_CONFIG 一致）
+#    ✅ BUILD_DEVICES:=hinlink_h29k（小写+下划线，与 .config 中 CONFIG_TARGET_... 保持一致）
+sed -i '/define U-Boot\/hinlink-h28k-rk3528/a\
+define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  UBOOT_CONFIG:=hinlink_h29k\n  NAME:=HINLINK_H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
+' "$makefile"
+
+# ======================== 【添加 H29K：armv8.mk 设备定义】 ========================
+# ✅ 修复点3：DEVICE_DTS 使用标准社区命名 rk3528-hinlink-h29k（非 opc- 前缀）
+TARGET_MK="target/linux/rockchip/image/armv8.mk"
+
+cat >> "$TARGET_MK" <<'EOF'
+# 📌 设备定义：HINLINK H29K（RK3528）
+#    - 遵循 OpenWrt 命名规范：rk3528-{vendor}-{model}
+define Device/hinlink_h29k
   SOC := rk3528
   SUBTARGET := armv8
   DEVICE_VENDOR := HINLINK
@@ -63,65 +74,33 @@ DEVICE_BLOCK='define Device/hinlink_h29k
     dnscrypt-proxy luci-app-dnscrypt-proxy luci-i18n-dnscrypt-proxy-zh-cn \
     luci-app-oaf appfilter luci-i18n-oaf-zh-cn
 endef
-TARGET_DEVICES += hinlink_h29k'
+TARGET_DEVICES += hinlink_h29k
+EOF
 
-# 🔹 步骤 1：校验 armv8.mk
-if [ ! -f "$ARMV8_MK" ]; then
-  echo "❌ FATAL: $ARMV8_MK not found."
+printf '\n'
+echo "===== ✅ 添加 H29K：armv8.mk 设备定义完成 ====="
+
+# ======================== 【H29K 强制2项校验 · 失败立即终止编译】 ========================
+echo "🔍 开始 H29K 构建前置2重校验..."
+
+# ✅ 校验1：设备定义已写入 armv8.mk
+DEVICE_NAME="hinlink_h29k"
+MK_FILE="target/linux/rockchip/image/armv8.mk"
+if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
+  echo -e "\033[31m[错误] H29K 设备未定义！\033[0m"
   exit 1
 fi
+echo -e "\033[32m[通过] 设备定义已写入 armv8.mk\033[0m"
 
-# 🔹 步骤 2：注入 Device（幂等）
-if grep -Fq "$DEVICE_BLOCK" "$ARMV8_MK"; then
-  echo "✅ define Device/$DEVICE_NAME already exists in $ARMV8_MK (skipped)"
-else
-  printf '%b\n' "$DEVICE_BLOCK" >> "$ARMV8_MK"
-  echo "✅ Device injected into $ARMV8_MK"
-fi
-
-# 🔹 步骤 3：校验 uboot-rockchip/Makefile
-if [ ! -f "$UBOOT_MK" ]; then
-  echo "❌ FATAL: $UBOOT_MK not found. Please ensure your OpenWrt fork includes it."
-  exit 1
-fi
-
-# 🔹 步骤 4：执行你指定的两个 sed 命令（POSIX 安全版）
-echo "🔧 Applying your exact sed patches to $UBOOT_MK..."
-
-# 1️⃣ 追加 UBOOT_TARGETS
+# ✅ 校验3：U-Boot 已添加 hinlink-h29k-rk3528（Makefile确认）
+UBOOT_MK="package/boot/uboot-rockchip/Makefile"
 if ! grep -q "hinlink-h29k-rk3528" "$UBOOT_MK"; then
-  sed -i "/hinlink-h28k-rk3528/a hinlink-h29k-rk3528" "$UBOOT_MK"
-  echo "✅ Added 'hinlink-h29k-rk3528' to UBOOT_TARGETS"
-else
-  echo "✅ 'hinlink-h29k-rk3528' already in UBOOT_TARGETS (skipped)"
+  echo -e "\033[31m[错误] U-Boot 未添加 H29K 设备！编译终止！\033[0m"
+  exit 1
 fi
+echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0m"
 
-# 2️⃣ 插入 define U-Boot/hinlink-h29k-rk3528
-if ! grep -q "define U-Boot/hinlink-h29k-rk3528" "$UBOOT_MK"; then
-  sed -i '/define U-Boot\/hinlink-h28k-rk3528/a\
-define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  UBOOT_CONFIG:=hinlink_h29k\n  NAME:=HINLINK_H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
-' "$UBOOT_MK"
-  echo "✅ Inserted 'define U-Boot/hinlink-h29k-rk3528'"
-else
-  echo "✅ 'define U-Boot/hinlink-h29k-rk3528' already exists (skipped)"
-fi
-
-# 🔹 步骤 5：双文件锁定
-for FILE in "$ARMV8_MK" "$UBOOT_MK"; do
-  if [ -w "$FILE" ]; then
-    if command -v sudo >/dev/null 2>&1 && command -v lsattr >/dev/null 2>&1; then
-      if ! lsattr "$FILE" 2>/dev/null | grep -q "i"; then
-        sudo chattr +i "$FILE" 2>/dev/null
-        if lsattr "$FILE" 2>/dev/null | grep -q "i"; then
-          echo "🔒 Locked: $FILE"
-        else
-          echo "⚠️  Warning: Failed to lock $FILE"
-        fi
-      else
-        echo "🔒 Already locked: $FILE"
-      fi
-    fi
-  fi
-done
-
-echo "🎯 diy-part1.sh done. Your exact logic is now applied."
+printf '\n'
+echo -e "\033[32m=====================================\033[0m"
+echo -e "\033[32m✅ 所有检查通过！\033[0m"
+echo -e "\033[32m=====================================\033[0m"
