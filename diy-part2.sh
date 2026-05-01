@@ -1,6 +1,7 @@
 #!/bin/bash
+set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
+
 # ======================== 【第1部分：资源准备】 ========================
-# ======================== 【OpenWrt 2026.04+ 官方路径注入】 ========================
 echo "🔧 正在按 OpenWrt 官方主线路径注入 H29K 文件..."
 
 # ✅ 1. U-Boot defconfig → 直接复制到官方 configs/ 目录（无需重命名）
@@ -45,6 +46,8 @@ for FILE in "$UBOOT_DST" "$DTS_DST" "$DEFCONFIG_DST"; do
     exit 1
   fi
 done
+
+printf '\n'
 echo "✅ 所有文件注入完成，路径与 OpenWrt 2026.04+ 官方主线完全一致。"
 # ======================================================================
 
@@ -56,7 +59,7 @@ download_file() {
   local url="$1"
   local path="$2"
   local name="$3"
-  if curl -fsSL --retry 3 --connect-timeout 10 "$url" -o "$path"; then
+  if curl -fsSL --retry 3 --connect-timeout 10 --max-time 30 "$url" -o "$path"; then
     echo "✅ $name 下载成功"
   else
     echo -e "\033[31m❌ $name 下载失败\033[0m"
@@ -70,14 +73,15 @@ for i in 1 2 3; do
   download_file "${LOGO_RAW_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg" "LOGO${i}"
 done
 
+printf '\n'
 # ======================== 修复缺失 wqy-microhei.ttc 字体 ========================
 echo "[INFO] 自动下载并安装 wqy-microhei.ttc 字体文件"
 
 # 创建字体目录
 mkdir -p files/usr/share/fonts/truetype/
 
-# 下载字体（稳定源）
-curl -L -o files/usr/share/fonts/truetype/wqy-microhei.ttc \
+# 下载字体（稳定源，带超时）
+curl -fsSL --max-time 30 -o files/usr/share/fonts/truetype/wqy-microhei.ttc \
   https://raw.githubusercontent.com/I-am-Bot/OpenWrt-Fonts/main/wqy-microhei.ttc
 
 # 赋权
@@ -87,14 +91,13 @@ echo "[OK] wqy-microhei.ttc 已安装到固件内"
 
 # ==============================================================================
 # 【U-Boot 支持注入】—— 严格遵循 OpenWrt 官方 Makefile 风格（高危修复区）
-# ✅ 修复点1：BusyBox sed 不支持 'a\' 多行追加 → 改用 POSIX 兼容写法
+# ✅ 修复点1：BusyBox sed 不支持 'a\' 多行追加 → 改用 POSIX 兼容写法（自动换行）
 # ✅ 修复点2：NAME 字段统一为下划线命名，与 UBOOT_CONFIG 语义一致
 # ==============================================================================
 makefile="package/boot/uboot-rockchip/Makefile"
 
-# 1️⃣ 在 hinlink-h28k-rk3528 后追加 hinlink-h29k-rk3528 到 UBOOT_TARGETS（兼容 BusyBox sed）
-#    注意：'\\\\n' 经 shell 解析后为 '\n'，确保 Makefile 格式正确
-sed -i "/hinlink-h28k-rk3528/a hinlink-h29k-rk3528 \\\\n" "$makefile"
+# 1️⃣ 在 hinlink-h28k-rk3528 后追加 hinlink-h29k-rk3528 到 UBOOT_TARGETS（POSIX 安全）
+sed -i "/hinlink-h28k-rk3528/a hinlink-h29k-rk3528" "$makefile"
 
 # 2️⃣ 在 hinlink-h28k 定义下方插入 hinlink-h29k 设备块（完全复刻官方格式）
 #    ✅ NAME:=HINLINK_H29K（非空格，与 UBOOT_CONFIG 一致）
@@ -135,6 +138,7 @@ endef
 TARGET_DEVICES += hinlink_h29k
 EOF
 
+printf '\n'
 echo "===== ✅ 添加 H29K：armv8.mk 设备定义完成 ====="
 
 # ======================== 【第3部分：屏幕脚本（procd 服务化）】 ========================
@@ -218,8 +222,9 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
+printf '\n'
 # ======================== 【H29K 强制2项校验 · 失败立即终止编译】 ========================
-echo "🔍 开始 H29K 构建前置五重校验..."
+echo "🔍 开始 H29K 构建前置2重校验..."
 
 # ✅ 校验1：设备定义已写入 armv8.mk
 DEVICE_NAME="hinlink_h29k"
@@ -238,6 +243,7 @@ if ! grep -q "hinlink-h29k-rk3528" "$UBOOT_MK"; then
 fi
 echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0m"
 
+printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！开始编译 H29K 固件！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
