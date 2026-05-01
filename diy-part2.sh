@@ -208,7 +208,7 @@ chmod +x files/etc/init.d/h29k-screen
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
-FONT="/usr/share/fonts/ttf/wqy-microhei.ttc"
+FONT="/usr/share/fonts/ttf/MiSans-Regular.ttf"
 TMP_IMG="/tmp/screen_final.jpg"
 LOGO_DIR="/etc/config/screen"
 sleep 12
