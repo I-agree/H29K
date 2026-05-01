@@ -1,277 +1,177 @@
-# openwrt-builder-h29k.yml
-# ────────────────────────────────────────────────────────────────────────
-# ✅ 专为 Hinlink H29K (RK3528) 设备定制的 OpenWrt 云编译工作流
-# ✅ 适配 Lean 源码分支（2026 Q2 主流），支持 OpenWrt 23.05+ LTS
-# ✅ 强制启用 dnsmasq-full + wpad-openssl 共存（经官方依赖图谱验证）
-# ✅ 所有构建参数均从环境变量注入，杜绝硬编码，便于多设备复用
-# ────────────────────────────────────────────────────────────────────────
-# 作者：灵犀｜依据：OpenWrt 官方文档 + KFERMercer/OpenWrt-CI v4.2 + Lean 源码实践（2026.04）
-# 最后更新：2026-05-02（星期六）
+#
+# https://github.com/P3TERX/Actions-OpenWrt
+#
+# File: .github/workflows/openwrt-bulder.yml
+# Description: Build OpenWrt using GitHub Actions
+#
+# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
+#
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
+#
 
-name: Build OpenWrt for H29K (RK3528)
+name: OpenWrt Builder
 
-# ⚙️ 触发策略：仅当 .config 或源码变更时触发；支持手动运行（with 参数）
 on:
-  push:
-    paths:
-      - '.config'
-      - 'feeds.conf.default'
-      - 'package/**'
-      - 'target/linux/rockchip/**'
-      - '.github/workflows/openwrt-builder-h29k.yml'
-  pull_request:
-    paths:
-      - '.config'
-      - 'feeds.conf.default'
-      - 'package/**'
-      - 'target/linux/rockchip/**'
-      - '.github/workflows/openwrt-builder-h29k.yml'
+  repository_dispatch:
   workflow_dispatch:
-    inputs:
-      profile:
-        description: 'Target device profile (default: hinlink_h29k)'
-        required: false
-        default: 'hinlink_h29k'
-      build_devices:
-        description: 'Space-separated list of devices to build (default: hinlink_h29k)'
-        required: false
-        default: 'hinlink_h29k'
 
-# 🧱 运行环境：Ubuntu 22.04（OpenWrt 推荐，GCC 11 + Python 3.10 稳定）
-# ⚠️ 注意：Ubuntu 24.04 尚未被 OpenWrt 官方 CI 全面验证，暂不推荐
-concurrency:
-  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
-  cancel-in-progress: true
+env:
+REPO_URL: https://github.com/openwrt/openwrt
+REPO_BRANCH: main
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  UPLOAD_BIN_DIR: true
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
 
 jobs:
-  build-h29k:
-    name: Build H29K Firmware (RK3528)
+  build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 240  # ⏱️ 最长 4 小时（首次编译约 2.5h，后续缓存后 <45min）
 
-    # 🔐 安全上下文：禁用 GITHUB_TOKEN 写权限（只读）
-    permissions:
-      contents: read
-      packages: read
-      id-token: write  # 用于 OIDC 登录私有 feed（如需）
-
-    # 🌐 环境变量：全局生效，供所有 steps 使用
-    env:
-      # 🔑 核心构建参数（优先级：workflow_dispatch > 默认值）
-      TARGET_PROFILE: ${{ github.event.inputs.profile || 'hinlink_h29k' }}
-      BUILD_DEVICES: ${{ github.event.inputs.build_devices || 'hinlink_h29k' }}
-      TARGET: "rockchip"
-      SUBTARGET: "rk35xx"
-      CONFIG_FILE: ".config"
-      # 🛡️ 构建安全加固
-      MAKEFLAGS: "-j$(nproc)"
-      # 📦 依赖包镜像（加速国内下载）
-      FEEDS_MIRROR: "https://mirrors.ustc.edu.cn/lede/releases/23.05-SNAPSHOT/packages"
-
-    # 📋 步骤 0：前置校验（快速失败，节省资源）
     steps:
-      - name: 🔍 Validate Inputs & Environment
-        id: validate
-        run: |
-          set -euxo pipefail
-          echo "⏰ [$(date '+%H:%M:%S')] Starting validation..."
-          
-          # 检查 .config 是否存在且非空
-          if [[ ! -f "${{ env.CONFIG_FILE }}" ]]; then
-            echo "❌ ERROR: '${{ env.CONFIG_FILE }}' not found. Please commit it first."
-            exit 1
-          fi
-          if [[ ! -s "${{ env.CONFIG_FILE }}" ]]; then
-            echo "❌ ERROR: '${{ env.CONFIG_FILE }}' is empty."
-            exit 1
-          fi
-          
-          # 检查 TARGET_PROFILE 是否在 .config 中启用
-          if ! grep -q "CONFIG_TARGET_PROFILE=\"${{ env.TARGET_PROFILE }}\"" "${{ env.CONFIG_FILE }}"; then
-            echo "❌ ERROR: TARGET_PROFILE '${{ env.TARGET_PROFILE }}' not found in ${env.CONFIG_FILE}."
-            echo "💡 Hint: Run 'make menuconfig' and select 'Target Profile' -> '${{ env.TARGET_PROFILE }}'"
-            exit 1
-          fi
-          
-          # 检查 BUILD_DEVICES 设备是否在 .config 中启用（关键！）
-          if ! grep -q "CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_${{ env.TARGET_PROFILE }}=y" "${{ env.CONFIG_FILE }}"; then
-            echo "❌ ERROR: Device '${{ env.TARGET_PROFILE }}' not enabled in ${env.CONFIG_FILE}."
-            echo "💡 Must have: CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_${{ env.TARGET_PROFILE }}=y"
-            exit 1
-          fi
-          
-          # 检查 dnsmasq-full 与 wpad-openssl 共存状态
-          if ! grep -q "CONFIG_PACKAGE_dnsmasq-full=y" "${{ env.CONFIG_FILE }}"; then
-            echo "❌ ERROR: 'dnsmasq-full' not enabled. Required for DHCP/DNS + wpad-openssl coexistence."
-            exit 1
-          fi
-          if ! grep -q "CONFIG_PACKAGE_wpad-openssl=y" "${{ env.CONFIG_FILE }}"; then
-            echo "❌ ERROR: 'wpad-openssl' not enabled. Required for WPA3 support."
-            exit 1
-          fi
-          if grep -q "CONFIG_PACKAGE_dnsmasq=y" "${{ env.CONFIG_FILE }}" || \
-             grep -q "CONFIG_PACKAGE_wpad-mini=y" "${{ env.CONFIG_FILE }}" || \
-             grep -q "CONFIG_PACKAGE_hostapd=y" "${{ env.CONFIG_FILE }}"; then
-            echo "❌ ERROR: Conflicting packages detected (dnsmasq / wpad-mini / hostapd)."
-            echo "💡 Please ensure only 'dnsmasq-full' and 'wpad-openssl' are enabled."
-            exit 1
-          fi
-          
-          echo "✅ All validations passed for profile '${{ env.TARGET_PROFILE }}'."
+    - name: Checkout
+      uses: actions/checkout@main
 
-      # 📦 步骤 1：检出代码（含子模块）
-      - name: 📥 Checkout source with submodules
-        uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-          fetch-depth: 0  # 全量历史，避免 git describe 失败
+    - name: Initialization environment
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown $USER:$GROUPS /workdir
 
-      # ⚙️ 步骤 2：安装系统依赖（OpenWrt 编译必需）
-      - name: 🛠️ Install build dependencies
-        run: |
-          set -euxo pipefail
-          echo "⏰ [$(date '+%H:%M:%S')] Installing system packages..."
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            libncurses5-dev \
-            zlib1g-dev \
-            gawk \
-            flex \
-            quilt \
-            git-core \
-            python3 \
-            python3-pip \
-            python3-setuptools \
-            libssl-dev \
-            rsync \
-            wget \
-            curl \
-            bc \
-            libncursesw5-dev \
-            unzip \
-            file \
-            xz-utils \
-            liblzma-dev \
-            libzstd-dev \
-            libelf-dev \
-            libdw-dev \
-            libbabeltrace-ctf-dev \
-            libbabeltrace-dev \
-            libbpf-dev \
-            libbpf0 \
-            libbpf-tools \
-            libbpf-dev \
-            libbpf0 \
-            libbpf-tools
+    - name: Clone source code
+      working-directory: /workdir
+      run: |
+        df -hT $PWD
+        git clone $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-      # 📂 步骤 3：准备 feeds（使用 USTC 镜像加速）
-      - name: 🌐 Setup feeds with mirror
-        run: |
-          set -euxo pipefail
-          echo "⏰ [$(date '+%H:%M:%S')] Updating feeds from ${FEEDS_MIRROR}..."
-          ./scripts/feeds clean
-          sed -i "s|https://downloads.openwrt.org|${FEEDS_MIRROR}|g" feeds.conf.default
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+    - name: Load custom feeds
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        # ✅【适配增强】双重 chmod 保障 diy-part1.sh 可执行（部分 fork 仓库会丢失 x 权限）
+        chmod +x $GITHUB_WORKSPACE/$DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
 
-      # 🧩 步骤 4：加载并验证 .config（核心！）
-      - name: 📄 Load and validate config
-        run: |
-          set -euxo pipefail
-          echo "⏰ [$(date '+%H:%M:%S')] Loading ${CONFIG_FILE}..."
-          cp "${{ env.CONFIG_FILE }}" .config
-          
-          # 强制 defconfig 校验语法与依赖
-          echo "🔧 Running 'make defconfig' to resolve dependencies..."
-          make defconfig || {
-            echo "❌ 'make defconfig' failed. Dumping broken .config:"
-            head -n 50 "${{ env.CONFIG_FILE }}"
-            tail -n 50 "${{ env.CONFIG_FILE }}"
-            exit 1
-          }
-          
-          # 再次确认关键项已解析成功
-          echo "🔍 Verifying critical packages after defconfig..."
-          if ! grep -q "CONFIG_PACKAGE_dnsmasq-full=y" .config; then
-            echo "❌ After defconfig, dnsmasq-full is NOT enabled! Check dependency conflicts."
-            grep -E "^(CONFIG_PACKAGE_dnsmasq|wpad|libopenssl)" .config
-            exit 1
-          fi
+    - name: Update feeds
+      run: cd openwrt && ./scripts/feeds update -a
 
-      # 🏗️ 步骤 5：执行固件构建（带超时保护与日志增强）
-      - name: 🏗️ Build firmware image (PROFILE=${{ env.TARGET_PROFILE }})
-        id: build
-        env:
-          # 显式传递给 make，确保 PROFILE 生效
-          PROFILE: ${{ env.TARGET_PROFILE }}
-        run: |
-          set -euxo pipefail
-          echo "⏰ [$(date '+%H:%M:%S')] Starting 'make image' for PROFILE=${PROFILE}..."
-          echo "📦 BUILD_DEVICES=${{ env.BUILD_DEVICES }}"
-          echo "🎯 TARGET=${{ env.TARGET }}, SUBTARGET=${{ env.SUBTARGET }}"
+    - name: Install feeds
+      run: cd openwrt && ./scripts/feeds install -a
 
-          # 启动构建，捕获实时日志到文件（便于 debug）
-          make -j$(nproc) V=s image PROFILE="${PROFILE}" 2>&1 | tee build.log || {
-            echo "❌ Build FAILED. See build.log above."
-            # 💡 关键诊断：dump .config 和最后 100 行日志
-            echo "📋 Last 100 lines of build.log:"
-            tail -n 100 build.log
-            echo "⚙️  Current .config (first 30 & last 30 lines):"
-            head -n 30 .config
-            echo "[...]"
-            tail -n 30 .config
-            exit 1
-          }
+    - name: Load custom configuration
+      run: |
+        [ -e files ] && mv files openwrt/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+        # ✅【适配增强】校验 rk3528-hinlink-h29k.config 是否存在且启用 H29K 设备
+        if [ ! -f ".config" ]; then
+          echo "❌ 错误：未找到 .config 文件，请确认 $CONFIG_FILE 已正确复制到 openwrt/ 目录"
+          exit 1
+        fi
+        if ! grep -q '^CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h29k=y' .config; then
+          echo "❌ 错误：.config 中未启用 H29K 设备，请确保包含 CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h29k=y"
+          exit 1
+        fi
 
-      # 📤 步骤 6：上传产物（仅当固件生成成功）
-      - name: 📤 Upload firmware artifacts
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: openwrt-h29k-firmware
-          path: |
-            bin/targets/rockchip/rk35xx/openwrt-rockchip-rk35xx-hinlink_h29k-*.bin
-            bin/targets/rockchip/rk35xx/*.manifest
-            bin/packages/aarch64_cortex-a53/base/*.ipk
-          retention-days: 7
+    - name: Download package
+      id: package
+      run: |
+        cd openwrt
+        make defconfig
+        make download -j8
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
 
-      # 📝 步骤 7：生成构建报告（人类可读摘要）
-      - name: 📝 Generate build report
-        if: always()
-        run: |
-          set -euxo pipefail
-          echo "📊 Build Report for ${{ env.TARGET_PROFILE }}"
-          echo "====================================="
-          echo "📅 Build time: $(date)"
-          echo "🔧 OpenWrt version: $(grep 'CONFIG_VERSION_REPO' .config | cut -d'"' -f2)"
-          echo "🎯 Target: ${{ env.TARGET }}/${{ env.SUBTARGET }} (${{ env.TARGET_PROFILE }})"
-          echo "📦 Firmware size: $(ls -lh bin/targets/rockchip/rk35xx/openwrt-rockchip-rk35xx-hinlink_h29k-*.bin 2>/dev/null | awk '{print $5}')"
-          echo "⚡ Build duration: $((SECONDS / 60))m $((SECONDS % 60))s"
-          echo "✅ Success: ${{ job.status }}"
-          echo "====================================="
+    - name: 编译固件（已启用设备型号参数）
+      id: compile
+      run: |
+        cd openwrt
+        echo -e "$(nproc) 线程编译"
+        # ✅【适配增强】PROFILE 名严格匹配 OpenWrt 源码定义：hinlink_h29k（下划线，非短横线）
+        make -j$(nproc) image PROFILE=hinlink_h29k || make -j1 image PROFILE=hinlink_h29k || make -j1 V=s image PROFILE=hinlink_h29k
+        echo "status=success" >> $GITHUB_OUTPUT
+        grep '^CONFIG_TARGET.*DEVICE_hinlink_h29k=y' .config >/dev/null && echo "DEVICE_NAME=_hinlink_h29k" >> $GITHUB_ENV || { echo "❌ 错误：.config 中未启用 hinlink_h29k 设备"; exit 1; }
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-      # 🚨 步骤 8：失败时发送详细诊断（仅失败时执行）
-      - name: 🚨 Debug on failure
-        if: failure()
-        run: |
-          set -euxo pipefail
-          echo "🚨 BUILD FAILED — DIAGNOSTIC DUMP START"
-          echo "🔧 System info:"
-          uname -a
-          cat /etc/os-release
-          echo "📦 OpenWrt commit:"
-          git log -1 --oneline
-          echo "⚙️  Final .config summary:"
-          grep -E "^(CONFIG_TARGET_PROFILE|CONFIG_PACKAGE_(dnsmasq-full|wpad-openssl|libopenssl|libustream-openssl)|CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE)" .config
-          echo "📁 Output directory listing:"
-          ls -la bin/targets/rockchip/rk35xx/ || echo "(empty)"
-          echo "🚨 DIAGNOSTIC DUMP END"
+    - name: Check space usage
+      if: (!cancelled)
+      run: df -hT
 
-      # 🧹 步骤 9：清理（释放磁盘空间，避免缓存污染）
-      - name: 🧹 Cleanup workspace
-        if: always()
-        run: |
-          set -euxo pipefail
-          echo "🧹 Cleaning up..."
-          rm -rf bin/ build_dir/ staging_dir/ tmp/ feeds/
+    - name: Upload bin directory
+      uses: actions/upload-artifact@main
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      with:
+        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: openwrt/bin
+
+    - name: 整理固件文件（已限定 H29K 路径）
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled
+      run: |
+        # ✅【适配增强】精确进入 hinlink_h29k 子目录，避免与其他设备固件混淆
+        cd openwrt/bin/targets/rockchip/rk35xx/hinlink_h29k
+        # ✅【适配增强】校验 H29K 固件是否存在，防止路径错误导致空上传
+        if [ ! -f "openwrt-rockchip-rk35xx-hinlink_h29k-*.bin" ]; then
+          echo "❌ 错误：未在 openwrt/bin/targets/rockchip/rk35xx/hinlink_h29k/ 下找到 H29K 固件"
+          ls -la
+          exit 1
+        fi
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 上传 H29K 固件（已精确过滤）
+      uses: actions/upload-artifact@main
+      if: steps.organize.outputs.status == 'success' && !cancelled
+      with:
+        name: OpenWrt_firmware_hinlink_h29k${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}/openwrt-rockchip-rk35xx-hinlink_h29k-*.bin
+
+    - name: Generate release tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled
+      run: |
+        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        touch release.txt
+        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload firmware to release
+      uses: softprops/action-gh-release@master
+      if: steps.tag.outputs.status == 'success' && !cancelled
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: ${{ env.FIRMWARE }}/openwrt-rockchip-rk35xx-hinlink_h29k-*.bin
+
+    - name: Delete workflow runs
+      uses: Mattraks/delete-workflow-runs@main
+      with:
+        retain_days: 0
+        keep_minimum_runs: 2
+
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@master
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled
+      with:
+        keep_latest: 3
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
