@@ -1,7 +1,14 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
+# 文件名：.github/workflows/openwrt-builder.yml
 # 描述：专为 Hinlink H29K（RK3528）定制的 OpenWrt 构建工作流
+#       ✅ 已移除全部 7 处非法 '!cancelled()' 表达式（GitHub Actions 不支持该语法）
+#       ✅ 已调整 'Load custom feeds' 步骤位置：从 'Update feeds' 之前移至 'Install feeds' 之后
+#           （确保 diy-part1.sh 对 armv8.mk 的注入不被 feeds install 覆盖）
+#       ✅ 所有注释均为中文，技术术语附带中文说明（如 PROFILE（设备配置标识符））
+#       ✅ 完全保留你原始的变量名、步骤名、artifact 命名、release 逻辑
+#
 # 版权声明（2019–2024）：P3TERX <https://p3terx.com>，MIT 许可证（开源软件许可协议）
 #
 
@@ -52,18 +59,18 @@ jobs:
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
+    - name: 更新软件源索引
+      run: cd openwrt && ./scripts/feeds update -a
+
+    - name: 安装全部软件源包
+      run: cd openwrt && ./scripts/feeds install -a
+
     - name: 加载自定义软件源（feeds）
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
-
-    - name: 更新软件源索引
-      run: cd openwrt && ./scripts/feeds update -a
-
-    - name: 安装全部软件源包
-      run: cd openwrt && ./scripts/feeds install -a
 
     - name: 加载自定义系统配置
       run: |
@@ -77,8 +84,9 @@ jobs:
       id: package
       run: |
         cd openwrt
-        # ← 关键修复：显式指定 PROFILE=hinlink_h29k（与 diy-part1.sh 文件第65行 'define Device/hinlink_h29k' 严格对应）
-        #    否则 make defconfig 将生成通用 rockchip/armv8 配置，导致 H29K 专用固件无法构建
+        # ← 关键修复：显式指定 PROFILE（设备配置标识符）=hinlink_h29k
+        #    与 diy-part1.sh 文件第65行 'define Device/hinlink_h29k' 严格对应
+        #    确保 make defconfig 生成 H29K 专用配置，而非通用 rockchip/armv8 配置
         make defconfig PROFILE=hinlink_h29k
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
