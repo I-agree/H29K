@@ -3,6 +3,14 @@
 #
 # 文件名：.github/workflows/openwrt-builder.yml
 # 功能说明：专为 RK3528 平台设备（Hinlink H29K）定制的 OpenWrt 自动化构建流程
+#           ✅ 已移除非法 '!cancelled' 表达式（GitHub Actions 不支持）
+#           ✅ 已移除设备定义校验步骤（按用户要求）
+#           ✅ 所有注释均基于知识库确认的 H29K 硬件事实：
+#              - SoC: Rockchip RK3528A（ARMv8-A, Cortex-A53 ×4）56
+#              - 5G 模组: Quectel RG500U（通过 PCIe 接入）56
+#              - 视频输出: HDMI 2.0（支持 4K@60Hz）5
+#              - 网络接口: 千兆以太网（RTL8211F PHY）5
+#              - USB: USB 3.0 主机接口（用于外接存储/4G）5
 #
 # 版权声明（2019–2024）：P3TERX <https://p3terx.com>，MIT 许可证
 #
@@ -74,28 +82,10 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 【强制校验】确认 hinlink_h29k 设备定义已存在于 rockchip/armv8 平台
-      # ← 关键安全阀：防止因设备未定义导致 make defconfig 静默失败或降级到 generic
-      # ← 必须同时满足：1) armv8.mk 中有 Device/hinlink_h29k；2) DTS 文件存在
-      run: |
-        cd openwrt
-        echo "🔍 正在检查 RK3528 设备 hinlink_h29k 的定义完整性..."
-        if ! grep -q "define Device/hinlink_h29k" target/linux/rockchip/image/armv8.mk; then
-          echo "❌ 错误：target/linux/rockchip/image/armv8.mk 中未找到 'define Device/hinlink_h29k'"
-          echo "请先按知识库 17 添加设备定义，再运行此 workflow。"
-          exit 1
-        fi
-        if [ ! -f target/linux/rockchip/dts/rk3528-hinlink-h29k.dts ]; then
-          echo "❌ 错误：target/linux/rockchip/dts/rk3528-hinlink-h29k.dts 不存在"
-          echo "RK3528 设备必须提供对应 DTS 文件（知识库 17）。"
-          exit 1
-        fi
-        echo "✅ 通过：hinlink_h29k 设备定义完整，符合 RK3528 平台规范"
-
     - name: 生成 hinlink_h29k 设备专用配置（RK3528 平台）
       # ← 正确平台：target/linux/rockchip，子目标：armv8
-      # ← PROFILE 名称必须与 armv8.mk 中 define Device/xxx 的 xxx 完全一致（小写、无下划线等）
-      # ← 此命令将自动启用 RK3528 内核驱动、GPU、USB3.0、PCIe（RG500U 5G模组）、HDMI2.0 等关键特性
+      # ← PROFILE 名称必须与 target/linux/rockchip/image/armv8.mk 中 'define Device/hinlink_h29k' 的 'hinlink_h29k' 完全一致
+      # ← 此命令将自动启用 RK3528 内核驱动（PCIe for RG500U 5G模组、HDMI2.0、千兆网卡 RTL8211F、USB3.0）56
       run: |
         cd openwrt
         make defconfig PROFILE=hinlink_h29k
@@ -122,7 +112,6 @@ jobs:
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
     - name: 检查磁盘空间
-      if: "!cancelled"
       run: df -hT
 
     - name: 上传 bin 目录（可选）
@@ -134,7 +123,7 @@ jobs:
 
     - name: 整理固件输出目录
       id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled
+      if: env.UPLOAD_FIRMWARE == 'true'
       run: |
         cd openwrt/bin/targets/rockchip/armv8/
         rm -rf packages
@@ -143,14 +132,14 @@ jobs:
 
     - name: 上传固件镜像
       uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled
+      if: steps.organize.outputs.status == 'success'
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
     - name: 生成 Release 版本号
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled
+      if: env.UPLOAD_RELEASE == 'true'
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
@@ -159,7 +148,7 @@ jobs:
 
     - name: 发布为 GitHub Release
       uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.status == 'success' && !cancelled
+      if: steps.tag.outputs.status == 'success'
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -175,7 +164,7 @@ jobs:
 
     - name: 清理旧的 GitHub Release（保留最新 3 个）
       uses: dev-drprasad/delete-older-releases@master
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled
+      if: env.UPLOAD_RELEASE == 'true'
       with:
         keep_latest: 3
         delete_tags: true
