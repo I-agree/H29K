@@ -78,7 +78,7 @@ printf '\n'
 echo "🔤 正在从仓库根目录复制 MiSans-Regular.ttf（零网络依赖）..."
 
 # 🔹 源文件：与 diy-part2.sh 同级的仓库根目录下的字体（绝对可靠）
-SRC_FONT="$(cd "$(dirname "$0")/.." && pwd)/MiSans-Regular.ttf"
+SRC_FONT="$(cd "$(dirname "$0")/.." && pwd)/fonts/MiSans-Regular.ttf"
 
 # 🔹 目标路径：OpenWrt 固件内标准字体位置
 DST_FONT="files/usr/share/fonts/truetype/MiSans-Regular.ttf"
@@ -86,7 +86,6 @@ DST_FONT="files/usr/share/fonts/truetype/MiSans-Regular.ttf"
 # 创建目标目录
 mkdir -p "$(dirname "$DST_FONT")"
 
-# 校验源文件是否存在且可读
 if [[ ! -f "$SRC_FONT" ]]; then
   echo -e "\033[31m❌ 错误：字体文件未找到！\033[0m"
   echo "   当前脚本路径：$(dirname "$0")"
@@ -94,9 +93,10 @@ if [[ ! -f "$SRC_FONT" ]]; then
   echo "   查找路径：$SRC_FONT"
   echo ""
   echo "   ✅ 请立即检查："
-  echo "     1. 确认 MiSans-Regular.ttf 已提交到 GitHub 仓库根目录（与 README.md、.git 同级）"
-  echo "     2. 运行此命令验证：ls -l \"$(cd "$(dirname "$0")/.." && pwd)/MiSans-Regular.ttf\""
-  echo "     3. 确保该文件未被 .gitignore 屏蔽（运行：git check-ignore -v MiSans-Regular.ttf）"
+  echo "     1. 确认 MiSans-Regular.ttf 已提交到 GitHub 仓库 /fonts/）"
+  echo "        正确路径应为：https://github.com/I-agree/H29K/tree/main/fonts/"
+  echo "     2. 运行此命令验证：ls -l \"$(cd "$(dirname "$0")/.." && pwd)/fonts/MiSans-Regular.ttf\""
+  echo "     3. 确保 /fonts/ 未被 .gitignore 屏蔽（运行：git check-ignore -v fonts/MiSans-Regular.ttf）"
   exit 1
 fi
 
