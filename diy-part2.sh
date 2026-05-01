@@ -27,6 +27,17 @@ mkdir -p "$(dirname "$DTS_DST")"
 cp -f "$DTS_SRC" "$DTS_DST"
 echo "✅ 已注入 DTS → $DTS_DST"
 
+# ✅ 2.5. DTS 文件 → 注入到 arch/arm/dts/rockchip/ 下的标准路径
+DTS_SRC="files/arch/arm/dts/rockchip/rk3528-hinlink-h29k.dts"
+DTS_DST="arch/arm/dts/rockchip/rockchip/rk3528-hinlink-h29k.dts"
+if [ ! -f "$DTS_SRC" ]; then
+  echo "❌ 错误：DTS 源文件不存在：$DTS_SRC"
+  exit 1
+fi
+mkdir -p "$(dirname "$DTS_DST")"
+cp -f "$DTS_SRC" "$DTS_DST"
+echo "✅ 已注入 DTS → $DTS_DST"
+
 # ✅ 3. Linux 内核 defconfig → 直接复制到 image/ 目录（官方标准位置）
 DEFCONFIG_SRC="files/target/linux/rockchip/image/hinlink_h29k_defconfig"
 DEFCONFIG_DST="target/linux/rockchip/image/hinlink_h29k_defconfig"
