@@ -74,7 +74,7 @@ for i in 1 2 3; do
 done
 
 printf '\n'
-# ======================== 修复缺失 wqy-microhei.ttc 字体 ========================
+# ======================== 修复缺失 MiSans-Regular.ttf 字体 ========================
 # 🔹 源文件：仓库根目录下的字体（绝对路径，自动检测）
 SRC_FONT="$(git rev-parse --show-toplevel)/MiSans-Regular.ttf"
 
