@@ -10,7 +10,7 @@
 # See /LICENSE for more information.
 #
 
-name: OpenWrt Builder
+name: openwrt-builder全中文
 
 on:
   repository_dispatch:
