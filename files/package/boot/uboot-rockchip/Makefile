@@ -451,6 +451,7 @@ UBOOT_TARGETS := \
   rock-pi-e-rk3328 \
   rock-pi-e-v3-rk3328 \
   hinlink-h28k-rk3528 \
+  hinlink-h29k-rk3528 \
   radxa-e20c-rk3528 \
   rock-2-rk3528 \
   nanopi-r3s-rk3566 \
