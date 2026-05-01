@@ -1,141 +1,31 @@
-name: OpenWrt Builder
-
-on:
-  workflow_dispatch:
-    inputs:
-      repo_url:
-        description: 'OpenWrt 仓库地址'
-        required: true
-        default: 'https://github.com/openwrt/openwrt.git'
-      repo_branch:
-        description: 'OpenWrt 分支名'
-        required: true
-        default: 'master'
-      diy_p1_sh:
-        description: 'diy-part1.sh 路径'
-        required: true
-        default: 'diy-part1.sh'
-      diy_p2_sh:
-        description: 'diy-part2.sh 路径'
-        required: true
-        default: 'diy-part2.sh'
-      feeds_conf:
-        description: 'feeds.conf 路径'
-        required: true
-        default: 'feeds.conf'
-
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 180
-
-    env:
-      REPO_URL: ${{ github.event.inputs.repo_url }}
-      REPO_BRANCH: ${{ github.event.inputs.repo_branch }}
-      DIY_P1_SH: ${{ github.event.inputs.diy_p1_sh }}
-      DIY_P2_SH: ${{ github.event.inputs.diy_p2_sh }}
-      FEEDS_CONF: ${{ github.event.inputs.feeds_conf }}
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          submodules: 'recursive'
+          submodules: recursive
 
-      - name: Setup Environment
+      - name: Set up environment
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential libncurses5-dev libncursesw5-dev \
-            zlib1g-dev gawk git gettext libssl-dev xsltproc wget python3 unzip rsync
+          echo "BUILD_DEVICES=hinlink_h29k" >> $GITHUB_ENV
+          echo "TARGET_PROFILE=hinlink_h29k" >> $GITHUB_ENV
+          echo "CONFIG_FILE=.config" >> $GITHUB_ENV
 
-      - name: 克隆 OpenWrt 官方源码
-        working-directory: /workdir
-        run: |
-          # 🔒 【新增】创建 ext4 安全区（绕过 Actions overlayfs 不支持 chattr 的限制）
-          sudo mkdir -p /safe-ext4
-          sudo dd if=/dev/zero of=/tmp/safe.img bs=1M count=1024 2>/dev/null
-          sudo mkfs.ext4 -F /tmp/safe.img >/dev/null 2>&1
-          sudo mount -o loop /tmp/safe.img /safe-ext4
-          sudo chown $USER:$GROUPS /safe-ext4
-          echo "✅ 已创建 ext4 安全区 /safe-ext4"
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential libncurses5-dev zlib1g-dev gawk flex quilt git-core python3 python3-pip
 
-          # 迁移 openwrt 到 ext4 区域（确保 chattr +i 生效）
-          mv openwrt /safe-ext4/
-          ln -sf /safe-ext4/openwrt $GITHUB_WORKSPACE/openwrt
-          echo "✅ 已将 openwrt 迁移至 ext4 安全区"
+      - name: Load config
+        run: cp "${{ env.CONFIG_FILE }}" .config
 
-          df -hT $PWD
-          git clone $REPO_URL -b $REPO_BRANCH openwrt
-          ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+      - name: Generate defconfig (validate .config)
+        run: make defconfig
 
-      - name: 更新软件源索引
-        run: cd openwrt && ./scripts/feeds update -a
+      - name: Build firmware
+        run: make -j$(nproc) image PROFILE="${{ env.TARGET_PROFILE }}"
 
-      - name: 加载自定义软件源（feeds）
-        run: |
-          [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-          # 🔒 【新增】在 feeds install 前，先执行 diy 脚本并锁定关键文件
-          chmod +x $DIY_P1_SH
-          cd openwrt
-          $GITHUB_WORKSPACE/$DIY_P1_SH
-          # 立即锁定 armv8.mk（防止后续 feeds install 覆盖）
-          sudo chattr +i target/linux/rockchip/image/armv8.mk 2>/dev/null || echo "⚠️  warning: failed to lock armv8.mk (may not exist yet)"
-          echo "✅ 已锁定 target/linux/rockchip/image/armv8.mk"
-
-          chmod +x $DIY_P1_SH
-          cd openwrt
-          $GITHUB_WORKSPACE/$DIY_P1_SH
-
-      - name: 安装全部软件源包
-        run: cd openwrt && ./scripts/feeds install -a
-
-      - name: 加载自定义系统配置
-        run: |
-          [ -e files ] && mv files openwrt/files
-          # 🔒 【新增】在 defconfig 前，执行 diy-part2.sh 并锁定 uboot-rockchip/Makefile
-          chmod +x $DIY_P2_SH
-          cd openwrt
-          $GITHUB_WORKSPACE/$DIY_P2_SH
-          # 立即锁定 uboot-rockchip/Makefile（防止 feeds install 覆盖）
-          sudo chattr +i package/boot/uboot-rockchip/Makefile 2>/dev/null || echo "⚠️  warning: failed to lock uboot-rockchip/Makefile (may not exist yet)"
-          echo "✅ 已锁定 package/boot/uboot-rockchip/Makefile"
-
-          # ← 已跳过空配置文件加载：因 rk3528-hinlink-h29k.config 为空，加载将使 .config 丢失 diy 脚本注入的设备定义
-          chmod +x $DIY_P2_SH
-          cd openwrt
-          $GITHUB_WORKSPACE/$DIY_P2_SH
-
-      - name: 生成默认配置
-        run: cd openwrt && make defconfig PROFILE=hinlink_h29k
-
-      - name: 下载依赖
-        run: cd openwrt && make download -j$(nproc)
-
-      - name: 编译固件
-        id: compile
-        run: |
-          # 🔍 【新增】构建前最终校验：确认关键文件已被锁定
-          echo "🔍 校验文件锁定状态："
-          lsattr openwrt/target/linux/rockchip/image/armv8.mk 2>/dev/null | grep -q "i" && echo "  ✅ armv8.mk 已锁定" || echo "  ❌ armv8.mk 未锁定"
-          lsattr openwrt/package/boot/uboot-rockchip/Makefile 2>/dev/null | grep -q "i" && echo "  ✅ uboot-rockchip/Makefile 已锁定" || echo "  ❌ uboot-rockchip/Makefile 未锁定"
-          echo ""
-
-          cd openwrt
-          echo -e "$(nproc) 线程并发编译"
-          make -j$(nproc) || make -j1 || make -j1 V=s
-
-      - name: 组织输出文件
-        if: always()
-        run: |
-          cd openwrt
-          mkdir -p artifacts
-          find bin/targets/rockchip/armv8 -type f \( -name "*sysupgrade.bin" -o -name "*factory.bin" -o -name "*rootfs.tar.gz" \) -exec cp {} artifacts/ \;
-          ls -lh artifacts/
-
-      - name: 上传固件
-        if: always()
+      - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
-          name: openwrt-rockchip-armv8-firmware
-          path: openwrt/artifacts/
-          if-no-files-found: warn
+          name: openwrt-h29k-firmware
+          path: bin/targets/rockchip/rk35xx/openwrt-rockchip-rk35xx-hinlink_h29k-*.bin
