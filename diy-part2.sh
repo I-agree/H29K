@@ -6,8 +6,8 @@ mkdir -p "target/linux/rockchip/dts"
 # 复制 DTS 文件（加引号防空格/特殊字符）
 cp -f "$GITHUB_WORKSPACE/rk3528-hinlink-h29k.dts" "target/linux/rockchip/dts/"
 
-mkdir -p "target/linux/rockchip/image"
-cp -f "$GITHUB_WORKSPACE/hinlink_h29k_defconfig" "target/linux/rockchip/image/"
+mkdir -p "package/boot/uboot-rockchip/files/configs/"
+cp -f "$GITHUB_WORKSPACE/hinlink_h29k_defconfig" "package/boot/uboot-rockchip/files/configs/"
 
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
