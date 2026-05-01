@@ -81,8 +81,8 @@ echo "[INFO] 自动下载并安装 wqy-microhei.ttc 字体文件"
 mkdir -p files/usr/share/fonts/truetype/
 
 # 下载字体（稳定源，带超时）
-curl -fsSL --max-time 30 -o files/usr/share/fonts/truetype/wqy-microhei.ttc \
-  https://raw.githubusercontent.com/I-am-Bot/OpenWrt-Fonts/main/wqy-microhei.ttc
+curl -fsSL --max-time 100 -o files/usr/share/fonts/truetype/MiSans-Regular.ttf \
+  https://raw.githubusercontent.com/I-agree/H29K/blob/main/MiSans-Regular.ttf
 
 # 赋权
 chmod 644 files/usr/share/fonts/truetype/wqy-microhei.ttc
