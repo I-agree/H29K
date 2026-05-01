@@ -264,7 +264,20 @@ while true; do
     RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}')
     [ -z "$RSRP" ] && RSRP="Search"
 
-    QUOTE=$(curl -s --connect-timeout 2 "https://v1.hitokoto.cn/?encode=text" | cut -c 1-25)
+    # ✅ 网络名言（带超时）→ 失败则 fallback 到本地预存名言（3条）
+    QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | cut -c 1-25)
+    if [ -z "$QUOTE" ]; then
+      # 🔹 本地名言库（UTF-8 短句，适配 MiSans 渲染）
+      QUOTES=(
+        "山高水长，行则将至"
+        "心之所向，素履以往"
+        "静水流深，厚积薄发"
+      )
+      # 🔹 随机选取一条（BusyBox shuf 兼容写法）
+      RAND_IDX=$((RANDOM % ${#QUOTES[@]}))
+      QUOTE="${QUOTES[$RAND_IDX]}"
+    fi
+
     convert "$LOGO_DIR/LOGO3.jpg" -fill "rgba(0,0,0,0.7)" -draw "rectangle 0 60 240 240" \
     -font "$FONT" -fill "#00FF00" -pointsize 45 -annotate +35+130 "$RSRP" \
     -fill white -pointsize 15 -annotate +160+130 "dB" \
