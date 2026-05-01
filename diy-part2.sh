@@ -86,67 +86,7 @@ endef
 TARGET_DEVICES += hinlink_h29k
 EOF
 
-# ======================== 【内核配置】 ========================
-# 清理旧内核选项（避免冲突），注入 H29K 专属配置
-CONF_FILES=$(find target/linux/rockchip/armv8 -name "config-*")
-for CONF in $CONF_FILES; do
-  # 移除可能冲突的 staging/fb/tcpc 配置（确保干净）
-  sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
-  # 注入 H29K 必需内核模块与算法（ST7789V 屏幕、BBR 拥塞控制、IRQ 平衡）
-  cat >> "$CONF" <<'EOF'
-CONFIG_STAGING=y
-CONFIG_FB_TFT=y
-CONFIG_FB_TFT_ST7789V=y
-CONFIG_TCP_CONG_BBR=y
-CONFIG_DEFAULT_BBR=y
-CONFIG_DEFAULT_TCP_CONG="bbr"
-CONFIG_IRQ_BALANCING=y
-CONFIG_IRQ_AFFINITY=y
-EOF
-done
-
-echo "===== ✅ 内核配置注入完成 ====="
-
-# 【分区大小重置】—— 删除旧值，写入 H29K 推荐值（256MB kernel + 2048MB rootfs）
-sed -i '/^CONFIG_TARGET_KERNEL_PARTSIZE=/d' .config
-sed -i '/^CONFIG_TARGET_ROOTFS_PARTSIZE=/d' .config
-echo "CONFIG_TARGET_KERNEL_PARTSIZE=256" >> .config
-echo "CONFIG_TARGET_ROOTFS_PARTSIZE=2048" >> .config
-
-# 【网络服务配置】—— ✅ 修复点7：dnsmasq-full 自动拉取 dnsmasq，无需显式禁用
-#    （避免编译失败：Package dnsmasq-full depends on dnsmasq）
-sed -i '/CONFIG_PACKAGE_dnsmasq/d' .config
-sed -i '/CONFIG_PACKAGE_wpad/d' .config
-echo "CONFIG_PACKAGE_wpad-basic-wolfssl=n" >> .config
-echo "CONFIG_PACKAGE_wpad-basic-mbedtls=n" >> .config
-echo "CONFIG_PACKAGE_wpad-openssl=y" >> .config
-echo "CONFIG_PACKAGE_dnsmasq-full=y" >> .config  # ← 自动包含 dnsmasq 依赖
-
-# 【LuCI 与工具链】—— 启用中文界面、IRQ 平衡、DNS 加密代理
-echo "CONFIG_PACKAGE_luci-mod-admin-full=y" >> .config
-echo "CONFIG_PACKAGE_luci-i18n-base-zh-cn=y" >> .config
-echo "CONFIG_PACKAGE_luci-app-irqbalance=y" >> .config
-echo "CONFIG_PACKAGE_luci-i18n-irqbalance-zh-cn=y" >> .config
-echo "CONFIG_PACKAGE_dnscrypt-proxy=y" >> .config
-echo "CONFIG_PACKAGE_luci-app-dnscrypt-proxy=y" >> .config
-echo "CONFIG_PACKAGE_luci-i18n-dnscrypt-proxy-zh-cn=y" >> .config
-
-# ==============================
-# 【最终写入：H29K 全量核心配置】
-# ✅ 严格匹配 OpenWrt 2026.04+ RK3528 官方要求
-# ==============================
-cat >> .config <<'EOF'
-CONFIG_TARGET_rockchip=y
-CONFIG_TARGET_MULTI_ARCH=n
-CONFIG_TARGET_rockchip_armv8=y
-CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
-CONFIG_PACKAGE_uboot-rockchip=y
-CONFIG_PACKAGE_uboot-rockchip-v8=y
-CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
-CONFIG_PACKAGE_luci-app-oaf=y
-CONFIG_PACKAGE_appfilter=y
-CONFIG_PACKAGE_luci-i18n-oaf-zh-cn=y
-EOF
+echo "===== ✅ 添加 H29K：armv8.mk 设备定义完成 ====="
 
 # ======================== 【第3部分：屏幕脚本（procd 服务化）】 ========================
 # ✅ 修复点8：弃用 /etc/rc.local（OpenWrt 22.03+ 已废弃），改用 procd 服务管理
@@ -229,18 +169,7 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# ==============================================
-# 【强制清理配置，避免残留冲突】
-sed -i '/^CONFIG_TARGET_rockchip_armv8_DEVICE_/s/=y$/=n/' .config
-echo "CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" >> .config
-
-# 👇 告诉 OpenWrt：“本次只配置并构建 H29K”
-make defconfig PROFILE=hinlink_h29k
-
-# 👇 告诉 OpenWrt：“本次只打包 H29K 的固件”
-make image PROFILE=hinlink_h29k -j$(nproc)
-
-# ======================== 【H29K 强制4项校验 · 失败立即终止编译】 ========================
+# ======================== 【H29K 强制2项校验 · 失败立即终止编译】 ========================
 echo "🔍 开始 H29K 构建前置五重校验..."
 
 # ✅ 校验1：设备定义已写入 armv8.mk
@@ -251,14 +180,6 @@ if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
   exit 1
 fi
 echo -e "\033[32m[通过] 设备定义已写入 armv8.mk\033[0m"
-
-# ✅ 校验2：只编译 H29K（防误启 H28K）
-COUNT=$(grep -c "hinlink_h29k" "$MK_FILE")
-if [ $COUNT -lt 1 ]; then
-  echo -e "\033[31m[错误] 未检测到 hinlink_h29k 设备定义\033[0m"
-  exit 1
-fi
-echo -e "\033[32m[通过] H29K 设备定义数量：$COUNT\033[0m"
 
 # ✅ 校验3：U-Boot 已添加 hinlink-h29k-rk3528（Makefile确认）
 UBOOT_MK="package/boot/uboot-rockchip/Makefile"
@@ -271,3 +192,10 @@ echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！开始编译 H29K 固件！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
+
+# ==============================================
+# 👇 告诉 OpenWrt：“本次只配置并构建 H29K”
+make defconfig PROFILE=hinlink_h29k
+
+# 👇 告诉 OpenWrt：“本次只打包 H29K 的固件”
+make image PROFILE=hinlink_h29k -j$(nproc)
