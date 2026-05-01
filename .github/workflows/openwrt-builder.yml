@@ -1,17 +1,7 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# 文件名：.github/workflows/openwrt-builder.yml
 # 功能说明：专为 RK3528 平台设备（Hinlink H29K）定制的 OpenWrt 自动化构建流程
-#           ✅ 已移除非法 '!cancelled' 表达式（GitHub Actions 不支持）
-#           ✅ 已移除设备定义校验步骤（按用户要求）
-#           ✅ 所有注释均基于知识库确认的 H29K 硬件事实：
-#              - SoC: Rockchip RK3528A（ARMv8-A, Cortex-A53 ×4）56
-#              - 5G 模组: Quectel RG500U（通过 PCIe 接入）56
-#              - 视频输出: HDMI 2.0（支持 4K@60Hz）5
-#              - 网络接口: 千兆以太网（RTL8211F PHY）5
-#              - USB: USB 3.0 主机接口（用于外接存储/4G）5
-#
 # 版权声明（2019–2024）：P3TERX <https://p3terx.com>，MIT 许可证
 #
 
@@ -83,9 +73,6 @@ jobs:
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: 生成 hinlink_h29k 设备专用配置（RK3528 平台）
-      # ← 正确平台：target/linux/rockchip，子目标：armv8
-      # ← PROFILE 名称必须与 target/linux/rockchip/image/armv8.mk 中 'define Device/hinlink_h29k' 的 'hinlink_h29k' 完全一致
-      # ← 此命令将自动启用 RK3528 内核驱动（PCIe for RG500U 5G模组、HDMI2.0、千兆网卡 RTL8211F、USB3.0）56
       run: |
         cd openwrt
         make defconfig PROFILE=hinlink_h29k
