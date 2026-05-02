@@ -88,7 +88,7 @@ echo "===== ✅ 添加 H29K：armv8.mk 设备定义完成 ====="
 CONF_FILES=$(find target/linux/rockchip/armv8 -name "config-*")
 for CONF in $CONF_FILES; do
   # 移除可能冲突的 staging/fb/tcpc 配置（确保干净）
-  sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
+  sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_ARC_EMAC_CORE/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
   # 注入 H29K 必需内核模屏幕相关（ST7789V 屏幕），CONFIG_OF_GPIO=y和CONFIG_BACKLIGHT_CLASS_DEVICE=y源代码已经有了。
   cat >> "$CONF" <<'EOF'
 CONFIG_DRM=y
