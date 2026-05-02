@@ -83,6 +83,26 @@ EOF
 printf '\n'
 echo "===== ✅ 添加 H29K：armv8.mk 设备定义完成 ====="
 
+# ======================== 【内核屏幕配置】 ========================
+# 清理旧内核选项（避免冲突），注入 H29K 屏幕专属配置
+CONF_FILES=$(find target/linux/rockchip/armv8 -name "config-*")
+for CONF in $CONF_FILES; do
+  # 移除可能冲突的 staging/fb/tcpc 配置（确保干净）
+  sed -i '/CONFIG_STAGING/d; /CONFIG_FB_TFT/d; /CONFIG_TCP_CONG/d; /CONFIG_DEFAULT_TCP_CONG/d' "$CONF"
+  # 注入 H29K 必需内核模屏幕相关（ST7789V 屏幕），CONFIG_OF_GPIO=y源代码已经有了。
+  cat >> "$CONF" <<'EOF'
+CONFIG_DRM_ROCKCHIP=y
+CONFIG_DRM_ROCKCHIP_DSI=y
+CONFIG_DRM_ROCKCHIP_VOP2=y
+CONFIG_FB_ST7789V=y
+CONFIG_GPIO_RK3528=y
+CONFIG_GPIOLIB=y
+CONFIG_BACKLIGHT_RK806=y
+CONFIG_BACKLIGHT_CLASS_DEVICE=y
+EOF
+done
+
+printf '\n'
 # ======================== 【H29K 强制2项校验 · 失败立即终止编译】 ========================
 echo "🔍 开始 H29K 构建前置2重校验..."
 
