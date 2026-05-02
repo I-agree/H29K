@@ -67,7 +67,7 @@ define Device/hinlink_h29k
   IMAGE/sysupgrade.img.gz := boot.bin | append-rootfs | pad-rootfs | check-size | gzip
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-usb-net-rtl8152 kmod-aic8800-sdio dnsmasq-full \
-    kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option \
+    kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
     luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn \
     luci-theme-argon imagemagick wqy-microhei curl irqbalance \
     luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn \
