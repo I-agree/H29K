@@ -1,6 +1,58 @@
 #!/bin/bash
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
+# ==============================================================================
+# 【U-Boot 支持注入】—— 严格遵循 OpenWrt 官方 Makefile 风格（高危修复区）
+# ✅ 修复点1：BusyBox sed 不支持 'a\' 多行追加 → 改用 POSIX 兼容写法（自动换行）
+# ✅ 修复点2：NAME 字段统一为下划线命名，与 UBOOT_CONFIG 语义一致
+# ==============================================================================
+makefile="package/boot/uboot-rockchip/Makefile"
+
+# 1️⃣ 在 hinlink-h28k-rk3528 后追加 hinlink-h29k-rk3528 到 UBOOT_TARGETS（POSIX 安全）
+sed -i "/hinlink-h28k-rk3528/a hinlink-h29k-rk3528" "$makefile"
+
+# 2️⃣ 在 hinlink-h28k 定义下方插入 hinlink-h29k 设备块（完全复刻官方格式）
+#    ✅ NAME:=HINLINK_H29K（非空格，与 UBOOT_CONFIG 一致）
+#    ✅ BUILD_DEVICES:=hinlink_h29k（小写+下划线，与 .config 中 CONFIG_TARGET_... 保持一致）
+sed -i '/define U-Boot\/hinlink-h28k-rk3528/a\
+define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  UBOOT_CONFIG:=hinlink_h29k\n  NAME:=HINLINK_H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
+' "$makefile"
+
+# ======================== 【添加 H29K：armv8.mk 设备定义】 ========================
+# ✅ 修复点3：DEVICE_DTS 使用标准社区命名 rk3528-hinlink-h29k（非 opc- 前缀）
+TARGET_MK="target/linux/rockchip/image/armv8.mk"
+
+cat >> "$TARGET_MK" <<'EOF'
+# 📌 设备定义：HINLINK H29K（RK3528）
+#    - 遵循 OpenWrt 命名规范：rk3528-{vendor}-{model}
+define Device/hinlink_h29k
+  SOC := rk3528
+  SUBTARGET := armv8
+  DEVICE_VENDOR := HINLINK
+  DEVICE_MODEL := H29K
+  DEVICE_DTS := rk3528-hinlink-h29k
+  UBOOT_CONFIG := hinlink_h29k
+  DEVICE_UBOOT_IMAGE := u-boot-rockchip-hinlink_h29k.bin
+  IMAGE/boot.bin := boot-scr | boot-kernel | boot-dtb
+  IMAGE/sysupgrade.img.gz := boot.bin | append-rootfs | pad-rootfs | check-size | gzip
+  DEVICE_PACKAGES := \
+    kmod-usb3 kmod-usb-net-rtl8152 kmod-r8169 kmod-aic8800-sdio wpad-openssl dnsmasq-full \
+    kmod-mtk_t7xx kmod-usb-net-cdc-mbim uqmi kmod-usb-net-rndis-host kmod-usb-serial-option \
+    kmod-h29k-fb-st7789v \
+    luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn \
+    luci-theme-argon fbv imagemagick wqy-microhei curl irqbalance \
+    luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn \
+    luci-mod-admin-full \
+    luci-app-irqbalance luci-i18n-irqbalance-zh-cn \
+    dnscrypt-proxy luci-app-dnscrypt-proxy luci-i18n-dnscrypt-proxy-zh-cn \
+    luci-app-oaf appfilter luci-i18n-oaf-zh-cn
+endef
+TARGET_DEVICES += hinlink_h29k
+EOF
+
+printf '\n'
+echo "===== ✅ 添加 H29K：armv8.mk 设备定义完成 ====="
+
 # ======================== 【资源准备】 ========================
 echo "🔧 正在按 OpenWrt 官方主线路径注入 H29K 文件..."
 
