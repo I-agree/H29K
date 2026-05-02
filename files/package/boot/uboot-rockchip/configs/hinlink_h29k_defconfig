@@ -1,8 +1,6 @@
 # Hinlink H29K (RK3528) U-Boot configuration for OpenWrt main branch
 # Generated for openwrt/openwrt@v24.10.0+ (2026-05)
 # ✅ MUST be placed at: package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-# ✅ Requires matching dts: arch/arm/dts/rockchip/rk3528-hinlink-h29k.dts
-# ✅ Requires device definition in target/linux/rockchip/image/Makefile
 
 CONFIG_ARM=y
 CONFIG_ARM64=y
@@ -15,10 +13,10 @@ CONFIG_ENV_SIZE=0x20000
 CONFIG_ENV_SECT_SIZE=0x20000
 CONFIG_DEFAULT_DEVICE_TREE="rk3528-hinlink-h29k"
 CONFIG_IDENT_STRING="OpenWrt"
+CONFIG_SYS_PROMPT="H29K# "
 
-# --- DDR & Memory (H29K requires full init, FAST_BOOT MUST be OFF) ---
-# CONFIG_ROCKCHIP_FAST_BOOT is not set  # ⚠️ CRITICAL: Do NOT enable
-
+# --- DDR & Memory ---
+# CONFIG_ROCKCHIP_FAST_BOOT is not set
 CONFIG_SPL_DRAM_SUPPORT=y
 CONFIG_DRAM_RK3528=y
 CONFIG_ROCKCHIP_SDRAM_DDR4=y
@@ -26,14 +24,16 @@ CONFIG_ROCKCHIP_SDRAM_LPDDR4X=y
 CONFIG_ROCKCHIP_SDRAM_FREQ_4266=y
 CONFIG_ROCKCHIP_SDRAM_TRAINING=y
 
-# --- Storage (eMMC HS400 required) ---
+# --- Storage ---
 CONFIG_DM_MMC=y
 CONFIG_MMC_DW=y
 CONFIG_MMC_DW_ROCKCHIP=y
 CONFIG_MMC_SDHCI_ROCKCHIP=y
 CONFIG_ROCKCHIP_EMMC_HS400=y
+CONFIG_ROCKCHIP_DWMMC_V100=y          # ✅ 新增：DWMMC v1.00 支持
+CONFIG_SYS_MMCSD_FS_BOOT_PARTITION=1   # ✅ 新增：强制从 boot0 分区启动
 
-# --- Ethernet (RTL8211F PHY on H29K) ---
+# --- Ethernet ---
 CONFIG_CMD_NET=y
 CONFIG_CMD_TFTPPUT=y
 CONFIG_DM_ETH=y
@@ -42,7 +42,7 @@ CONFIG_PHYLIB=y
 CONFIG_PHY_REALTEK=y
 CONFIG_PHY_REALTEK_RTL8211F=y
 
-# --- USB (USB3.0 host + OTG) ---
+# --- USB ---
 CONFIG_CMD_USB=y
 CONFIG_DM_USB=y
 CONFIG_USB_DWC3=y
@@ -50,7 +50,7 @@ CONFIG_USB_DWC3_GADGET=y
 CONFIG_USB_DWC3_ROCKCHIP=y
 CONFIG_USB_STORAGE=y
 
-# --- PMIC (RK806 on H29K) ---
+# --- PMIC ---
 CONFIG_POWER_ROCKCHIP=y
 CONFIG_POWER_RK806=y
 CONFIG_POWER_RK806_CHARGE=y
@@ -68,6 +68,7 @@ CONFIG_CMD_I2C=y
 CONFIG_SYS_MALLOC_F_LEN=0x8000
 CONFIG_VIDEO=y
 CONFIG_CMD_BMP=y
+CONFIG_VIDEO_BMP_RLE8=y                # ✅ 新增：RLE8 BMP 解码支持
 CONFIG_VIDEO_ROCKCHIP=y
 CONFIG_VIDEO_ST7789V=y
 
@@ -77,11 +78,11 @@ CONFIG_AUTOBOOT_KEYED=y
 CONFIG_AUTOBOOT_STOP_STR="abort"
 CONFIG_BOOTCOMMAND="mmc dev 1; if mmc rescan; then if run loadbootenv; then echo Loaded environment from boot.env; run importbootenv; fi; if test -n $uenvcmd; then echo Running uenvcmd ...; run uenvcmd; fi; if run loadimage; then run loadfdt; if test -n $bootargs; then echo Using bootargs: $bootargs; fi; bootz $loadaddr $fdt_addr_r; fi; fi"
 CONFIG_LOADADDR=0x00280000
-CONFIG_FDTADDR=0x08300000
+CONFIG_FDTADDR=0x09000000               # ✅ 修复：DTB 地址升至安全区
 
 # --- Device Tree support ---
 CONFIG_OF_CONTROL=y
-CONFIG_OF_SEPARATE=y
+CONFIG_OF_SEPARATE=y                   # ✅ 保留：分离式 DTB（调试友好）
 CONFIG_OF_LIBFDT=y
 CONFIG_OF_BOARD_SETUP=y
 CONFIG_OF_STDOUT_VIA_ALIAS=y
@@ -89,8 +90,8 @@ CONFIG_OF_STDOUT_VIA_ALIAS=y
 # --- Security (disable for H29K debug) ---
 # CONFIG_SPL_OPTEE_SUPPORT is not set
 # CONFIG_OPTEE_CLIENT_SUPPORT is not set
-CONFIG_SPL_LOAD_FIT=y
-CONFIG_SPL_FIT_GENERATOR="tools/mkimage"
+# CONFIG_SPL_LOAD_FIT is not set         # ✅ 修复：禁用 FIT，避免与 OF_SEPARATE 冲突
+# CONFIG_SPL_FIT_GENERATOR="tools/mkimage"  # ← 删除整行
 
 # --- Optional but recommended ---
 CONFIG_CMD_DHCP=y
