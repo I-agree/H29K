@@ -193,7 +193,8 @@ endef
 TARGET_DEVICES += hinlink_h28k
 
 define Device/hinlink_h29k
-  $(Device/rk3528)
+  SOC := rk3528
+  SUBTARGET := armv8
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
