@@ -119,7 +119,7 @@ if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
 fi
 echo -e "\033[32m[通过] 设备定义已写入 armv8.mk\033[0m"
 
-# ✅ 校验3：U-Boot 已添加 hinlink-h29k-rk3528（Makefile确认）
+# ✅ 校验2：U-Boot 已添加 hinlink-h29k-rk3528（Makefile确认）
 UBOOT_MK="package/boot/uboot-rockchip/Makefile"
 if ! grep -q "hinlink-h29k-rk3528" "$UBOOT_MK"; then
   echo -e "\033[31m[错误] U-Boot 未添加 H29K 设备！编译终止！\033[0m"
