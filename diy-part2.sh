@@ -15,6 +15,17 @@ mkdir -p "$(dirname "$UBOOT_DST")"
 cp -f "$UBOOT_SRC" "$UBOOT_DST"
 echo "✅ 已注入 U-Boot defconfig → $UBOOT_DST"
 
+# ✅ 1.5. package/boot/arm-trusted-firmware-rockchip/Makefile
+UBOOT_SRC="files/package/boot/arm-trusted-firmware-rockchip/Makefile"
+UBOOT_DST="package/boot/arm-trusted-firmware-rockchip/Makefile"
+if [ ! -f "$UBOOT_SRC" ]; then
+  echo "❌ 错误：arm-trusted-firmware-rockchip/Makefile 源文件不存在：$UBOOT_SRC"
+  exit 1
+fi
+mkdir -p "$(dirname "$UBOOT_DST")"
+cp -f "$UBOOT_SRC" "$UBOOT_DST"
+echo "✅ 已注入 U-Boot defconfig → $UBOOT_DST"
+
 # ✅ 2. DTS 文件 → 注入到 target/linux/rockchip/files/ 下的标准路径
 #    官方约定：所有自定义 DTS 必须放在 target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 DTS_SRC="files/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts"
