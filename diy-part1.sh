@@ -53,7 +53,8 @@ cat >> "$TARGET_MK" <<'EOF'
 # 📌 设备定义：HINLINK H29K（RK3528）
 #    - 遵循 OpenWrt 命名规范：rk3528-{vendor}-{model}
 define Device/hinlink_h29k
-  $(Device/rk3528)
+  SOC := rk3528
+  SUBTARGET := armv8
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
