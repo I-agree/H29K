@@ -58,6 +58,8 @@ define Device/hinlink_h29k
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
   UBOOT_CONFIG := hinlink_h29k
+  KERNEL_LOADADDR := 0x00280000
+  KERNEL_ENTRYADDR := 0x00280000
   DEVICE_UBOOT_IMAGE := u-boot-rockchip-hinlink_h29k.bin
   IMAGE/boot.bin := boot-scr | boot-kernel | boot-dtb
   IMAGE/sysupgrade.img.gz := boot.bin | append-rootfs | pad-rootfs | check-size | gzip
