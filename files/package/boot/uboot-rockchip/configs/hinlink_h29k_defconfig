@@ -71,6 +71,21 @@ CONFIG_CMD_BMP=y
 CONFIG_VIDEO_BMP_RLE8=y                # ✅ 新增：RLE8 BMP 解码支持
 CONFIG_VIDEO_ROCKCHIP=y
 
+# --- Video & Display ---
+CONFIG_VIDEO_ROCKCHIP_GC9307=y
+CONFIG_VIDEO_ROCKCHIP_XPT2046=y
+
+# --- PWM (for backlight) ---
+CONFIG_PWM_ROCKCHIP=y
+CONFIG_PWM_ROCKCHIP_VOP=y
+
+# --- LED support ---
+CONFIG_LED_GPIO=y
+
+# --- I2C (for RTC) ---
+CONFIG_SYS_I2C_ROCKCHIP=y
+CONFIG_SYS_I2C_MAX_BUS=2
+
 # --- Boot options ---
 CONFIG_BOOTDELAY=1
 CONFIG_AUTOBOOT_KEYED=y
@@ -90,7 +105,6 @@ CONFIG_OF_STDOUT_VIA_ALIAS=y
 # CONFIG_SPL_OPTEE_SUPPORT is not set
 # CONFIG_OPTEE_CLIENT_SUPPORT is not set
 # CONFIG_SPL_LOAD_FIT is not set         # ✅ 修复：禁用 FIT，避免与 OF_SEPARATE 冲突
-# CONFIG_SPL_FIT_GENERATOR="tools/mkimage"  # ← 删除整行
 
 # --- Optional but recommended ---
 CONFIG_CMD_DHCP=y
