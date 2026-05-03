@@ -96,6 +96,26 @@ define U-Boot/hinlink-h29k-rk3528\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
 
+# 检查并恢复 BBR 关键配置
+KERNEL_CONFIG="./target/linux/rockchip/armv8/config-6.12"
+
+BBR_CONFIGS=(
+"CONFIG_TCP_CONG_BBR=y"
+"CONFIG_NET_SCH_FQ_CODEL=y"
+"CONFIG_DEFAULT_TCP_CONG=\"bbr\""
+"CONFIG_TCP_CONG_CUBIC=y"
+"CONFIG_NET_SCHED=y"
+)
+
+for cfg in "${BBR_CONFIGS[@]}"; do
+    if ! grep -qxF "$cfg" "$KERNEL_CONFIG"; then
+        echo "$cfg" >> "$KERNEL_CONFIG"
+        echo "已恢复：$cfg"
+    fi
+done
+
+echo "✅ BBR 全部配置检查/恢复完成"
+
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置
 # ==============================================
