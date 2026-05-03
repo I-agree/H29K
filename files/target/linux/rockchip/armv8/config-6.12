@@ -748,9 +748,9 @@ CONFIG_ZONE_DMA32=y
 # CONFIG_ARC_EMAC_CORE is not set
 # CONFIG_EMAC_ROCKCHIP is not set
 
-# === Hinlink H29K Hardware Mandatory Built-in Drivers (RK3528) ===
+# === Hinlink H29K Hardware Mandatory Built-in Drivers (RK3528, Kernel 6.12) ===
 
-# --- ST7789V3 LCD Panel (172x320, SPI interface) ---
+# --- ST7789V3 LCD Panel (172x320, SPI) ---
 CONFIG_FB=y
 CONFIG_FB_CFB_FILLRECT=y
 CONFIG_FB_CFB_COPYAREA=y
@@ -761,15 +761,15 @@ CONFIG_FB_SYS_IMAGEBLIT=y
 CONFIG_FB_FOREIGN_ENDIAN=y
 CONFIG_FB_ROCKCHIP=y
 CONFIG_FB_ROCKCHIP_LCDC=y
-CONFIG_FB_ST7789V3=y   # ← MUST be =y: framebuffer driver for 172x320 panel
+CONFIG_FB_ST7789V3=y
 
-# --- FT6236 Touch Controller (I2C, 5-point capacitive) ---
+# --- FT6236 Touch Controller (I2C) ---
 CONFIG_INPUT=y
 CONFIG_INPUT_EVDEV=y
 CONFIG_INPUT_TOUCHSCREEN=y
-CONFIG_TOUCHSCREEN_FT6236=y   # ← MUST be =y: built-in I2C touch driver
+CONFIG_TOUCHSCREEN_FT6236=y
 
-# --- USB 5G Modem Support (FM350-GL / Quectel EC25 etc.) ---
+# --- USB 5G Modem Support (MBIM + NCM + RNDIS foundation) ---
 CONFIG_USB=y
 CONFIG_USB_DEVICEFS=y
 CONFIG_USB_COMMON=y
@@ -781,21 +781,17 @@ CONFIG_USB_STORAGE=y
 CONFIG_USB_SERIAL=y
 CONFIG_USB_SERIAL_OPTION=y
 CONFIG_USB_NET_DRIVERS=y
-CONFIG_USB_NET_QMI_WWAN=y   # ← MUST be =y: QMI protocol support (not module!)
-CONFIG_USB_NET_CDC_MBIM=y   # ← MUST be =y: MBIM protocol support (critical for FM350-GL)
+CONFIG_USB_NET_RNDIS=y          # ← MBIM foundation core
+CONFIG_USB_NET_RNDIS_HOST=y     # ← CRITICAL: enables MBIM control channel
+CONFIG_USB_NET_CDC_MBIM=y       # ← MBIM protocol stack
+CONFIG_USB_NET_CDC_NCM=y        # ← fallback NCM mode
+CONFIG_USB_NET_CDC_EEM=y        # ← optional (rarely used, but harmless)
 
-# --- Required for USB 5G power & enumeration stability ---
+# --- Power & Regulator for Modem ---
 CONFIG_POWER_SUPPLY=y
 CONFIG_POWER_RESET=y
 CONFIG_POWER_RESET_SYSCON_POWEROFF=y
 CONFIG_POWER_RESET_SYSCON_RESTART=y
 CONFIG_REGULATOR=y
 CONFIG_REGULATOR_FIXED_VOLTAGE=y
-CONFIG_REGULATOR_RK808=y   # ← MUST be =y: RK808 PMIC for modem VCC_3V3/VCC_5V control
-
-# --- Optional but strongly recommended for field reliability ---
-CONFIG_CRC_CCITT=y
-CONFIG_CRC16=y
-CONFIG_XZ_DEC=y
-CONFIG_ZSTD_COMPRESS=y
-CONFIG_ZSTD_DECOMPRESS=y
+CONFIG_REGULATOR_RK808=y
