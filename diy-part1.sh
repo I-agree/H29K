@@ -60,3 +60,20 @@ define Device/hinlink_h29k
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
+
+# ==============================================================================
+# 【U-Boot 支持注入】—— 严格遵循 OpenWrt 官方 Makefile 风格（高危修复区）
+# ✅ 修复点1：BusyBox sed 不支持 'a\' 多行追加 → 改用 POSIX 兼容写法（自动换行）
+# ✅ 修复点2：NAME 字段统一为下划线命名，与 UBOOT_CONFIG 语义一致
+# ==============================================================================
+makefile="package/boot/uboot-rockchip/Makefile"
+
+# 1️⃣ 在 hinlink-h28k-rk3528 后追加 hinlink-h29k-rk3528 到 UBOOT_TARGETS（POSIX 安全）
+sed -i "/hinlink-h28k-rk3528/a hinlink-h29k-rk3528" "$makefile"
+
+# 2️⃣ 在 hinlink-h28k 定义下方插入 hinlink-h29k 设备块（完全复刻官方格式）
+#    ✅ NAME:=HINLINK_H29K（非空格，与 UBOOT_CONFIG 一致）
+#    ✅ BUILD_DEVICES:=hinlink_h29k（小写+下划线，与 .config 中 CONFIG_TARGET_... 保持一致）
+sed -i '/define U-Boot\/hinlink-h28k-rk3528/a\
+define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  UBOOT_CONFIG:=hinlink_h29k\n  NAME:=HINLINK_H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
+' "$makefile"
