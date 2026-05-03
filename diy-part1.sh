@@ -61,19 +61,37 @@ endef
 TARGET_DEVICES += hinlink_h29k
 EOF
 
-# ==============================================================================
-# 【U-Boot 支持注入】—— 严格遵循 OpenWrt 官方 Makefile 风格（高危修复区）
-# ✅ 修复点1：BusyBox sed 不支持 'a\' 多行追加 → 改用 POSIX 兼容写法（自动换行）
-# ✅ 修复点2：NAME 字段统一为下划线命名，与 UBOOT_CONFIG 语义一致
-# ==============================================================================
-makefile="package/boot/uboot-rockchip/Makefile"
+# ==============================================
+# 定制 uboot-rockchip：替换 rk3528 默认配置 + 添加 H29K
+# ==============================================
+sed -i '/^define U-Boot\/rk3528\/Default/,/^endef/d' package/boot/uboot-rockchip/Makefile
 
-# 1️⃣ 在 hinlink-h28k-rk3528 后追加 hinlink-h29k-rk3528 到 UBOOT_TARGETS（POSIX 安全）
-sed -i "/hinlink-h28k-rk3528/a hinlink-h29k-rk3528" "$makefile"
+# 插入新的 rk3528/Default
+sed -i '/# RK3528 boards/a\
+define U-Boot/rk3528/Default\n\
+  BUILD_SUBTARGET:=armv8\n\
+  DEPENDS:=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3528\n\
+  ATF:=rk3528_bl31_v1.20.elf\n\
+  # ⚠️ Default TPL is for reference only — DO NOT use for H29K\n\
+  TPL:=rk3528_ddr_1056MHz_v1.11.bin\n\
+endef\n\
+' package/boot/uboot-rockchip/Makefile
 
-# 2️⃣ 在 hinlink-h28k 定义下方插入 hinlink-h29k 设备块（完全复刻官方格式）
-#    ✅ NAME:=HINLINK_H29K（非空格，与 UBOOT_CONFIG 一致）
-#    ✅ BUILD_DEVICES:=hinlink_h29k（小写+下划线，与 .config 中 CONFIG_TARGET_... 保持一致）
-sed -i '/define U-Boot\/hinlink-h28k-rk3528/a\
-define U-Boot/hinlink-h29k-rk3528\n  $(U-Boot/rk3528/Default)\n  UBOOT_CONFIG:=hinlink_h29k\n  NAME:=HINLINK_H29K\n  BUILD_DEVICES:=hinlink_h29k\nendef
-' "$makefile"
+# 插入 hinlink-h29k-rk3528 设备定义
+sed -i '/^define U-Boot\/radxa-e20c-rk3528/i\
+define U-Boot/hinlink-h29k-rk3528\n\
+  $(U-Boot/rk3528/Default)\n\
+  NAME:=HINLINK H29K\n\
+  BUILD_DEVICES:= \\\n\
+    hinlink_h29k\n\
+  UBOOT_CONFIG:=rk3528/hinlink_h29k_defconfig\n\
+  UBOOT_DTS:=rockchip/rk3528-hinlink-h29k\n\
+  TPL:=rk3528_ddr_1066MHz_v1.13.bin\n\
+  MINILOADER:=rk3528_miniloader_v1.13.bin\n\
+endef\n\
+' package/boot/uboot-rockchip/Makefile
+
+# 将新设备添加到 UBOOT_TARGETS 编译列表
+sed -i '/hinlink-h28k-rk3528/a\
+  hinlink-h29k-rk3528 \\\
+' package/boot/uboot-rockchip/Makefile
