@@ -66,6 +66,11 @@ EOF
 # ==============================================
 sed -i '/^define U-Boot\/rk3528\/Default/,/^endef/d' package/boot/uboot-rockchip/Makefile
 
+# 将新设备添加到 UBOOT_TARGETS 编译列表
+sed -i '/hinlink-h28k-rk3528/a\
+  hinlink-h29k-rk3528 \\\
+' package/boot/uboot-rockchip/Makefile
+
 # 插入新的 rk3528/Default
 sed -i '/# RK3528 boards/a\
 define U-Boot/rk3528/Default\n\
@@ -91,7 +96,56 @@ define U-Boot/hinlink-h29k-rk3528\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
 
-# 将新设备添加到 UBOOT_TARGETS 编译列表
-sed -i '/hinlink-h28k-rk3528/a\
-  hinlink-h29k-rk3528 \\\
-' package/boot/uboot-rockchip/Makefile
+# ==============================================
+# 为 Hinlink H29K 添加内核驱动配置
+# ==============================================
+cat >> target/linux/rockchip/armv8/config-6.12 << 'EOF'
+
+# === Hinlink H29K Hardware Mandatory Built-in Drivers (RK3528, Kernel 6.12) ===
+
+# --- ST7789V3 LCD Panel (172x320, SPI) ---
+CONFIG_FB=y
+CONFIG_FB_CFB_FILLRECT=y
+CONFIG_FB_CFB_COPYAREA=y
+CONFIG_FB_CFB_IMAGEBLIT=y
+CONFIG_FB_SYS_FILLRECT=y
+CONFIG_FB_SYS_COPYAREA=y
+CONFIG_FB_SYS_IMAGEBLIT=y
+CONFIG_FB_FOREIGN_ENDIAN=y
+CONFIG_FB_ROCKCHIP=y
+CONFIG_FB_ROCKCHIP_LCDC=y
+CONFIG_FB_ST7789V3=y
+
+# --- FT6236 Touch Controller (I2C) ---
+CONFIG_INPUT=y
+CONFIG_INPUT_EVDEV=y
+CONFIG_INPUT_TOUCHSCREEN=y
+CONFIG_TOUCHSCREEN_FT6236=y
+
+# --- USB 5G Modem Support (MBIM + NCM + RNDIS foundation) ---
+CONFIG_USB=y
+CONFIG_USB_DEVICEFS=y
+CONFIG_USB_COMMON=y
+CONFIG_USB_ARCH_HAS_HCD=y
+CONFIG_USB_SUPPORT=y
+CONFIG_USB_PHY=y
+CONFIG_USB_ROCKCHIP_PHY=y
+CONFIG_USB_STORAGE=y
+CONFIG_USB_SERIAL=y
+CONFIG_USB_SERIAL_OPTION=y
+CONFIG_USB_NET_DRIVERS=y
+CONFIG_USB_NET_RNDIS=y
+CONFIG_USB_NET_RNDIS_HOST=y
+CONFIG_USB_NET_CDC_MBIM=y
+CONFIG_USB_NET_CDC_NCM=y
+CONFIG_USB_NET_CDC_EEM=y
+
+# --- Power & Regulator for Modem ---
+CONFIG_POWER_SUPPLY=y
+CONFIG_POWER_RESET=y
+CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+CONFIG_POWER_RESET_SYSCON_RESTART=y
+CONFIG_REGULATOR=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+CONFIG_REGULATOR_RK808=y
+EOF
