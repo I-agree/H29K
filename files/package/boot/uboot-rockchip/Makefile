@@ -171,6 +171,7 @@ define U-Boot/rk3528/Default
   BUILD_SUBTARGET:=armv8
   DEPENDS:=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3528
   ATF:=rk3528_bl31_v1.20.elf
+  # ⚠️ Default TPL is for reference only — DO NOT use for H29K
   TPL:=rk3528_ddr_1056MHz_v1.11.bin
 endef
 
@@ -188,6 +189,8 @@ define U-Boot/hinlink-h29k-rk3528
     hinlink_h29k
   UBOOT_CONFIG:=rk3528/hinlink_h29k_defconfig
   UBOOT_DTS:=rockchip/rk3528-hinlink-h29k
+  TPL:=rk3528_ddr_1066MHz_v1.13.bin
+  MINILOADER:=rk3528_miniloader_v1.13.bin
 endef
 
 define U-Boot/radxa-e20c-rk3528
