@@ -103,7 +103,7 @@ cat >> target/linux/rockchip/armv8/config-6.12 << 'EOF'
 
 # === Hinlink H29K Hardware Mandatory Built-in Drivers (RK3528, Kernel 6.12) ===
 
-# --- ST7789V3 LCD Panel (172x320, SPI) ---
+# --- ST7789V LCD Panel (172x320, SPI) ---
 CONFIG_FB=y
 CONFIG_FB_CFB_FILLRECT=y
 CONFIG_FB_CFB_COPYAREA=y
@@ -114,7 +114,7 @@ CONFIG_FB_SYS_IMAGEBLIT=y
 CONFIG_FB_FOREIGN_ENDIAN=y
 CONFIG_FB_ROCKCHIP=y
 CONFIG_FB_ROCKCHIP_LCDC=y
-CONFIG_FB_ST7789V3=y
+CONFIG_FB_ST7789V=y
 
 # --- FT6236 Touch Controller (I2C) ---
 CONFIG_INPUT=y
