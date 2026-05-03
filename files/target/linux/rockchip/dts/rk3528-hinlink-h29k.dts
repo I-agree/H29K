@@ -2,7 +2,7 @@
 /*
  * Device Tree Source for Hinlink H29K (RK3528)
  * - SoC: RK3528 (Cortex-A53 × 4)
- * - Display: ST7789V3, 172×320, SPI, 3.3V
+ * - Display: ST7789V, 172×320, SPI, 3.3V
  * - Touch: FT6236, I²C, GPIO4_A0 (IRQ), GPIO4_B0 (RST)
  * - 5G: FM350-GL, connected via USB (not PCIe)
  * - PMIC: RK808 (I²C0)
@@ -69,7 +69,7 @@
     vsn-supply = <&vcc3v3_lcd>;
 
     panel@0 {
-        compatible = "st,st7789v3", "simple-panel";
+        compatible = "st,ST7789V", "simple-panel";
         reg = <0>;
         enable-gpios = <&gpio4 RK_PA7 GPIO_ACTIVE_HIGH>; /* LCD_EN */
         reset-gpios = <&gpio4 RK_PA6 GPIO_ACTIVE_LOW>;   /* LCD_RST */
@@ -101,7 +101,7 @@
         status = "okay";
     };
 
-    /* ST7789V3 on SPI0 */
+    /* ST7789V on SPI0 */
     &spi0 {
         status = "okay";
         #address-cells = <1>;
@@ -112,8 +112,8 @@
             remote-endpoint = <&panel_in>;
         };
 
-        st7789v3@0 {
-            compatible = "st,st7789v3";
+        ST7789V@0 {
+            compatible = "st,ST7789V";
             reg = <0>;
             spi-max-frequency = <20000000>;
             spi-cpol;
