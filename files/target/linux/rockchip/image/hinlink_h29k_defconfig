@@ -1,6 +1,6 @@
 #
 # Hinlink H29K (RK3528) - OpenWrt 23.05+ compliant defconfig
-# Generated for: USB 5G (FM350-GL), ST7789V3 240x240 LCD, RK808 PMIC, eMMC boot
+# Generated for: USB 5G (FM350-GL), ST7789V3 172×320 LCD, RK808 PMIC, eMMC boot
 #
 
 CONFIG_TARGET_PROFILE_HINLINK_H29K=y
