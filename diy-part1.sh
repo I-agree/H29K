@@ -31,7 +31,7 @@ echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
 
 cat >> "$TARGET_MK" <<'EOF'
-# 📌 设备定义：HINLINK H29K（RK3528）
+# 📌 设备定义：HINLINK H29K（RK3528）有线网卡kmod-r8168驱动集成到内核
 #    - 遵循 OpenWrt 命名规范：rk3528-{vendor}-{model}
 define Device/hinlink_h29k
   SOC := rk3528
@@ -48,7 +48,7 @@ define Device/hinlink_h29k
   IMAGE/boot.bin := boot-scr | boot-kernel | boot-dtb
   IMAGE/sysupgrade.img.gz := boot.bin | append-rootfs | pad-rootfs | check-size | gzip
   DEVICE_PACKAGES := \
-    kmod-usb3 kmod-r8168 kmod-aic8800-sdio dnsmasq-full \
+    kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
     kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
     luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn \
     luci-theme-argon imagemagick imagemagick-jpeg imagemagick-png imagemagick-gif curl irqbalance \
@@ -122,6 +122,7 @@ echo "✅ BBR 全部配置检查/恢复完成"
 cat >> target/linux/rockchip/armv8/config-6.12 << 'EOF'
 
 # === Hinlink H29K Hardware Mandatory Built-in Drivers (RK3528, Kernel 6.12) ===
+CONFIG_R8168=y
 
 # --- ST7789V LCD Panel (172x320, SPI) ---
 CONFIG_FB=y
