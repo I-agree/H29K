@@ -1,389 +1,419 @@
-/dts-v1/;
+// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+/*
+ * Device Tree Source for Hinlink H29K (RK3528)
+ * - SoC: RK3528 (Cortex-A53 × 4)
+ * - Display: ST7789V3, 172×320, SPI, 3.3V, reset/dc/backlight controlled
+ * - Touch: FT6236, I²C, GPIO4_A0 (IRQ), GPIO4_B0 (RST)
+ * - 5G: FM350-GL, PCIe Gen2 x1 (fallback USB via DWC3)
+ * - PMIC: RK808 (I²C0)
+ * - Boot: UART0 @ 115200n8
+ */
+
 #include "rk3528.dtsi"
-#include "rk3528-evb.dtsi"
+#include "rk3528-opp.dtsi"
 
 / {
-    model = "HINLINK H29K";
+    model = "Hinlink H29K";
     compatible = "hinlink,h29k", "rockchip,rk3528";
+
+    aliases {
+        serial0 = &uart0;
+        spi0 = &spi0;
+        i2c1 = &i2c1;
+        pwm2 = &pwm2;
+        ethernet0 = &gmac;
+    };
 
     chosen {
         stdout-path = "serial0:115200n8";
+        bootargs = "console=ttyS0,115200n8 earlycon=uart8250,mmio32,0xfeb50000 rootwait rw";
     };
 
-    /* ====== MEMORY ====== */
-    memory@80000000 {
+    memory@10000000 {
         device_type = "memory";
-        reg = <0x0 0x80000000 0x0 0x80000000>; /* 2GB */
+        reg = <0x0 0x10000000 0x0 0x80000000>; /* 2GB */
     };
 
-    /* ====== LEDS ====== */
-    leds: leds {
+    leds {
         compatible = "gpio-leds";
-        #address-cells = <1>;
-        #size-cells = <0>;
+        pinctrl-names = "default";
+        pinctrl-0 = <&led_power>;
 
-        /* LED1: POWER (GPIO0_B0, active low) */
         power {
-            label = "power";
-            gpios = <&gpio0 8 GPIO_ACTIVE_LOW>; /* GPIO0_B0 → Pin#12 on 40pin header */
-            linux,default-trigger = "default-on";
+            label = "h29k:blue:power";
+            gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
             default-state = "on";
         };
-
-        /* LED2: WORK (GPIO0_B2, active high) */
-        work {
-            label = "work";
-            gpios = <&gpio0 10 GPIO_ACTIVE_HIGH>; /* GPIO0_B2 → Pin#14 */
-            linux,default-trigger = "heartbeat";
-        };
-
-        /* LED3: STATUS (GPIO0_B3, active high) */
-        status {
-            label = "status";
-            gpios = <&gpio0 11 GPIO_ACTIVE_HIGH>; /* GPIO0_B3 → Pin#15 */
-            linux,default-trigger = "cpu0";
-        };
     };
 
-    /* ====== KEYS ====== */
-    keys: keys {
-        compatible = "gpio-keys";
-        #address-cells = <1>;
-        #size-cells = <0>;
-        autorepeat;
-
-        /* KEY1: RESET (GPIO4_C3, active low) */
-        reset {
-            label = "reset";
-            linux,code = <KEY_ESC>;
-            gpios = <&gpio4 19 GPIO_ACTIVE_LOW>; /* GPIO4_C3 → Pin#36 */
-            debounce-interval = <10>;
-        };
-
-        /* KEY2: USER (GPIO0_C0, active low) */
-        user {
-            label = "user";
-            linux,code = <KEY_ENTER>;
-            gpios = <&gpio0 16 GPIO_ACTIVE_LOW>; /* GPIO0_C0 → Pin#22 */
-            debounce-interval = <10>;
-        };
-    };
-
-    /* ====== REGULATORS ====== */
-    pmu: power-management@ff600000 {
-        compatible = "rockchip,rk3528-pmu";
-        #address-cells = <2>;
-        #size-cells = <2>;
-        ranges;
-
-        /* VCC_3V3: Power for LCD, Touch, SDIO, USB */
-        vcc_3v3: vcc-3v3 {
-            compatible = "regulator-fixed";
-            regulator-name = "vcc_3v3";
-            regulator-min-microvolt = <3300000>;
-            regulator-max-microvolt = <3300000>;
-            regulator-always-on;
-            regulator-boot-on;
-        };
-
-        /* VCC_1V8: I/O voltage for LCD, Touch, UART */
-        vcc_1v8: vcc-1v8 {
-            compatible = "regulator-fixed";
-            regulator-name = "vcc_1v8";
-            regulator-min-microvolt = <1800000>;
-            regulator-max-microvolt = <1800000>;
-            regulator-always-on;
-            regulator-boot-on;
-        };
-
-        /* VCC_5V: USB Host, GMAC PHY */
-        vcc_5v: vcc-5v {
-            compatible = "regulator-fixed";
-            regulator-name = "vcc_5v";
-            regulator-min-microvolt = <5000000>;
-            regulator-max-microvolt = <5000000>;
-            regulator-always-on;
-            regulator-boot-on;
-        };
-    };
-
-    /* ====== BACKLIGHT (PWM2) ====== */
     backlight: backlight {
         compatible = "pwm-backlight";
         pwms = <&pwm2 0 5000000 0>;
-        brightness-levels = <
-            0 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 255
-        >;
-        default-brightness-level = <16>;
-        power-supply = <&vcc_3v3>;
+        brightness-levels = <0 4 8 16 32 64 128 255>;
+        default-brightness-level = <255>;
+        enable-gpios = <&gpio4 RK_PB0 GPIO_ACTIVE_HIGH>;
     };
 
-    /* ====== RTC (PCF8563 via I2C2) ====== */
-    &i2c2 {
-        status = "okay";
-        clock-frequency = <100000>;
+    vcc3v3_lcd: vcc3v3-lcd-regulator {
+        compatible = "regulator-fixed";
+        regulator-name = "vcc3v3-lcd";
+        regulator-min-microvolt = <3300000>;
+        regulator-max-microvolt = <3300000>;
+        regulator-always-on;
+        regulator-boot-on;
+    };
 
-        rtc@51 {
-            compatible = "nxp,pcf8563";
-            reg = <0x51>;
-            #clock-cells = <0>;
+    vsp-supply = <&vcc3v3_lcd>;
+    vsn-supply = <&vcc3v3_lcd>;
+
+    panel@0 {
+        compatible = "st,st7789v3", "simple-panel";
+        reg = <0>;
+        enable-gpios = <&gpio4 RK_PA7 GPIO_ACTIVE_HIGH>; /* LCD_EN */
+        reset-gpios = <&gpio4 RK_PA6 GPIO_ACTIVE_LOW>;   /* LCD_RST */
+        dc-gpios = <&gpio4 RK_PA5 GPIO_ACTIVE_HIGH>;     /* LCD_DC */
+        backlight = <&backlight>;
+        power-supply = <&vcc3v3_lcd>;
+        rotation = <0>;
+        video-mode = <0>; /* horizontal mode */
+
+        port {
+            panel_in: endpoint {
+                remote-endpoint = <&spi0_out>;
+            };
         };
     };
 
-    /* ====== USB HOST (USB2.0) ====== */
-    &usb_host0_ehci {
+    touchscreen@38 {
+        compatible = "focaltech,ft6236";
+        reg = <0x38>;
+        interrupt-parent = <&gpio4>;
+        interrupts = <RK_PA0 IRQ_TYPE_EDGE_FALLING>;
+        reset-gpios = <&gpio4 RK_PB0 GPIO_ACTIVE_LOW>;
+        vcc-supply = <&vcc3v3_lcd>;
+        vddio-supply = <&vcc3v3_lcd>;
+        touchscreen-size-x = <320>;
+        touchscreen-size-y = <172>;
+        touchscreen-inverted-x;
+        linux,code-base = <0x100>;
         status = "okay";
     };
 
-    &usb_host0_ohci {
+    /* FM350-GL 5G via PCIe */
+    &pcie0 {
         status = "okay";
+        #address-cells = <3>;
+        #size-cells = <2>;
+        ranges = <0x82000000 0x0 0x0 0x0 0x0 0x0 0x0>;
+
+        fm350gl: pci@1,0 {
+            compatible = "qcom,qmi-wwan";
+            reg = <0x10000 0x0 0x0 0x0 0x0>;
+            #address-cells = <3>;
+            #size-cells = <2>;
+            ranges;
+            max-link-speed = <2>;
+            num-lanes = <1>;
+            msi-interrupts = <1>;
+            status = "okay";
+
+            usb@1,0 {
+                compatible = "usb-device";
+                reg = <0x10000 0x0 0x0 0x0 0x0>;
+                status = "disabled"; /* fallback only */
+            };
+        };
     };
 
-    /* ====== USB OTG (USB2.0) ====== */
-    &usb_otg0 {
-        dr_mode = "otg";
+    /* ST7789V3 on SPI0 */
+    &spi0 {
         status = "okay";
-    };
+        #address-cells = <1>;
+        #size-cells = <0>;
 
-    /* ====== AUDIO (I2S0) ====== */
-    &i2s0 {
-        status = "disabled"; /* Optional: enable if using audio codec */
-    };
-
-    /* ====== UART0 (DEBUG) ====== */
-    &uart0 {
-        status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&uart0m0_xfer>;
-    };
-
-    /* ====== UART2 (BLE/RS232) ====== */
-    &uart2 {
-        status = "okay";
-        pinctrl-names = "default";
-        pinctrl-0 = <&uart2m0_xfer>;
-    };
-
-    /* ====== ETHERNET (GMAC1) ====== */
-    &gmac1 {
-        phy-mode = "rgmii-id";
-        phy-supply = <&vcc_3v3>;
-        snps,reset-gpio = <&gpio4 18 GPIO_ACTIVE_LOW>; /* GPIO4_C2 */
-        snps,reset-delays-us = <10000 20000 100000>;
-        status = "okay";
-    };
-
-    /* ====== EMMC ====== */
-    &emmc {
-        status = "okay";
-        mmc-hs200-1_8v;
-        mmc-hs400-1_8v;
-        no-sdio;
-        no-sd;
-        bus-width = <8>;
-        cap-mmc-highspeed;
-        cap-sd-highspeed;
-        cap-power-off-card;
-        disable-wp;
-        broken-cd;
-    };
-
-    /* ====== SPI1 FOR GC9307 + XPT2046 ====== */
-    &spi1 {
-        status = "okay";
-        /delete-node/ spidev@0;
-
-        /* --- GC9307 LCD (HSX0147015001B-A0) --- */
-        gc9307@0 {
-            compatible = "rockchip,gc9307";
+        spi0_out: endpoint@0 {
             reg = <0>;
-            spi-max-frequency = <24000000>;
+            remote-endpoint = <&panel_in>;
+        };
+
+        st7789v3@0 {
+            compatible = "st,st7789v3";
+            reg = <0>;
+            spi-max-frequency = <20000000>;
+            spi-cpol;
+            spi-cpha;
             #address-cells = <1>;
             #size-cells = <0>;
 
-            vcc-supply = <&vcc_3v3>;
-            vccio-supply = <&vcc_1v8>;
-
-            reset-gpios = <&gpio0 12 GPIO_ACTIVE_LOW>; /* GPIO0_B4 */
-            dc-gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;   /* GPIO0_B5 */
-            backlight = <&backlight>;
-
-            width = <172>;
-            height = <320>;
-            rotate = <0>;     /* 0° + swap-xy = landscape */
-            fps = <60>;
-            spi-cpol;        /* CPOL=1 required */
-            spi-cpha;
-            rockchip,spi-rx-bus-width = <0>;
-            rockchip,spi-tx-bus-width = <1>;
-            rgb;             /* GC9307 uses RGB565 */
-            reset-duration-us = <15000>;
-            vcom = <0x24>;
-            gamma-curve = <0x04>;
-            swap-xy;         /* Critical for horizontal display */
-        };
-
-        /* --- XPT2046 TOUCHSCREEN --- */
-        xpt2046@1 {
-            compatible = "ti,xpt2046";
-            reg = <1>;
-            spi-max-frequency = <2000000>;
-            interrupt-parent = <&gpio0>;
-            interrupts = <14 IRQ_TYPE_EDGE_FALLING>; /* GPIO0_B6 */
-            ti,vref-delay-usecs = <100>;
-            ti,keep-vref-on = <0>;
-            ti,settle-delay-usecs = <150>;
-            ti,pen-up-delay-usecs = <200>;
-            ti,x-plate-ohms = <400>;
-            ti,pressure-max = <255>;
-            ti,x-min = <0>;
-            ti,x-max = <171>;
-            ti,y-min = <0>;
-            ti,y-max = <319>;
-            touchscreen-inverted-x;
-            touchscreen-swapped-x-y;
-            linux,swap-x-y;
-            linux,ts-resistance-threshold = <200>;
+            port {
+                spi0_out: endpoint {
+                    remote-endpoint = <&panel_in>;
+                };
+            };
         };
     };
 
-    /* ====== PWM2 FOR BACKLIGHT ====== */
+    /* FT6236 on I2C1 */
+    &i2c1 {
+        status = "okay";
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        ft6236@38 {
+            compatible = "focaltech,ft6236";
+            reg = <0x38>;
+            interrupt-parent = <&gpio4>;
+            interrupts = <RK_PA0 IRQ_TYPE_EDGE_FALLING>;
+            reset-gpios = <&gpio4 RK_PB0 GPIO_ACTIVE_LOW>;
+            vcc-supply = <&vcc3v3_lcd>;
+            vddio-supply = <&vcc3v3_lcd>;
+            touchscreen-size-x = <320>;
+            touchscreen-size-y = <172>;
+            touchscreen-inverted-x;
+            linux,code-base = <0x100>;
+            status = "okay";
+        };
+    };
+
+    /* PWM2 for backlight */
     &pwm2 {
         status = "okay";
     };
 
-    /* ====== WATCHDOG ====== */
-    &watchdog {
+    /* RK808 PMIC on I2C0 */
+    &i2c0 {
+        status = "okay";
+
+        rk808: pmic@18 {
+            compatible = "rockchip,rk808";
+            reg = <0x18>;
+            interrupt-parent = <&gpio0>;
+            interrupts = <RK_PA2 IRQ_TYPE_LEVEL_LOW>;
+            #clock-cells = <1>;
+            clock-output-names = "xin32k", "rk808-clkout2";
+            rockchip,system-power-controller;
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            vcc1-supply = <&vcc3v3>;
+            vcc2-supply = <&vcc3v3>;
+            vcc3-supply = <&vcc3v3>;
+            vcc4-supply = <&vcc3v3>;
+            vcc5-supply = <&vcc3v3>;
+            vcc6-supply = <&vcc3v3>;
+            vcc7-supply = <&vcc3v3>;
+            vcc8-supply = <&vcc3v3>;
+
+            regulators {
+                vdd_log: DCDC_REG1 {
+                    regulator-name = "vdd_log";
+                    regulator-min-microvolt = <712500>;
+                    regulator-max-microvolt = <1450000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vdd_arm: DCDC_REG2 {
+                    regulator-name = "vdd_arm";
+                    regulator-min-microvolt = <712500>;
+                    regulator-max-microvolt = <1450000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vdd_gpu: DCDC_REG3 {
+                    regulator-name = "vdd_gpu";
+                    regulator-min-microvolt = <712500>;
+                    regulator-max-microvolt = <1450000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc_ddr: DCDC_REG4 {
+                    regulator-name = "vcc_ddr";
+                    regulator-min-microvolt = <1000000>;
+                    regulator-max-microvolt = <1200000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc_io: LDO_REG1 {
+                    regulator-name = "vcc_io";
+                    regulator-min-microvolt = <3300000>;
+                    regulator-max-microvolt = <3300000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc3v3: LDO_REG2 {
+                    regulator-name = "vcc3v3";
+                    regulator-min-microvolt = <3300000>;
+                    regulator-max-microvolt = <3300000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc1v8: LDO_REG3 {
+                    regulator-name = "vcc1v8";
+                    regulator-min-microvolt = <1800000>;
+                    regulator-max-microvolt = <1800000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc_1v2: LDO_REG4 {
+                    regulator-name = "vcc_1v2";
+                    regulator-min-microvolt = <1200000>;
+                    regulator-max-microvolt = <1200000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc_1v1: LDO_REG5 {
+                    regulator-name = "vcc_1v1";
+                    regulator-min-microvolt = <1100000>;
+                    regulator-max-microvolt = <1100000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc_1v0: LDO_REG6 {
+                    regulator-name = "vcc_1v0";
+                    regulator-min-microvolt = <1000000>;
+                    regulator-max-microvolt = <1000000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc_0v9: LDO_REG7 {
+                    regulator-name = "vcc_0v9";
+                    regulator-min-microvolt = <900000>;
+                    regulator-max-microvolt = <900000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+
+                vcc_0v8: LDO_REG8 {
+                    regulator-name = "vcc_0v8";
+                    regulator-min-microvolt = <800000>;
+                    regulator-max-microvolt = <800000>;
+                    regulator-always-on;
+                    regulator-boot-on;
+                };
+            };
+        };
+    };
+
+    /* Thermal zones */
+    thermal-zones {
+        cpu_thermal: cpu-thermal {
+            polling-delay-passive = <250>;
+            polling-delay = <2000>;
+            thermal-sensors = <&tsadc 0>;
+            trips {
+                cpu_alert0: trip-point@0 {
+                    temperature = <85000>;
+                    hysteresis = <2000>;
+                    type = "passive";
+                };
+                cpu_crit: trip-point@1 {
+                    temperature = <105000>;
+                    hysteresis = <2000>;
+                    type = "critical";
+                };
+            };
+        };
+
+        gpu_thermal: gpu-thermal {
+            polling-delay-passive = <250>;
+            polling-delay = <2000>;
+            thermal-sensors = <&tsadc 1>;
+            trips {
+                gpu_alert0: trip-point@0 {
+                    temperature = <85000>;
+                    hysteresis = <2000>;
+                    type = "passive";
+                };
+                gpu_crit: trip-point@1 {
+                    temperature = <105000>;
+                    hysteresis = <2000>;
+                    type = "critical";
+                };
+            };
+        };
+
+        pmic_thermal: pmic-thermal {
+            polling-delay-passive = <250>;
+            polling-delay = <2000>;
+            thermal-sensors = <&tsadc 2>;
+            trips {
+                pmic_alert0: trip-point@0 {
+                    temperature = <100000>;
+                    hysteresis = <2000>;
+                    type = "passive";
+                };
+                pmic_crit: trip-point@1 {
+                    temperature = <120000>;
+                    hysteresis = <2000>;
+                    type = "critical";
+                };
+            };
+        };
+    };
+
+    /* GMAC Ethernet */
+    &gmac {
+        status = "okay";
+        phy-mode = "rgmii";
+        phy-handle = <&rgmii_phy>;
+        rockchip,grf = <&grf>;
+        #address-cells = <1>;
+        #size-cells = <0>;
+
+        mdio {
+            #address-cells = <1>;
+            #size-cells = <0>;
+
+            rgmii_phy: ethernet-phy@0 {
+                reg = <0>;
+                phy-mode = "rgmii";
+            };
+        };
+    };
+
+    /* UART0 for console */
+    &uart0 {
         status = "okay";
     };
-};
 
-/* ====== PINCTRL DEFINITIONS ====== */
-&pinctrl {
-    /* UART0: TX/RX */
-    uart0m0_xfer: uart0m0-xfer {
-        rockchip,pins = <
-            RK_PA0 0x1001 /* uart0_tx */
-            RK_PA1 0x1001 /* uart0_rx */
-        >;
+    /* GPIO pin control groups */
+    &pmu_gpio0 {
+        led_power: led-power {
+            rockchip,pins = <0 RK_PA0 2 &pcfg_pull_none>;
+        };
     };
 
-    /* UART2: TX/RX */
-    uart2m0_xfer: uart2m0-xfer {
-        rockchip,pins = <
-            RK_PC0 0x1001 /* uart2_tx */
-            RK_PC1 0x1001 /* uart2_rx */
-        >;
+    &gpio4 {
+        lcd_pins: lcd-pins {
+            rockchip,pins = <
+                4 RK_PA5 2 &pcfg_pull_none	/* LCD_DC */
+                4 RK_PA6 2 &pcfg_pull_none	/* LCD_RST */
+                4 RK_PA7 2 &pcfg_pull_none	/* LCD_EN */
+            >;
+        };
+
+        touch_irq_rst: touch-irq-rst {
+            rockchip,pins = <
+                4 RK_PA0 0 &pcfg_pull_none	/* IRQ */
+                4 RK_PB0 2 &pcfg_pull_none	/* RST */
+            >;
+        };
     };
 
-    /* SPI1: CLK/MOSI/CS0/CS1 */
-    spi1m0_pins: spi1m0-pins {
-        rockchip,pins = <
-            RK_PB0 0x1101 /* spi1_clk  → CPOL=1 needs pull-up */
-            RK_PB1 0x1101 /* spi1_mosi */
-        >;
+    /* EDID firmware loading hint (for DRM/KMS) */
+    &edid {
+        compatible = "rockchip,edid";
+        status = "okay";
+        edid-firmware = "edid/h29k.bin";
     };
-
-    spi1m0_cs0: spi1m0-cs0 {
-        rockchip,pins = <
-            RK_PB3 0x1101 /* spi1_cs0 */
-        >;
-    };
-
-    spi1m0_cs1: spi1m0-cs1 {
-        rockchip,pins = <
-            RK_PB4 0x1101 /* spi1_cs1 → shared with LCD RESET */
-        >;
-    };
-
-    /* LCD GPIOs: RESET & DC */
-    lcd_gpio_pins: lcd-gpio-pins {
-        rockchip,pins = <
-            RK_PB4 0x1001 /* gpio0_b4 → RESET (and CS1!) */
-            RK_PB5 0x1001 /* gpio0_b5 → DC */
-        >;
-    };
-
-    /* TOUCH INTERRUPT */
-    touch_int_pins: touch-int-pins {
-        rockchip,pins = <
-            RK_PB6 0x1001 /* gpio0_b6 → INT */
-        >;
-    };
-
-    /* PWM2 */
-    pwm2m0_pins: pwm2m0-pins {
-        rockchip,pins = <
-            RK_PG6 0x1001 /* pwm2_ch0 */
-        >;
-    };
-
-    /* RESET BUTTON (GPIO4_C3) */
-    key_reset_pins: key-reset-pins {
-        rockchip,pins = <
-            RK_PD3 0x1001 /* gpio4_c3 → RESET KEY */
-        >;
-    };
-
-    /* USER BUTTON (GPIO0_C0) */
-    key_user_pins: key-user-pins {
-        rockchip,pins = <
-            RK_PC0 0x1001 /* gpio0_c0 → USER KEY */
-        >;
-    };
-
-    /* LED GPIOs */
-    led_power_pins: led-power-pins {
-        rockchip,pins = <
-            RK_PB0 0x1001 /* gpio0_b0 → POWER LED */
-        >;
-    };
-
-    led_work_pins: led-work-pins {
-        rockchip,pins = <
-            RK_PB2 0x1001 /* gpio0_b2 → WORK LED */
-        >;
-    };
-
-    led_status_pins: led-status-pins {
-        rockchip,pins = <
-            RK_PB3 0x1001 /* gpio0_b3 → STATUS LED */
-        >;
-    };
-};
-
-/* ====== BIND PINCTRL TO NODES ====== */
-&uart0 {
-    pinctrl-names = "default";
-    pinctrl-0 = <&uart0m0_xfer>;
-};
-
-&uart2 {
-    pinctrl-names = "default";
-    pinctrl-0 = <&uart2m0_xfer>;
-};
-
-&spi1 {
-    pinctrl-names = "default";
-    pinctrl-0 = <&spi1m0_pins &spi1m0_cs0 &spi1m0_cs1 &lcd_gpio_pins &touch_int_pins>;
-};
-
-&pwm2 {
-    pinctrl-names = "default";
-    pinctrl-0 = <&pwm2m0_pins>;
-};
-
-&gmac1 {
-    pinctrl-names = "default";
-    pinctrl-0 = <&gmac1m0_xfer>;
-};
-
-&keys {
-    pinctrl-names = "default";
-    pinctrl-0 = <&key_reset_pins &key_user_pins>;
-};
-
-&leds {
-    pinctrl-names = "default";
-    pinctrl-0 = <&led_power_pins &led_work_pins &led_status_pins>;
 };
