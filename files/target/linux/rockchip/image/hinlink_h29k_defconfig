@@ -1,53 +1,69 @@
-CONFIG_TARGET_ROCKCHIP=y
-CONFIG_TARGET_ROCKCHIP_RK35XX=y
-CONFIG_TARGET_ROCKCHIP_RK3528=y
-CONFIG_ARCH_ROCKCHIP=y
-CONFIG_SOC_RK3528=y
-CONFIG_ARCH_ARM64=y
-CONFIG_ARCH_64BIT=y
-CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h29k=y
-CONFIG_TARGET_KERNEL_PARTSIZE=256M
-CONFIG_TARGET_ROOTFS_PARTSIZE=2048M
-CONFIG_TARGET_ROOTFS_SQUASHFS=y
+#
+# Hinlink H29K (RK3528) - OpenWrt 23.05+ compliant defconfig
+# Generated for: USB 5G (FM350-GL), ST7789V3 240x240 LCD, RK808 PMIC, eMMC boot
+#
+
+CONFIG_TARGET_PROFILE_HINLINK_H29K=y
+
+# === Partitioning & Image Layout (used by image/Makefile) ===
+CONFIG_TARGET_KERNEL_PARTSIZE=256
+CONFIG_TARGET_ROOTFS_PARTSIZE=2048
+CONFIG_TARGET_ROOTFS_EXT4FS_SIZE=256
+CONFIG_TARGET_IMAGES_PAD=y
+CONFIG_TARGET_IMAGES_GZIP=y
+CONFIG_TARGET_KERNEL_PACKAGE=y
 CONFIG_TARGET_ROOTFS_EXT4FS=y
-CONFIG_TARGET_ROOTFS_EXT4FS_SIZE=256M
-CONFIG_STAGING=y
-CONFIG_TCP_CONG_BBR=y
-CONFIG_DEFAULT_BBR=y
-CONFIG_DEFAULT_TCP_CONG="bbr"
-CONFIG_IRQ_BALANCING=y
-CONFIG_IRQ_AFFINITY=y
-CONFIG_PACKAGE_uboot-rockchip=y
-CONFIG_PACKAGE_uboot-rockchip-v8=y
-CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
-CONFIG_KERNEL_KALLSYMS=y
+CONFIG_TARGET_ROOTFS_SQUASHFS=y
+CONFIG_TARGET_ROOTFS_TARGZ=y
 
-# --- DRM Display (GC9307) ---
-CONFIG_DRM=y
-CONFIG_DRM_MIPI_DSI=y
-CONFIG_DRM_PANEL=y
-CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y
-CONFIG_DRM_ROCKCHIP=y
-CONFIG_ROCKCHIP_VOP2=y
-CONFIG_ROCKCHIP_DSI=y
-CONFIG_ROCKCHIP_DSI_PHY=y
-CONFIG_DRM_PANEL_GC9307=y
-CONFIG_DRM_PANEL_BACKLIGHT=y
+# === Rockchip-specific target options ===
+CONFIG_TARGET_rockchip=y
+CONFIG_TARGET_rockchip_rk3528=y
 
-# --- Touchscreen (XPT2046) ---
-CONFIG_INPUT_TOUCHSCREEN=y
-CONFIG_TOUCHSCREEN_XPT2046=y
+# === Required for RK3528 boot reliability ===
+CONFIG_TARGET_ROCKCHIP_BOOT_DEVICE="emmc"
+CONFIG_TARGET_ROCKCHIP_FIRMWARE="rk3528_ddr_1066MHz_v1.13.bin rk3528_miniloader_v1.13.bin"
 
-# --- PWM (Backlight) ---
-CONFIG_PWM=y
-CONFIG_PWM_ROCKCHIP=y
-CONFIG_PWM_SYSFS=y
+# === USB 5G essential support (qmi_wwan + mbim + firmware loading) ===
+CONFIG_PACKAGE_kmod-usb-net-qmi-wwan=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
+CONFIG_PACKAGE_kmod-usb-serial-option=y
+CONFIG_PACKAGE_comgt=y
+CONFIG_PACKAGE_uqmi=y
+CONFIG_PACKAGE_usbmode=y
+CONFIG_PACKAGE_luci-proto-qmi=y
+CONFIG_PACKAGE_luci-proto-mbim=y
 
-# --- RTC (PCF8563) ---
-CONFIG_RTC_CLASS=y
-CONFIG_RTC_DRV_PCF8563=y
+# === ST7789V3 display stack (framebuffer + DRM + panel) ===
+CONFIG_PACKAGE_kmod-fb-st7789v3=y
+CONFIG_PACKAGE_kmod-drm-rockchip=y
+CONFIG_PACKAGE_kmod-drm-panel-simple=y
+CONFIG_PACKAGE_kmod-drm-bridge-analogix-anx6345=y
+CONFIG_PACKAGE_kmod-backlight=y
+CONFIG_PACKAGE_kmod-pwm-rockchip=y
 
-# --- Optional but recommended ---
-CONFIG_I2C_CHARDEV=y
-CONFIG_SPI_SPIDEV=y
-CONFIG_GPIO_SYSFS=y
+# === Touch & Input ===
+CONFIG_PACKAGE_kmod-input-ft6236=y
+
+# === Power & PMIC ===
+CONFIG_PACKAGE_kmod-regulator-rk808=y
+
+# === Storage & USB ===
+CONFIG_PACKAGE_kmod-usb-storage=y
+CONFIG_PACKAGE_kmod-usb-storage-uas=y
+CONFIG_PACKAGE_kmod-fs-vfat=y
+CONFIG_PACKAGE_kmod-nls-cp437=y
+CONFIG_PACKAGE_kmod-nls-iso8859-1=y
+
+# === Debug & Diagnostics (recommended for H29K field deployment) ===
+CONFIG_PACKAGE_dmesg=y
+CONFIG_PACKAGE_logread=y
+CONFIG_PACKAGE_ethtool=y
+CONFIG_PACKAGE_usbutils=y
+CONFIG_PACKAGE_lsusb=y
+
+# === Minimal UI (for small screen usability) ===
+CONFIG_PACKAGE_luci-app-uhttpd=y
+CONFIG_PACKAGE_luci-app-firewall=y
+CONFIG_PACKAGE_luci-theme-bootstrap=y
+CONFIG_PACKAGE_luci-i18n-base-zh-cn=y
