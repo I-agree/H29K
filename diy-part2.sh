@@ -312,21 +312,21 @@ fi
 echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0m"
 
 # ==============================
-# 检查内核配置是否包含 CONFIG_FB_ST7789V3=y
+# 检查内核配置是否包含 CONFIG_FB_ST7789V=y
 # 没有则报错并终止编译
 # ==============================
 KERNEL_CONFIG="target/linux/rockchip/armv8/config-6.12"
 
-if ! grep -q "^CONFIG_FB_ST7789V3=y" "$KERNEL_CONFIG"; then
+if ! grep -q "^CONFIG_FB_ST7789V=y" "$KERNEL_CONFIG"; then
     echo "====================================================="
-    echo " ERROR: 内核配置缺少 CONFIG_FB_ST7789V3=y"
+    echo " ERROR: 内核配置缺少 CONFIG_FB_ST7789V=y"
     echo " 请检查 target/linux/rockchip/armv8/config-6.12"
     echo " 编译终止！"
     echo "====================================================="
     exit 1
 fi
 
-echo "✅ 检查成功：CONFIG_FB_ST7789V3=y 已启用"
+echo "✅ 检查成功：CONFIG_FB_ST7789V=y 已启用"
 
 printf '\n'
 echo -e "\033[32m=====================================\033[0m"
