@@ -2,9 +2,9 @@
 /*
  * Device Tree Source for Hinlink H29K (RK3528)
  * - SoC: RK3528 (Cortex-A53 × 4)
- * - Display: ST7789V3, 172×320, SPI, 3.3V, reset/dc/backlight controlled
+ * - Display: ST7789V3, 172×320, SPI, 3.3V
  * - Touch: FT6236, I²C, GPIO4_A0 (IRQ), GPIO4_B0 (RST)
- * - 5G: FM350-GL, PCIe Gen2 x1 (fallback USB via DWC3)
+ * - 5G: FM350-GL, connected via USB (not PCIe)
  * - PMIC: RK808 (I²C0)
  * - Boot: UART0 @ 115200n8
  */
@@ -22,6 +22,8 @@
         i2c1 = &i2c1;
         pwm2 = &pwm2;
         ethernet0 = &gmac;
+        usb0 = &usb_host0_xhci;
+        usb1 = &usb_otg0;
     };
 
     chosen {
@@ -97,32 +99,6 @@
         touchscreen-inverted-x;
         linux,code-base = <0x100>;
         status = "okay";
-    };
-
-    /* FM350-GL 5G via PCIe */
-    &pcie0 {
-        status = "okay";
-        #address-cells = <3>;
-        #size-cells = <2>;
-        ranges = <0x82000000 0x0 0x0 0x0 0x0 0x0 0x0>;
-
-        fm350gl: pci@1,0 {
-            compatible = "qcom,qmi-wwan";
-            reg = <0x10000 0x0 0x0 0x0 0x0>;
-            #address-cells = <3>;
-            #size-cells = <2>;
-            ranges;
-            max-link-speed = <2>;
-            num-lanes = <1>;
-            msi-interrupts = <1>;
-            status = "okay";
-
-            usb@1,0 {
-                compatible = "usb-device";
-                reg = <0x10000 0x0 0x0 0x0 0x0>;
-                status = "disabled"; /* fallback only */
-            };
-        };
     };
 
     /* ST7789V3 on SPI0 */
@@ -384,6 +360,17 @@
     /* UART0 for console */
     &uart0 {
         status = "okay";
+    };
+
+    /* USB Host0 (USB3.0) — for FM350-GL */
+    &usb_host0_xhci {
+        status = "okay";
+    };
+
+    /* USB OTG0 (USB2.0) — for device mode / debug */
+    &usb_otg0 {
+        status = "okay";
+        dr_mode = "otg";
     };
 
     /* GPIO pin control groups */
