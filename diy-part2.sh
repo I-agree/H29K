@@ -15,6 +15,17 @@ mkdir -p "$(dirname "$UBOOT_DST")"
 cp -f "$UBOOT_SRC" "$UBOOT_DST"
 echo "✅ 已注入 U-Boot defconfig → $UBOOT_DST"
 
+# ✅ 1.1. target/linux/rockchip/armv8/config-6.12
+UBOOT_SRC="files/target/linux/rockchip/armv8/config-6.12"
+UBOOT_DST="target/linux/rockchip/armv8/config-6.12"
+if [ ! -f "$UBOOT_SRC" ]; then
+  echo "❌ 错误：U-Boot defconfig 源文件不存在：$UBOOT_SRC"
+  exit 1
+fi
+mkdir -p "$(dirname "$UBOOT_DST")"
+cp -f "$UBOOT_SRC" "$UBOOT_DST"
+echo "✅ 已注入 U-Boot defconfig → $UBOOT_DST"
+
 # ✅ 1.5. package/boot/arm-trusted-firmware-rockchip/Makefile
 UBOOT_SRC="files/package/boot/arm-trusted-firmware-rockchip/Makefile"
 UBOOT_DST="package/boot/arm-trusted-firmware-rockchip/Makefile"
