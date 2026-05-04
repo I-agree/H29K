@@ -1,141 +1,7 @@
 #!/bin/bash
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
-set -e
 
-ROCKCHIP_CFG="./target/linux/rockchip/armv8/config-6.12"
-
-# ✅ 关键：只写入 Rockchip 平台专属 config，避免 generic 冲突
-cat >> "$ROCKCHIP_CFG" <<'EOF'
-
-#
-# TCP BBR Support (required for DEFAULT_TCP_CONG="bbr")
-#
-CONFIG_NET_SCH_FQ=y
-CONFIG_DEFAULT_QDISC_FQ=y
-CONFIG_TCP_CONG_ADVANCED=y
-CONFIG_TCP_CONG_BBR=y
-CONFIG_TCP_CONG_CUBIC=y
-CONFIG_NET_SCH_FQ_CODEL=y
-CONFIG_NET_SCHED=y
-CONFIG_INET=y
-CONFIG_IP_ADVANCED_ROUTER=y
-CONFIG_NETFILTER=y
-CONFIG_DEFAULT_TCP_CONG="bbr"
-EOF
-
-echo "✅ BBR configs written to $ROCKCHIP_CFG"
-
-# ==============================================
-# 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
-# ==============================================
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
-# 删除 CONFIG_EMAC_ROCKCHIP=y
-sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
-
-# 删除 CONFIG_ARC_EMAC_CORE=y
-sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
-
-echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
-
-# ====== BEGIN: Predefine config via .config.override ======
-echo "🔧 Writing .config.override for u-boot-rk3528..."
-
-cat > /workdir/openwrt/.config.override << 'EOF'
-# RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
-CONFIG_TARGET_MULTI_ARCH=n
-CONFIG_TARGET_rockchip_armv8=y
-CONFIG_TARGET_rockchip_armv8_SUBTARGET_generic=y
-CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
-CONFIG_PACKAGE_u-boot-rk3528=y
-CONFIG_PACKAGE_u-boot-rk3528-tpl=y
-CONFIG_TRUSTED_FIRMWARE_A="rk3528"
-CONFIG_PACKAGE_kmod-rockchip-pcie=y
-CONFIG_PACKAGE_kmod-usb-dwc3-rockchip=y
-CONFIG_PACKAGE_kmod-sound-soc-rockchip=y
-# Optional: Pin rkbin version to prevent accidental upgrade
-CONFIG_RKBIN_VERSION="2025.06.13"
-EOF
-
-echo "✅ .config.override written with RK3528 bootloader stack"
-ls -l /workdir/openwrt/.config.override
-
-# Now run defconfig — it will merge .config.override automatically
-cd /workdir/openwrt
-make defconfig > /dev/null 2>&1
-echo "✅ make defconfig completed with override applied"
-# ====== END ======
-
-# ==============================================
-# 为 Hinlink H29K 添加内核驱动配置
-# ==============================================
-cat >> target/linux/rockchip/armv8/config-6.12 << 'EOF'
-
-# === Hinlink H29K Hardware Mandatory Built-in Drivers (RK3528, Kernel 6.12) ===
-CONFIG_R8168=y
-
-# --- ST7789V LCD Panel (172x320, SPI) ---
-CONFIG_FB=y
-CONFIG_FB_CFB_FILLRECT=y
-CONFIG_FB_CFB_COPYAREA=y
-CONFIG_FB_CFB_IMAGEBLIT=y
-CONFIG_FB_SYS_FILLRECT=y
-CONFIG_FB_SYS_COPYAREA=y
-CONFIG_FB_SYS_IMAGEBLIT=y
-CONFIG_FB_FOREIGN_ENDIAN=y
-CONFIG_FB_ROCKCHIP=y
-CONFIG_FB_ROCKCHIP_LCDC=y
-CONFIG_FB_ST7789V=y
-
-# --- FT6236 Touch Controller (I2C) ---
-CONFIG_INPUT=y
-CONFIG_INPUT_EVDEV=y
-CONFIG_INPUT_TOUCHSCREEN=y
-CONFIG_TOUCHSCREEN_FT6236=y
-
-# --- USB 5G Modem Support (MBIM + NCM + RNDIS foundation) ---
-CONFIG_USB=y
-CONFIG_USB_DEVICEFS=y
-CONFIG_USB_COMMON=y
-CONFIG_USB_ARCH_HAS_HCD=y
-CONFIG_USB_SUPPORT=y
-CONFIG_USB_PHY=y
-CONFIG_USB_ROCKCHIP_PHY=y
-CONFIG_USB_STORAGE=y
-CONFIG_USB_SERIAL=y
-CONFIG_USB_SERIAL_OPTION=y
-CONFIG_USB_NET_DRIVERS=y
-CONFIG_USB_NET_RNDIS=y
-CONFIG_USB_NET_RNDIS_HOST=y
-CONFIG_USB_NET_CDC_MBIM=y
-CONFIG_USB_NET_CDC_NCM=y
-CONFIG_USB_NET_CDC_EEM=y
-
-# --- Power & Regulator for Modem ---
-CONFIG_POWER_SUPPLY=y
-CONFIG_POWER_RESET=y
-CONFIG_POWER_RESET_SYSCON_POWEROFF=y
-CONFIG_POWER_RESET_SYSCON_RESTART=y
-CONFIG_REGULATOR=y
-CONFIG_REGULATOR_FIXED_VOLTAGE=y
-CONFIG_REGULATOR_RK808=y
-
-# H29K RK3528 USB Support
-CONFIG_USB_SERIAL_CONSOLE=y
-CONFIG_USB_SERIAL_GENERIC=y
-CONFIG_USB_SERIAL_QUALCOMM=y
-CONFIG_USB_SERIAL_SIERRAWIRELESS=y
-CONFIG_USB_SERIAL_WWAN=y
-
-# CDC MBIM/RNDIS
-CONFIG_USB_NET=y
-CONFIG_USB_NET_CDCETHER=y
-
-# ST7789V & FT6236 (built-in, not module)
-CONFIG_FB_TFT=y
-CONFIG_FB_TFT_ST7789V=y
-EOF
 
 # ======================== 【资源准备】 ========================
 echo "🔧 正在按 OpenWrt 官方主线路径注入 H29K 文件..."
@@ -415,21 +281,21 @@ fi
 echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0m"
 
 # ==============================
-# 检查内核配置是否包含 CONFIG_FB_ST7789V=y
+# 检查内核配置是否包含 CONFIG_NET_SCH_FQ=y
 # 没有则报错并终止编译
 # ==============================
 KERNEL_CONFIG="target/linux/rockchip/armv8/config-6.12"
 
-if ! grep -q "^CONFIG_FB_ST7789V=y" "$KERNEL_CONFIG"; then
+if ! grep -q "^CONFIG_NET_SCH_FQ=y" "$KERNEL_CONFIG"; then
     echo "====================================================="
-    echo " ERROR: 内核配置缺少 CONFIG_FB_ST7789V=y"
+    echo " ERROR: 内核配置缺少 CONFIG_NET_SCH_FQ=y"
     echo " 请检查 target/linux/rockchip/armv8/config-6.12"
     echo " 编译终止！"
     echo "====================================================="
     exit 1
 fi
 
-echo "✅ 检查成功：CONFIG_FB_ST7789V=y 已启用"
+echo "✅ 检查成功：CONFIG_NET_SCH_FQ=y 已启用"
 
 printf '\n'
 echo -e "\033[32m=====================================\033[0m"
