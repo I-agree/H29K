@@ -23,8 +23,6 @@ echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.co
 echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon.git;master' >> feeds.conf.default
 # 添加 Argon 配置插件源
 echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;master' >> feeds.conf.default
-# 添加 OpenAppFilter 插件源
-#echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master' >> feeds.conf.default
 
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
