@@ -15,43 +15,10 @@ mkdir -p "$(dirname "$UBOOT_DST")"
 cp -f "$UBOOT_SRC" "$UBOOT_DST"
 echo "✅ 已注入 U-Boot defconfig → $UBOOT_DST"
 
-# ✅ 1.1. target/linux/rockchip/armv8/config-6.12
-UBOOT_SRC="files/target/linux/rockchip/armv8/config-6.12"
-UBOOT_DST="target/linux/rockchip/armv8/config-6.12"
-if [ ! -f "$UBOOT_SRC" ]; then
-  echo "❌ 错误：U-Boot defconfig 源文件不存在：$UBOOT_SRC"
-  exit 1
-fi
-mkdir -p "$(dirname "$UBOOT_DST")"
-cp -f "$UBOOT_SRC" "$UBOOT_DST"
-echo "✅ 已注入 U-Boot defconfig → $UBOOT_DST"
-
-# ✅ 1.5. package/boot/arm-trusted-firmware-rockchip/Makefile
-UBOOT_SRC="files/package/boot/arm-trusted-firmware-rockchip/Makefile"
-UBOOT_DST="package/boot/arm-trusted-firmware-rockchip/Makefile"
-if [ ! -f "$UBOOT_SRC" ]; then
-  echo "❌ 错误：arm-trusted-firmware-rockchip/Makefile 源文件不存在：$UBOOT_SRC"
-  exit 1
-fi
-mkdir -p "$(dirname "$UBOOT_DST")"
-cp -f "$UBOOT_SRC" "$UBOOT_DST"
-echo "✅ 已注入 U-Boot defconfig → $UBOOT_DST"
-
 # ✅ 2. DTS 文件 → 注入到 target/linux/rockchip/files/ 下的标准路径
 #    官方约定：所有自定义 DTS 必须放在 target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
 DTS_SRC="files/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts"
 DTS_DST="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
-if [ ! -f "$DTS_SRC" ]; then
-  echo "❌ 错误：DTS 源文件不存在：$DTS_SRC"
-  exit 1
-fi
-mkdir -p "$(dirname "$DTS_DST")"
-cp -f "$DTS_SRC" "$DTS_DST"
-echo "✅ 已注入 DTS → $DTS_DST"
-
-# ✅ 2.5. DTS 文件 → 注入到 arch/arm/dts/rockchip/ 下的标准路径
-DTS_SRC="files/arch/arm/dts/rockchip/rk3528-hinlink-h29k.dts"
-DTS_DST="arch/arm/dts/rockchip/rockchip/rk3528-hinlink-h29k.dts"
 if [ ! -f "$DTS_SRC" ]; then
   echo "❌ 错误：DTS 源文件不存在：$DTS_SRC"
   exit 1
