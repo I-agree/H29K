@@ -41,28 +41,6 @@ else
     exit 1
 fi
 
-# ==========================
-# 极简版：下载3个DTSI + 验证
-# ==========================
-
-# 正确路径
-DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
-mkdir -p "$DTS_DIR"
-
-# 下载地址前缀
-URL="https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
-
-# 下载 3 个文件
-wget -q "$URL/rk3528.dtsi" -O "$DTS_DIR/rk3528.dtsi"
-wget -q "$URL/rk3528-rock-2.dtsi" -O "$DTS_DIR/rk3528-rock-2.dtsi"
-wget -q "$URL/rk3528-pinctrl.dtsi" -O "$DTS_DIR/rk3528-pinctrl.dtsi"
-
-# 验证
-echo "验证文件是否下载成功..."
-for f in rk3528.dtsi rk3528-rock-2.dtsi rk3528-pinctrl.dtsi; do
-  [ -f "$DTS_DIR/$f" ] && echo "✅ $f 正常" || echo "❌ $f 缺失"
-done
-
 # ======================== 【添加 H29K：armv8.mk 设备定义】 ========================
 # ✅ 修复点3：DEVICE_DTS 使用标准社区命名 rk3528-hinlink-h29k（非 opc- 前缀）
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
