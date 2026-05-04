@@ -26,6 +26,64 @@ echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;m
 # 添加 OpenAppFilter 插件源
 #echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master' >> feeds.conf.default
 
+#!/bin/bash
+set -e
+
+echo "🔧 正在配置 BBR 支持..."
+
+# ===== 1. 定义目标配置文件 =====
+ROCKCHIP_CONFIG="./target/linux/rockchip/armv8/config-6.12"
+GENERIC_CONFIG="./target/linux/generic/config-6.12"
+DOT_CONFIG="./.config"
+
+# ===== 2. 所需的完整 BBR 配置项（含依赖）=====
+BBR_REQUIRED=(
+  "CONFIG_TCP_CONG_ADVANCED=y"     # ← 关键！父开关，必须开启
+  "CONFIG_TCP_CONG_BBR=y"
+  "CONFIG_TCP_CONG_CUBIC=y"        # 保留兼容，默认可切
+  "CONFIG_NET_SCH_FQ_CODEL=y"
+  "CONFIG_NET_SCHED=y"
+  "CONFIG_INET=y"                  # IPv4 基础
+  "CONFIG_IP_ADVANCED_ROUTER=y"    # FQ_CODEL & BBR 依赖
+  "CONFIG_NETFILTER=y"             # 推荐启用
+  "CONFIG_DEFAULT_TCP_CONG=\"bbr\""
+)
+
+# ===== 3. 安全写入：先删后写，避免重复/冲突 =====
+for cfg in "${BBR_REQUIRED[@]}"; do
+  # 提取 CONFIG_XXX 部分（如 CONFIG_TCP_CONG_BBR）
+  key=$(echo "$cfg" | sed 's/=.*//')
+  
+  # 删除所有以该 KEY 开头的行（兼容 =y/m/n/is not set）
+  sed -i "/^$key[ =]/d" "$ROCKCHIP_CONFIG"
+  sed -i "/^$key[ =]/d" "$GENERIC_CONFIG"
+  sed -i "/^$key[ =]/d" "$DOT_CONFIG"
+  
+  # 追加到 rockchip config（推荐放这里，设备专属）
+  echo "$cfg" >> "$ROCKCHIP_CONFIG"
+  echo "✅ 已设置：$cfg"
+done
+
+# ===== 4. 强制更新 .config（避免被 feeds 或 menuconfig 覆盖）=====
+# 如果 .config 存在且未设置 DEFAULT_TCP_CONG，则补上
+if [ -f "$DOT_CONFIG" ]; then
+  if ! grep -q '^CONFIG_DEFAULT_TCP_CONG=' "$DOT_CONFIG"; then
+    echo 'CONFIG_DEFAULT_TCP_CONG="bbr"' >> "$DOT_CONFIG"
+  fi
+  # 确保 TCP_CONG_ADVANCED=y（否则 BBR 不可用）
+  if ! grep -q '^CONFIG_TCP_CONG_ADVANCED=y' "$DOT_CONFIG"; then
+    sed -i '/^CONFIG_TCP_CONG_ADVANCED=/d' "$DOT_CONFIG"
+    echo 'CONFIG_TCP_CONG_ADVANCED=y' >> "$DOT_CONFIG"
+  fi
+fi
+
+# ===== 5. 验证写入结果 =====
+echo "🔍 验证配置："
+grep -E "^(CONFIG_TCP_CONG_ADVANCED|CONFIG_TCP_CONG_BBR|CONFIG_DEFAULT_TCP_CONG)" "$ROCKCHIP_CONFIG" || true
+
+echo "✅ BBR 配置已安全写入，准备编译..."
+
+
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
 mkdir -p "$DTS_SAVE_DIR"
@@ -124,26 +182,6 @@ sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
 sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
 
 echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
-
-# 检查并恢复 BBR 关键配置
-KERNEL_CONFIG="./target/linux/rockchip/armv8/config-6.12"
-
-BBR_CONFIGS=(
-"CONFIG_TCP_CONG_BBR=y"
-"CONFIG_NET_SCH_FQ_CODEL=y"
-"CONFIG_DEFAULT_TCP_CONG=\"bbr\""
-"CONFIG_TCP_CONG_CUBIC=y"
-"CONFIG_NET_SCHED=y"
-)
-
-for cfg in "${BBR_CONFIGS[@]}"; do
-    if ! grep -qxF "$cfg" "$KERNEL_CONFIG"; then
-        echo "$cfg" >> "$KERNEL_CONFIG"
-        echo "已恢复：$cfg"
-    fi
-done
-
-echo "✅ BBR 全部配置检查/恢复完成"
 
 # ====== BEGIN: Predefine config via .config.override ======
 echo "🔧 Writing .config.override for u-boot-rk3528..."
