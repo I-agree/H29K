@@ -24,6 +24,47 @@ echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon.git;master' >>
 # 添加 Argon 配置插件源
 echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;master' >> feeds.conf.default
 
+# ====== BEGIN: Predefine config via .config.override ======
+echo "🔧 Writing .config.override for u-boot-rk3528..."
+
+cat > /workdir/openwrt/.config.override << 'EOF'
+# RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
+CONFIG_TARGET_MULTI_ARCH=n
+CONFIG_TARGET_rockchip_armv8=y
+CONFIG_TARGET_rockchip_armv8_SUBTARGET_generic=y
+CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
+CONFIG_PACKAGE_u-boot-rk3528=y
+CONFIG_PACKAGE_u-boot-rk3528-tpl=y
+CONFIG_TRUSTED_FIRMWARE_A="rk3528"
+CONFIG_PACKAGE_kmod-rockchip-pcie=y
+CONFIG_PACKAGE_kmod-usb-dwc3-rockchip=y
+CONFIG_PACKAGE_kmod-sound-soc-rockchip=y
+# Optional: Pin rkbin version to prevent accidental upgrade
+CONFIG_RKBIN_VERSION="2025.06.13"
+EOF
+
+echo "✅ .config.override written with RK3528 bootloader stack"
+ls -l /workdir/openwrt/.config.override
+
+# Now run defconfig — it will merge .config.override automatically
+cd /workdir/openwrt
+make defconfig > /dev/null 2>&1
+echo "✅ make defconfig completed with override applied"
+# ====== END ======
+
+# ==============================================
+# 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
+# ==============================================
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+# 删除 CONFIG_EMAC_ROCKCHIP=y
+sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
+
+# 删除 CONFIG_ARC_EMAC_CORE=y
+sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
+
+echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
+
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
 mkdir -p "$DTS_SAVE_DIR"
@@ -109,3 +150,86 @@ define U-Boot/hinlink-h29k-rk3528\n\
   MINILOADER:=rk3528_miniloader_v1.13.bin\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
+
+# ==============================================
+# 为 Hinlink H29K 添加内核驱动配置
+# ==============================================
+cat >> target/linux/rockchip/armv8/config-6.12 << 'EOF'
+
+# === Hinlink H29K Hardware Mandatory Built-in Drivers (RK3528, Kernel 6.12) ===
+CONFIG_R8168=y
+
+# TCP BBR Support (required for DEFAULT_TCP_CONG="bbr")
+CONFIG_NET_SCH_FQ=y
+CONFIG_DEFAULT_QDISC_FQ=y
+CONFIG_TCP_CONG_ADVANCED=y
+CONFIG_TCP_CONG_BBR=y
+CONFIG_TCP_CONG_CUBIC=y
+CONFIG_NET_SCH_FQ_CODEL=y
+CONFIG_NET_SCHED=y
+CONFIG_INET=y
+CONFIG_IP_ADVANCED_ROUTER=y
+CONFIG_NETFILTER=y
+CONFIG_DEFAULT_TCP_CONG="bbr"
+
+# --- ST7789V LCD Panel (172x320, SPI) ---
+CONFIG_FB=y
+CONFIG_FB_CFB_FILLRECT=y
+CONFIG_FB_CFB_COPYAREA=y
+CONFIG_FB_CFB_IMAGEBLIT=y
+CONFIG_FB_SYS_FILLRECT=y
+CONFIG_FB_SYS_COPYAREA=y
+CONFIG_FB_SYS_IMAGEBLIT=y
+CONFIG_FB_FOREIGN_ENDIAN=y
+CONFIG_FB_ROCKCHIP=y
+CONFIG_FB_ROCKCHIP_LCDC=y
+CONFIG_FB_ST7789V=y
+
+# --- FT6236 Touch Controller (I2C) ---
+CONFIG_INPUT=y
+CONFIG_INPUT_EVDEV=y
+CONFIG_INPUT_TOUCHSCREEN=y
+CONFIG_TOUCHSCREEN_FT6236=y
+
+# --- USB 5G Modem Support (MBIM + NCM + RNDIS foundation) ---
+CONFIG_USB=y
+CONFIG_USB_DEVICEFS=y
+CONFIG_USB_COMMON=y
+CONFIG_USB_ARCH_HAS_HCD=y
+CONFIG_USB_SUPPORT=y
+CONFIG_USB_PHY=y
+CONFIG_USB_ROCKCHIP_PHY=y
+CONFIG_USB_STORAGE=y
+CONFIG_USB_SERIAL=y
+CONFIG_USB_SERIAL_OPTION=y
+CONFIG_USB_NET_DRIVERS=y
+CONFIG_USB_NET_RNDIS=y
+CONFIG_USB_NET_RNDIS_HOST=y
+CONFIG_USB_NET_CDC_MBIM=y
+CONFIG_USB_NET_CDC_NCM=y
+CONFIG_USB_NET_CDC_EEM=y
+
+# --- Power & Regulator for Modem ---
+CONFIG_POWER_SUPPLY=y
+CONFIG_POWER_RESET=y
+CONFIG_POWER_RESET_SYSCON_POWEROFF=y
+CONFIG_POWER_RESET_SYSCON_RESTART=y
+CONFIG_REGULATOR=y
+CONFIG_REGULATOR_FIXED_VOLTAGE=y
+CONFIG_REGULATOR_RK808=y
+
+# H29K RK3528 USB Support
+CONFIG_USB_SERIAL_CONSOLE=y
+CONFIG_USB_SERIAL_GENERIC=y
+CONFIG_USB_SERIAL_QUALCOMM=y
+CONFIG_USB_SERIAL_SIERRAWIRELESS=y
+CONFIG_USB_SERIAL_WWAN=y
+
+# CDC MBIM/RNDIS
+CONFIG_USB_NET=y
+CONFIG_USB_NET_CDCETHER=y
+
+# ST7789V & FT6236 (built-in, not module)
+CONFIG_FB_TFT=y
+CONFIG_FB_TFT_ST7789V=y
+EOF
