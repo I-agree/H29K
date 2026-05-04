@@ -96,6 +96,19 @@ define U-Boot/hinlink-h29k-rk3528\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
 
+# ==============================================
+# 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
+# ==============================================
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+# 删除 CONFIG_EMAC_ROCKCHIP=y
+sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
+
+# 删除 CONFIG_ARC_EMAC_CORE=y
+sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
+
+echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
+
 # 检查并恢复 BBR 关键配置
 KERNEL_CONFIG="./target/linux/rockchip/armv8/config-6.12"
 
