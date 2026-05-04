@@ -26,6 +26,34 @@ echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;m
 # 添加 OpenAppFilter 插件源
 echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master' >> feeds.conf.default
 
+# ============= 只下载 LEDE RK3528 DTS 文件夹（稳妥不缺文件） =============
+# 功能：下载 LEDE 的 rockchip dts 文件夹 → 自动解压 → 自动放置 → 自动清理
+# 不克隆仓库 | 不下载多余头文件 | 只拿设备树文件夹
+
+# 目标路径（官方 OpenWrt 标准目录）
+DTS_FOLDER="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+
+# 创建目录
+mkdir -p $DTS_FOLDER
+
+# 下载 LEDE 源码 master.zip（只解压需要的文件夹，超快）
+echo "正在下载 LEDE RK3528 设备树文件夹..."
+wget -q https://github.com/coolsnowwolf/lede/archive/refs/heads/master.zip -O lede-dts.zip
+
+# 只解压 rockchip dts 文件夹（精确提取，不浪费空间）
+unzip -q lede-dts.zip "lede-master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/*" -d .
+
+# 复制整个文件夹到你的 OpenWrt 源码
+cp -rf lede-master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/* $DTS_FOLDER/
+
+# 清理临时文件
+rm -rf lede-master lede-dts.zip
+
+echo "✅ LEDE RK3528 设备树文件夹下载完成！"
+echo "✅ 路径：$DTS_FOLDER"
+echo "✅ gpio.h / rockchip.h 由内核自动提供，无需下载"
+# ======================================================================
+
 # ======================== 【添加 H29K：armv8.mk 设备定义】 ========================
 # ✅ 修复点3：DEVICE_DTS 使用标准社区命名 rk3528-hinlink-h29k（非 opc- 前缀）
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
