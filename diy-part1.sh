@@ -26,62 +26,28 @@ echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;m
 # 添加 OpenAppFilter 插件源
 #echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master' >> feeds.conf.default
 
-#!/bin/bash
 set -e
 
-echo "🔧 正在配置 BBR 支持..."
+ROCKCHIP_CFG="./target/linux/rockchip/armv8/config-6.12"
 
-# ===== 1. 定义目标配置文件 =====
-ROCKCHIP_CONFIG="./target/linux/rockchip/armv8/config-6.12"
-GENERIC_CONFIG="./target/linux/generic/config-6.12"
-DOT_CONFIG="./.config"
+# ✅ 关键：只写入 Rockchip 平台专属 config，避免 generic 冲突
+cat >> "$ROCKCHIP_CFG" <<'EOF'
 
-# ===== 2. 所需的完整 BBR 配置项（含依赖）=====
-BBR_REQUIRED=(
-  "CONFIG_TCP_CONG_ADVANCED=y"     # ← 关键！父开关，必须开启
-  "CONFIG_TCP_CONG_BBR=y"
-  "CONFIG_TCP_CONG_CUBIC=y"        # 保留兼容，默认可切
-  "CONFIG_NET_SCH_FQ_CODEL=y"
-  "CONFIG_NET_SCHED=y"
-  "CONFIG_INET=y"                  # IPv4 基础
-  "CONFIG_IP_ADVANCED_ROUTER=y"    # FQ_CODEL & BBR 依赖
-  "CONFIG_NETFILTER=y"             # 推荐启用
-  "CONFIG_DEFAULT_TCP_CONG=\"bbr\""
-)
+#
+# TCP BBR Support (required for DEFAULT_TCP_CONG="bbr")
+#
+CONFIG_TCP_CONG_ADVANCED=y
+CONFIG_TCP_CONG_BBR=y
+CONFIG_TCP_CONG_CUBIC=y
+CONFIG_NET_SCH_FQ_CODEL=y
+CONFIG_NET_SCHED=y
+CONFIG_INET=y
+CONFIG_IP_ADVANCED_ROUTER=y
+CONFIG_NETFILTER=y
+CONFIG_DEFAULT_TCP_CONG="bbr"
+EOF
 
-# ===== 3. 安全写入：先删后写，避免重复/冲突 =====
-for cfg in "${BBR_REQUIRED[@]}"; do
-  # 提取 CONFIG_XXX 部分（如 CONFIG_TCP_CONG_BBR）
-  key=$(echo "$cfg" | sed 's/=.*//')
-  
-  # 删除所有以该 KEY 开头的行（兼容 =y/m/n/is not set）
-  sed -i "/^$key[ =]/d" "$ROCKCHIP_CONFIG"
-  sed -i "/^$key[ =]/d" "$GENERIC_CONFIG"
-  sed -i "/^$key[ =]/d" "$DOT_CONFIG"
-  
-  # 追加到 rockchip config（推荐放这里，设备专属）
-  echo "$cfg" >> "$ROCKCHIP_CONFIG"
-  echo "✅ 已设置：$cfg"
-done
-
-# ===== 4. 强制更新 .config（避免被 feeds 或 menuconfig 覆盖）=====
-# 如果 .config 存在且未设置 DEFAULT_TCP_CONG，则补上
-if [ -f "$DOT_CONFIG" ]; then
-  if ! grep -q '^CONFIG_DEFAULT_TCP_CONG=' "$DOT_CONFIG"; then
-    echo 'CONFIG_DEFAULT_TCP_CONG="bbr"' >> "$DOT_CONFIG"
-  fi
-  # 确保 TCP_CONG_ADVANCED=y（否则 BBR 不可用）
-  if ! grep -q '^CONFIG_TCP_CONG_ADVANCED=y' "$DOT_CONFIG"; then
-    sed -i '/^CONFIG_TCP_CONG_ADVANCED=/d' "$DOT_CONFIG"
-    echo 'CONFIG_TCP_CONG_ADVANCED=y' >> "$DOT_CONFIG"
-  fi
-fi
-
-# ===== 5. 验证写入结果 =====
-echo "🔍 验证配置："
-grep -E "^(CONFIG_TCP_CONG_ADVANCED|CONFIG_TCP_CONG_BBR|CONFIG_DEFAULT_TCP_CONG)" "$ROCKCHIP_CONFIG" || true
-
-echo "✅ BBR 配置已安全写入，准备编译..."
+echo "✅ BBR configs written to $ROCKCHIP_CFG"
 
 
 # 下载指定 dts 到目标目录，带校验
