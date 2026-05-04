@@ -27,7 +27,7 @@ echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;m
 echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master' >> feeds.conf.default
 
 # 下载指定 dts 到目标目录，带校验
-DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
 mkdir -p "$DTS_SAVE_DIR"
 
 wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts \
@@ -46,7 +46,7 @@ fi
 # ==========================
 
 # 正确路径
-DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
 mkdir -p "$DTS_DIR"
 
 # 下载地址前缀
