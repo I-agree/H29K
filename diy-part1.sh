@@ -165,15 +165,12 @@ cat > /workdir/openwrt/.config.override << 'EOF'
 # RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
 CONFIG_TARGET_MULTI_ARCH=n
 CONFIG_TARGET_rockchip_armv8=y
-CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h29k=y
-CONFIG_PACKAGE_uboot-rockchip=y
-CONFIG_PACKAGE_uboot-rockchip-v8=y
-CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
+CONFIG_TARGET_rockchip_armv8_SUBTARGET_generic=y
+CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 CONFIG_PACKAGE_u-boot-rk3528=y
 CONFIG_PACKAGE_u-boot-rk3528-tpl=y
-CONFIG_TARGET_rockchip=y
-CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 CONFIG_TRUSTED_FIRMWARE_A="rk3528"
+CONFIG_PACKAGE_kmod-rockchip-pcie=y
 # Optional: Pin rkbin version to prevent accidental upgrade
 CONFIG_RKBIN_VERSION="2025.06.13"
 EOF
