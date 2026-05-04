@@ -49,7 +49,6 @@ EOF
 
 echo "✅ BBR configs written to $ROCKCHIP_CFG"
 
-
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
 mkdir -p "$DTS_SAVE_DIR"
