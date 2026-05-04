@@ -26,6 +26,21 @@ echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;m
 # 添加 OpenAppFilter 插件源
 echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master' >> feeds.conf.default
 
+# 下载指定 dts 到目标目录，带校验
+DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+mkdir -p "$DTS_SAVE_DIR"
+
+wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts \
+-O "$DTS_SAVE_DIR/rk3528-hinlink-h29k.dts"
+
+# 验证是否下载成功
+if [ -f "$DTS_SAVE_DIR/rk3528-hinlink-h29k.dts" ]; then
+    echo "✅ rk3528-hinlink-h29k.dts 下载并保存成功"
+else
+    echo "❌ rk3528-hinlink-h29k.dts 下载失败"
+    exit 1
+fi
+
 # ==========================
 # 极简版：下载3个DTSI + 验证
 # ==========================
