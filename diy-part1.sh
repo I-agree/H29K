@@ -158,6 +158,35 @@ done
 
 echo "✅ BBR 全部配置检查/恢复完成"
 
+# ====== BEGIN: Predefine config via .config.override ======
+echo "🔧 Writing .config.override for u-boot-rk3528..."
+
+cat > /workdir/openwrt/.config.override << 'EOF'
+# RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
+CONFIG_TARGET_MULTI_ARCH=n
+CONFIG_TARGET_rockchip_armv8=y
+CONFIG_TARGET_ROCKCHIP_RK35XX_DEVICE_hinlink_h29k=y
+CONFIG_PACKAGE_uboot-rockchip=y
+CONFIG_PACKAGE_uboot-rockchip-v8=y
+CONFIG_PACKAGE_uboot-rockchip-hinlink_h29k=y
+CONFIG_PACKAGE_u-boot-rk3528=y
+CONFIG_PACKAGE_u-boot-rk3528-tpl=y
+CONFIG_TARGET_rockchip=y
+CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
+CONFIG_TRUSTED_FIRMWARE_A="rk3528"
+# Optional: Pin rkbin version to prevent accidental upgrade
+CONFIG_RKBIN_VERSION="2025.06.13"
+EOF
+
+echo "✅ .config.override written with RK3528 bootloader stack"
+ls -l /workdir/openwrt/.config.override
+
+# Now run defconfig — it will merge .config.override automatically
+cd /workdir/openwrt
+make defconfig > /dev/null 2>&1
+echo "✅ make defconfig completed with override applied"
+# ====== END ======
+
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置
 # ==============================================
