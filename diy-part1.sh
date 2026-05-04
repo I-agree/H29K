@@ -67,12 +67,12 @@ define Device/hinlink_h29k
     kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
     kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
     luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn \
-    luci-theme-argon imagemagick imagemagick-jpeg imagemagick-png imagemagick-gif curl irqbalance \
+    luci-theme-argon imagemagick imagemagick-jpeg imagemagick-png imagemagick-gif curl \
     luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn \
     luci-app-bbr luci-i18n-bbr-zh-cn luci-mod-admin-full \
     luci-app-irqbalance luci-i18n-irqbalance-zh-cn \
     dnscrypt-proxy luci-app-dnscrypt-proxy luci-i18n-dnscrypt-proxy-zh-cn \
-    luci-app-oaf appfilter luci-i18n-oaf-zh-cn
+    irqbalance luci-app-irqbalance luci-i18n-irqbalance-zh-cn
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
