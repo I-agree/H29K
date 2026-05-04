@@ -26,33 +26,27 @@ echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;m
 # 添加 OpenAppFilter 插件源
 echo 'src-git OpenAppFilter https://github.com/destan19/OpenAppFilter.git;master' >> feeds.conf.default
 
-# ============= 只下载 LEDE RK3528 DTS 文件夹（稳妥不缺文件） =============
-# 功能：下载 LEDE 的 rockchip dts 文件夹 → 自动解压 → 自动放置 → 自动清理
-# 不克隆仓库 | 不下载多余头文件 | 只拿设备树文件夹
+# ==========================
+# 极简版：下载3个DTSI + 验证
+# ==========================
 
-# 目标路径（官方 OpenWrt 标准目录）
-DTS_FOLDER="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+# 正确路径
+DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+mkdir -p "$DTS_DIR"
 
-# 创建目录
-mkdir -p $DTS_FOLDER
+# 下载地址前缀
+URL="https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 
-# 下载 LEDE 源码 master.zip（只解压需要的文件夹，超快）
-echo "正在下载 LEDE RK3528 设备树文件夹..."
-wget -q https://github.com/coolsnowwolf/lede/archive/refs/heads/master.zip -O lede-dts.zip
+# 下载 3 个文件
+wget -q "$URL/rk3528.dtsi" -O "$DTS_DIR/rk3528.dtsi"
+wget -q "$URL/rk3528-rock-2.dtsi" -O "$DTS_DIR/rk3528-rock-2.dtsi"
+wget -q "$URL/rk3528-pinctrl.dtsi" -O "$DTS_DIR/rk3528-pinctrl.dtsi"
 
-# 只解压 rockchip dts 文件夹（精确提取，不浪费空间）
-unzip -q lede-dts.zip "lede-master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/*" -d .
-
-# 复制整个文件夹到你的 OpenWrt 源码
-cp -rf lede-master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/* $DTS_FOLDER/
-
-# 清理临时文件
-rm -rf lede-master lede-dts.zip
-
-echo "✅ LEDE RK3528 设备树文件夹下载完成！"
-echo "✅ 路径：$DTS_FOLDER"
-echo "✅ gpio.h / rockchip.h 由内核自动提供，无需下载"
-# ======================================================================
+# 验证
+echo "验证文件是否下载成功..."
+for f in rk3528.dtsi rk3528-rock-2.dtsi rk3528-pinctrl.dtsi; do
+  [ -f "$DTS_DIR/$f" ] && echo "✅ $f 正常" || echo "❌ $f 缺失"
+done
 
 # ======================== 【添加 H29K：armv8.mk 设备定义】 ========================
 # ✅ 修复点3：DEVICE_DTS 使用标准社区命名 rk3528-hinlink-h29k（非 opc- 前缀）
@@ -172,6 +166,7 @@ CONFIG_PACKAGE_u-boot-rk3528-tpl=y
 CONFIG_TRUSTED_FIRMWARE_A="rk3528"
 CONFIG_PACKAGE_kmod-rockchip-pcie=y
 CONFIG_PACKAGE_kmod-usb-dwc3-rockchip=y
+CONFIG_PACKAGE_kmod-sound-soc-rockchip=y
 # Optional: Pin rkbin version to prevent accidental upgrade
 CONFIG_RKBIN_VERSION="2025.06.13"
 EOF
