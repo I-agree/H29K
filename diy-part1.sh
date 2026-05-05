@@ -80,6 +80,11 @@ else
     exit 1
 fi
 
+mkdir -p package/boot/uboot-rockchip/configs target/linux/rockchip/image
+wget -O package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
+wget -O target/linux/rockchip/image/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/hinlink_h29k_defconfig
+[ -f package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig ] && [ -f target/linux/rockchip/image/hinlink_h29k_defconfig ] || { echo "❌ H29K config download failed" >&2; exit 1; }
+
 # ======================== 【添加 H29K：armv8.mk 设备定义】 ========================
 # ✅ 修复点3：DEVICE_DTS 使用标准社区命名 rk3528-hinlink-h29k（非 opc- 前缀）
 TARGET_MK="target/linux/rockchip/image/armv8.mk"
