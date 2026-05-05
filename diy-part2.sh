@@ -4,7 +4,7 @@ set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝
 # ======================== 【资源准备】 ========================
 
 # 创建开机 LOGO 存放目录
-mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
+mkdir -p files/etc/config/screen bin/targets/rockchip/armv8/
 
 # 定义通用下载函数（带重试、超时、失败退出）
 download_file() {
