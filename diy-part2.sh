@@ -2,54 +2,6 @@
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
 # ======================== 【资源准备】 ========================
-echo "🔧 正在按 OpenWrt 官方主线路径注入 H29K 文件..."
-
-# ✅ 1. U-Boot defconfig → 直接复制到官方 configs/ 目录（无需重命名）
-UBOOT_SRC="files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
-UBOOT_DST="package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
-if [ ! -f "$UBOOT_SRC" ]; then
-  echo "❌ 错误：U-Boot defconfig 源文件不存在：$UBOOT_SRC"
-  exit 1
-fi
-mkdir -p "$(dirname "$UBOOT_DST")"
-cp -f "$UBOOT_SRC" "$UBOOT_DST"
-echo "✅ 已注入 U-Boot defconfig → $UBOOT_DST"
-
-# ✅ 2. DTS 文件 → 注入到 target/linux/rockchip/files/ 下的标准路径
-#    官方约定：所有自定义 DTS 必须放在 target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/
-DTS_SRC="files/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts"
-DTS_DST="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
-if [ ! -f "$DTS_SRC" ]; then
-  echo "❌ 错误：DTS 源文件不存在：$DTS_SRC"
-  exit 1
-fi
-mkdir -p "$(dirname "$DTS_DST")"
-cp -f "$DTS_SRC" "$DTS_DST"
-echo "✅ 已注入 DTS → $DTS_DST"
-
-# ✅ 3. Linux 内核 defconfig → 直接复制到 image/ 目录（官方标准位置）
-DEFCONFIG_SRC="files/target/linux/rockchip/image/hinlink_h29k_defconfig"
-DEFCONFIG_DST="target/linux/rockchip/image/hinlink_h29k_defconfig"
-if [ ! -f "$DEFCONFIG_SRC" ]; then
-  echo "❌ 错误：Linux defconfig 源文件不存在：$DEFCONFIG_SRC"
-  exit 1
-fi
-mkdir -p "$(dirname "$DEFCONFIG_DST")"
-cp -f "$DEFCONFIG_SRC" "$DEFCONFIG_DST"
-echo "✅ 已注入 Linux defconfig → $DEFCONFIG_DST"
-
-# ✅ 4. 强制验证：三个目标文件必须存在且非空
-for FILE in "$UBOOT_DST" "$DTS_DST" "$DEFCONFIG_DST"; do
-  if [ ! -s "$FILE" ]; then
-    echo "❌ 严重错误：注入文件为空或缺失：$FILE"
-    ls -lh "$FILE"
-    exit 1
-  fi
-done
-
-printf '\n'
-echo "✅ 所有文件注入完成，路径与 OpenWrt 2026.04+ 官方主线完全一致。"
-# ======================================================================
 
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
