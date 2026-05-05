@@ -288,3 +288,7 @@ CONFIG_QCOM_QDF2400_ERRATUM_0065=n
 CONFIG_QCOM_FALKOR_ERRATUM_E1041=n
 CONFIG_NVIDIA_CARMEL_CNP_ERRATUM=n
 EOF
+
+# 删除两个与 ARM64_PAN=y 冲突的 config 行
+sed -i '/^CONFIG_ARM64_PSEUDO_NMI=/d' target/linux/rockchip/armv8/config-6.12
+sed -i '/^CONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY=/d' target/linux/rockchip/armv8/config-6.12
