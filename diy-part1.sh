@@ -178,6 +178,7 @@ CONFIG_UNMAP_KERNEL_AT_EL0=n
 CONFIG_RODATA_FULL_DEFAULT_ENABLED=n
 CONFIG_ARM64_TAGGED_ADDR_ABI=n
 CONFIG_ARM64_SW_TTBR0_PAN=n
+CONFIG_ARM64_PSEUDO_NMI=n
 
 # TCP BBR Support (required for DEFAULT_TCP_CONG="bbr")
 # 注意：6.12.x 内核要求 CONFIG_DEFAULT_TCP_CONG 必须为小写字符串，带双引号
@@ -295,5 +296,5 @@ CONFIG_NVIDIA_CARMEL_CNP_ERRATUM=n
 EOF
 
 # 删除两个与 ARM64_PAN=y 冲突的 config 行
-sed -i '/^CONFIG_ARM64_PSEUDO_NMI=/d' target/linux/rockchip/armv8/config-6.12
+sed -i '/^CONFIG_COMPAT_32BIT_TIME=/d' target/linux/rockchip/armv8/config-6.12
 sed -i '/^CONFIG_MITIGATE_SPECTRE_BRANCH_HISTORY=/d' target/linux/rockchip/armv8/config-6.12
