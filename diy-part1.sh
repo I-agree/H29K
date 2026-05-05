@@ -157,6 +157,7 @@ endef\n\
 # 内容覆盖写入 config-6.12（注意：使用 > 而非 >>，确保干净替换）
 cat > target/linux/rockchip/armv8/config-6.12 << 'EOF'
 # === Hinlink H29K Hardware Mandatory Built-in Drivers (RK3528, Kernel 6.12) ===
+CONFIG_ROCKCHIP_ERRATUM_3568002=y
 
 # TCP BBR Support (required for DEFAULT_TCP_CONG="bbr")
 # 注意：6.12.x 内核要求 CONFIG_DEFAULT_TCP_CONG 必须为小写字符串，带双引号
