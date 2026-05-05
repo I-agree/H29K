@@ -247,6 +247,20 @@ fi
 
 echo "✅ 检查成功：CONFIG_NET_SCH_FQ=y 已启用"
 
+# ==================== H29K 配置文件存在性验证（diy-part2.sh 专用） ====================
+# ✅ 作用：在构建中途（defconfig 已执行后）再次确认两个关键配置文件已成功下载并就位
+# ✅ 原因：防止 diy-part1.sh 下载失败、路径错误或被其他脚本误删，导致后续编译静默出错
+# ✅ 策略：严格检查「普通文件是否存在」，任一缺失立即报错并终止构建，不妥协
+
+# 检查 U-Boot 配置文件：应位于 package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
+[ -f package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig ] || { echo "❌ 错误：U-Boot 配置文件缺失！请检查 diy-part1.sh 是否执行成功，或手动运行 wget 下载" >&2; exit 1; }
+
+# 检查 Rockchip 固件镜像配置文件：应位于 target/linux/rockchip/image/hinlink_h29k_defconfig
+[ -f target/linux/rockchip/image/hinlink_h29k_defconfig ] || { echo "❌ 错误：Rockchip 镜像配置文件缺失！该文件决定 kernel/image 打包行为，请勿遗漏" >&2; exit 1; }
+
+# 全部通过 → 输出友好提示，继续构建流程
+echo "✅ 成功：H29K 两份配置文件均已就位，构建流程将继续..."
+
 printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
