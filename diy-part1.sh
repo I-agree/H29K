@@ -201,7 +201,7 @@ define Device/hinlink_h29k
     luci-app-bbr luci-i18n-bbr-zh-cn luci-mod-admin-full \
     luci-app-irqbalance luci-i18n-irqbalance-zh-cn \
     dnscrypt-proxy luci-app-dnscrypt-proxy luci-i18n-dnscrypt-proxy-zh-cn \
-    irqbalance luci-app-irqbalance luci-i18n-irqbalance-zh-cn
+    irqbalance luci-app-irqbalance luci-i18n-irqbalance-zh-cn -urngd
 endef
 TARGET_DEVICES += hinlink_h29k
 EOF
