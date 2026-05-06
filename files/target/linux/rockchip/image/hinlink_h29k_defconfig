@@ -33,12 +33,15 @@ CONFIG_PACKAGE_luci-proto-qmi=y
 CONFIG_PACKAGE_luci-proto-mbim=y
 
 # === ST7789V display stack (framebuffer + DRM + panel) ===
+# CONFIG_PACKAGE_kmod-fb-ST7789V=y ← kept for U-Boot fbdev fallback & debug; builtin DRM panel (st7789v) is primary
 CONFIG_PACKAGE_kmod-fb-ST7789V=y
 CONFIG_PACKAGE_kmod-drm-rockchip=y
 CONFIG_PACKAGE_kmod-drm-panel-simple=y
 CONFIG_PACKAGE_kmod-drm-bridge-analogix-anx6345=y
 CONFIG_PACKAGE_kmod-backlight=y
 CONFIG_PACKAGE_kmod-pwm-rockchip=y
+# Explicitly disable DRM panel module (since we use builtin =y)
+CONFIG_PACKAGE_kmod-drm-panel-st7789v=n
 
 # === Touch & Input ===
 CONFIG_PACKAGE_kmod-input-ft6236=y
