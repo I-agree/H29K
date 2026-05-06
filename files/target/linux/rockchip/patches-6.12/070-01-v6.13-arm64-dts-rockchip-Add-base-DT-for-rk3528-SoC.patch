@@ -215,7 +215,7 @@ Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 +			clock-names = "hclk_trng";
 +			resets = <&cru SRST_HRESETN_TRNG_NS>;
 +			reset-names = "reset";
-+			status = "disabled";
++			status = "okay";
 +		};
 +
 +		usb2phy: usb2-phy@ffdf0000 {
