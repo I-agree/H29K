@@ -1,8 +1,8 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# File: .github/workflows/openwrt-bulder.yml
-# Description: Build OpenWrt using GitHub Actions
+# File: .github/workflows/openwrt-builder.yml
+# Description: Build OpenWrt using GitHub Actions (Fixed for RK3528-H29K fragment)
 #
 # Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
 #
@@ -73,17 +73,43 @@ jobs:
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
-        # <!-- ✅ 修改点 1：删除危险的直接 mv → 避免污染 .config -->
-        # [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        # 🇨🇳 正确加载 fragment：复制到 openwrt/ 目录，保持原文件名（rk3528-hinlink-h29k.config）
+        [ -e $CONFIG_FILE ] && cp $CONFIG_FILE openwrt/ || { echo "❌ ERROR: $CONFIG_FILE not found in repo root"; exit 1; }
+        # ← 原因：OpenWrt kernel_olddefconfig 只扫描 *.config（非 .config）
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: Generate initial configuration
+      # 🇨🇳 必须首个构建命令：生成合法 .config 基础（含 TARGET/DEVICE）
+      run: cd openwrt && make defconfig
+      # ← 原因：defconfig 是 OpenWrt 配置流程唯一法定起点
+
+    - name: Apply device kernel fragment
+      # 🇨🇳 唯一合法 fragment 应用点：feeds install 后，download 前
+      run: |
+        cd openwrt
+        if [ ! -f "rk3528-hinlink-h29k.config" ]; then
+          echo "❌ ERROR: rk3528-hinlink-h29k.config missing in openwrt/ root"
+          exit 1
+        fi
+        make kernel_olddefconfig V=s
+        # ← 原因：OpenWrt 官方指定 fragment merge 命令
+        # 🇨🇳 强制验证关键驱动是否生效（防静默失败）
+        if ! grep -q "CONFIG_DRM_PANEL_ST7789V=y" .config; then
+          echo "❌ ERROR: CONFIG_DRM_PANEL_ST7789V not enabled"
+          exit 1
+        fi
+        if ! grep -q "CONFIG_INPUT_FT6236=y" .config; then
+          echo "❌ ERROR: CONFIG_INPUT_FT6236 not enabled"
+          exit 1
+        fi
+        echo "✅ Fragment applied: ST7789V + FT6236 enabled"
 
     - name: Download package
       id: package
       run: |
         cd openwrt
-        make defconfig  # <-- 此步由 diy-part2.sh 完成，此处可删（但保留也无害）
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
@@ -93,15 +119,6 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-
-        # <!-- ✅ 修改点 2：增加防御性检查，确保 H29K 配置已生效 -->
-        if ! grep -q "CONFIG_TARGET_PROFILE_HINLINK_H29K=y" .config; then
-          echo "❌ 错误：.config 中未启用 Hinlink H29K 配置！请检查 diy-part2.sh 是否正常执行。"
-          echo "🔍 当前 .config 开头 15 行："
-          head -15 .config
-          exit 1
-        fi
-
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
