@@ -248,15 +248,3 @@ printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
-
-# diy-part2.sh —— 安全加载配置（必须存在且可执行）
-set -e
-
-echo "🔧 正在通过 'make defconfig' 加载自定义配置：$GITHUB_WORKSPACE/rk3528-hinlink-h29k.config"
-make defconfig CONFIG_FILE="$GITHUB_WORKSPACE/rk3528-hinlink-h29k.config"
-
-echo "⚙️  正在同步内核配置（自动从 target/linux/rockchip/armv8/config-6.12 加载驱动选项）"
-make kernel_olddefconfig
-
-echo "✅ 自定义配置加载完成，H29K 目标已就绪"
-
