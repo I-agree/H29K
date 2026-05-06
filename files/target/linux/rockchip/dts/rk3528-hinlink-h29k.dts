@@ -426,7 +426,9 @@
 
 	usb2phy0_host: host-port {
 		#phy-cells = <0>;
-		status = "okay";
+		interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "linestate";
+		status = "disabled";
 	};
 
 	usb2phy0_otg: otg-port {
