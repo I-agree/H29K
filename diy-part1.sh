@@ -80,6 +80,14 @@ else
     exit 1
 fi
 
+# 下载修改的rk3528.dtsi补丁到正确路径并验证
+wget -O ./target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch \
+https://raw.githubusercontent.com/I-agree/H29K/blob/main/files/target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
+
+# 验证文件是否存在、大小是否正常、是否可解析
+ls -lh ./target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
+grep -q "usb2phy0_host" ./target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch && echo -e "\033[32m✅ 验证成功：包含 usb2phy0_host / usb2phy0_otg / rng\033[0m" || echo -e "\033[31m❌ 验证失败\033[0m"
+
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
 wget -O package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
 wget -O target/linux/rockchip/image/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/hinlink_h29k_defconfig
