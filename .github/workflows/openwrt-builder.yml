@@ -80,11 +80,6 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 生成初始配置
-      # 运行 make defconfig 创建基础 .config 文件
-      run: cd openwrt && make defconfig
-      # 说明：这是 OpenWrt 配置流程的法定起点，必须在应用片段前执行
-
     - name: 应用设备内核配置片段
       # 在安装源包后、下载前，应用 RK3528-H29K 配置片段
       run: |
