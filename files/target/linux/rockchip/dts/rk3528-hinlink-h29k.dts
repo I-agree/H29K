@@ -401,7 +401,7 @@ usb2phy0_host: host-port {
 	interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
 	interrupt-names = "linestate";
 	phy-supply = <&vcc5v0_usb>;
-	status = "disabled";
+	status = "okay";
 };
 
 usb2phy0_otg: otg-port {
@@ -413,7 +413,7 @@ usb2phy0_otg: otg-port {
 			  "otg-id",
 			  "linestate";
 	phy-supply = <&vcc5v0_usb>;
-	status = "disabled";
+	status = "okay";
 };
 
 &usb_host0_ehci {
@@ -430,12 +430,12 @@ usb2phy0_otg: otg-port {
 };
 
 rng: rng@ffc50000 {
-    compatible = "rockchip,rkrng";
-    reg = <0x0 0xffc50000 0x0 0x200>;
-    interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-    clocks = <&scmi_clk SCMI_HCLK_TRNG>;
-    clock-names = "hclk_trng";
-    resets = <&cru SRST_HRESETN_TRNG_NS>;
-    reset-names = "reset";
-    status = "okay";
+	compatible = "rockchip,rkrng";
+	reg = <0x0 0xffc50000 0x0 0x200>;
+	interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+	clocks = <&scmi_clk SCMI_HCLK_TRNG>;
+	clock-names = "hclk_trng";
+	resets = <&cru SRST_HRESETN_TRNG_NS>;
+	reset-names = "reset";
+	status = "okay";
 };
