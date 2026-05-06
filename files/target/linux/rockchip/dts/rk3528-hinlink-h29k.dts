@@ -396,14 +396,24 @@
 	status = "okay";
 };
 
-&usb2phy0_host {
+usb2phy0_host: host-port {
+	#phy-cells = <0>;
+	interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+	interrupt-names = "linestate";
 	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
+	status = "disabled";
 };
 
-&usb2phy0_otg {
+usb2phy0_otg: otg-port {
+	#phy-cells = <0>;
+	interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
+		     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+	interrupt-names = "otg-bvalid",
+			  "otg-id",
+			  "linestate";
 	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
+	status = "disabled";
 };
 
 &usb_host0_ehci {
@@ -419,31 +429,6 @@
 	status = "okay";
 };
 
-// -------------- 自动补齐缺失的三个标签，解决编译报错 --------------
-// 用于兼容 官方 / 6.12 内核 rk3528.dtsi 缺少 host/otg 子节点
-&usb2phy0 {
-	#phy-cells = <0>;
-
-	usb2phy0_host: host-port {
-		#phy-cells = <0>;
-		interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-		interrupt-names = "linestate";
-		status = "disabled";
-	};
-
-	usb2phy0_otg: otg-port {
-		#phy-cells = <0>;
-		interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-			     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-		interrupt-names = "otg-bvalid",
-				  "otg-id",
-				  "linestate";
-		status = "disabled";
-	};
-};
-
-// 官方 RK3528 TRNG 硬件随机数（从 aiamadeus 标准 rk3528.dtsi 提取）
 rng: rng@ffc50000 {
     compatible = "rockchip,rkrng";
     reg = <0x0 0xffc50000 0x0 0x200>;
@@ -454,4 +439,3 @@ rng: rng@ffc50000 {
     reset-names = "reset";
     status = "okay";
 };
-// --------------------------------------------------------------
