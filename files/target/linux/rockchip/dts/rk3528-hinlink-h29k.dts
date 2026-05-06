@@ -433,7 +433,13 @@
 
 	usb2phy0_otg: otg-port {
 		#phy-cells = <0>;
-		status = "okay";
+		interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "otg-bvalid",
+				  "otg-id",
+				  "linestate";
+		status = "disabled";
 	};
 };
 
