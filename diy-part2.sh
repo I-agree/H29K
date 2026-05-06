@@ -2,6 +2,13 @@
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
 # ======================== 【资源准备】 ========================
+# 下载官方标准 rk3528.dtsi 到正确路径并验证
+wget -O ./target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi \
+https://raw.githubusercontent.com/aiamadeus/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi
+
+# 验证文件是否存在、大小是否正常、是否可解析
+ls -lh ./target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi
+grep -q "usb2phy0_host" ./target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi && echo -e "\033[32m✅ 验证成功：包含 usb2phy0_host / usb2phy0_otg / rng\033[0m" || echo -e "\033[31m❌ 验证失败\033[0m"
 
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8/
