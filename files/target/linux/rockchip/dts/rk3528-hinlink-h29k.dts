@@ -393,7 +393,10 @@
 };
 
 &usb2phy {
-	status = "okay";
+    resets = <&cru SRST_A_USB2PHY0>;
+    clocks = <&cru SCLK_USB2PHY0_REF>;
+    clock-names = "ref";
+    status = "okay";
 };
 
 usb2phy0_host: host-port {
