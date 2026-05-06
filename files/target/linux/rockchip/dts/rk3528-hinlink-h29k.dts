@@ -7,8 +7,8 @@
 #include "rk3528.dtsi"
 
 / {
-	model = "HINLINK H29K";
-	compatible = "hinlink,h29k", "rockchip,rk3528";
+	model = "HINLINK OPC-H29K Board";
+	compatible = "hinlink,opc-h29k", "rockchip,rk3528";
 
 	aliases {
 		mmc0 = &sdhci;
@@ -396,7 +396,6 @@
 	status = "okay";
 };
 
-usb2phy0_host: host-port {
 &usb2phy0_host {
 	phy-supply = <&vcc5v0_usb>;
 	status = "okay";
