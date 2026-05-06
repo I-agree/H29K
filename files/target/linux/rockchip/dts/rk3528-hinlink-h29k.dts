@@ -439,7 +439,7 @@
 		interrupt-names = "otg-bvalid",
 				  "otg-id",
 				  "linestate";
-		status = "okay";
+		status = "disabled";
 	};
 };
 
@@ -452,6 +452,6 @@ rng: rng@ffc50000 {
     clock-names = "hclk_trng";
     resets = <&cru SRST_HRESETN_TRNG_NS>;
     reset-names = "reset";
-    status = "disabled";
+    status = "okay";
 };
 // --------------------------------------------------------------
