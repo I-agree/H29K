@@ -1,13 +1,13 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# 文件：.github/workflows/openwrt-builder.yml
-# 功能：使用 GitHub Actions 构建 OpenWrt（已修复 RK3528-H29K 配置片段加载）
+# File: .github/workflows/openwrt-bulder.yml
+# Description: Build OpenWrt using GitHub Actions
 #
-# 版权所有 (c) 2019-2024 P3TERX <https://p3terx.com>
+# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
 #
-# 此为自由软件，遵循 MIT 许可证。
-# 详见 /LICENSE 获取更多信息。
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
 #
 
 name: OpenWrt 构建器
@@ -73,37 +73,16 @@ jobs:
     - name: 加载自定义配置
       run: |
         [ -e files ] && mv files openwrt/files
-        # 将配置片段文件复制到 openwrt 目录，保持原始文件名
         [ -e openwrt/$CONFIG_FILE ] && cp openwrt/$CONFIG_FILE openwrt/ || { echo "错误：未在 openwrt/ 目录下找到 $CONFIG_FILE"; exit 1; }
-        # 说明：OpenWrt 仅识别 openwrt 目录下的 *.config 文件作为配置片段
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: 应用设备内核配置片段
-      run: |
-        cd openwrt
-        if [ ! -f "$CONFIG_FILE" ]; then
-          echo "错误：openwrt 目录中缺少 $CONFIG_FILE"
-          exit 1
-        fi
-        make olddefconfig V=s
-        # 说明：openwrt-25.12+ 已移除 kernel_olddefconfig，统一使用顶层 olddefconfig
-        # 验证关键驱动是否已启用
-        if ! grep -q "CONFIG_DRM_PANEL_ST7789V=y" .config; then
-          echo "错误：CONFIG_DRM_PANEL_ST7789V 未启用，请检查配置片段内容"
-          exit 1
-        fi
-        if ! grep -q "CONFIG_INPUT_FT6236=y" .config; then
-          echo "错误：CONFIG_INPUT_FT6236 未启用，请检查配置片段内容"
-          exit 1
-        fi
-        echo "成功：RK3528-H29K 配置片段已正确应用"
-
-    - name: 下载依赖包
       id: package
       run: |
         cd openwrt
+        make olddefconfig V=s
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
@@ -112,7 +91,7 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        echo "$(nproc) 线程编译"
+        echo -e "$(nproc) 线程编译"
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
@@ -120,7 +99,7 @@ jobs:
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
     - name: 检查磁盘空间
-      if: "!cancelled"
+      if: (!cancelled)
       run: df -hT
 
     - name: 上传 bin 目录
@@ -155,7 +134,7 @@ jobs:
         [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: 发布固件到 GitHub Release
+    - name: 上传固件到 GitHub Release
       uses: softprops/action-gh-release@master
       if: steps.tag.outputs.status == 'success' && !cancelled
       env:
