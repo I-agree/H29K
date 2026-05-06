@@ -418,3 +418,24 @@
 	dr_mode = "host";
 	status = "okay";
 };
+
+// -------------- 自动补齐缺失的三个标签，解决编译报错 --------------
+// 用于兼容 官方 / 6.12 内核 rk3528.dtsi 缺少 host/otg 子节点
+&usb2phy0 {
+	#phy-cells = <0>;
+
+	usb2phy0_host: host-port {
+		#phy-cells = <0>;
+		status = "okay";
+	};
+
+	usb2phy0_otg: otg-port {
+		#phy-cells = <0>;
+		status = "okay";
+	};
+};
+
+&rng {
+	status = "okay";
+};
+// --------------------------------------------------------------
