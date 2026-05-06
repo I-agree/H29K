@@ -82,7 +82,7 @@ fi
 
 # 下载修改的rk3528.dtsi补丁到正确路径并验证
 wget -O ./target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch \
-https://raw.githubusercontent.com/I-agree/H29K/blob/main/files/target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
+https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
 
 # 验证文件是否存在、大小是否正常、是否可解析
 ls -lh ./target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
