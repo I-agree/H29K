@@ -74,22 +74,21 @@ jobs:
       run: |
         [ -e files ] && mv files openwrt/files
         # 将配置片段文件复制到 openwrt 目录，保持原始文件名
-        [ -e $CONFIG_FILE ] && cp $CONFIG_FILE openwrt/ || { echo "错误：未在仓库根目录找到 $CONFIG_FILE"; exit 1; }
+        [ -e openwrt/$CONFIG_FILE ] && cp openwrt/$CONFIG_FILE openwrt/ || { echo "错误：未在 openwrt/ 目录下找到 $CONFIG_FILE"; exit 1; }
         # 说明：OpenWrt 仅识别 openwrt 目录下的 *.config 文件作为配置片段
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: 应用设备内核配置片段
-      # 在安装源包后、下载前，应用 RK3528-H29K 配置片段
       run: |
         cd openwrt
-        if [ ! -f "rk3528-hinlink-h29k.config" ]; then
-          echo "错误：openwrt 目录中缺少 rk3528-hinlink-h29k.config"
+        if [ ! -f "$CONFIG_FILE" ]; then
+          echo "错误：openwrt 目录中缺少 $CONFIG_FILE"
           exit 1
         fi
-        make kernel_olddefconfig V=s
-        # 说明：OpenWrt 官方指定的配置片段合并命令
+        make olddefconfig V=s
+        # 说明：openwrt-25.12+ 已移除 kernel_olddefconfig，统一使用顶层 olddefconfig
         # 验证关键驱动是否已启用
         if ! grep -q "CONFIG_DRM_PANEL_ST7789V=y" .config; then
           echo "错误：CONFIG_DRM_PANEL_ST7789V 未启用，请检查配置片段内容"
@@ -121,7 +120,7 @@ jobs:
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
     - name: 检查磁盘空间
-      if: "!cancelled()"
+      if: "!cancelled"
       run: df -hT
 
     - name: 上传 bin 目录
@@ -133,7 +132,7 @@ jobs:
 
     - name: 整理固件文件
       id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled
       run: |
         cd openwrt/bin/targets/*/*
         rm -rf packages
@@ -142,14 +141,14 @@ jobs:
 
     - name: 上传固件目录
       uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled()
+      if: steps.organize.outputs.status == 'success' && !cancelled
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}
 
     - name: 生成发布版本号
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled
       run: |
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
@@ -158,7 +157,7 @@ jobs:
 
     - name: 发布固件到 GitHub Release
       uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.status == 'success' && !cancelled()
+      if: steps.tag.outputs.status == 'success' && !cancelled
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
@@ -174,7 +173,7 @@ jobs:
 
     - name: 清理旧的发布版本
       uses: dev-drprasad/delete-older-releases@master
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled
       with:
         keep_latest: 3
         delete_tags: true
