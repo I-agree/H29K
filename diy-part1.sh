@@ -118,13 +118,52 @@ else
     exit 1
 fi
 
-# 下载修改的rk3528.dtsi补丁到正确路径并验证
-wget -O ./target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch \
-https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
+set -euo pipefail
 
-# 验证文件是否存在、大小是否正常、是否可解析
-ls -lh ./target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
-grep -q "usb2phy0_host" ./target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch && echo -e "\033[32m✅ 验证成功：包含 usb2phy0_host / usb2phy0_otg / rng\033[0m" || echo -e "\033[31m❌ 验证失败\033[0m"
+# ======================== 配置 ========================
+# 真正的 coolsnowwolf lede 仓库地址
+REPO_URL="https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+
+# 正确路径（OpenWrt 编译优先读取）
+DTS_DIR="./target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+
+# 要下载的两个关键文件
+FILES="rk3528.dtsi rk3528-pinctrl.dtsi"
+
+# ======================== 开始执行 ========================
+echo -e "\033[33m=====================================\033[0m"
+echo -e "\033[33m  下载 coolsnowwolf/lede 原版 RK3528 设备树  \033[0m"
+echo -e "\033[33m=====================================\033[0m\n"
+
+# 创建目录
+mkdir -p "$DTS_DIR"
+
+# 下载 + 校验
+for file in $FILES; do
+    echo "→ 下载: $file"
+    wget -q --show-progress -O "$DTS_DIR/$file" "$REPO_URL/$file"
+
+    # 检查是否下载成功
+    if [ ! -s "$DTS_DIR/$file" ]; then
+        echo -e "\033[31m❌ 下载失败：$file 不存在或为空，停止编译！\033[0m"
+        exit 1
+    fi
+
+    # 检查 DTS 语法（关键！）
+    dtc -I dts -O dtb "$DTS_DIR/$file" -o /dev/null 2>/dev/null
+    if [ $? -ne 0 ]; then
+        echo -e "\033[31m❌ 错误：$file 语法错误，停止编译！\033[0m"
+        exit 1
+    fi
+
+    echo -e "\033[32m✅ $file 下载成功 + 校验通过！\033[0m"
+done
+
+# 最终显示
+echo -e "\n\033[32m=====================================\033[0m"
+echo -e "✅ 全部文件下载完成！路径如下："
+ls -lh "$DTS_DIR"/rk3528*.dtsi
+echo -e "\033[32m=====================================\033[0m\n"
 
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
 wget -O package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
