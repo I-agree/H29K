@@ -401,7 +401,7 @@ usb2phy0_host: host-port {
 	interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
 	interrupt-names = "linestate";
 	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
+	status = "disabled";
 };
 
 usb2phy0_otg: otg-port {
@@ -413,7 +413,7 @@ usb2phy0_otg: otg-port {
 			  "otg-id",
 			  "linestate";
 	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
+	status = "disabled";
 };
 
 &usb_host0_ehci {
