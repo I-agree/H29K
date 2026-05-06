@@ -393,30 +393,18 @@
 };
 
 &usb2phy {
-    resets = <&cru SRST_A_USB2PHY0>;
-    clocks = <&cru SCLK_USB2PHY0_REF>;
-    clock-names = "ref";
-    status = "okay";
+	status = "okay";
 };
 
 usb2phy0_host: host-port {
-	#phy-cells = <0>;
-	interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
-	interrupt-names = "linestate";
+&usb2phy0_host {
 	phy-supply = <&vcc5v0_usb>;
-	status = "disabled";
+	status = "okay";
 };
 
-usb2phy0_otg: otg-port {
-	#phy-cells = <0>;
-	interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-		     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-		     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
-	interrupt-names = "otg-bvalid",
-			  "otg-id",
-			  "linestate";
+&usb2phy0_otg {
 	phy-supply = <&vcc5v0_usb>;
-	status = "disabled";
+	status = "okay";
 };
 
 &usb_host0_ehci {
@@ -441,4 +429,22 @@ rng: rng@ffc50000 {
 	resets = <&cru SRST_HRESETN_TRNG_NS>;
 	reset-names = "reset";
 	status = "okay";
+};
+
+&usb2phy0 {
+	usb2phy0_host: host-port {
+		#phy-cells = <0>;
+		interrupts = <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "linestate";
+		status = "disabled";
+	};
+
+	usb2phy0_otg: otg-port {
+		#phy-cells = <0>;
+		interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
+			     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "otg-bvalid", "otg-id", "linestate";
+		status = "disabled";
+	};
 };
