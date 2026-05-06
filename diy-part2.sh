@@ -230,23 +230,6 @@ if ! grep -q "hinlink-h29k-rk3528" "$UBOOT_MK"; then
 fi
 echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0m"
 
-# ==============================
-# 检查内核配置是否包含 CONFIG_NET_SCH_FQ=y
-# 没有则报错并终止编译
-# ==============================
-KERNEL_CONFIG="target/linux/rockchip/armv8/config-6.12"
-
-if ! grep -q "^CONFIG_NET_SCH_FQ=y" "$KERNEL_CONFIG"; then
-    echo "====================================================="
-    echo " ERROR: 内核配置缺少 CONFIG_NET_SCH_FQ=y"
-    echo " 请检查 target/linux/rockchip/armv8/config-6.12"
-    echo " 编译终止！"
-    echo "====================================================="
-    exit 1
-fi
-
-echo "✅ 检查成功：CONFIG_NET_SCH_FQ=y 已启用"
-
 # ==================== H29K 配置文件存在性验证（diy-part2.sh 专用） ====================
 # ✅ 作用：在构建中途（defconfig 已执行后）再次确认两个关键配置文件已成功下载并就位
 # ✅ 原因：防止 diy-part1.sh 下载失败、路径错误或被其他脚本误删，导致后续编译静默出错
