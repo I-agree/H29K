@@ -73,7 +73,8 @@ jobs:
     - name: Load custom configuration
       run: |
         [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        # <!-- ✅ 修改点 1：删除危险的直接 mv → 避免污染 .config -->
+        # [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
@@ -82,7 +83,7 @@ jobs:
       id: package
       run: |
         cd openwrt
-        make defconfig
+        make defconfig  # <-- 此步由 diy-part2.sh 完成，此处可删（但保留也无害）
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
@@ -92,6 +93,15 @@ jobs:
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
+
+        # <!-- ✅ 修改点 2：增加防御性检查，确保 H29K 配置已生效 -->
+        if ! grep -q "CONFIG_TARGET_PROFILE_HINLINK_H29K=y" .config; then
+          echo "❌ 错误：.config 中未启用 Hinlink H29K 配置！请检查 diy-part2.sh 是否正常执行。"
+          echo "🔍 当前 .config 开头 15 行："
+          head -15 .config
+          exit 1
+        fi
+
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
