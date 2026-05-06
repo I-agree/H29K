@@ -18,7 +18,7 @@ Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
 --- /dev/null
 +++ b/arch/arm64/boot/dts/rockchip/rk3528.dtsi
-@@ -0,0 +1,232 @@
+@@ -0,0 +1,228 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * Copyright (c) 2022 Rockchip Electronics Co., Ltd.
