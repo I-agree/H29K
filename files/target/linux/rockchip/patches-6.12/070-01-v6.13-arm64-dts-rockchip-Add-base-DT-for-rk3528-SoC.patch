@@ -12,8 +12,8 @@ Signed-off-by: Yao Zi <ziyao@disroot.org>
 Link: https://lore.kernel.org/r/20240829092705.6241-4-ziyao@disroot.org
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm64/boot/dts/rockchip/rk3528.dtsi | 232 +++++++++++++++++++++++
- 1 file changed, 232 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3528.dtsi | 228 +++++++++++++++++++++++
+ 1 file changed, 228 insertions(+)
  create mode 100644 arch/arm64/boot/dts/rockchip/rk3528.dtsi
 
 --- /dev/null
