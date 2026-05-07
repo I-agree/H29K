@@ -65,7 +65,8 @@ sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
 
 echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
 
-rm -f target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
+# 删除导致 rk3528.dtsi 补丁冲突的文件
+rm -vf target/linux/rockchip/patches-6.12/070-02-v6.15-arm64-dts-rockchip-Add-clock-generators-for-RK3528-SoC.patch
 
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
