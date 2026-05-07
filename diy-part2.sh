@@ -96,7 +96,6 @@ echo "✅ All critical RK3528 symbols confirmed in both configs"
 echo "🎉 diy-part2.sh completed successfully."
 echo "➡️  Next: Run 'make defconfig' to apply changes to .config"
 
-
 # ======================== 【资源准备】 ========================
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8/
