@@ -59,11 +59,7 @@ CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 CONFIG_PACKAGE_u-boot-rk3528=y
 CONFIG_PACKAGE_u-boot-rk3528-tpl=y
 CONFIG_TRUSTED_FIRMWARE_A="rk3528"
-CONFIG_PACKAGE_kmod-rockchip-pcie=y
 CONFIG_PACKAGE_kmod-usb-dwc3-rockchip=y
-CONFIG_PACKAGE_kmod-sound-soc-rockchip=y
-# Optional: Pin rkbin version to prevent accidental upgrade
-CONFIG_RKBIN_VERSION="2025.06.13"
 EOF
 
 echo "✅ .config.override written with RK3528 bootloader stack"
