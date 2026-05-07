@@ -65,43 +65,7 @@ sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
 
 echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
 
-rm -f target/linux/rockchip/patches-6.12/101-arm64-dts-rockchip-Add-HINLINK-H28K.patch
-rm -f target/linux/rockchip/patches-6.12/070-20-v6.17-arm64-dts-rockchip-Fix-pinctrl-node-names-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-04-v6.15-arm64-dts-rockchip-Add-pinctrl-and-gpio-nodes-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/163-02-arm64-dts-rockchip-Add-USB-nodes-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/071-01-v6.13-arm64-dts-rockchip-Add-Radxa-e20c-board.patch
-rm -f target/linux/rockchip/patches-6.12/071-03-v6.15-arm64-dts-rockchip-Add-leds-node-to-Radxa-E20C.patch
-rm -f target/linux/rockchip/patches-6.12/070-13-v6.16-arm64-dts-rockchip-Add-pwm-nodes-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-02-v6.15-arm64-dts-rockchip-Add-clock-generators-for-RK3528-SoC.patch
-rm -f target/linux/rockchip/patches-6.12/163-03-arm64-dts-rockchip-Add-TSADC-controller-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-19-v6.17-arm64-dts-rockchip-Add-GPU-node-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-22-v6.18-arm64-dts-rockchip-convert-rk3528-power-domains-to.patch
-rm -f target/linux/rockchip/patches-6.12/071-08-v6.16-arm64-dts-rockchip-Enable-regulators-for-Radxa-E20C.patch
-rm -f target/linux/rockchip/patches-6.12/070-03-v6.15-arm64-dts-rockchip-Add-UART-clocks-for-RK3528-SoC.patch
-rm -f target/linux/rockchip/patches-6.12/070-25-v6.18-arm64-dts-rockchip-Add-rk3528-CPU-frequency-scaling.patch
-rm -f package/boot/uboot-rockchip/patches/107-board-rockchip-add-HINLINK-H28K.patch
-rm -f target/linux/rockchip/patches-6.12/070-09-v6.16-arm64-dts-rockchip-Add-missing-uart3-interrupt-for-RK3528.patch
 rm -f target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
-rm -f target/linux/rockchip/patches-6.12/070-07-v6.15-arm64-dts-rockchip-Add-SARADC-node-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-15-v6.16-arm64-dts-rockchip-Add-GMAC-nodes-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-12-v6.16-arm64-dts-rockchip-Add-I2C-controllers-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-16-v6.16-arm64-dts-rockchip-move-rk3528-pinctrl-node-outside-the.patch
-rm -f target/linux/rockchip/patches-6.12/072-v6.18-arm64-dts-rockchip-Add-Radxa-ROCK-2A-2F.patch
-rm -f target/linux/rockchip/patches-6.12/070-08-v6.15-arm64-dts-rockchip-Add-SDHCI-controller-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-10-v6.16-arm64-dts-rockchip-Add-DMA-controller-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/071-04-v6.15-arm64-dts-rockchip-Add-user-button-to-Radxa-E20C.patch
-rm -f target/linux/rockchip/patches-6.12/070-17-v6.17-arm64-dts-rockchip-Add-spi-nodes-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/163-01-arm64-dts-rockchip-Enable-OTP-controller-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-06-v6.15-arm64-dts-rockchip-enable-SCMI-clk-for-RK3528-SoC.patch
-rm -f target/linux/rockchip/patches-6.12/070-26-v6.19-arm64-dts-rockchip-Add-PCIe-Gen2x1-controller-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/071-11-v6.16-arm64-dts-rockchip-move-rk3528-i2c-uart-aliases-to-board.patch
-rm -f target/linux/rockchip/patches-6.12/070-05-v6.15-arm64-dts-rockchip-Add-rk3528-QoS-register-node.patch
-rm -f target/linux/rockchip/patches-6.12/070-21-v6.17-arm64-dts-rockchip-Fix-UART-DMA-support-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-18-v6.17-arm64-dts-rockchip-Add-power-controller-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-14-v6.16-arm64-dts-rockchip-Add-SDMMC-SDIO-controllers-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-23-v6.18-arm64-dts-rockchip-Add-naneng-combphy-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-11-v6.16-arm64-dts-rockchip-Add-UART-DMA-support-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/070-24-v6.18-arm64-dts-rockchip-Enable-more-power-domains-for-RK3528.patch
 
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
