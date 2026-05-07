@@ -202,3 +202,23 @@ define U-Boot/hinlink-h29k-rk3528\n\
   MINILOADER:=rk3528_miniloader_v1.13.bin\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
+
+# 清理 armv8.mk：只保留 rk3528 + hinlink_h29k，其余所有 define Device 块全部删除
+awk '
+!in_dev { print }
+/^define Device\// {
+    in_dev=1; keep=0
+    if (/define Device\/rk3528/ || /define Device\/hinlink_h29k/) keep=1
+}
+in_dev && keep { print }
+/^endef$/ { in_dev=0 }
+' target/linux/rockchip/image/armv8.mk > tmp && mv tmp target/linux/rockchip/image/armv8.mk
+
+# 清理 TARGET_DEVICES：只保留 rk3528 和 hinlink_h29k
+awk '
+/^TARGET_DEVICES += / {
+    if ($3 == "rk3528" || $3 == "hinlink_h29k") print
+    next
+}
+{ print }
+' target/linux/rockchip/image/armv8.mk > tmp && mv tmp target/linux/rockchip/image/armv8.mk
