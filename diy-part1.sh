@@ -47,6 +47,37 @@ ls -lh target/linux/rockchip/patches-6.12/*rk3528*
 
 echo "✅ 已切换为LEDE全套源码+补丁，版本完全对齐，无补丁冲突"
 
+# 下载适配的 rockchip_defconfig 内核配置文件
+DEST_PATH="target/linux/rockchip/files/arch/arm64/configs"
+DEST_FILE="$DEST_PATH/rockchip_defconfig"
+
+# 创建目录
+mkdir -p "$DEST_PATH"
+
+# 下载原始文件
+wget --no-check-certificate -q -O "$DEST_FILE" "https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/files/arch/arm64/configs/rockchip_defconfig"
+
+# 验证1：文件是否存在且不为空
+if [ ! -s "$DEST_FILE" ]; then
+    echo "====================================================="
+    echo " ❌ 下载 rockchip_defconfig 失败！文件为空或不存在"
+    echo "====================================================="
+    exit 1
+fi
+
+# 验证2：必须包含 CONFIG_ARM64 标识（确保是正确的内核配置）
+if ! grep -q "CONFIG_ARM64" "$DEST_FILE"; then
+    echo "====================================================="
+    echo " ❌ 下载的 rockchip_defconfig 格式错误！"
+    echo "====================================================="
+    exit 1
+fi
+
+echo "====================================================="
+echo " ✅ 成功下载并替换 rockchip_defconfig 内核配置"
+echo " ✅ 路径：$DEST_FILE"
+echo "====================================================="
+
 # ====== BEGIN: Predefine config via .config.override ======
 echo "🔧 Writing .config.override for u-boot-rk3528..."
 
