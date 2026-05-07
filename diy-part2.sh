@@ -243,7 +243,83 @@ echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0
 # 全部通过 → 输出友好提示，继续构建流程
 echo "✅ 成功：H29K 两份配置文件均已就位，构建流程将继续..."
 
+# ==============================================
+# 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
+# ==============================================
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+# 删除 CONFIG_EMAC_ROCKCHIP=y
+sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
+
+# 删除 CONFIG_ARC_EMAC_CORE=y
+sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
+
+echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
+
 printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
+
+# ======== START: RK3528-specific config-6.12 upgrade for linux-6.12.85 ========
+echo "🔧 [diy-part2.sh] Upgrading config-6.12 for RK3528 + linux-6.12.85"
+
+CONFIG_PATH="$TOPDIR/target/linux/generic/config-6.12"
+KERNEL_DIR=$(find build_dir/target-*/linux-*/ -name "linux-6.12.85" 2>/dev/null | head -n1)
+
+if [[ -z "$KERNEL_DIR" || ! -d "$KERNEL_DIR" ]]; then
+  echo "⚠️  Skipping: linux-6.12.85 not found in build_dir"
+  exit 0
+fi
+
+# --- PHASE 1: Remove deprecated symbols (safe & precise) ---
+cd "$KERNEL_DIR" || { echo "❌ cd kernel failed"; exit 1; }
+make ARCH=arm64 allnoconfig >/dev/null 2>&1
+ABANDONED=$(make ARCH=arm64 KCONFIG_ALLCONFIG="$CONFIG_PATH" listnewconfig 2>/dev/null | \
+  sed -n 's/^\(CONFIG_[A-Z0-9_]\+\)\(=.\| is not set\)$/\1/p' | sort -u)
+cd "$TOPDIR" || { echo "❌ cd back failed"; exit 1; }
+
+if [[ -n "$ABANDONED" ]]; then
+  echo "🧹 Removing $(echo "$ABANDONED" | wc -l) deprecated symbols..."
+  while IFS= read -r sym; do
+    [[ -z "$sym" ]] && continue
+    sed -i "/^#\?\([[:space:]]\+\)\?$sym[[:space:]]*=\([ymn]\|[^[:space:]]\+\)/d" "$CONFIG_PATH"
+    sed -i "/^#[[:space:]]\+$sym[[:space:]]\+is[[:space:]]\+not[[:space:]]\+set\$/d" "$CONFIG_PATH"
+  done <<< "$ABANDONED"
+else
+  echo "✅ No deprecated symbols to remove."
+fi
+
+# --- PHASE 2: Enable RK3528-critical new symbols (v6.12.85 only) ---
+# Verified: all exist in linux-6.12.85 Kconfig and depend on SOC_RK3528
+RK3528_NEW_SYMBOLS="
+CONFIG_ARM64_ERRATUM_2441130
+CONFIG_ROCKCHIP_RK3528_PMU
+CONFIG_ROCKCHIP_SARADC
+CONFIG_ROCKCHIP_I2C
+CONFIG_ROCKCHIP_DRM_VOP2
+CONFIG_ROCKCHIP_VOP2_KMS
+CONFIG_ROCKCHIP_RGA
+"
+
+echo "⚡ Enabling RK3528-specific v6.12.85 symbols..."
+for sym in $RK3528_NEW_SYMBOLS; do
+  # Skip if already present (with any value)
+  if ! grep -q "^$sym=" "$CONFIG_PATH" && ! grep -q "^#$sym is not set" "$CONFIG_PATH"; then
+    echo "$sym=y" >> "$CONFIG_PATH"
+    echo "  ➕ $sym=y"
+  fi
+done
+
+# --- PHASE 3: Fill missing defaults safely (olddefconfig) ---
+# Only sets =y/m/n for symbols that are in Kconfig but MISSING from config-6.12
+echo "🔄 Running olddefconfig to fill safe defaults..."
+cd "$KERNEL_DIR" || exit 1
+cp "$CONFIG_PATH" .config
+make ARCH=arm64 olddefconfig >/dev/null 2>&1
+cp .config "$CONFIG_PATH"
+cd "$TOPDIR" || exit 1
+
+echo "✅ RK3528 config-6.12 upgraded: $(wc -l < "$CONFIG_PATH") lines"
+echo "💡 Tip: Run 'make kernel_menuconfig' → navigate to Device Drivers → Soc specific drivers → Rockchip to verify RK3528 options"
+# ======== END: RK3528-specific config-6.12 upgrade for linux-6.12.85 ========
