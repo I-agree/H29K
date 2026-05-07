@@ -1,29 +1,6 @@
 #!/bin/bash
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
-set -e
-set -x
-
-export TOPDIR="/workdir/openwrt"
-cd "$TOPDIR" || { echo "ERROR: cd $TOPDIR failed"; exit 1; }
-
-# --- 🔒 FEEDS SAFETY CHECK ---
-if [[ ! -f "package/kernel/linux/Makefile" ]]; then
-  echo "❌ FATAL: package/kernel/linux/Makefile not found."
-  echo "   Please ensure 'diy-part1.sh' ran './scripts/feeds install -a' successfully."
-  exit 1
-fi
-echo "✅ feeds installed: kernel/linux ready"
-
-echo "🔧 [diy-part2.sh] Synchronizing RK3528 kernel configs..."
-
-# STEP 0: Now safe to run prepare
-echo "⚙️  STEP 0: Running 'make target/linux/prepare'..."
-make target/linux/prepare > /dev/null 2>&1
-echo "✅ target/linux/prepare completed"
-
-# ... rest of your sync logic (as before) ...
-
 # diy-part2.sh — Sync RK3528 kernel configs: generic + rockchip/armv8
 # ✅ Must run AFTER diy-part1.sh (which sets up feeds, dts, override)
 
