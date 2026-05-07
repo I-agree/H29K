@@ -1,139 +1,101 @@
 #!/bin/bash
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
-# ======== START: RK3528双config安全升级（CI原生兼容版） ========
-# ✅ 本脚本可在 make defconfig 之前安全运行，自动触发内核源码准备
-# ✅ 无需修改 .yml，无需新增 workflow step，100% 自包含
+# diy-part2.sh — Sync RK3528 kernel configs: generic + rockchip/armv8
+# ✅ Must run AFTER diy-part1.sh (which sets up feeds, dts, override)
 
-set -e  # 任一命令失败立即退出
+set -e  # Exit on any error
+set -x  # Print commands (remove in prod)
 
-echo "🔧 [diy-part2.sh] 同步升级 RK3528 双配置文件："
-echo "   • target/linux/generic/config-6.12（通用基线）"
-echo "   • target/linux/rockchip/armv8/config-6.12（平台专属）"
+# --- 🔑 CRITICAL: Define and export TOPDIR ---
+export TOPDIR="/workdir/openwrt"
+cd "$TOPDIR" || { echo "ERROR: Cannot cd to TOPDIR=$TOPDIR"; exit 1; }
 
-# --- STEP 0: 强制触发 linux-6.12.85 源码准备（OpenWrt 官方推荐方式）---
-echo "⚙️  STEP 0：执行 'make target/linux/prepare' 确保内核源码就绪..."
-if ! make -C "$TOPDIR" target/linux/prepare V=s >/dev/null 2>&1; then
-  echo "❌ 错误：'make target/linux/prepare' 失败。可能原因："
-  echo "   • 网络无法访问 kernel.org 或 mirror（检查 GitHub Actions 出口 IP 是否被限）"
-  echo "   • feeds 中 rockchip 支持未启用（检查 feeds.conf.default 是否包含 rockchip 源）"
-  echo "   • CONFIG_KERNEL_VERSION 不匹配（检查 .config 中是否为 '6.12.85'）"
+echo "🔧 [diy-part2.sh] Synchronizing RK3528 kernel configs..."
+
+# STEP 0: Ensure kernel source is prepared
+echo "⚙️  STEP 0: Running 'make target/linux/prepare'..."
+make target/linux/prepare > /dev/null 2>&1
+echo "✅ target/linux/prepare completed"
+
+# STEP 1: Locate the two config files (must exist after 'make target/linux/prepare')
+GENERIC_CFG="target/linux/generic/config-6.12"
+ROCKCHIP_CFG="target/linux/rockchip/armv8/config-6.12"
+
+if [[ ! -f "$GENERIC_CFG" ]]; then
+  echo "❌ ERROR: $GENERIC_CFG not found. Did 'make target/linux/prepare' succeed?"
   exit 1
 fi
-echo "✅ linux-6.12.85 源码已准备就绪（build_dir/target-*/linux-*/linux-6.12.85/）"
-
-# --- STEP 1: 定义并校验配置文件路径 ---
-GENERIC_CONFIG="$TOPDIR/target/linux/generic/config-6.12"
-ROCKCHIP_CONFIG="$TOPDIR/target/linux/rockchip/armv8/config-6.12"
-
-if [[ ! -f "$GENERIC_CONFIG" ]]; then
-  echo "❌ 错误：$GENERIC_CONFIG 不存在。请确认 OpenWrt 分支支持 kernel 6.12（如 openwrt-24.10 或 master）。"
+if [[ ! -f "$ROCKCHIP_CFG" ]]; then
+  echo "❌ ERROR: $ROCKCHIP_CFG not found. Rockchip config missing!"
   exit 1
 fi
-echo "✅ $GENERIC_CONFIG 存在（$(wc -l < "$GENERIC_CONFIG") 行）"
 
-if [[ ! -f "$ROCKCHIP_CONFIG" ]]; then
-  echo "⚠️  警告：$ROCKCHIP_CONFIG 不存在，将仅处理 generic 配置。"
-  ROCKCHIP_CONFIG=""
-else
-  echo "✅ $ROCKCHIP_CONFIG 存在（$(wc -l < "$ROCKCHIP_CONFIG") 行）"
-fi
+echo "📋 Found configs:"
+echo "  • $GENERIC_CFG (generic base)"
+echo "  • $ROCKCHIP_CFG (rockchip platform)"
 
-# --- STEP 2: 定位内核源码目录（prepare 后必存在）---
-KERNEL_DIR=$(find build_dir/target-*/linux-*/ -name "linux-6.12.85" 2>/dev/null | head -n1)
-if [[ -z "$KERNEL_DIR" || ! -d "$KERNEL_DIR" ]]; then
-  echo "❌ 错误：'make target/linux/prepare' 成功，但未找到 linux-6.12.85 目录。"
-  echo "   请检查："
-  echo "   • 是否存在多个 target（如 aarch64_generic vs rockchip_armv8）？"
-  echo "   • 是否 CONFIG_TARGET_ROCKCHIP=y 已在 .config 中启用？"
-  exit 1
-fi
-echo "✅ 内核源码目录：$KERNEL_DIR"
+# STEP 2: Inject RK3528 SoC symbols into GENERIC config
+# Why? Because generic/config-6.12 is the base for ALL targets — 
+# we must ensure ARCH_ROCKCHIP, RK3528_PMU etc. are enabled here too.
+echo "⚙️  STEP 2: Injecting RK3528 SoC symbols into $GENERIC_CFG..."
 
-# --- STEP 3: 清理废弃符号（双 config 同步）---
-echo "🧹 STEP 3：清理 linux-6.12.85 中已废弃的 CONFIG_* 符号..."
-cd "$KERNEL_DIR" || { echo "❌ cd $KERNEL_DIR 失败"; exit 1; }
-make ARCH=arm64 allnoconfig >/dev/null 2>&1 || { echo "❌ make allnoconfig 失败"; exit 1; }
-
-ABANDONED=$(make ARCH=arm64 KCONFIG_ALLCONFIG="$GENERIC_CONFIG" listnewconfig 2>/dev/null | \
-  sed -n 's/^\(CONFIG_[A-Z0-9_]\+\)\(=.\| is not set\)$/\1/p' | sort -u)
-
-cd "$TOPDIR" || { echo "❌ cd $TOPDIR 失败"; exit 1; }
-
-if [[ -n "$ABANDONED" ]]; then
-  echo "   → 在 $GENERIC_CONFIG 中删除 $(echo "$ABANDONED" | wc -l) 个废弃符号..."
-  while IFS= read -r sym; do
-    [[ -z "$sym" ]] && continue
-    sed -i "/^#\?\([[:space:]]\+\)\?$sym[[:space:]]*=\([ymn]\|[^[:space:]]\+\)/d" "$GENERIC_CONFIG"
-    sed -i "/^#[[:space:]]\+$sym[[:space:]]\+is[[:space:]]\+not[[:space:]]\+set\$/d" "$GENERIC_CONFIG"
-  done <<< "$ABANDONED"
-
-  if [[ -n "$ROCKCHIP_CONFIG" ]]; then
-    echo "   → 在 $ROCKCHIP_CONFIG 中同步删除..."
-    while IFS= read -r sym; do
-      [[ -z "$sym" ]] && continue
-      sed -i "/^#\?\([[:space:]]\+\)\?$sym[[:space:]]*=\([ymn]\|[^[:space:]]\+\)/d" "$ROCKCHIP_CONFIG"
-      sed -i "/^#[[:space:]]\+$sym[[:space:]]\+is[[:space:]]\+not[[:space:]]\+set\$/d" "$ROCKCHIP_CONFIG"
-    done <<< "$ABANDONED"
-  fi
-else
-  echo "   → 无废弃符号需要清理。"
-fi
-
-# --- STEP 4: 启用 RK3528 新增符号（平台层优先）---
-RK3528_NEW_SYMBOLS="
-CONFIG_ARM64_ERRATUM_2441130
-CONFIG_ROCKCHIP_RK3528_PMU
-CONFIG_ROCKCHIP_SARADC
-CONFIG_ROCKCHIP_I2C
-CONFIG_ROCKCHIP_DRM_VOP2
-CONFIG_ROCKCHIP_VOP2_KMS
-CONFIG_ROCKCHIP_RGA
+RK3528_SYMBOLS="
+CONFIG_ARCH_ROCKCHIP=y
+CONFIG_ARCH_MULTI_V8=y
+CONFIG_ARM64_ERRATUM_2441130=y
+CONFIG_ROCKCHIP_RK3528_PMU=y
+CONFIG_ROCKCHIP_SARADC=y
+CONFIG_ROCKCHIP_I2C=y
+CONFIG_ROCKCHIP_DRM_VOP2=y
+CONFIG_ROCKCHIP_VOP2_KMS=y
+CONFIG_ROCKCHIP_RGA=y
+CONFIG_ROCKCHIP_USBPHY=y
+CONFIG_ROCKCHIP_USB3PHY=y
+CONFIG_ROCKCHIP_EMMC=y
+CONFIG_ROCKCHIP_SDIO=y
+CONFIG_ROCKCHIP_SPI=y
+CONFIG_ROCKCHIP_GPIO=y
+CONFIG_ROCKCHIP_PINCTRL=y
+CONFIG_ROCKCHIP_CLK_RK3528=y
+CONFIG_ROCKCHIP_PM_DOMAINS=y
+CONFIG_ROCKCHIP_PM=y
+CONFIG_ROCKCHIP_CPUFREQ=y
+CONFIG_ROCKCHIP_THERMAL=y
+CONFIG_ROCKCHIP_WATCHDOG=y
+CONFIG_ROCKCHIP_WDT=y
 "
 
-echo "⚡ STEP 4：为 RK3528 启用 v6.12.85 新增符号..."
-for sym in $RK3528_NEW_SYMBOLS; do
-  if [[ -n "$ROCKCHIP_CONFIG" ]]; then
-    if ! grep -q "^$sym=" "$ROCKCHIP_CONFIG" && ! grep -q "^#$sym is not set" "$ROCKCHIP_CONFIG"; then
-      echo "$sym=y" >> "$ROCKCHIP_CONFIG"
-      echo "   ➕ $ROCKCHIP_CONFIG: $sym=y"
-    fi
-  fi
-  if ! grep -q "^$sym=" "$GENERIC_CONFIG" && ! grep -q "^#$sym is not set" "$GENERIC_CONFIG"; then
-    echo "# $sym is not set" >> "$GENERIC_CONFIG"
-    echo "   ➕ $GENERIC_CONFIG: 声明 $sym（平台层将覆盖）"
+for sym in $RK3528_SYMBOLS; do
+  key=$(echo "$sym" | cut -d'=' -f1)
+  if ! grep -q "^$key=" "$GENERIC_CFG"; then
+    echo "$sym" >> "$GENERIC_CFG"
+    echo "  ➕ Added $key"
   fi
 done
 
-# --- STEP 5: olddefconfig 填充默认值（双 config）---
-echo "🔄 STEP 5：运行 olddefconfig 填充安全默认值..."
-cd "$KERNEL_DIR" || { echo "❌ cd $KERNEL_DIR 失败（STEP 5）"; exit 1; }
+# STEP 3: Sync ROCKCHIP config from GENERIC (so it inherits all RK3528 symbols)
+echo "⚙️  STEP 3: Syncing $ROCKCHIP_CFG from $GENERIC_CFG..."
+cp -f "$GENERIC_CFG" "$ROCKCHIP_CFG"
+echo "✅ $ROCKCHIP_CFG updated from generic base"
 
-cp "$GENERIC_CONFIG" .config
-make ARCH=arm64 olddefconfig >/dev/null 2>&1 || { echo "❌ make olddefconfig for generic failed"; exit 1; }
-cp .config "$GENERIC_CONFIG"
+# STEP 4: Verify critical symbols exist in both configs
+echo "🔍 STEP 4: Verifying RK3528 symbols in both configs..."
+for cfg in "$GENERIC_CFG" "$ROCKCHIP_CFG"; do
+  if ! grep -q "^CONFIG_ARCH_ROCKCHIP=y$" "$cfg"; then
+    echo "❌ ERROR: CONFIG_ARCH_ROCKCHIP=y missing in $cfg"
+    exit 1
+  fi
+  if ! grep -q "^CONFIG_ROCKCHIP_RK3528_PMU=y$" "$cfg"; then
+    echo "❌ ERROR: CONFIG_ROCKCHIP_RK3528_PMU=y missing in $cfg"
+    exit 1
+  fi
+done
+echo "✅ All critical RK3528 symbols confirmed in both configs"
 
-if [[ -n "$ROCKCHIP_CONFIG" ]]; then
-  cp "$ROCKCHIP_CONFIG" .config
-  make ARCH=arm64 olddefconfig >/dev/null 2>&1 || { echo "❌ make olddefconfig for rockchip failed"; exit 1; }
-  cp .config "$ROCKCHIP_CONFIG"
-fi
+echo "🎉 diy-part2.sh completed successfully."
+echo "➡️  Next: Run 'make defconfig' to apply changes to .config"
 
-cd "$TOPDIR" || { echo "❌ cd $TOPDIR 失败（STEP 5）"; exit 1; }
-
-echo "✅ 双配置升级完成："
-echo "   • $GENERIC_CONFIG：$(wc -l < "$GENERIC_CONFIG") 行"
-if [[ -n "$ROCKCHIP_CONFIG" ]]; then
-  echo "   • $ROCKCHIP_CONFIG：$(wc -l < "$ROCKCHIP_CONFIG") 行"
-  echo "💡 提示：RK3528 专用选项将在 'make menuconfig' 中显示于："
-  echo "     Platform selection  --->"
-  echo "       Rockchip SoC support  --->"
-  echo "         [*] RK3528 support"
-  echo "         [*] RK3528 PMU support"
-  echo "         [*] RK3528 VOP2 display controller"
-fi
-echo "🚀 下一步：'make defconfig' 将基于此配置生成最终 .config"
-# ======== END: RK3528双config安全升级（CI原生兼容版） ========
 
 # ======================== 【资源准备】 ========================
 # 创建开机 LOGO 存放目录
