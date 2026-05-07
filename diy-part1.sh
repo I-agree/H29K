@@ -75,19 +75,6 @@ make defconfig > /dev/null 2>&1
 echo "✅ make defconfig completed with override applied"
 # ====== END ======
 
-# ==============================================
-# 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
-# ==============================================
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
-# 删除 CONFIG_EMAC_ROCKCHIP=y
-sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
-
-# 删除 CONFIG_ARC_EMAC_CORE=y
-sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
-
-echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
-
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
 mkdir -p "$DTS_SAVE_DIR"
