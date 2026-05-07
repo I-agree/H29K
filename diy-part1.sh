@@ -132,41 +132,26 @@ wget -O package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig https://raw.g
 wget -O target/linux/rockchip/image/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/hinlink_h29k_defconfig
 [ -f package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig ] && [ -f target/linux/rockchip/image/hinlink_h29k_defconfig ] || { echo "❌ H29K config download failed" >&2; exit 1; }
 
-# ======================== 【添加 H29K：armv8.mk 设备定义】 ========================
-# ✅ 修复点3：DEVICE_DTS 使用标准社区命名 rk3528-hinlink-h29k（非 opc- 前缀）
-TARGET_MK="target/linux/rockchip/image/armv8.mk"
+# 下载纯净版 armv8.mk 替换，只保留 rk3528 + hinlink_h29k
+MK_FILE="target/linux/rockchip/image/armv8.mk"
 
-cat >> "$TARGET_MK" <<'EOF'
-# 📌 设备定义：HINLINK H29K（RK3528）
-#    - 遵循 OpenWrt 命名规范：rk3528-{vendor}-{model}
-define Device/hinlink_h29k
-  SOC := rk3528
-  SUBTARGET := armv8
-  DEVICE_VENDOR := HINLINK
-  DEVICE_MODEL := H29K
-  DEVICE_DTS := rk3528-hinlink-h29k
-  TRUSTED_FIRMWARE_A := rk3528
-  UBOOT_CONFIG := hinlink_h29k
-  KERNEL_LOADADDR := 0x00280000
-  KERNEL_ENTRYADDR := 0x00280000
-  DEVICE_UBOOT_IMAGE := u-boot-rockchip-hinlink_h29k.bin
-  DEVICE_COMPAT_VERSION := 1
-  SUPPORTED_DEVICES := hinlink_h29k
-  IMAGE/boot.bin := boot-scr | boot-kernel | boot-dtb
-  IMAGE/sysupgrade.img.gz := boot.bin | append-rootfs | pad-rootfs | check-size | gzip
-  DEVICE_PACKAGES := \
-    kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
-    kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
-    luci-app-qmodem-next luci-i18n-qmodem-next-zh-cn \
-    luci-theme-argon imagemagick imagemagick-jpeg imagemagick-png imagemagick-gif curl \
-    luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn \
-    luci-app-bbr luci-i18n-bbr-zh-cn luci-mod-admin-full \
-    luci-app-irqbalance luci-i18n-irqbalance-zh-cn \
-    dnscrypt-proxy luci-app-dnscrypt-proxy luci-i18n-dnscrypt-proxy-zh-cn \
-    irqbalance luci-app-irqbalance luci-i18n-irqbalance-zh-cn -urngd
-endef
-TARGET_DEVICES += hinlink_h29k
-EOF
+# 下载 raw 原始文件
+wget -O "$MK_FILE" https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/armv8.mk
+
+# 校验下载是否成功
+if [ ! -s "$MK_FILE" ]; then
+    echo "ERROR: 下载 armv8.mk 失败，终止编译"
+    exit 1
+fi
+
+# 校验不包含 hinlink_h28k
+if grep -q "hinlink_h28k" "$MK_FILE"; then
+    echo "ERROR: armv8.mk 包含 hinlink_h28k，终止编译"
+    exit 1
+fi
+
+echo "✅ 已下载并替换 armv8.mk 成功"
+echo "✅ 已校验：无 hinlink_h28k，仅保留 rk3528 + hinlink_h29k"
 
 # ==============================================
 # 定制 uboot-rockchip：替换 rk3528 默认配置 + 添加 H29K
@@ -202,38 +187,3 @@ define U-Boot/hinlink-h29k-rk3528\n\
   MINILOADER:=rk3528_miniloader_v1.13.bin\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
-
-FILE="target/linux/rockchip/image/armv8.mk"
-
-# 只保留：
-# 1. define Device/rk3528
-# 2. define Device/hinlink_h29k
-# 其余所有 define Device 块 彻底删除
-sed -i '/^define Device\//,/^endef/{
-/define Device\/rk3528/b
-/define Device\/hinlink_h29k/b
-d
-}' "$FILE"
-
-# 只保留对应的 TARGET_DEVICES，其余全部删除
-sed -i '/^TARGET_DEVICES += /{
-/rk3528/b
-/hinlink_h29k/b
-d
-}' "$FILE"
-
-# 强制清理任何残留 h28k
-sed -i '/hinlink_h28k/d' "$FILE"
-
-# ====================== 验证 ======================
-echo -e "\n==== 最终 armv8.mk 内容 ===="
-cat "$FILE"
-echo "============================================"
-
-# 检查必须保留的内容是否存在
-if ! grep -q "define Device/rk3528" "$FILE"; then echo "❌ rk3528 丢失！" && exit 1; fi
-if ! grep -q "define Device/hinlink_h29k" "$FILE"; then echo "❌ H29K 丢失！" && exit 1; fi
-if grep -q "hinlink_h28k" "$FILE"; then echo "❌ h28k 仍存在！" && exit 1; fi
-
-echo -e "\n✅ 成功保留：rk3528 + hinlink_h29k"
-echo "✅ 已删除：所有其他设备"
