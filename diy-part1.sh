@@ -24,6 +24,29 @@ echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon.git;master' >>
 # 添加 Argon 配置插件源
 echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;master' >> feeds.conf.default
 
+# ====================== 方案B：全套切换为 LEDE 原版 ======================
+# 1. 清理OpenWrt原生冲突DTS和补丁
+rm -rf target/linux/rockchip/patches-6.12
+rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
+
+# 2. 下载 LEDE 全套 rockchip patches-6.12
+git clone --depth 1 --single-branch --branch master https://github.com/coolsnowwolf/lede.git /tmp/lede-tmp
+
+# 3. 复制LEDE原版补丁、DTS覆盖到当前OpenWrt
+mkdir -p target/linux/rockchip/
+cp -r /tmp/lede-tmp/target/linux/rockchip/patches-6.12 target/linux/rockchip/
+cp -r /tmp/lede-tmp/target/linux/rockchip/files target/linux/rockchip/
+
+# 4. 清理临时文件
+rm -rf /tmp/lede-tmp
+
+# 5. 验证关键文件是否就位
+echo "==== 校验LEDE原版RK3528文件 ===="
+ls -lh target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
+ls -lh target/linux/rockchip/patches-6.12/*rk3528*
+
+echo "✅ 已切换为LEDE全套源码+补丁，版本完全对齐，无补丁冲突"
+
 # ====== BEGIN: Predefine config via .config.override ======
 echo "🔧 Writing .config.override for u-boot-rk3528..."
 
@@ -65,9 +88,6 @@ sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
 
 echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
 
-# 删除导致 rk3528.dtsi 补丁冲突的文件
-rm -vf target/linux/rockchip/patches-6.12/070-02-v6.15-arm64-dts-rockchip-Add-clock-generators-for-RK3528-SoC.patch
-
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
 mkdir -p "$DTS_SAVE_DIR"
@@ -82,15 +102,6 @@ else
     echo "❌ rk3528-hinlink-h29k.dts 下载失败"
     exit 1
 fi
-
-# 先建文件夹
-mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip
-
-# 下载 lede 原版 rk3528.dtsi
-wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi
-
-# 下载 rk3528-pinctrl.dtsi
-wget -O target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-pinctrl.dtsi https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-pinctrl.dtsi
 
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
 wget -O package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
