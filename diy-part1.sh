@@ -203,34 +203,37 @@ define U-Boot/hinlink-h29k-rk3528\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
 
-# 清理 armv8.mk：只保留 rk3528 + hinlink_h29k，删除所有设备
 FILE="target/linux/rockchip/image/armv8.mk"
 
-# 第一步：只保留指定设备块
-awk '
-!in_dev { print }
-/^define Device\// {
-    in_dev=1; keep=0
-    if (/define Device\/rk3528/ || /define Device\/hinlink_h29k/) keep=1
-}
-in_dev && keep { print }
-/^endef$/ { in_dev=0 }
-' "$FILE" > "${FILE}.tmp" && mv "${FILE}.tmp" "$FILE"
+# 只保留：
+# 1. define Device/rk3528
+# 2. define Device/hinlink_h29k
+# 其余所有 define Device 块 彻底删除
+sed -i '/^define Device\//,/^endef/{
+/define Device\/rk3528/b
+/define Device\/hinlink_h29k/b
+d
+}' "$FILE"
 
-# 第二步：只保留指定 TARGET_DEVICES
-awk '
-/^TARGET_DEVICES += / {
-    if ($3 == "rk3528" || $3 == "hinlink_h29k") print
-    next
-}
-{ print }
-' "$FILE" > "${FILE}.tmp" && mv "${FILE}.tmp" "$FILE"
+# 只保留对应的 TARGET_DEVICES，其余全部删除
+sed -i '/^TARGET_DEVICES += /{
+/rk3528/b
+/hinlink_h29k/b
+d
+}' "$FILE"
 
-# 第三步：强验证 —— 绝对不能有 hinlink_h28k
-if grep -q -E "hinlink_h28k|Device/hinlink_h28k" "$FILE"; then
-    echo "ERROR: 检测到 hinlink_h28k，编译终止！"
-    exit 1
-fi
+# 强制清理任何残留 h28k
+sed -i '/hinlink_h28k/d' "$FILE"
 
-echo "✅ armv8.mk 清理完成，仅保留 rk3528 + hinlink_h29k"
-echo "✅ 验证通过：无 hinlink_h28k 设备"
+# ====================== 验证 ======================
+echo -e "\n==== 最终 armv8.mk 内容 ===="
+cat "$FILE"
+echo "============================================"
+
+# 检查必须保留的内容是否存在
+if ! grep -q "define Device/rk3528" "$FILE"; then echo "❌ rk3528 丢失！" && exit 1; fi
+if ! grep -q "define Device/hinlink_h29k" "$FILE"; then echo "❌ H29K 丢失！" && exit 1; fi
+if grep -q "hinlink_h28k" "$FILE"; then echo "❌ h28k 仍存在！" && exit 1; fi
+
+echo -e "\n✅ 成功保留：rk3528 + hinlink_h29k"
+echo "✅ 已删除：所有其他设备"
