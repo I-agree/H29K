@@ -48,7 +48,7 @@ ls -lh target/linux/rockchip/patches-6.12/*rk3528*
 echo "✅ 已切换为LEDE全套源码+补丁，版本完全对齐，无补丁冲突"
 
 # 下载适配的 rockchip_defconfig 内核配置文件
-DEST_PATH="target/linux/rockchip/files/arch/arm64/configs"
+DEST_PATH="target/linux/rockchip/files/arch/arm64/configs/"
 DEST_FILE="$DEST_PATH/rockchip_defconfig"
 
 # 创建目录
