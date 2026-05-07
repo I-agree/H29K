@@ -1,6 +1,140 @@
 #!/bin/bash
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
+# ======== START: RK3528双config安全升级（CI原生兼容版） ========
+# ✅ 本脚本可在 make defconfig 之前安全运行，自动触发内核源码准备
+# ✅ 无需修改 .yml，无需新增 workflow step，100% 自包含
+
+set -e  # 任一命令失败立即退出
+
+echo "🔧 [diy-part2.sh] 同步升级 RK3528 双配置文件："
+echo "   • target/linux/generic/config-6.12（通用基线）"
+echo "   • target/linux/rockchip/armv8/config-6.12（平台专属）"
+
+# --- STEP 0: 强制触发 linux-6.12.85 源码准备（OpenWrt 官方推荐方式）---
+echo "⚙️  STEP 0：执行 'make target/linux/prepare' 确保内核源码就绪..."
+if ! make -C "$TOPDIR" target/linux/prepare V=s >/dev/null 2>&1; then
+  echo "❌ 错误：'make target/linux/prepare' 失败。可能原因："
+  echo "   • 网络无法访问 kernel.org 或 mirror（检查 GitHub Actions 出口 IP 是否被限）"
+  echo "   • feeds 中 rockchip 支持未启用（检查 feeds.conf.default 是否包含 rockchip 源）"
+  echo "   • CONFIG_KERNEL_VERSION 不匹配（检查 .config 中是否为 '6.12.85'）"
+  exit 1
+fi
+echo "✅ linux-6.12.85 源码已准备就绪（build_dir/target-*/linux-*/linux-6.12.85/）"
+
+# --- STEP 1: 定义并校验配置文件路径 ---
+GENERIC_CONFIG="$TOPDIR/target/linux/generic/config-6.12"
+ROCKCHIP_CONFIG="$TOPDIR/target/linux/rockchip/armv8/config-6.12"
+
+if [[ ! -f "$GENERIC_CONFIG" ]]; then
+  echo "❌ 错误：$GENERIC_CONFIG 不存在。请确认 OpenWrt 分支支持 kernel 6.12（如 openwrt-24.10 或 master）。"
+  exit 1
+fi
+echo "✅ $GENERIC_CONFIG 存在（$(wc -l < "$GENERIC_CONFIG") 行）"
+
+if [[ ! -f "$ROCKCHIP_CONFIG" ]]; then
+  echo "⚠️  警告：$ROCKCHIP_CONFIG 不存在，将仅处理 generic 配置。"
+  ROCKCHIP_CONFIG=""
+else
+  echo "✅ $ROCKCHIP_CONFIG 存在（$(wc -l < "$ROCKCHIP_CONFIG") 行）"
+fi
+
+# --- STEP 2: 定位内核源码目录（prepare 后必存在）---
+KERNEL_DIR=$(find build_dir/target-*/linux-*/ -name "linux-6.12.85" 2>/dev/null | head -n1)
+if [[ -z "$KERNEL_DIR" || ! -d "$KERNEL_DIR" ]]; then
+  echo "❌ 错误：'make target/linux/prepare' 成功，但未找到 linux-6.12.85 目录。"
+  echo "   请检查："
+  echo "   • 是否存在多个 target（如 aarch64_generic vs rockchip_armv8）？"
+  echo "   • 是否 CONFIG_TARGET_ROCKCHIP=y 已在 .config 中启用？"
+  exit 1
+fi
+echo "✅ 内核源码目录：$KERNEL_DIR"
+
+# --- STEP 3: 清理废弃符号（双 config 同步）---
+echo "🧹 STEP 3：清理 linux-6.12.85 中已废弃的 CONFIG_* 符号..."
+cd "$KERNEL_DIR" || { echo "❌ cd $KERNEL_DIR 失败"; exit 1; }
+make ARCH=arm64 allnoconfig >/dev/null 2>&1 || { echo "❌ make allnoconfig 失败"; exit 1; }
+
+ABANDONED=$(make ARCH=arm64 KCONFIG_ALLCONFIG="$GENERIC_CONFIG" listnewconfig 2>/dev/null | \
+  sed -n 's/^\(CONFIG_[A-Z0-9_]\+\)\(=.\| is not set\)$/\1/p' | sort -u)
+
+cd "$TOPDIR" || { echo "❌ cd $TOPDIR 失败"; exit 1; }
+
+if [[ -n "$ABANDONED" ]]; then
+  echo "   → 在 $GENERIC_CONFIG 中删除 $(echo "$ABANDONED" | wc -l) 个废弃符号..."
+  while IFS= read -r sym; do
+    [[ -z "$sym" ]] && continue
+    sed -i "/^#\?\([[:space:]]\+\)\?$sym[[:space:]]*=\([ymn]\|[^[:space:]]\+\)/d" "$GENERIC_CONFIG"
+    sed -i "/^#[[:space:]]\+$sym[[:space:]]\+is[[:space:]]\+not[[:space:]]\+set\$/d" "$GENERIC_CONFIG"
+  done <<< "$ABANDONED"
+
+  if [[ -n "$ROCKCHIP_CONFIG" ]]; then
+    echo "   → 在 $ROCKCHIP_CONFIG 中同步删除..."
+    while IFS= read -r sym; do
+      [[ -z "$sym" ]] && continue
+      sed -i "/^#\?\([[:space:]]\+\)\?$sym[[:space:]]*=\([ymn]\|[^[:space:]]\+\)/d" "$ROCKCHIP_CONFIG"
+      sed -i "/^#[[:space:]]\+$sym[[:space:]]\+is[[:space:]]\+not[[:space:]]\+set\$/d" "$ROCKCHIP_CONFIG"
+    done <<< "$ABANDONED"
+  fi
+else
+  echo "   → 无废弃符号需要清理。"
+fi
+
+# --- STEP 4: 启用 RK3528 新增符号（平台层优先）---
+RK3528_NEW_SYMBOLS="
+CONFIG_ARM64_ERRATUM_2441130
+CONFIG_ROCKCHIP_RK3528_PMU
+CONFIG_ROCKCHIP_SARADC
+CONFIG_ROCKCHIP_I2C
+CONFIG_ROCKCHIP_DRM_VOP2
+CONFIG_ROCKCHIP_VOP2_KMS
+CONFIG_ROCKCHIP_RGA
+"
+
+echo "⚡ STEP 4：为 RK3528 启用 v6.12.85 新增符号..."
+for sym in $RK3528_NEW_SYMBOLS; do
+  if [[ -n "$ROCKCHIP_CONFIG" ]]; then
+    if ! grep -q "^$sym=" "$ROCKCHIP_CONFIG" && ! grep -q "^#$sym is not set" "$ROCKCHIP_CONFIG"; then
+      echo "$sym=y" >> "$ROCKCHIP_CONFIG"
+      echo "   ➕ $ROCKCHIP_CONFIG: $sym=y"
+    fi
+  fi
+  if ! grep -q "^$sym=" "$GENERIC_CONFIG" && ! grep -q "^#$sym is not set" "$GENERIC_CONFIG"; then
+    echo "# $sym is not set" >> "$GENERIC_CONFIG"
+    echo "   ➕ $GENERIC_CONFIG: 声明 $sym（平台层将覆盖）"
+  fi
+done
+
+# --- STEP 5: olddefconfig 填充默认值（双 config）---
+echo "🔄 STEP 5：运行 olddefconfig 填充安全默认值..."
+cd "$KERNEL_DIR" || { echo "❌ cd $KERNEL_DIR 失败（STEP 5）"; exit 1; }
+
+cp "$GENERIC_CONFIG" .config
+make ARCH=arm64 olddefconfig >/dev/null 2>&1 || { echo "❌ make olddefconfig for generic failed"; exit 1; }
+cp .config "$GENERIC_CONFIG"
+
+if [[ -n "$ROCKCHIP_CONFIG" ]]; then
+  cp "$ROCKCHIP_CONFIG" .config
+  make ARCH=arm64 olddefconfig >/dev/null 2>&1 || { echo "❌ make olddefconfig for rockchip failed"; exit 1; }
+  cp .config "$ROCKCHIP_CONFIG"
+fi
+
+cd "$TOPDIR" || { echo "❌ cd $TOPDIR 失败（STEP 5）"; exit 1; }
+
+echo "✅ 双配置升级完成："
+echo "   • $GENERIC_CONFIG：$(wc -l < "$GENERIC_CONFIG") 行"
+if [[ -n "$ROCKCHIP_CONFIG" ]]; then
+  echo "   • $ROCKCHIP_CONFIG：$(wc -l < "$ROCKCHIP_CONFIG") 行"
+  echo "💡 提示：RK3528 专用选项将在 'make menuconfig' 中显示于："
+  echo "     Platform selection  --->"
+  echo "       Rockchip SoC support  --->"
+  echo "         [*] RK3528 support"
+  echo "         [*] RK3528 PMU support"
+  echo "         [*] RK3528 VOP2 display controller"
+fi
+echo "🚀 下一步：'make defconfig' 将基于此配置生成最终 .config"
+# ======== END: RK3528双config安全升级（CI原生兼容版） ========
+
 # ======================== 【资源准备】 ========================
 # 创建开机 LOGO 存放目录
 mkdir -p files/etc/config/screen bin/targets/rockchip/armv8/
@@ -260,135 +394,3 @@ printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
-
-# ======== START: RK3528双config安全升级（带超时等待、路径校验、错误中断） ========
-set -e  # ⚠️ 关键！任何命令失败立即退出，不再静默继续
-
-echo "🔧 [diy-part2.sh] 同步升级 RK3528 双配置文件："
-echo "   • target/linux/generic/config-6.12（通用基线）"
-echo "   • target/linux/rockchip/armv8/config-6.12（平台专属）"
-
-# --- 步骤1：等待 linux-6.12.85 解压完成（最多 120 秒）---
-echo "⏳ 步骤1：等待 linux-6.12.85 源码就绪..."
-for i in $(seq 1 120); do
-  KERNEL_DIR=$(find build_dir/target-*/linux-*/ -name "linux-6.12.85" 2>/dev/null | head -n1)
-  if [[ -n "$KERNEL_DIR" && -d "$KERNEL_DIR" ]]; then
-    echo "✅ linux-6.12.85 已就绪：$KERNEL_DIR"
-    break
-  fi
-  if [[ $i == 120 ]]; then
-    echo "❌ 错误：等待 120 秒后仍未找到 linux-6.12.85。请确认已执行 'make target/linux/compile' 或检查内核版本是否为 6.12.85。"
-    exit 1
-  fi
-  sleep 1
-done
-
-# --- 步骤2：定义并校验配置文件路径 ---
-GENERIC_CONFIG="$TOPDIR/target/linux/generic/config-6.12"
-ROCKCHIP_CONFIG="$TOPDIR/target/linux/rockchip/armv8/config-6.12"
-
-if [[ ! -f "$GENERIC_CONFIG" ]]; then
-  echo "❌ 错误：$GENERIC_CONFIG 不存在。请检查 OpenWrt 版本是否支持 kernel 6.12。"
-  exit 1
-fi
-echo "✅ $GENERIC_CONFIG 存在（$(wc -l < "$GENERIC_CONFIG") 行）"
-
-if [[ ! -f "$ROCKCHIP_CONFIG" ]]; then
-  echo "⚠️  警告：$ROCKCHIP_CONFIG 不存在，将仅处理 generic 配置。"
-  ROCKCHIP_CONFIG=""
-else
-  echo "✅ $ROCKCHIP_CONFIG 存在（$(wc -l < "$ROCKCHIP_CONFIG") 行）"
-fi
-
-# --- 步骤3：清理废弃符号（双 config 同步）---
-echo "🧹 步骤3：清理 linux-6.12.85 中已废弃的 CONFIG_* 符号..."
-
-# 进入内核目录执行 listnewconfig（关键！必须在此目录）
-cd "$KERNEL_DIR" || { echo "❌ cd $KERNEL_DIR 失败"; exit 1; }
-make ARCH=arm64 allnoconfig >/dev/null 2>&1 || { echo "❌ make allnoconfig 失败"; exit 1; }
-
-# 生成废弃符号列表（仅从 generic/config-6.12 提取，因它是基线）
-ABANDONED=$(make ARCH=arm64 KCONFIG_ALLCONFIG="$GENERIC_CONFIG" listnewconfig 2>/dev/null | \
-  sed -n 's/^\(CONFIG_[A-Z0-9_]\+\)\(=.\| is not set\)$/\1/p' | sort -u)
-
-cd "$TOPDIR" || { echo "❌ cd $TOPDIR 失败"; exit 1; }
-
-if [[ -n "$ABANDONED" ]]; then
-  echo "   → 在 $GENERIC_CONFIG 中删除 $(echo "$ABANDONED" | wc -l) 个废弃符号..."
-  while IFS= read -r sym; do
-    [[ -z "$sym" ]] && continue
-    # 安全删除：匹配 CONFIG_FOO=y/m/n 或 # CONFIG_FOO is not set（严格锚点）
-    sed -i "/^#\?\([[:space:]]\+\)\?$sym[[:space:]]*=\([ymn]\|[^[:space:]]\+\)/d" "$GENERIC_CONFIG"
-    sed -i "/^#[[:space:]]\+$sym[[:space:]]\+is[[:space:]]\+not[[:space:]]\+set\$/d" "$GENERIC_CONFIG"
-  done <<< "$ABANDONED"
-
-  if [[ -n "$ROCKCHIP_CONFIG" ]]; then
-    echo "   → 在 $ROCKCHIP_CONFIG 中同步删除..."
-    while IFS= read -r sym; do
-      [[ -z "$sym" ]] && continue
-      sed -i "/^#\?\([[:space:]]\+\)\?$sym[[:space:]]*=\([ymn]\|[^[:space:]]\+\)/d" "$ROCKCHIP_CONFIG"
-      sed -i "/^#[[:space:]]\+$sym[[:space:]]\+is[[:space:]]\+not[[:space:]]\+set\$/d" "$ROCKCHIP_CONFIG"
-    done <<< "$ABANDONED"
-  fi
-else
-  echo "   → 无废弃符号需要清理。"
-fi
-
-# --- 步骤4：启用 RK3528 专属新符号（平台层优先）---
-RK3528_NEW_SYMBOLS="
-CONFIG_ARM64_ERRATUM_2441130
-CONFIG_ROCKCHIP_RK3528_PMU
-CONFIG_ROCKCHIP_SARADC
-CONFIG_ROCKCHIP_I2C
-CONFIG_ROCKCHIP_DRM_VOP2
-CONFIG_ROCKCHIP_VOP2_KMS
-CONFIG_ROCKCHIP_RGA
-"
-
-echo "⚡ 步骤4：为 RK3528 启用 v6.12.85 新增符号..."
-for sym in $RK3528_NEW_SYMBOLS; do
-  # 优先写入 rockchip/armv8/config-6.12（平台层，高优先级）
-  if [[ -n "$ROCKCHIP_CONFIG" ]]; then
-    if ! grep -q "^$sym=" "$ROCKCHIP_CONFIG" && ! grep -q "^#$sym is not set" "$ROCKCHIP_CONFIG"; then
-      echo "$sym=y" >> "$ROCKCHIP_CONFIG"
-      echo "   ➕ $ROCKCHIP_CONFIG: $sym=y"
-    fi
-  fi
-  # generic/config-6.12 中仅声明存在（避免 menuconfig 不可见）
-  if ! grep -q "^$sym=" "$GENERIC_CONFIG" && ! grep -q "^#$sym is not set" "$GENERIC_CONFIG"; then
-    echo "# $sym is not set" >> "$GENERIC_CONFIG"
-    echo "   ➕ $GENERIC_CONFIG: 声明 $sym（平台层将覆盖）"
-  fi
-done
-
-# --- 步骤5：对两个配置分别运行 olddefconfig（填充缺失默认值）---
-echo "🔄 步骤5：运行 olddefconfig 填充安全默认值..."
-cd "$KERNEL_DIR" || { echo "❌ cd $KERNEL_DIR 失败（步骤5）"; exit 1; }
-
-# 处理 generic/config-6.12
-cp "$GENERIC_CONFIG" .config
-make ARCH=arm64 olddefconfig >/dev/null 2>&1 || { echo "❌ make olddefconfig for generic failed"; exit 1; }
-cp .config "$GENERIC_CONFIG"
-
-# 处理 rockchip/armv8/config-6.12（如果存在）
-if [[ -n "$ROCKCHIP_CONFIG" ]]; then
-  cp "$ROCKCHIP_CONFIG" .config
-  make ARCH=arm64 olddefconfig >/dev/null 2>&1 || { echo "❌ make olddefconfig for rockchip failed"; exit 1; }
-  cp .config "$ROCKCHIP_CONFIG"
-fi
-
-cd "$TOPDIR" || { echo "❌ cd $TOPDIR 失败（步骤5）"; exit 1; }
-
-echo "✅ 双配置升级完成："
-echo "   • $GENERIC_CONFIG：$(wc -l < "$GENERIC_CONFIG") 行"
-if [[ -n "$ROCKCHIP_CONFIG" ]]; then
-  echo "   • $ROCKCHIP_CONFIG：$(wc -l < "$ROCKCHIP_CONFIG") 行"
-  echo "💡 提示：RK3528 专用选项将在 'make menuconfig' 中显示于："
-  echo "     Platform selection  --->"
-  echo "       Rockchip SoC support  --->"
-  echo "         [*] RK3528 support"
-  echo "         [*] RK3528 PMU support"
-  echo "         [*] RK3528 VOP2 display controller"
-fi
-echo "🚀 下一步：运行 'make defconfig' 或 'make menuconfig' 开始构建"
-# ======== END: RK3528双config安全升级（带超时等待、路径校验、错误中断） ========
