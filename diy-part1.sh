@@ -47,37 +47,6 @@ ls -lh target/linux/rockchip/patches-6.12/*rk3528*
 
 echo "✅ 已切换为LEDE全套源码+补丁，版本完全对齐，无补丁冲突"
 
-# 下载适配的 rockchip_defconfig 内核配置文件
-DEST_PATH="target/linux/rockchip/files/arch/arm64/configs/"
-DEST_FILE="$DEST_PATH/rockchip_defconfig"
-
-# 创建目录
-mkdir -p "$DEST_PATH"
-
-# 下载原始文件
-wget --no-check-certificate -q -O "$DEST_FILE" "https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/files/arch/arm64/configs/rockchip_defconfig"
-
-# 验证1：文件是否存在且不为空
-if [ ! -s "$DEST_FILE" ]; then
-    echo "====================================================="
-    echo " ❌ 下载 rockchip_defconfig 失败！文件为空或不存在"
-    echo "====================================================="
-    exit 1
-fi
-
-# 验证2：必须包含 CONFIG_ARM64 标识（确保是正确的内核配置）
-if ! grep -q "CONFIG_ARM64" "$DEST_FILE"; then
-    echo "====================================================="
-    echo " ❌ 下载的 rockchip_defconfig 格式错误！"
-    echo "====================================================="
-    exit 1
-fi
-
-echo "====================================================="
-echo " ✅ 成功下载并替换 rockchip_defconfig 内核配置"
-echo " ✅ 路径：$DEST_FILE"
-echo "====================================================="
-
 # ====== BEGIN: Predefine config via .config.override ======
 echo "🔧 Writing .config.override for u-boot-rk3528..."
 
@@ -177,3 +146,39 @@ define U-Boot/hinlink-h29k-rk3528\n\
   MINILOADER:=rk3528_miniloader_v1.13.bin\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
+
+# ==============================================
+# 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
+# ==============================================
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+# 删除 CONFIG_EMAC_ROCKCHIP=y
+sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
+
+# 删除 CONFIG_ARC_EMAC_CORE=y
+sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
+
+echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
+
+# ==============================================
+# 为 Hinlink H29K 添加内核驱动配置
+# ==============================================
+# 内容覆盖写入 config-6.12（注意：使用 > 而非 >>，确保干净替换）
+cat > target/linux/rockchip/armv8/config-6.12 << 'EOF'
+# RK3528-specific additions (required)
+CONFIG_ROCKCHIP_RK3528_PMU=y
+CONFIG_ROCKCHIP_DRM_VOP2=y
+CONFIG_ROCKCHIP_VOP2_KMS=y
+CONFIG_ROCKCHIP_USB3PHY=y
+CONFIG_ROCKCHIP_EMMC=y
+CONFIG_ROCKCHIP_CLK_RK3528=y
+CONFIG_ROCKCHIP_THERMAL=y
+
+# RK3528-specific removals (required)
+CONFIG_PCIE_ROCKCHIP_HOST=n
+CONFIG_SND_SOC_ROCKCHIP_I2S=n
+CONFIG_MFD_RK808=n
+
+# Optional cleanup
+CONFIG_ARM64_ERRATUM_1530923=n
+EOF
