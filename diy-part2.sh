@@ -243,19 +243,6 @@ echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0
 # 全部通过 → 输出友好提示，继续构建流程
 echo "✅ 成功：H29K 两份配置文件均已就位，构建流程将继续..."
 
-# ==============================================
-# 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
-# ==============================================
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
-# 删除 CONFIG_EMAC_ROCKCHIP=y
-sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
-
-# 删除 CONFIG_ARC_EMAC_CORE=y
-sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
-
-echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
-
 printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
