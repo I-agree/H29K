@@ -214,4 +214,6 @@ CONFIG_ROCKCHIP_SARADC_V2=n
 CONFIG_ROCKCHIP_DMC_RK3588=n
 EOF
 
-make kernel_olddefconfig
+# ✅ 使用 make defconfig 指定 config 文件（更安全）
+make defconfig CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
+
