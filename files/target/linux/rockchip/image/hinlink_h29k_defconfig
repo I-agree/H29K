@@ -1,88 +1,26 @@
-#
-# Hinlink H29K (RK3528) OpenWrt 25.12 镜像生成配置文件
-# 路径：target/linux/rockchip/image/hinlink_h29k_defconfig
-# 作用：控制固件镜像（sysupgrade.bin / factory.img）的生成行为
-# 注意：此文件不配置内核，只配置 OpenWrt 构建系统对本设备的支持策略
-#
-
-# === 设备基础标识（必须，用于 LuCI 设备识别与 sysupgrade 兼容性校验） ===
-DEVICE_VENDOR:=Hinlink                    # 设备厂商名，显示在 LuCI 系统信息页
-DEVICE_MODEL:=H29K                        # 设备型号，用于区分不同硬件变体
-DEVICE_VARIANT:=RK3528                    # SoC 型号，辅助构建脚本选择工具链和 dts
-DEVICE_PACKAGES:=kmod-usb-net-rndis-host kmod-usb-net-cdc-mbim kmod-usb-serial-option \
-    uqmi qmi-utils mbimcli luci-proto-qmi luci-proto-mbim luci-app-ttyd \
-    luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-i18n-uhttpd-zh-cn \
-    kmod-regulator-rk808 kmod-fb-st7789v-v2 kmod-video-uvc \
-    # ↑ 默认安装的核心软件包列表（空格分隔）
-    # • kmod-*：内核模块（USB 5G、RK808、LCD、UVC 摄像头）
-    # • uqmi/qmi-utils/mbimcli：5G 模组通信工具
-    # • luci-proto-*：LuCI 网络协议插件（QMI/MBIM）
-    # • luci-app-ttyd：Web SSH 终端（调试必备）
-    # • luci-i18n-*：中文语言包（含基础、防火墙、uhttpd）
-    # • kmod-fb-st7789v-v2：⚠️ 注意！这是 OpenWrt 25.12 新增的 v2 驱动模块名（非 st7789v）
-
-# === 设备树（Device Tree）指定（关键！决定 kernel 如何初始化硬件） ===
-DEVICE_DTS:=rockchip/rk3528-hinlink-h29k   # 对应内核源码路径：
-                                            # linux-6.12.85/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts
-                                            # 必须存在，否则 build 失败
-
-# === 镜像类型与启动方式（eMMC 启动专用） ===
-IMAGE_SIZE:=32m                             # 最终生成的 factory.img 总大小（32MB）
-KERNEL_SIZE:=256k                           # kernel 分区大小（匹配 CONFIG_TARGET_KERNEL_PARTSIZE=256）
-ROOTFS_SIZE:=2048k                          # rootfs 分区大小（匹配 CONFIG_TARGET_ROOTFS_PARTSIZE=2048）
+DEVICE_VENDOR:=Hinlink
+DEVICE_MODEL:=H29K
+DEVICE_VARIANT:=RK3528
+DEVICE_PACKAGES:=kmod-usb-net-rndis-host kmod-usb-net-cdc-mbim kmod-usb-serial-option uqmi qmi-utils mbimcli luci-proto-qmi luci-proto-mbim luci-app-ttyd luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-i18n-uhttpd-zh-cn kmod-regulator-rk808 kmod-fb-st7789v-v2 kmod-video-uvc
+DEVICE_DTS:=rockchip/rk3528-hinlink-h29k
+IMAGE_SIZE:=32m
+KERNEL_SIZE:=256k
+ROOTFS_SIZE:=2048k
 IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | check-size $$$$(IMAGE_SIZE)
-                                            # 生成 sysupgrade.bin 格式（tar + OpenWrt 元数据头）
 IMAGE/factory.img := boot-img | pad-rootfs | check-size $$$$(IMAGE_SIZE)
-                                            # 生成 factory.img（用于首次刷机，含 boot.img + rootfs）
-
-# === 启动镜像（boot.img）构建参数（RK3528 eMMC Boot Flow 所需） ===
-BOOT_IMG_NAME:=boot.img                     # 输出文件名
-BOOT_IMG_KERNEL:=arch/arm64/boot/Image      # 内核镜像路径（6.12.85 编译后为 Image，非 zImage）
-BOOT_IMG_INITRAMFS:=                      # 不使用 initramfs（H29K 直接挂载 eMMC rootfs）
+BOOT_IMG_NAME:=boot.img
+BOOT_IMG_KERNEL:=arch/arm64/boot/Image
+BOOT_IMG_INITRAMFS:=
 BOOT_IMG_DTB:=arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dtb
-                                            # 设备树二进制文件（由 dts 编译生成）
 BOOT_IMG_CMDLINE:=console=ttys0,115200n8 rw root=/dev/mmcblk0p2 rootwait earlycon=uart8250,mmio32,0xff1a0000
-                                            # 内核启动参数：
-                                            # • console=ttys0：串口调试输出
-                                            # • root=/dev/mmcblk0p2：eMMC 第二分区为 rootfs（p1=boot, p2=rootfs）
-                                            # • earlycon=...：早期串口控制台（RK3528 UART8 地址）
-
-# === 分区表（eMMC layout，供 rkflash.sh 或 upgrade 工具解析） ===
-DEVICE_PROFILE:=hinlink_h29k               # 与 CONFIG_TARGET_PROFILE_HINLINK_H29K=y 对应
-DEVICE_PACKAGES += kmod-usb-net-rndis-host # 重复添加确保不遗漏（安全冗余）
-
-# === eMMC 分区布局（OpenWrt 官方推荐，兼容 RK3528 Loader） ===
-# partition table: GPT（GUID Partition Table）
-#   partition 1: boot     → 256KB → 存放 boot.img（kernel + dtb）
-#   partition 2: rootfs   → 2048KB → squashfs/ext4 根文件系统
-#   partition 3: overlay  → 剩余空间 → ext4 可写 overlay（用于保存配置）
-# 注：实际分区由 tools/firmware-utils/mkmylofwimg.pl 或 rkbin 工具生成，此处仅声明逻辑大小
-
-# === 镜像签名与验证（可选，生产环境建议启用） ===
-# IMAGE/sysupgrade.bin := sysupgrade-tar | append-metadata | sign-sysupgrade | check-size $$$$(IMAGE_SIZE)
-# CONFIG_TARGET_rockchip_rk3528_SIGNED_IMAGES=y
-# CONFIG_TARGET_rockchip_rk3528_IMAGE_KEYS:=/path/to/keys/
-# ↑ 若启用签名，需配置私钥路径，否则跳过
-
-# === LuCI 主题与默认设置（影响 Web UI） ===
-LUCI_DEFAULT_THEME:=bootstrap              # 默认 LuCI 主题（轻量、兼容 LCD 小屏）
-LUCI_DEFAULT_LANG:=zh_cn                   # 默认语言（中文）
+DEVICE_PROFILE:=hinlink_h29k
+LUCI_DEFAULT_THEME:=bootstrap
+LUCI_DEFAULT_LANG:=zh_cn
 LUCI_DEFAULT_PACKAGES:=luci-app-firewall luci-app-uhttpd luci-app-ttyd
-                                            # LuCI 默认启用的应用（无需用户手动安装）
-
-# === 构建优化（加速编译 & 减小镜像） ===
-IMAGEOPT:=--no-strip --no-debug-info        # 不剥离符号、不嵌入 debug info（调试需要）
-IMAGEOPT += --compress gzip                 # 使用 gzip 压缩 rootfs（减小 sysupgrade.bin 体积）
-IMAGEOPT += --pad-rootfs                    # 对齐 rootfs 到 4KB 边界（eMMC 必需）
-
-# === 兼容性与升级策略（防止误刷） ===
-DEVICE_COMPAT_VERSION:=25.12.85            # 设备兼容版本号（sysupgrade 时校验）
+IMAGEOPT:=--no-strip --no-debug-info --compress gzip --pad-rootfs
+DEVICE_COMPAT_VERSION:=25.12.85
 DEVICE_COMPAT_MESSAGE:=Hinlink H29K (RK3528) running OpenWrt 25.12.85
-                                            # 升级失败时显示的提示信息
-
-# === 其他 OpenWrt 25.12 特有支持 ===
-CONFIG_TARGET_rockchip_rk3528=y             # 强制启用 RK3528 子目标（避免 fallback）
+CONFIG_TARGET_rockchip_rk3528=y
 CONFIG_TARGET_rockchip_rk3528_DEVICE_hinlink_h29k=y
-                                            # 显式声明本设备属于 rk3528 子目标（用于 feeds 自动依赖解析）
-CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y      # 确保 MBIM 模块在 kernel_menuconfig 中被选中
-CONFIG_PACKAGE_kmod-usb-serial-option=y     # 确保 Option 驱动被编译进内核（非模块）
+CONFIG_PACKAGE_kmod-usb-net-cdc-mbim=y
+CONFIG_PACKAGE_kmod-usb-serial-option=y
