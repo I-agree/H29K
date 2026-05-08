@@ -13,6 +13,12 @@ on:
       - 'target/linux/rockchip/**'
       - 'package/kernel/linux/**'
       - 'include/kernel-version.mk'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Skip validation and just echo config? (true/false)'
+        required: false
+        default: 'false'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -44,70 +50,77 @@ jobs:
             bc \
             libssl-dev \
             liblz4-tool \
-            device-tree-compiler
+            device-tree-compiler \
+            rsync
 
       - name: Initialize OpenWrt build environment
         run: |
-          # Force minimal defconfig to extract kernel source
           make defconfig >/dev/null 2>&1 || true
-          # Ensure kernel is downloaded & extracted (critical for syncconfig)
+          # Pre-compile rockchip target to ensure kernel source is fetched
           make target/linux/rockchip/compile -j1 >/dev/null 2>&1 || true
 
-      - name: Locate linux-6.12.85 source directory
+      - name: Locate Rockchip Linux kernel source directory
         id: find-kernel
         run: |
-          KERNEL_DIR=$(find build_dir -name "linux-6.12.85" | head -n1)
+          # Match linux-* pattern used in OpenWrt (e.g., linux-6.12.85, linux-6.6.30)
+          KERNEL_DIR=$(find build_dir -maxdepth 2 -type d -name "linux-*" -path "build_dir/target-linux-arm64_musl/linux-rockchip/*" | head -n1)
           if [ -z "$KERNEL_DIR" ]; then
-            echo "ERROR: linux-6.12.85 not found in build_dir — kernel source not extracted"
-            echo "Please ensure CONFIG_LINUX_6_12=y is set in config and try again."
+            echo "ERROR: Rockchip kernel source not found in build_dir" >&2
+            echo "INFO: Available dirs:" >&2
+            find build_dir -maxdepth 2 -type d -name "linux-*" -path "build_dir/target-linux-arm64_musl/linux-rockchip/*" 2>/dev/null || echo "(none)" >&2
             exit 1
           fi
           echo "KERNEL_DIR=$KERNEL_DIR" >> "$GITHUB_OUTPUT"
+          echo "Found kernel: $(basename $KERNEL_DIR)" >&2
 
-      - name: Validate Kconfig dependency graph (RK3528-safe)
+      - name: Validate Kconfig dependency graph
+        if: ${{ github.event.inputs.debug != 'true' }}
         run: |
           cd "${{ steps.find-kernel.outputs.KERNEL_DIR }}"
-          echo "🔍 Validating Kconfig for RK3528 (Linux 6.12.85)..."
-          echo "   → Checking: CONFIG_ROCKCHIP_RK3528, CONFIG_ARM64_PA_BITS_40, CONFIG_SPARSEMEM_VMEMMAP"
-          echo "   → Enforcing: ARM64_PA_BITS_40=y + SPARSEMEM_VMEMMAP=n (RK3528 hardware requirement)"
-
-          # Run syncconfig — this is the *exact same step* make defconfig performs internally
+          echo "=== Running syncconfig for RK3528 validation ==="
+          echo "Kernel dir: $(pwd)"
+          echo "Config file: $(ls -l .config)"
+          
+          # Force ARCH + CROSS_COMPILE to avoid host arch confusion
           if ! make -s ARCH=arm64 CROSS_COMPILE= HOSTCC="$(command -v gcc)" syncconfig 2>&1 | grep -q "error:"; then
-            echo "✅ SUCCESS: Kconfig dependency graph is consistent"
-            echo "   All required symbols resolved without conflict."
+            echo "✅ Kconfig dependency graph is consistent"
           else
-            echo "❌ FAILURE: Kconfig validation failed — unresolved dependency or symbol conflict"
-            echo ""
-            echo "=== FULL SYNC CONFIG ERROR OUTPUT ==="
+            echo "❌ Kconfig validation FAILED:"
             make -s ARCH=arm64 CROSS_COMPILE= HOSTCC="$(command -v gcc)" syncconfig 2>&1
-            echo "====================================="
-            echo ""
-            echo "💡 Common fixes:"
-            echo "   • Add 'CONFIG_ROCKCHIP_RK3528=y' (required by SOC_RK3528)"
-            echo "   • Add 'CONFIG_ARM64_PA_BITS_40=y' (required by DRM_ROCKCHIP_VOP2)"
-            echo "   • Add 'CONFIG_SPARSEMEM_VMEMMAP=n' (required for PA_BITS_40 on RK3528)"
-            echo ""
             exit 1
           fi
 
-      - name: Verify mandatory symbols are explicitly set
+      - name: Verify mandatory RK3528 symbols
+        if: ${{ github.event.inputs.debug != 'true' }}
         run: |
           cd "${{ steps.find-kernel.outputs.KERNEL_DIR }}"
-          REQUIRED=(
+          REQUIRED_SYMBOLS=(
             "CONFIG_ROCKCHIP_RK3528=y"
             "CONFIG_ARM64_PA_BITS_40=y"
             "CONFIG_SPARSEMEM_VMEMMAP=n"
+            "CONFIG_ARM64_VA_BITS_48=y"
           )
-          for req in "${REQUIRED[@]}"; do
-            sym="${req%=*}"
-            val="${req#*=}"
-            if ! grep -q "^$req$" .config; then
-              echo "❌ ERROR: Missing explicit setting: $req"
-              echo "   Please add it to your root 'config' file."
+          for sym in "${REQUIRED_SYMBOLS[@]}"; do
+            if ! grep -q "^$sym$" .config; then
+              echo "❌ Missing required symbol: $sym" >&2
               exit 1
             fi
           done
-          echo "✅ All mandatory RK3528 symbols explicitly declared in .config"
+          echo "✅ All mandatory RK3528 symbols present"
+
+      - name: Debug mode — echo current config
+        if: ${{ github.event.inputs.debug == 'true' }}
+        run: |
+          echo "🔍 DEBUG MODE ENABLED"
+          echo "Repository: ${{ github.repository }}"
+          echo "Branch: ${{ github.head_ref || github.ref }}"
+          echo "Workflow triggered by: ${{ github.event_name }}"
+          echo ""
+          echo "=== First 20 lines of config ==="
+          head -20 config || echo "(config file missing)"
+          echo ""
+          echo "=== Kernel source detection result ==="
+          ls -ld build_dir/target-linux-arm64_musl/linux-rockchip/* 2>/dev/null || echo "No kernel dir found"
 
       - name: Cleanup
         if: always()
