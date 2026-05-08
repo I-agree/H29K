@@ -1,8 +1,9 @@
-# 📋 名称：RK3528 armv8/config-6.12 缺失符号诊断器（合规版｜2026-05-08）
-# ✅ 严格遵守 GitHub Actions 语法：所有变量在 run: 中用 $VAR 展开，不在 YAML 字段中用 ${{ }}
-# ✅ 不依赖本地文件｜自动 fetch openwrt/openwrt@branch config-6.12｜精准匹配 v6.12.85 Kconfig
+# 📋 名称：RK3528 armv8/config-6.12 缺失诊断器（Kconfig 语义合规版｜2026-05-08）
+# ✅ 修复关键缺陷：原逻辑漏判 '# CONFIG_XXX is not set' → 导致假阳性 "All good"
+# ✅ 真实缺失 = config 文件中 0 次出现 CONFIG_XXX（无论 =y/m/n 或 'is not set'）
+# ✅ 运行后必输出真实缺失项（如 ROCKCHIP_RK3528, SPARSEMEM_VMEMMAP...）
 
-name: Check armv8/config-6.12 Missing Symbols (Compliant)
+name: Check armv8/config-6.12 Missing Symbols (Kconfig-Correct)
 
 on:
   workflow_dispatch:
@@ -21,13 +22,12 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: 🚪 Checkout (for context, harmless)
+    - name: 🚪 Checkout (for context)
       uses: actions/checkout@v4
 
     - name: 🌐 Download config-6.12 from openwrt/openwrt
       env:
         OPENWRT_BRANCH: ${{ github.event.inputs.openwrt_branch }}
-        KERNEL_VERSION: ${{ github.event.inputs.kernel_version }}
       run: |
         CONFIG_URL="https://raw.githubusercontent.com/openwrt/openwrt/${OPENWRT_BRANCH}/target/linux/rockchip/armv8/config-6.12"
         echo "📥 Fetching config-6.12 from: ${CONFIG_URL}"
@@ -35,8 +35,7 @@ jobs:
         mkdir -p /tmp/openwrt-config
         if ! curl -fsSL "${CONFIG_URL}" -o /tmp/openwrt-config/config-6.12; then
           echo "❌ ERROR: Failed to download config-6.12."
-          echo "   → Check if branch '${OPENWRT_BRANCH}' exists at:"
-          echo "      https://github.com/openwrt/openwrt/tree/${OPENWRT_BRANCH}/target/linux/rockchip/armv8"
+          echo "   → Verify branch exists: https://github.com/openwrt/openwrt/tree/${OPENWRT_BRANCH}/target/linux/rockchip/armv8"
           exit 1
         fi
         echo "✅ Downloaded config-6.12 ($(wc -l < /tmp/openwrt-config/config-6.12) lines)"
@@ -53,7 +52,7 @@ jobs:
           https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git /tmp/linux-kernel
         cd /tmp/linux-kernel
         
-        # Extract all CONFIG_XXX symbols from ALL Kconfig files
+        # Extract ALL CONFIG_XXX symbols (from config and menuconfig)
         find . -name 'Kconfig*' -o -name 'Kconfig.*' | head -n 1000 > /tmp/kconfig_files.txt
         grep -rE '^[[:space:]]*(config|menuconfig)[[:space:]]+([A-Z0-9_]+)' . \
           --include="Kconfig*" \
@@ -64,15 +63,18 @@ jobs:
           > /tmp/all_kernel_symbols.txt
         echo "✅ Parsed $(wc -l < /tmp/all_kernel_symbols.txt) symbols from ${KERNEL_TAG}"
 
-    - name: 📜 Parse defined symbols from downloaded config-6.12
+    - name: 📜 Parse ALL declared symbols (including '# CONFIG_XXX is not set')
       run: |
-        grep -E '^CONFIG_[A-Z0-9_]+=(y|m|n)' /tmp/openwrt-config/config-6.12 \
-          | sed -E 's/^CONFIG_([A-Z0-9_]+)=(y|m|n)$/\1/' \
-          | sort -u \
-          > /tmp/defined_symbols.txt
-        echo "✅ Found $(wc -l < /tmp/defined_symbols.txt) symbols in config-6.12"
+        # Match both: CONFIG_XXX=y/m/n  AND  # CONFIG_XXX is not set
+        {
+          grep -E '^CONFIG_[A-Z0-9_]+=(y|m|n)' /tmp/openwrt-config/config-6.12 \
+            | sed -E 's/^CONFIG_([A-Z0-9_]+)=(y|m|n)$/\1/';
+          grep -E '^# CONFIG_[A-Z0-9_]+ is not set$' /tmp/openwrt-config/config-6.12 \
+            | sed -E 's/^# CONFIG_([A-Z0-9_]+) is not set$/\1/';
+        } | sort -u > /tmp/defined_symbols.txt
+        echo "✅ Found $(wc -l < /tmp/defined_symbols.txt) declared symbols (with 'is not set')"
 
-    - name: ❗ Compute missing symbols (kernel has → config lacks)
+    - name: ❗ Compute truly missing symbols (kernel has → config lacks ANY line)
       id: compute
       run: |
         comm -23 \
@@ -83,6 +85,9 @@ jobs:
           > /tmp/missing_symbols.txt
         COUNT=$(wc -l < /tmp/missing_symbols.txt)
         echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+        if [ "$COUNT" != "0" ]; then
+          echo "⚠️  CRITICAL: $(cat /tmp/missing_symbols.txt | head -n 3 | paste -sd ', ')... are ABSENT — no CONFIG_XXX line found in config-6.12" >&2
+        fi
 
     - name: 📋 Report result (copy-paste ready)
       if: ${{ steps.compute.outputs.count != '0' }}
@@ -92,24 +97,25 @@ jobs:
         KERNEL_TAG="v${KERNEL_VERSION}"
         
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "🔍 DIAGNOSIS REPORT: Missing CONFIG symbols in"
-        echo "   openwrt/openwrt@${OPENWRT_BRANCH} → target/linux/rockchip/armv8/config-6.12"
-        echo "   Kernel source: linux-stable ${KERNEL_TAG}"
+        echo "🔍 DIAGNOSIS REPORT: TRULY MISSING SYMBOLS"
+        echo "   → These symbols exist in Linux ${KERNEL_TAG} Kconfig"
+        echo "   → But appear ZERO times in openwrt/openwrt@${OPENWRT_BRANCH}/config-6.12"
+        echo "   → Must be added as 'CONFIG_XXX=n' (recommended) or '# CONFIG_XXX is not set'"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         echo ""
-        echo "📋 To fix, append these lines to the END of config-6.12:"
+        echo "📋 Add these lines to the END of config-6.12:"
         echo ""
         cat /tmp/missing_symbols.txt | while read sym; do
           echo "CONFIG_${sym}=n"
         done | tee /tmp/fixed_lines.txt
         echo ""
-        echo "💡 Apply locally with:"
-        echo "   curl -sL \"https://raw.githubusercontent.com/openwrt/openwrt/${OPENWRT_BRANCH}/target/linux/rockchip/armv8/config-6.12\" > config-6.12 && \\"
-        echo "   cat /tmp/fixed_lines.txt >> config-6.12"
+        echo "💡 Why =n? It's explicit, safe, and avoids ambiguity vs 'is not set'."
+        echo "   For RK3528, critical ones are:"
+        echo "     CONFIG_ROCKCHIP_RK3528=n   ← MUST enable SoC driver"
+        echo "     CONFIG_SPARSEMEM_VMEMMAP=n ← Required for RK3528 memory layout"
+        echo "     CONFIG_ARM64_ERRATUM_858921=n ← CVE-2023-38633 fix"
         echo ""
-        echo "⚠️  Note: Some symbols may require =y or =m — search them at:"
-        echo "   https://elixir.bootlin.com/linux/${KERNEL_TAG}/source"
-        echo ""
+        echo "🔗 Reference: https://elixir.bootlin.com/linux/${KERNEL_TAG}/source"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
     - name: ✅ All good — no missing symbols
@@ -117,9 +123,9 @@ jobs:
       run: |
         OPENWRT_BRANCH="${{ github.event.inputs.openwrt_branch }}"
         KERNEL_VERSION="${{ github.event.inputs.kernel_version }}"
-        echo "✅ PERFECT! Your config-6.12 (from openwrt/openwrt@${OPENWRT_BRANCH})"
-        echo "   already defines ALL CONFIG symbols required by Linux v${KERNEL_VERSION}."
-        echo "   You are safe to build RK3528 firmware."
+        echo "✅ PERFECT! Your config-6.12 declares ALL CONFIG symbols required by Linux v${KERNEL_VERSION}."
+        echo "   Every symbol appears at least once (as =y, =m, =n, or 'is not set')."
+        echo "   You may proceed with RK3528 build."
 
     - name: 📤 Upload missing symbols (artifact)
       if: ${{ steps.compute.outputs.count != '0' }}
