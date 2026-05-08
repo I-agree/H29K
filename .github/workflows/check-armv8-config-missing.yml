@@ -1,0 +1,125 @@
+# 📋 名称：RK3528 armv8/config-6.12 缺失符号诊断器（2026-05-08）
+# 🎯 目标：一次性列出 target/linux/rockchip/armv8/config-6.12 中缺失但内核 6.12 要求显式声明的 CONFIG_XXX
+# ⚠️ 注意：此 workflow 不构建固件，仅诊断；需仓库中存在 config-6.12 文件
+# ✅ 输出格式：每行 `CONFIG_XXX=n`（可直接复制粘贴到 config-6.12 末尾）
+
+name: Check armv8/config-6.12 Missing Symbols
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Linux kernel version (e.g., 6.12)'
+        required: true
+        default: '6.12'
+      config_path:
+        description: 'Path to config file (relative to repo root)'
+        required: true
+        default: 'target/linux/rockchip/armv8/config-6.12'
+
+env:
+  KERNEL_VERSION: ${{ github.event.inputs.kernel_version }}
+  CONFIG_PATH: ${{ github.event.inputs.config_path }}
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: 🚪 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🔍 Validate config file exists
+      run: |
+        if [ ! -f "${{ env.CONFIG_PATH }}" ]; then
+          echo "❌ ERROR: Config file not found at '${{ env.CONFIG_PATH }}'"
+          echo "   Please check path and commit it to your repo."
+          exit 1
+        fi
+        echo "✅ Config file found: ${{ env.CONFIG_PATH }}"
+
+    - name: 🧩 Extract all CONFIG symbols from Kconfig tree (Linux ${{ env.KERNEL_VERSION }})
+      id: extract-kconfig
+      run: |
+        # Clone minimal kernel source (only Kconfig dirs, shallow)
+        git clone --depth=1 --branch="v${{ env.KERNEL_VERSION }}.85" \
+          --filter=blob:none \
+          --no-checkout \
+          https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git /tmp/linux-kernel
+        cd /tmp/linux-kernel
+
+        # Find all Kconfig files under arch/arm64/ & drivers/ & net/ etc.
+        find . -name 'Kconfig*' -o -name 'Kconfig.*' | head -n 1000 > /tmp/kconfig_files.txt
+
+        # Parse all 'config XXX' and 'menuconfig XXX' lines → extract symbol names
+        grep -rE '^[[:space:]]*(config|menuconfig)[[:space:]]+([A-Z0-9_]+)' . \
+          --include="Kconfig*" \
+          | sed -E 's/^[[:space:]]*(config|menuconfig)[[:space:]]+([A-Z0-9_]+).*/\2/' \
+          | sort -u \
+          | grep '^CONFIG_' \
+          | sed 's/^CONFIG_//' \
+          > /tmp/all_kernel_symbols.txt
+
+        echo "✅ Parsed $(wc -l < /tmp/all_kernel_symbols.txt) kernel symbols from v${{ env.KERNEL_VERSION }}.85"
+
+    - name: 📜 Extract CONFIG symbols already defined in ${{ env.CONFIG_PATH }}
+      id: extract-config
+      run: |
+        # Extract CONFIG_XXX=y/m/n from config file (ignore comments & empty lines)
+        grep -E '^CONFIG_[A-Z0-9_]+=(y|m|n)' "${{ env.CONFIG_PATH }}" \
+          | sed -E 's/^CONFIG_([A-Z0-9_]+)=(y|m|n)$/\1/' \
+          | sort -u \
+          > /tmp/defined_symbols.txt
+
+        echo "✅ Found $(wc -l < /tmp/defined_symbols.txt) symbols already defined in ${{ env.CONFIG_PATH }}"
+
+    - name: ❗ Compute missing symbols (in kernel but NOT in config-6.12)
+      id: compute-missing
+      run: |
+        # Get set difference: kernel_symbols - defined_symbols
+        comm -23 \
+          <(sort /tmp/all_kernel_symbols.txt) \
+          <(sort /tmp/defined_symbols.txt) \
+          | grep -v '^$' \
+          | grep -E '^[A-Z0-9_]+$' \
+          | sort \
+          > /tmp/missing_symbols.txt
+
+        COUNT=$(wc -l < /tmp/missing_symbols.txt)
+        echo "missing_count=${COUNT}" >> "$GITHUB_OUTPUT"
+        echo "✅ Missing symbols count: ${COUNT}"
+
+    - name: 📋 Print human-readable report (copy-paste ready)
+      if: ${{ steps.compute-missing.outputs.missing_count != '0' }}
+      run: |
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "🔍 DIAGNOSIS REPORT: Missing CONFIG symbols required by Linux ${{ env.KERNEL_VERSION }}"
+        echo "   → File: ${{ env.CONFIG_PATH }}"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo ""
+        echo "📋 To fix, append these lines to the END of ${{ env.CONFIG_PATH }}:"
+        echo ""
+        cat /tmp/missing_symbols.txt | while read sym; do
+          echo "CONFIG_${sym}=n"
+        done | tee /tmp/fixed_config_lines.txt
+        echo ""
+        echo "💡 Tip: Run this command locally to auto-append:"
+        echo "     cat /tmp/fixed_config_lines.txt >> ${{ env.CONFIG_PATH }}"
+        echo ""
+        echo "⚠️  WARNING: Some symbols may need =y or =m instead of =n — check Kconfig help text."
+        echo "   If unsure, run \`make menuconfig\` and search for each symbol."
+        echo ""
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+    - name: ✅ All symbols already present
+      if: ${{ steps.compute-missing.outputs.missing_count == '0' }}
+      run: |
+        echo "✅ PERFECT! Your ${{ env.CONFIG_PATH }} contains ALL CONFIG symbols required by Linux ${{ env.KERNEL_VERSION }}."
+        echo "   No action needed — safe to proceed with build."
+
+    - name: 📤 Upload missing symbols list as artifact (optional)
+      if: ${{ steps.compute-missing.outputs.missing_count != '0' }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: missing-config-symbols-${{ env.KERNEL_VERSION }}
+        path: /tmp/fixed_config_lines.txt
