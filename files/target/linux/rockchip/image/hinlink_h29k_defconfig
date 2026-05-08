@@ -1,4 +1,4 @@
-DEVICE_VENDOR:=Hinlink
+DEVICE_VENDOR:=HINLINK
 DEVICE_MODEL:=H29K
 DEVICE_PACKAGES:=luci-proto-qmi luci-i18n-qmodem-next-zh-cn kmod-fb-st7789v-v2 kmod-video-uvc -urngd
 IMAGE_SIZE:=32m
