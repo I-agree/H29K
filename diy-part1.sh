@@ -166,8 +166,6 @@ echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC
 # 内容覆盖写入 config-6.12（注意：使用 > 而非 >>，确保干净替换）
 cat > target/linux/rockchip/armv8/config-6.12 << 'EOF'
 # RK3528-specific additions (required)
-cat > target/linux/rockchip/armv8/config-6.12 << 'EOF'
-# RK3528-specific additions (required)
 CONFIG_ROCKCHIP_RK3528=y
 CONFIG_ROCKCHIP_RK3528_PMU=y
 CONFIG_ROCKCHIP_DRM_VOP2=y
