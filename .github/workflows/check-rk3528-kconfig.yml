@@ -1,0 +1,115 @@
+name: Check RK3528 Kconfig Consistency
+
+on:
+  push:
+    paths:
+      - 'config'
+      - 'target/linux/rockchip/**'
+      - 'package/kernel/linux/**'
+      - 'include/kernel-version.mk'
+  pull_request:
+    paths:
+      - 'config'
+      - 'target/linux/rockchip/**'
+      - 'package/kernel/linux/**'
+      - 'include/kernel-version.mk'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 1
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libncurses5-dev \
+            gawk \
+            zlib1g-dev \
+            flex \
+            bison \
+            python3 \
+            bc \
+            libssl-dev \
+            liblz4-tool \
+            device-tree-compiler
+
+      - name: Initialize OpenWrt build environment
+        run: |
+          # Force minimal defconfig to extract kernel source
+          make defconfig >/dev/null 2>&1 || true
+          # Ensure kernel is downloaded & extracted (critical for syncconfig)
+          make target/linux/rockchip/compile -j1 >/dev/null 2>&1 || true
+
+      - name: Locate linux-6.12.85 source directory
+        id: find-kernel
+        run: |
+          KERNEL_DIR=$(find build_dir -name "linux-6.12.85" | head -n1)
+          if [ -z "$KERNEL_DIR" ]; then
+            echo "ERROR: linux-6.12.85 not found in build_dir — kernel source not extracted"
+            echo "Please ensure CONFIG_LINUX_6_12=y is set in config and try again."
+            exit 1
+          fi
+          echo "KERNEL_DIR=$KERNEL_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Kconfig dependency graph (RK3528-safe)
+        run: |
+          cd "${{ steps.find-kernel.outputs.KERNEL_DIR }}"
+          echo "🔍 Validating Kconfig for RK3528 (Linux 6.12.85)..."
+          echo "   → Checking: CONFIG_ROCKCHIP_RK3528, CONFIG_ARM64_PA_BITS_40, CONFIG_SPARSEMEM_VMEMMAP"
+          echo "   → Enforcing: ARM64_PA_BITS_40=y + SPARSEMEM_VMEMMAP=n (RK3528 hardware requirement)"
+
+          # Run syncconfig — this is the *exact same step* make defconfig performs internally
+          if ! make -s ARCH=arm64 CROSS_COMPILE= HOSTCC="$(command -v gcc)" syncconfig 2>&1 | grep -q "error:"; then
+            echo "✅ SUCCESS: Kconfig dependency graph is consistent"
+            echo "   All required symbols resolved without conflict."
+          else
+            echo "❌ FAILURE: Kconfig validation failed — unresolved dependency or symbol conflict"
+            echo ""
+            echo "=== FULL SYNC CONFIG ERROR OUTPUT ==="
+            make -s ARCH=arm64 CROSS_COMPILE= HOSTCC="$(command -v gcc)" syncconfig 2>&1
+            echo "====================================="
+            echo ""
+            echo "💡 Common fixes:"
+            echo "   • Add 'CONFIG_ROCKCHIP_RK3528=y' (required by SOC_RK3528)"
+            echo "   • Add 'CONFIG_ARM64_PA_BITS_40=y' (required by DRM_ROCKCHIP_VOP2)"
+            echo "   • Add 'CONFIG_SPARSEMEM_VMEMMAP=n' (required for PA_BITS_40 on RK3528)"
+            echo ""
+            exit 1
+          fi
+
+      - name: Verify mandatory symbols are explicitly set
+        run: |
+          cd "${{ steps.find-kernel.outputs.KERNEL_DIR }}"
+          REQUIRED=(
+            "CONFIG_ROCKCHIP_RK3528=y"
+            "CONFIG_ARM64_PA_BITS_40=y"
+            "CONFIG_SPARSEMEM_VMEMMAP=n"
+          )
+          for req in "${REQUIRED[@]}"; do
+            sym="${req%=*}"
+            val="${req#*=}"
+            if ! grep -q "^$req$" .config; then
+              echo "❌ ERROR: Missing explicit setting: $req"
+              echo "   Please add it to your root 'config' file."
+              exit 1
+            fi
+          done
+          echo "✅ All mandatory RK3528 symbols explicitly declared in .config"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -rf build_dir/
