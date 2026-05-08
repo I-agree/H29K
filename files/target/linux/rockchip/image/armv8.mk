@@ -10,7 +10,7 @@ endef
 define Device/hinlink_h29k
   SOC := rk3528
   SUBTARGET := armv8
-  DEVICE_VENDOR := HINLINK
+  DEVICE_VENDOR := Hinlink
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
   TRUSTED_FIRMWARE_A := rk3528
@@ -18,7 +18,7 @@ define Device/hinlink_h29k
   KERNEL_LOADADDR := 0x00280000
   KERNEL_ENTRYADDR := 0x00280000
   DEVICE_UBOOT_IMAGE := u-boot-rockchip-hinlink_h29k.bin
-  DEVICE_COMPAT_VERSION := 1
+  DEVICE_COMPAT_VERSION := 25.12.85
   SUPPORTED_DEVICES := hinlink_h29k
   IMAGE/boot.bin := boot-scr | boot-kernel | boot-dtb
   IMAGE/sysupgrade.img.gz := boot.bin | append-rootfs | pad-rootfs | check-size | gzip
