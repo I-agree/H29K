@@ -24,28 +24,30 @@ echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon.git;master' >>
 # 添加 Argon 配置插件源
 echo 'src-git jerrykuku https://github.com/jerrykuku/luci-app-argon-config.git;master' >> feeds.conf.default
 
-# ====================== 方案B：全套切换为 LEDE 原版 ======================
+# ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
 rm -rf target/linux/rockchip/patches-6.12
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
 
-# 2. 下载 LEDE 全套 rockchip patches-6.12
-git clone --depth 1 --single-branch --branch master https://github.com/coolsnowwolf/lede.git /tmp/lede-tmp
+# 定义路径
+DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
+mkdir -p "$DTS_DIR"
 
-# 3. 复制LEDE原版补丁、DTS覆盖到当前OpenWrt
-mkdir -p target/linux/rockchip/
-cp -r /tmp/lede-tmp/target/linux/rockchip/patches-6.12 target/linux/rockchip/
-cp -r /tmp/lede-tmp/target/linux/rockchip/files target/linux/rockchip/
+# 下载 LEDE 原版 rk3528.dtsi
+wget -q -O "$DTS_DIR/rk3528.dtsi" \
+https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi
 
-# 4. 清理临时文件
-rm -rf /tmp/lede-tmp
+# 下载 LEDE 原版 rk3528-pinctrl.dtsi
+wget -q -O "$DTS_DIR/rk3528-pinctrl.dtsi" \
+https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-pinctrl.dtsi
 
-# 5. 验证关键文件是否就位
-echo "==== 校验LEDE原版RK3528文件 ===="
-ls -lh target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
-ls -lh target/linux/rockchip/patches-6.12/*rk3528*
+# 验证文件是否下载成功
+if [ ! -s "$DTS_DIR/rk3528.dtsi" ] || [ ! -s "$DTS_DIR/rk3528-pinctrl.dtsi" ]; then
+    echo "❌ 下载 DTSI 文件失败，停止编译！"
+    exit 1
+fi
 
-echo "✅ 已切换为LEDE全套源码+补丁，版本完全对齐，无补丁冲突"
+echo "✅ 成功下载 LEDE rk3528.dtsi + rk3528-pinctrl.dtsi 到正确目录"
 
 # ====== BEGIN: Predefine config via .config.override ======
 echo "🔧 Writing .config.override for u-boot-rk3528..."
