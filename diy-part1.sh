@@ -155,6 +155,25 @@ echo " ✅ 已成功删除 CONFIG_ARM64_VA_BITS_48 配置项"
 echo " ✅ 验证通过，继续编译……"
 echo "====================================================="
 
+# 定义配置文件路径
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+# 1. 删除这两项配置
+sed -i '/CONFIG_ARM64_PA_BITS=48/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ARM64_PA_BITS_48=y/d' "$CONFIG_FILE"
+
+# 2. 验证是否删除成功
+if grep -q "CONFIG_ARM64_PA_BITS=48" "$CONFIG_FILE" || grep -q "CONFIG_ARM64_PA_BITS_48=y" "$CONFIG_FILE"; then
+    echo "====================================================="
+    echo " ❌ 错误：删除 CONFIG_ARM64_PA_BITS 相关配置失败！"
+    exit 1
+fi
+
+echo "====================================================="
+echo " ✅ 已成功删除 CONFIG_ARM64_PA_BITS=48 和 CONFIG_ARM64_PA_BITS_48=y"
+echo " ✅ 验证通过，继续编译……"
+echo "====================================================="
+
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置
 # ==============================================
