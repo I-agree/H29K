@@ -208,25 +208,10 @@ CONFIG_ROCKCHIP_DMC_RK3588=n
 
 # RK3528 mandatory for VA_BITS=48
 CONFIG_ARM64_EPAN=y
-CONFIG_ARM64_PAN=n
-CONFIG_ARM64_AS_HAS_MTE=y  # 启用 MTE 模拟（增强 EPAN 稳定性，RK3528 支持）
-EOF
+CONFIG_ARM64_ASIMD=y
 
-# ====== BEGIN: Predefine config via .config.override ======
-echo "🔧 Writing .config.override for u-boot-rk3528..."
-
-cat > /workdir/openwrt/.config.override << 'EOF'
-# RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
-CONFIG_TARGET_MULTI_ARCH=n
-CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_hinlink_h29k=y
-CONFIG_ARM64_VA_BITS_48=y
-CONFIG_ARM64_PA_BITS_48=y
-CONFIG_ARM64_VHE=y
-CONFIG_ARM64_PAN=y
-CONFIG_ARM64_EPHEMERAL_PAGE_TABLES=n
-CONFIG_PACKAGE_u-boot-rk3528=y
-CONFIG_PACKAGE_u-boot-rk3528-tpl=y
-CONFIG_TRUSTED_FIRMWARE_A="rk3528"
+# RK3528 mandatory for VHE stability (no MTE on RK3528)
+# CONFIG_ARM64_AS_HAS_MTE is not set
 EOF
 
 echo "✅ .config.override written with RK3528 bootloader stack"
