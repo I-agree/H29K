@@ -22,13 +22,78 @@ echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.co
 # 添加 Argon 主题源
 echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon.git;master' >> feeds.conf.default
 
+# OpenWrt 构建前预处理脚本
+#          自动注入 RK3528 必需的 dt-bindings 头文件，解决 'rk3528-cru.h: No such file' 错误
+# 📌 放置位置：OpenWrt 根目录下，与 feeds.conf.default 同级（即 ./diy-part1.sh）
+
+set -euo pipefail
+
+# === 配置区（可按需修改）===
+OPENWRT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+KERNEL_VERSION="6.12.85"
+TARGET_DIR="build_dir/target-aarch64_generic_musl/linux-rockchip_armv8"
+LINUX_SRC="${TARGET_DIR}/linux-${KERNEL_VERSION}"
+
+# === 检查依赖 ===
+if ! command -v curl >/dev/null 2>&1; then
+  echo "❌ Error: 'curl' is required but not installed." >&2
+  exit 1
+fi
+
+if [ ! -d "${LINUX_SRC}" ]; then
+  echo "❌ Error: Linux source dir not found at ${LINUX_SRC}" >&2
+  echo "   Hint: Run 'make defconfig' first to generate build_dir." >&2
+  exit 1
+fi
+
+# === 创建 dt-bindings 目录结构 ===
+BINDINGS_DIR="${LINUX_SRC}/include/dt-bindings"
+CLOCK_DIR="${BINDINGS_DIR}/clock"
+RESET_DIR="${BINDINGS_DIR}/reset"
+
+mkdir -p "${CLOCK_DIR}" "${RESET_DIR}"
+
+# === 下载 Rockchip 官方 dt-bindings 头文件（来自 rockchip-linux-6.12 分支）===
+echo "🔧 Injecting RK3528 dt-bindings headers..."
+
+# 下载 rk3528-cru.h（Clock Unit）
+curl -sSL \
+  "https://raw.githubusercontent.com/rockchip-linux/kernel/rockchip-linux-6.12/include/dt-bindings/clock/rk3528-cru.h" \
+  -o "${CLOCK_DIR}/rk3528-cru.h"
+
+# 下载 rk3528-resets.h（Reset Unit）
+curl -sSL \
+  "https://raw.githubusercontent.com/rockchip-linux/kernel/rockchip-linux-6.12/include/dt-bindings/reset/rk3528-resets.h" \
+  -o "${RESET_DIR}/rk3528-resets.h"
+
+# === 验证下载完整性 ===
+if [ ! -s "${CLOCK_DIR}/rk3528-cru.h" ] || [ ! -s "${RESET_DIR}/rk3528-resets.h" ]; then
+  echo "❌ Error: Failed to download one or more dt-bindings headers." >&2
+  echo "   Check network connectivity and GitHub availability." >&2
+  exit 1
+fi
+
+# === 输出成功信息 ===
+echo "✅ Successfully injected:"
+echo "   • ${CLOCK_DIR}/rk3528-cru.h (size: $(wc -c < "${CLOCK_DIR}/rk3528-cru.h") bytes)"
+echo "   • ${RESET_DIR}/rk3528-resets.h (size: $(wc -c < "${RESET_DIR}/rk3528-resets.h") bytes)"
+echo "💡 Next step: run 'make image PROFILE=hinlink_h29k'"
+
+# === 可选：打印验证命令供调试 ===
+cat << 'EOF'
+
+🔍 To verify manually:
+   ls -l ${LINUX_SRC}/include/dt-bindings/clock/rk3528-cru.h
+   grep -q "RK3528_CRU_CLK_" ${LINUX_SRC}/include/dt-bindings/clock/rk3528-cru.h && echo "✅ Header syntax OK"
+EOF
+
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
 rm -rf target/linux/rockchip/patches-6.12
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
 
 # 定义路径
-DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
+DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_DIR"
 
 # 下载 LEDE 原版 rk3528.dtsi
@@ -48,7 +113,7 @@ fi
 echo "✅ 成功下载 LEDE rk3528.dtsi + rk3528-pinctrl.dtsi 到正确目录"
 
 # 下载指定 dts 到目标目录，带校验
-DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
+DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_SAVE_DIR"
 
 wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts \
