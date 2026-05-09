@@ -1,4 +1,100 @@
 #!/bin/bash
+
+# =====================================================================
+# ✅ DIY-PART2.SH —— P3TERX Actions-OpenWrt 标准兼容版（RK3528 bindings 注入）
+# 🎯 运行时机：./scripts/feeds install -a 之后，make defconfig 之前
+# 📍 作用：向已解压的 feeds/kernels/linux/linux-6.12.85/ 注入 dt-bindings 头文件
+# ⚠️ 前提：feeds/kernels/linux/ 必须已通过 install -a 安装（即目录存在）
+# =====================================================================
+
+set -euo pipefail
+
+OPENWRT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+KERNEL_VERSION="6.12.85"
+FEEDS_KERNEL_DIR="feeds/kernels/linux"
+LINUX_SRC="${FEEDS_KERNEL_DIR}/linux-${KERNEL_VERSION}"
+
+ROCKCHIP_REPO="https://raw.githubusercontent.com/rockchip-linux/kernel/rockchip-linux-6.12"
+
+# ==================== 【检查 feeds/kernels/linux 是否已安装】====================
+if [ ! -d "${FEEDS_KERNEL_DIR}" ]; then
+  echo "❌ 错误：${FEEDS_KERNEL_DIR} 未找到！" >&2
+  echo "   请确认 workflow 中已执行：" >&2
+  echo "     - ./scripts/feeds update -a" >&2
+  echo "     - ./scripts/feeds install -a" >&2
+  exit 1
+fi
+
+if [ ! -d "${LINUX_SRC}" ]; then
+  echo "❌ 错误：${LINUX_SRC} 不存在！" >&2
+  echo "   可能原因：" >&2
+  echo "     • feeds install 未成功（检查日志中是否出现 'Installing package'）；" >&2
+  echo "     • KERNEL_VERSION 与 feeds 中实际版本不匹配（如 feeds 提供的是 6.12.84）；" >&2
+  echo "   请运行：ls -l ${FEEDS_KERNEL_DIR}/" >&2
+  exit 1
+fi
+
+echo "✅ 已定位内核源码：${LINUX_SRC}"
+
+# ==================== 【注入 dt-bindings】====================
+BINDINGS_DIR="${LINUX_SRC}/include/dt-bindings"
+mkdir -p \
+  "${BINDINGS_DIR}/clock" \
+  "${BINDINGS_DIR}/reset" \
+  "${BINDINGS_DIR}/power" \
+  "${BINDINGS_DIR}/soc" \
+  "${BINDINGS_DIR}/pinctrl" \
+  "${BINDINGS_DIR}/thermal" \
+  "${BINDINGS_DIR}/interrupt-controller" \
+  "${BINDINGS_DIR}/phy"
+
+download_header() {
+  local url="$1"
+  local out_path="$2"
+  echo "⬇️  下载 ${out_path##*/}..."
+  curl -sSL "$url" -o "$out_path" || {
+    echo "❌ 下载失败：$out_path（URL: $url）" >&2
+    exit 1
+  }
+}
+
+# 下载全部必需头文件（Rockchip 官方 rockchip-linux-6.12 分支）
+download_header "${ROCKCHIP_REPO}/include/dt-bindings/clock/rk3528-cru.h" \
+  "${BINDINGS_DIR}/clock/rk3528-cru.h"
+
+download_header "${ROCKCHIP_REPO}/include/dt-bindings/reset/rk3528-resets.h" \
+  "${BINDINGS_DIR}/reset/rk3528-resets.h"
+
+download_header "${ROCKCHIP_REPO}/include/dt-bindings/power/rk3528-power.h" \
+  "${BINDINGS_DIR}/power/rk3528-power.h"
+
+download_header "${ROCKCHIP_REPO}/include/dt-bindings/soc/rockchip,boot-mode.h" \
+  "${BINDINGS_DIR}/soc/rockchip,boot-mode.h"
+
+download_header "${ROCKCHIP_REPO}/include/dt-bindings/pinctrl/rockchip.h" \
+  "${BINDINGS_DIR}/pinctrl/rockchip.h"
+
+# ==================== 【校验】====================
+echo "🧪 校验头文件..."
+for h in \
+  "clock/rk3528-cru.h" \
+  "reset/rk3528-resets.h" \
+  "power/rk3528-power.h" \
+  "soc/rockchip,boot-mode.h" \
+  "pinctrl/rockchip.h"
+do
+  if [ ! -s "${BINDINGS_DIR}/${h}" ]; then
+    echo "❌ 校验失败：${BINDINGS_DIR}/${h} 为空或缺失！" >&2
+    exit 1
+  fi
+done
+
+echo ""
+echo "🎉 成功！RK3528 dt-bindings 已注入至："
+echo "   ${LINUX_SRC}/include/dt-bindings/"
+echo ""
+echo "🚀 下一步：make defconfig CONFIG_TARGET_PROFILE=hinlink_h29k"
+
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
 # ======================== 【资源准备】 ========================
