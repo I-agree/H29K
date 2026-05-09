@@ -177,6 +177,10 @@ CONFIG_ARM64_MODULE_PLTS=y
 CONFIG_ARM64_VHE=y
 CONFIG_CPU_LITTLE_ENDIAN=y
 CONFIG_ARM64_PA_BITS_40=y
+CONFIG_ARM64_PA_BITS=40
+CONFIG_ARM64_VA_BITS_48=y
+CONFIG_ARM64_VA_BITS=48
+CONFIG_ARM64_PAGE_SHIFT=12
 CONFIG_NR_CPUS=512
 CONFIG_SCHED_MC=n
 CONFIG_SCHED_CLUSTER=n
@@ -191,7 +195,6 @@ CONFIG_ARM64_ERRATUM_858921=n
 CONFIG_ROCKCHIP_IOMMU=n
 CONFIG_ROCKCHIP_DW_HDMI=n
 CONFIG_ROCKCHIP_RGA=n
-CONFIG_ARM64_VA_BITS_48=y
 # CONFIG_ARM64_VA_BITS_39 is not set
 # CONFIG_ARM64_VA_BITS_52 is not set
 
@@ -217,15 +220,6 @@ CONFIG_ARM64_ASIMD=y
 # CONFIG_ARM64_AS_HAS_MTE is not set
 EOF
 
-echo "✅ .config.override written with RK3528 bootloader stack"
-ls -l /workdir/openwrt/.config.override
-
-# Now run defconfig — it will merge .config.override automatically
-cd /workdir/openwrt
-make defconfig > /dev/null 2>&1
-echo "✅ make defconfig completed with override applied"
-# ====== END ======
-
 # Step 1: 彻底移除 rockchip/armv8/config-6.12 中的 CONFIG_ARM64_SVE=y（它不该存在）
 sed -i '/CONFIG_ARM64_SVE=y/d' target/linux/rockchip/armv8/config-6.12
 
@@ -234,3 +228,29 @@ echo "# CONFIG_ARM64_SVE is not set" >> target/linux/generic/config-6.12
 
 # Step 3: 显式启用 ASIMD（VHE 的硬依赖，且 RK3528 原生支持）
 echo "CONFIG_ARM64_ASIMD=y" >> target/linux/generic/config-6.12
+
+# ====== BEGIN: Predefine config via .config.override ======
+echo "🔧 Writing .config.override for u-boot-rk3528..."
+
+cat > /workdir/openwrt/.config.override << 'EOF'
+# RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
+CONFIG_TARGET_MULTI_ARCH=n
+CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_hinlink_h29k=y
+CONFIG_ARM64_VA_BITS_48=y
+CONFIG_ARM64_PA_BITS_48=y
+CONFIG_ARM64_VHE=y
+CONFIG_ARM64_PAN=y
+CONFIG_ARM64_EPHEMERAL_PAGE_TABLES=n
+CONFIG_PACKAGE_u-boot-rk3528=y
+CONFIG_PACKAGE_u-boot-rk3528-tpl=y
+CONFIG_TRUSTED_FIRMWARE_A="rk3528"
+EOF
+
+echo "✅ .config.override written with RK3528 bootloader stack"
+ls -l /workdir/openwrt/.config.override
+
+# Now run defconfig — it will merge .config.override automatically
+cd /workdir/openwrt
+make defconfig > /dev/null 2>&1
+echo "✅ make defconfig completed with override applied"
+# ====== END ======
