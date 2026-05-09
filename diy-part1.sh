@@ -47,32 +47,6 @@ fi
 
 echo "✅ 成功下载 LEDE rk3528.dtsi + rk3528-pinctrl.dtsi 到正确目录"
 
-# ====== BEGIN: Predefine config via .config.override ======
-echo "🔧 Writing .config.override for u-boot-rk3528..."
-
-cat > /workdir/openwrt/.config.override << 'EOF'
-# RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
-CONFIG_TARGET_MULTI_ARCH=n
-CONFIG_TARGET_rockchip=y
-CONFIG_TARGET_rockchip_armv8=y
-CONFIG_TARGET_rockchip_armv8=armv8
-CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
-CONFIG_PACKAGE_u-boot-rk3528=y
-CONFIG_PACKAGE_u-boot-rk3528-tpl=y
-CONFIG_TRUSTED_FIRMWARE_A="rk3528"
-CONFIG_PACKAGE_trusted-firmware-a-rk3528=y
-CONFIG_PACKAGE_kmod-usb-dwc3-rockchip=y
-EOF
-
-echo "✅ .config.override written with RK3528 bootloader stack"
-ls -l /workdir/openwrt/.config.override
-
-# Now run defconfig — it will merge .config.override automatically
-cd /workdir/openwrt
-make defconfig > /dev/null 2>&1
-echo "✅ make defconfig completed with override applied"
-# ====== END ======
-
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/"
 mkdir -p "$DTS_SAVE_DIR"
@@ -220,9 +194,25 @@ CONFIG_ARM64_PAN=n
 CONFIG_ARM64_AS_HAS_MTE=y  # 启用 MTE 模拟（增强 EPAN 稳定性，RK3528 支持）
 EOF
 
+# ====== BEGIN: Predefine config via .config.override ======
+echo "🔧 Writing .config.override for u-boot-rk3528..."
+
+cat > /workdir/openwrt/.config.override << 'EOF'
+# RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
+CONFIG_TARGET_MULTI_ARCH=n
+EOF
+
+echo "✅ .config.override written with RK3528 bootloader stack"
+ls -l /workdir/openwrt/.config.override
+
+# Now run defconfig — it will merge .config.override automatically
+cd /workdir/openwrt
+make defconfig > /dev/null 2>&1
+echo "✅ make defconfig completed with override applied"
+# ====== END ======
+
 # =============== 🔍 FINAL SANITY CHECK — NO MODIFICATION, ONLY VALIDATION ===============
 echo "🔍 Validating build readiness for OpenWrt 25.12.3 + Linux 6.12.85 + RK3528..."
 [ "$(grep -c '^CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y' /workdir/openwrt/.config)" -eq 1 ] || { echo "❌ FATAL: .config missing hinlink_h29k device — abort"; exit 1; }
 [ -f "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" ] || { echo "❌ FATAL: DTS file missing — abort"; exit 1; }
 echo "✅ All pre-build checks PASSED. Ready for 'make image PROFILE=hinlink_h29k'."
-
