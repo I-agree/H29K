@@ -245,12 +245,3 @@ CONFIG_PACKAGE_u-boot-rk3528=y
 CONFIG_PACKAGE_u-boot-rk3528-tpl=y
 CONFIG_TRUSTED_FIRMWARE_A="rk3528"
 EOF
-
-echo "✅ .config.override written with RK3528 bootloader stack"
-ls -l /workdir/openwrt/.config.override
-
-# Now run defconfig — it will merge .config.override automatically
-cd /workdir/openwrt
-make defconfig > /dev/null 2>&1
-echo "✅ make defconfig completed with override applied"
-# ====== END ======
