@@ -1,9 +1,29 @@
 DEVICE_VENDOR:=HINLINK
 DEVICE_MODEL:=H29K
-DEVICE_PACKAGES:=luci-proto-qmi luci-i18n-qmodem-next-zh-cn kmod-fb-st7789v-v2 kmod-video-uvc -urngd
-IMAGE_SIZE:=32m
+DEVICE_PACKAGES:= \
+    luci-proto-qmi \
+    luci-i18n-qmodem-next-zh_Hans \
+    kmod-fb-st7789v-v2 \
+    kmod-video-uvc \
+    kmod-aic8800-sdio \
+    kmod-usb-net-cdc-mbim \
+    uqmi \
+    qmi-utils \
+    kmod-usb3 \
+    dnsmasq-full \
+    luci-app-qmodem-next \
+    luci-i18n-qmodem-next-zh_Hans \
+    luci-theme-argon \
+    curl \
+    irqbalance \
+    luci-app-irqbalance \
+    luci-i18n-irqbalance-zh_Hans \
+    dnscrypt-proxy \
+    luci-app-dnscrypt-proxy \
+    luci-i18n-dnscrypt-proxy-zh_Hans
+IMAGE_SIZE:=64m
 KERNEL_LOADADDR:=0x00280000
 KERNEL_ENTRYADDR:=0x00280000
-LUCI_DEFAULT_THEME:=bootstrap
-LUCI_DEFAULT_LANG:=zh_cn
+LUCI_DEFAULT_THEME:=argon
+LUCI_DEFAULT_LANG:=zh_Hans
 DEVICE_COMPAT_VERSION:=25.12.85
