@@ -239,7 +239,7 @@ echo "✅ make defconfig completed with override applied"
 # ====== END ======
 
 # Step 1: 彻底移除 rockchip/armv8/config-6.12 中的 CONFIG_ARM64_SVE=y（它不该存在）
-sed -i '/ARM64_SVE/d' target/linux/rockchip/armv8/config-6.12
+sed -i '/CONFIG_ARM64_SVE=y/d' target/linux/rockchip/armv8/config-6.12
 
 # Step 2: 显式确保 generic/config-6.12 中 SVE 为明确 not set（防歧义）
 echo "# CONFIG_ARM64_SVE is not set" >> target/linux/generic/config-6.12
