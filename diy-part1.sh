@@ -147,6 +147,31 @@ sed -i '/CONFIG_ARM64_PA_BITS_48=y/d' "$CONFIG_FILE"
 
 echo "✅ 已清理非法 PA_BITS 配置：CONFIG_ARM64_PA_BITS=48 和 CONFIG_ARC_EMAC_CORE=y 已删除"
 
+# 定义配置文件路径
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+# 批量删除指定的配置项
+sed -i '/CONFIG_ARM64_TAGGED_ADDR_ABI=y/d' "$CONFIG_FILE"
+sed -i '/CONFIG_COMPAT_32BIT_TIME=y/d' "$CONFIG_FILE"
+sed -i '/CONFIG_UNMAP_KERNEL_AT_EL0=y/d' "$CONFIG_FILE"
+sed -i '/CONFIG_RODATA_FULL_DEFAULT_ENABLED=y/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ROCKCHIP_IOMMU=y/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ARM64_ERRATUM_1530923=y/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ARM64_ERRATUM_858921=y/d' "$CONFIG_FILE"
+
+# 验证所有配置项是否删除成功
+if grep -qE "CONFIG_ARM64_TAGGED_ADDR_ABI=y|CONFIG_COMPAT_32BIT_TIME=y|CONFIG_UNMAP_KERNEL_AT_EL0=y|CONFIG_RODATA_FULL_DEFAULT_ENABLED=y|CONFIG_ROCKCHIP_IOMMU=y|CONFIG_ARM64_ERRATUM_1530923=y|CONFIG_ARM64_ERRATUM_858921=y" "$CONFIG_FILE"; then
+    echo "====================================================="
+    echo " ❌ 错误：部分配置项删除失败，请检查！"
+    echo "====================================================="
+    exit 1
+fi
+
+echo "====================================================="
+echo " ✅ 所有指定配置项已成功删除！"
+echo " ✅ 验证通过，继续编译……"
+echo "====================================================="
+
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置（追加到文件末尾）
 # ==============================================
@@ -157,9 +182,6 @@ cat >> "$CONFIG_FILE" << 'EOF'
 # CONFIG_ARC_EMAC_CORE is not set
 
 # ARM64 Address Space (MANDATORY per RK3528 TRM §3.2.1 & §12.5)
-CONFIG_ARM64_VA_BITS=48
-CONFIG_ARM64_VA_BITS_48=y
-# CONFIG_ARM64_VA_BITS_39 is not set
 # CONFIG_ARM64_VA_BITS_52 is not set
 CONFIG_ARM64_PA_BITS_40=y
 # CONFIG_ARM64_PA_BITS_36 is not set
@@ -179,11 +201,9 @@ CONFIG_ROCKCHIP_RK3528=y
 CONFIG_ROCKCHIP_RK3528_PMU=y
 CONFIG_ROCKCHIP_DRM_VOP2=y
 CONFIG_ROCKCHIP_VOP2_KMS=y
-CONFIG_PHY_ROCKCHIP_INNO_USB2=y
 CONFIG_ROCKCHIP_USB3PHY=y
 CONFIG_ROCKCHIP_EMMC=y
 CONFIG_ROCKCHIP_CLK_RK3528=y
-CONFIG_ROCKCHIP_THERMAL=y
 CONFIG_USB_XHCI_PCI_RENESAS=y
 CONFIG_MMC_SDHCI_OF_ROCKCHIP_V2=y
 CONFIG_ROCKCHIP_SECURE_BOOT=y
@@ -191,10 +211,8 @@ CONFIG_ROCKCHIP_TRUSTED_FOUNDATION=y
 
 # RK3528 Kernel Features
 CONFIG_ARM64_PAN=y
-CONFIG_ARM64_4K_PAGES=y
 CONFIG_ARM64_MODULE_PLTS=y
 CONFIG_ARM64_VHE=y
-CONFIG_CPU_LITTLE_ENDIAN=y
 CONFIG_ARM64_PAGE_SHIFT=12
 CONFIG_NR_CPUS=512
 CONFIG_SCHED_MC=n
@@ -223,6 +241,7 @@ CONFIG_ROCKCHIP_DMC_RK3588=n
 CONFIG_ARM64_EPAN=y
 CONFIG_ARM64_ASIMD=y
 # CONFIG_ARM64_AS_HAS_MTE is not set
+
 # === END RK3528 CONFIGURATION ===
 EOF
 
