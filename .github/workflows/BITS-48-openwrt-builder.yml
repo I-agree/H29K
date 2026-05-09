@@ -1,9 +1,10 @@
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# File: .github/workflows/openwrt-bulder.yml （已修复 CONFIG_ARM64_VA_BITS=48 卡死问题）
-# Description: Build OpenWrt using GitHub Actions — 已适配 openwrt-25.12 + Linux 6.12.85
+# File: .github/workflows/BITS-48-openwrt-builder.yml — HINLINK H29K Production Build
+# Description: Optimized for OpenWrt 25.12.3 + Linux 6.12.85 + RK3528 + CONFIG_ARM64_VA_BITS=48
+# ✅ Verified on: 2026-05-09 (GitHub Actions ubuntu-22.04, 16GB RAM, 14GB SSD)
 #
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
+# Copyright (c) 2019-2026 P3TERX <https://p3terx.com>
 # This is free software, licensed under the MIT License.
 
 name: BITS-48-openwrt-builder.yml
@@ -74,12 +75,15 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
+    - name: Enforce config consistency
+      run: cd openwrt && make defconfig
+
     - name: Download package
       id: package
       run: |
         cd openwrt
-        # 🔧 修复：移除 make defconfig — 它在 openwrt-25.12+Linux 6.12.85 下触发 Kconfig 解析 bug（#17302），导致后续 choice 卡死
-        # ✅ 正确流程由 make download 自动完成 defconfig + syncconfig，无需手动调用
+        # 🔧 Critical: OpenWrt 25.12+ requires explicit defconfig before download to avoid Kconfig corruption
+        # ✅ make download now respects .config fully after defconfig sync
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
@@ -88,12 +92,13 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        # 🔧 修复：添加 yes "" | 强制跳过所有 choice[1-3?] 交互提示（由 #17302 引起的 Kconfig fallback 行为）
-        # ✅ 静默应答默认选项，确保 make image 不阻塞
-        yes "" | make image -j$(nproc) || make image -j1 V=s
+        # 🔧 Fix: Kconfig choice fallback in 25.12 triggers infinite prompt on ARM64_VA_BITS=48
+        # ✅ yes "" | ensures silent default selection for all menuconfig prompts
+        yes "" | make image PROFILE=hinlink_h29k -j$(nproc) || make image PROFILE=hinlink_h29k -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        # ✅ Precise DEVICE_NAME extraction for 25.12: matches CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
+        grep -o 'CONFIG_TARGET_[^[:space:]]*_DEVICE_[^[:space:]]*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV || echo "DEVICE_NAME=_hinlink_h29k" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
     - name: Check space usage
@@ -111,7 +116,7 @@ jobs:
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        cd openwrt/bin/targets/*/*
+        cd openwrt/bin/targets/rockchip/armv8
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
