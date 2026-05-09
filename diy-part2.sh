@@ -243,6 +243,15 @@ echo -e "\033[32m[通过] U-Boot 已添加 H29K 设备（Makefile校验）\033[0
 # 全部通过 → 输出友好提示，继续构建流程
 echo "✅ 成功：H29K 两份配置文件均已就位，构建流程将继续..."
 
+# ✅ 正确校验：确认 PROFILE 可被识别
+[ "$(make -s -C /workdir/openwrt help | grep -c 'hinlink_h29k')" -ge 1 ] || { echo "❌ FATAL: PROFILE hinlink_h29k not registered in make help — check armv8.mk"; exit 1; }
+
+# ✅ 正确校验：确认 DTS 文件存在且路径匹配
+[ -f "/workdir/openwrt/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" ] || { echo "❌ FATAL: DTS file missing"; exit 1; }
+
+# ✅ 正确校验：确认 armv8.mk 中 define Device/hinlink_h29k 存在
+[ "$(grep -c '^define Device/hinlink_h29k' /workdir/openwrt/target/linux/rockchip/image/armv8.mk)" -eq 1 ] || { echo "❌ FATAL: Device/hinlink_h29k not defined in armv8.mk"; exit 1; }
+
 printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
