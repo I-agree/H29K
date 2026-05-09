@@ -211,8 +211,11 @@ make defconfig > /dev/null 2>&1
 echo "✅ make defconfig completed with override applied"
 # ====== END ======
 
-# =============== 🔍 FINAL SANITY CHECK — NO MODIFICATION, ONLY VALIDATION ===============
-echo "🔍 Validating build readiness for OpenWrt 25.12.3 + Linux 6.12.85 + RK3528..."
-[ "$(grep -c '^CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y' /workdir/openwrt/.config)" -eq 1 ] || { echo "❌ FATAL: .config missing hinlink_h29k device — abort"; exit 1; }
-[ -f "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" ] || { echo "❌ FATAL: DTS file missing — abort"; exit 1; }
-echo "✅ All pre-build checks PASSED. Ready for 'make image PROFILE=hinlink_h29k'."
+# ✅ 正确校验：确认 PROFILE 可被识别
+[ "$(make -s -C /workdir/openwrt help | grep -c 'hinlink_h29k')" -ge 1 ] || { echo "❌ FATAL: PROFILE hinlink_h29k not registered in make help — check armv8.mk"; exit 1; }
+
+# ✅ 正确校验：确认 DTS 文件存在且路径匹配
+[ -f "/workdir/openwrt/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" ] || { echo "❌ FATAL: DTS file missing"; exit 1; }
+
+# ✅ 正确校验：确认 armv8.mk 中 define Device/hinlink_h29k 存在
+[ "$(grep -c '^define Device/hinlink_h29k' /workdir/openwrt/target/linux/rockchip/image/armv8.mk)" -eq 1 ] || { echo "❌ FATAL: Device/hinlink_h29k not defined in armv8.mk"; exit 1; }
