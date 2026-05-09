@@ -1,99 +1,88 @@
-#!/bin/bash
+#!/bin/sh
+# diy-part2.sh —— RK3528 bindings 注入 + 三重验证（P3TERX 兼容）
+set -e
 
-# =====================================================================
-# ✅ DIY-PART2.SH —— P3TERX Actions-OpenWrt 标准兼容版（RK3528 bindings 注入）
-# 🎯 运行时机：./scripts/feeds install -a 之后，make defconfig 之前
-# 📍 作用：向已解压的 feeds/kernels/linux/linux-6.12.85/ 注入 dt-bindings 头文件
-# ⚠️ 前提：feeds/kernels/linux/ 必须已通过 install -a 安装（即目录存在）
-# =====================================================================
-
-set -euo pipefail
-
-OPENWRT_ROOT="$(cd "$(dirname "$0")" && pwd)"
+# ==================== 【配置】====================
+FEED_NAME="rockchip-kernel"
+BRANCH="rockchip-linux-6.12"
 KERNEL_VERSION="6.12.85"
-FEEDS_KERNEL_DIR="feeds/kernels/linux"
-LINUX_SRC="${FEEDS_KERNEL_DIR}/linux-${KERNEL_VERSION}"
+LINUX_SRC="feeds/$FEED_NAME/linux-$KERNEL_VERSION"
+BINDINGS="$LINUX_SRC/include/dt-bindings"
 
-ROCKCHIP_REPO="https://raw.githubusercontent.com/rockchip-linux/kernel/rockchip-linux-6.12"
-
-# ==================== 【检查 feeds/kernels/linux 是否已安装】====================
-if [ ! -d "${FEEDS_KERNEL_DIR}" ]; then
-  echo "❌ 错误：${FEEDS_KERNEL_DIR} 未找到！" >&2
-  echo "   请确认 workflow 中已执行：" >&2
-  echo "     - ./scripts/feeds update -a" >&2
-  echo "     - ./scripts/feeds install -a" >&2
+# ==================== 【1. 校验 feed 目录是否存在】====================
+if [ ! -d "$LINUX_SRC" ]; then
+  echo "❌ ERROR: $LINUX_SRC 不存在！" >&2
+  echo "   • 请确认已执行：./scripts/feeds install -a" >&2
+  echo "   • 请确认 diy-part1.sh 已正确添加 feed：" >&2
+  echo "       src-git $FEED_NAME https://github.com/rockchip-linux/kernel.git;$BRANCH" >&2
+  echo "   • 运行 'ls feeds/$FEED_NAME/' 查看实际内容" >&2
   exit 1
 fi
+echo "✅ 1/3 —— $LINUX_SRC 存在"
 
-if [ ! -d "${LINUX_SRC}" ]; then
-  echo "❌ 错误：${LINUX_SRC} 不存在！" >&2
-  echo "   可能原因：" >&2
-  echo "     • feeds install 未成功（检查日志中是否出现 'Installing package'）；" >&2
-  echo "     • KERNEL_VERSION 与 feeds 中实际版本不匹配（如 feeds 提供的是 6.12.84）；" >&2
-  echo "   请运行：ls -l ${FEEDS_KERNEL_DIR}/" >&2
-  exit 1
-fi
+# ==================== 【2. 创建 bindings 目录】====================
+mkdir -p "$BINDINGS"/clock "$BINDINGS"/reset "$BINDINGS"/power "$BINDINGS"/soc "$BINDINGS"/pinctrl
 
-echo "✅ 已定位内核源码：${LINUX_SRC}"
-
-# ==================== 【注入 dt-bindings】====================
-BINDINGS_DIR="${LINUX_SRC}/include/dt-bindings"
-mkdir -p \
-  "${BINDINGS_DIR}/clock" \
-  "${BINDINGS_DIR}/reset" \
-  "${BINDINGS_DIR}/power" \
-  "${BINDINGS_DIR}/soc" \
-  "${BINDINGS_DIR}/pinctrl" \
-  "${BINDINGS_DIR}/thermal" \
-  "${BINDINGS_DIR}/interrupt-controller" \
-  "${BINDINGS_DIR}/phy"
-
-download_header() {
+# ==================== 【3. 下载头文件（带 curl 错误捕获）】====================
+download() {
   local url="$1"
-  local out_path="$2"
-  echo "⬇️  下载 ${out_path##*/}..."
-  curl -sSL "$url" -o "$out_path" || {
-    echo "❌ 下载失败：$out_path（URL: $url）" >&2
+  local out="$2"
+  echo "⬇️  $out ..."
+  if ! curl -sSL "$url" -o "$out" 2>/dev/null; then
+    echo "❌ FAILED: curl failed for $out (URL: $url)" >&2
     exit 1
-  }
+  fi
 }
 
-# 下载全部必需头文件（Rockchip 官方 rockchip-linux-6.12 分支）
-download_header "${ROCKCHIP_REPO}/include/dt-bindings/clock/rk3528-cru.h" \
-  "${BINDINGS_DIR}/clock/rk3528-cru.h"
+download "https://raw.githubusercontent.com/rockchip-linux/kernel/$BRANCH/include/dt-bindings/clock/rk3528-cru.h" "$BINDINGS"/clock/rk3528-cru.h
+download "https://raw.githubusercontent.com/rockchip-linux/kernel/$BRANCH/include/dt-bindings/reset/rk3528-resets.h" "$BINDINGS"/reset/rk3528-resets.h
+download "https://raw.githubusercontent.com/rockchip-linux/kernel/$BRANCH/include/dt-bindings/power/rk3528-power.h" "$BINDINGS"/power/rk3528-power.h
+download "https://raw.githubusercontent.com/rockchip-linux/kernel/$BRANCH/include/dt-bindings/soc/rockchip,boot-mode.h" "$BINDINGS"/soc/rockchip,boot-mode.h
+download "https://raw.githubusercontent.com/rockchip-linux/kernel/$BRANCH/include/dt-bindings/pinctrl/rockchip.h" "$BINDINGS"/pinctrl/rockchip.h
 
-download_header "${ROCKCHIP_REPO}/include/dt-bindings/reset/rk3528-resets.h" \
-  "${BINDINGS_DIR}/reset/rk3528-resets.h"
+# ==================== 【4. 校验文件存在且非空】====================
+HEADERS="
+$BINDINGS/clock/rk3528-cru.h
+$BINDINGS/reset/rk3528-resets.h
+$BINDINGS/power/rk3528-power.h
+$BINDINGS/soc/rockchip,boot-mode.h
+$BINDINGS/pinctrl/rockchip.h
+"
 
-download_header "${ROCKCHIP_REPO}/include/dt-bindings/power/rk3528-power.h" \
-  "${BINDINGS_DIR}/power/rk3528-power.h"
-
-download_header "${ROCKCHIP_REPO}/include/dt-bindings/soc/rockchip,boot-mode.h" \
-  "${BINDINGS_DIR}/soc/rockchip,boot-mode.h"
-
-download_header "${ROCKCHIP_REPO}/include/dt-bindings/pinctrl/rockchip.h" \
-  "${BINDINGS_DIR}/pinctrl/rockchip.h"
-
-# ==================== 【校验】====================
-echo "🧪 校验头文件..."
-for h in \
-  "clock/rk3528-cru.h" \
-  "reset/rk3528-resets.h" \
-  "power/rk3528-power.h" \
-  "soc/rockchip,boot-mode.h" \
-  "pinctrl/rockchip.h"
-do
-  if [ ! -s "${BINDINGS_DIR}/${h}" ]; then
-    echo "❌ 校验失败：${BINDINGS_DIR}/${h} 为空或缺失！" >&2
+for h in $HEADERS; do
+  if [ ! -s "$h" ]; then
+    echo "❌ ERROR: '$h' 为空或缺失！" >&2
+    echo "   • 可能原因：GitHub raw URL 失效 / 网络超时 / 分支名变更" >&2
+    echo "   • 手动验证：curl -I '$(echo "$h" | sed 's|^.*include/|https://raw.githubusercontent.com/rockchip-linux/kernel/'"$BRANCH"'/include/|')'" >&2
     exit 1
   fi
 done
+echo "✅ 2/3 —— 5 个头文件全部存在且非空"
 
+# ==================== 【5. 校验内核版本一致性（防误用其他分支）】====================
+VERSION_FILE="$LINUX_SRC/Makefile"
+if [ ! -f "$VERSION_FILE" ]; then
+  echo "❌ ERROR: $VERSION_FILE not found —— $LINUX_SRC 不是合法内核源码树！" >&2
+  exit 1
+fi
+
+# 提取 KERNELVERSION（如 6.12.85）
+KERNEL_VERSION_IN_SRC=$(grep '^KERNELVERSION :=' "$VERSION_FILE" 2>/dev/null | head -n1 | sed 's/KERNELVERSION := //; s/ //g')
+if [ "$KERNEL_VERSION_IN_SRC" != "$KERNEL_VERSION" ]; then
+  echo "❌ ERROR: 内核版本不匹配！" >&2
+  echo "   • 预期版本：$KERNEL_VERSION" >&2
+  echo "   • 实际版本：$KERNEL_VERSION_IN_SRC" >&2
+  echo "   • 请检查：$BRANCH 分支是否真的提供 $KERNEL_VERSION 版本？" >&2
+  echo "     （访问 https://github.com/rockchip-linux/kernel/tree/$BRANCH/Makefile 查看 KERNELVERSION）" >&2
+  exit 1
+fi
+echo "✅ 3/3 —— 内核版本 $KERNEL_VERSION 与源码一致"
+
+# ==================== 【完成】====================
 echo ""
-echo "🎉 成功！RK3528 dt-bindings 已注入至："
-echo "   ${LINUX_SRC}/include/dt-bindings/"
-echo ""
-echo "🚀 下一步：make defconfig CONFIG_TARGET_PROFILE=hinlink_h29k"
+echo "🎉 SUCCESS —— RK3528 dt-bindings 已就绪！"
+echo "   • 路径：$LINUX_SRC/include/dt-bindings/"
+echo "   • 下一步：make defconfig CONFIG_TARGET_PROFILE=hinlink_h29k"
 
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
