@@ -1,5 +1,5 @@
 # Hinlink H29K (RK3528) U-Boot configuration for OpenWrt main branch
-# Generated for openwrt/openwrt@v24.10.0+ (2026-05)
+# Generated for openwrt/openwrt@v25.12.0+ (2026-05)
 # ✅ MUST be placed at: package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
 
 CONFIG_ARM=y
