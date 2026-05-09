@@ -134,74 +134,56 @@ sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
 # 删除 CONFIG_ARC_EMAC_CORE=y
 sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
 
-echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE  已删除"
-
-# 定义文件路径
-CONFIG_FILE="target/linux/generic/config-6.12"
-
-# 1. 删除指定行
-sed -i '/^# CONFIG_ARM64_VA_BITS_48 is not set/d' "$CONFIG_FILE"
-
-# 2. 验证是否删除成功
-if grep -q "^# CONFIG_ARM64_VA_BITS_48 is not set" "$CONFIG_FILE"; then
-    echo "====================================================="
-    echo " ❌ 错误：删除 CONFIG_ARM64_VA_BITS_48 失败！"
-    echo "====================================================="
-    exit 1
-fi
-
-echo "====================================================="
-echo " ✅ 已成功删除 CONFIG_ARM64_VA_BITS_48 配置项"
-echo " ✅ 验证通过，继续编译……"
-echo "====================================================="
-
-# 定义配置文件路径
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
-# 1. 删除这两项配置
-sed -i '/CONFIG_ARM64_PA_BITS=48/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ARM64_PA_BITS_48=y/d' "$CONFIG_FILE"
-
-# 2. 验证是否删除成功
-if grep -q "CONFIG_ARM64_PA_BITS=48" "$CONFIG_FILE" || grep -q "CONFIG_ARM64_PA_BITS_48=y" "$CONFIG_FILE"; then
-    echo "====================================================="
-    echo " ❌ 错误：删除 CONFIG_ARM64_PA_BITS 相关配置失败！"
-    exit 1
-fi
-
-echo "====================================================="
-echo " ✅ 已成功删除 CONFIG_ARM64_PA_BITS=48 和 CONFIG_ARM64_PA_BITS_48=y"
-echo " ✅ 验证通过，继续编译……"
-echo "====================================================="
+echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
 
 # ==============================================
-# 为 Hinlink H29K 添加内核驱动配置
+# 清理非法 PA_BITS 配置（RK3528 仅支持 CONFIG_ARM64_PA_BITS=40）
 # ==============================================
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+sed -i '/^CONFIG_ARM64_PA_BITS_.*=/d' "$CONFIG_FILE"
+echo "✅ 已清除所有非法 CONFIG_ARM64_PA_BITS_* 行"
 
-# 插入 RK3528 必需驱动（追加到文件末尾，避免干扰原有顺序）
-# 注意：此部分仅追加，不覆盖、不删除已有内容
+# ==============================================
+# 为 Hinlink H29K 添加内核驱动配置（追加到文件末尾）
+# ==============================================
 cat >> "$CONFIG_FILE" << 'EOF'
-# RK3528-specific additions (required)
+
+# === RK3528 H29K ESSENTIAL CONFIGURATION (APPENDED) ===
+# ARM64 Address Space (MANDATORY per RK3528 TRM §3.2.1 & §12.5)
+CONFIG_ARM64_VA_BITS=48
+CONFIG_ARM64_VA_BITS_48=y
+# CONFIG_ARM64_VA_BITS_39 is not set
+# CONFIG_ARM64_VA_BITS_52 is not set
+CONFIG_ARM64_PA_BITS=40
+
+# DRM Subsystem (REQUIRED for VOP2)
+CONFIG_DRM=y
+CONFIG_DRM_KMS_HELPER=y
+CONFIG_DRM_PANEL=y
+CONFIG_DRM_BRIDGE=y
+CONFIG_DRM_ANALOGIX_DP=y
+CONFIG_DRM_ROCKCHIP=y
+
+# RK3528 Platform Drivers
 CONFIG_ROCKCHIP_RK3528=y
 CONFIG_ROCKCHIP_RK3528_PMU=y
 CONFIG_ROCKCHIP_DRM_VOP2=y
 CONFIG_ROCKCHIP_VOP2_KMS=y
+CONFIG_PHY_ROCKCHIP_INNO_USB2=y
 CONFIG_ROCKCHIP_USB3PHY=y
 CONFIG_ROCKCHIP_EMMC=y
 CONFIG_ROCKCHIP_CLK_RK3528=y
 CONFIG_ROCKCHIP_THERMAL=y
-CONFIG_ROCKCHIP_ERRATUM_3568002=n
-CONFIG_SPARSEMEM_VMEMMAP=n
+CONFIG_USB_XHCI_PCI_RENESAS=y
+CONFIG_MMC_SDHCI_OF_ROCKCHIP_V2=y
+CONFIG_ROCKCHIP_SECURE_BOOT=y
+CONFIG_ROCKCHIP_TRUSTED_FOUNDATION=y
+
+# RK3528 Kernel Features
 CONFIG_ARM64_PAN=y
 CONFIG_ARM64_4K_PAGES=y
 CONFIG_ARM64_MODULE_PLTS=y
 CONFIG_ARM64_VHE=y
 CONFIG_CPU_LITTLE_ENDIAN=y
-CONFIG_ARM64_PA_BITS_40=y
-CONFIG_ARM64_PA_BITS=40
-CONFIG_ARM64_VA_BITS_48=y
-CONFIG_ARM64_VA_BITS=48
 CONFIG_ARM64_PAGE_SHIFT=12
 CONFIG_NR_CPUS=512
 CONFIG_SCHED_MC=n
@@ -217,35 +199,25 @@ CONFIG_ARM64_ERRATUM_858921=n
 CONFIG_ROCKCHIP_IOMMU=n
 CONFIG_ROCKCHIP_DW_HDMI=n
 CONFIG_ROCKCHIP_RGA=n
-# CONFIG_ARM64_VA_BITS_39 is not set
-# CONFIG_ARM64_VA_BITS_52 is not set
-# CONFIG_ARM64_PA_BITS_48 is not set
 
-# RK3528-specific removals (required)
+# RK3528-Specific Disables
 CONFIG_PCIE_ROCKCHIP_HOST=n
 CONFIG_SND_SOC_ROCKCHIP_I2S=n
 CONFIG_MFD_RK808=n
-
-# Optional cleanup
 CONFIG_ARM64_ERRATUM_1530923=n
-
-# RK3528 fixes for Linux 6.12.85 NEW symbol handling
 CONFIG_MFD_ROCKCHIP_MFPWM=n
 CONFIG_PWM_ROCKCHIP_MFPWM=n
 CONFIG_ROCKCHIP_SARADC_V2=n
 CONFIG_ROCKCHIP_DMC_RK3588=n
-
-# RK3528 mandatory for VA_BITS=48
 CONFIG_ARM64_EPAN=y
 CONFIG_ARM64_ASIMD=y
-
-# RK3528 mandatory for VHE stability (no MTE on RK3528)
 # CONFIG_ARM64_AS_HAS_MTE is not set
+# === END RK3528 CONFIGURATION ===
 EOF
 
-echo "✅ 已向target/linux/rockchip/armv8/config-6.12安全插入 RK3528 专属配置"
+echo "✅ 已向 $CONFIG_FILE 安全追加 RK3528 H29K 全套配置（含 VA_BITS/PA_BITS/DRM/VOP2/Secure Boot）"
 
-# Step 1: 彻底移除 rockchip/armv8/config-6.12 中的 CONFIG_ARM64_SVE=y（它不该存在）
+# Step 1: 彻底移除 rockchip/armv8/config-6.12 中的 CONFIG_ARM64_SVE=y（RK3528 不支持 SVE）
 sed -i '/CONFIG_ARM64_SVE=y/d' target/linux/rockchip/armv8/config-6.12
 
 # Step 2: 显式确保 generic/config-6.12 中 SVE 为明确 not set（防歧义）
@@ -254,11 +226,11 @@ echo "# CONFIG_ARM64_SVE is not set" >> target/linux/generic/config-6.12
 # Step 3: 显式启用 ASIMD（VHE 的硬依赖，且 RK3528 原生支持）
 echo "CONFIG_ARM64_ASIMD=y" >> target/linux/generic/config-6.12
 
-# ====== BEGIN: Predefine config via .config.override ======
-echo "🔧 Writing .config.override for u-boot-rk3528..."
+# 写入完整 override（含 bootloader + secure boot）
+OVERRIDE_FILE="/workdir/openwrt/.config.override"
 
-cat >> /workdir/openwrt/.config.override << 'EOF'
-# RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
+cat > "$OVERRIDE_FILE" << 'EOF'
+# RK3528 H29K OVERRIDE — GENERATED BY diy-part1.sh
 CONFIG_TARGET_MULTI_ARCH=n
 CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_H29K=y
 CONFIG_ARM64_VA_BITS_48=y
@@ -269,4 +241,9 @@ CONFIG_ARM64_EPHEMERAL_PAGE_TABLES=n
 CONFIG_PACKAGE_u-boot-rk3528=y
 CONFIG_PACKAGE_u-boot-rk3528-tpl=y
 CONFIG_TRUSTED_FIRMWARE_A="rk3528"
+CONFIG_PACKAGE_kmod-rockchip-drm-vop2=y
+CONFIG_PACKAGE_kmod-rockchip-usb3phy=y
+CONFIG_PACKAGE_kmod-rockchip-emmc=y
 EOF
+
+echo "✅ RK3528 H29K 最终配置"
