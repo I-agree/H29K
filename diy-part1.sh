@@ -218,6 +218,7 @@ echo "🔧 Writing .config.override for u-boot-rk3528..."
 cat > /workdir/openwrt/.config.override << 'EOF'
 # RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
 CONFIG_TARGET_MULTI_ARCH=n
+CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_hinlink_h29k=y
 CONFIG_ARM64_VHE=y
 CONFIG_PACKAGE_u-boot-rk3528=y
 CONFIG_PACKAGE_u-boot-rk3528-tpl=y
