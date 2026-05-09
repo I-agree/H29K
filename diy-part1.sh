@@ -217,3 +217,10 @@ CONFIG_ARM64_EPAN=y
 CONFIG_ARM64_PAN=n
 CONFIG_ARM64_AS_HAS_MTE=y  # 启用 MTE 模拟（增强 EPAN 稳定性，RK3528 支持）
 EOF
+
+# =============== 🔍 FINAL SANITY CHECK — NO MODIFICATION, ONLY VALIDATION ===============
+echo "🔍 Validating build readiness for OpenWrt 25.12.3 + Linux 6.12.85 + RK3528..."
+[ "$(grep -c '^CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y' /workdir/openwrt/.config)" -eq 1 ] || { echo "❌ FATAL: .config missing hinlink_h29k device — abort"; exit 1; }
+[ -f "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" ] || { echo "❌ FATAL: DTS file missing — abort"; exit 1; }
+echo "✅ All pre-build checks PASSED. Ready for 'make image PROFILE=hinlink_h29k'."
+
