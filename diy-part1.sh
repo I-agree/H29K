@@ -177,8 +177,11 @@ echo "====================================================="
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置
 # ==============================================
-# 内容覆盖写入 config-6.12（注意：使用 > 而非 >>，确保干净替换）
-cat > target/linux/rockchip/armv8/config-6.12 << 'EOF'
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+# 插入 RK3528 必需驱动（追加到文件末尾，避免干扰原有顺序）
+# 注意：此部分仅追加，不覆盖、不删除已有内容
+cat >> "$CONFIG_FILE" << 'EOF'
 # RK3528-specific additions (required)
 CONFIG_ROCKCHIP_RK3528=y
 CONFIG_ROCKCHIP_RK3528_PMU=y
@@ -240,6 +243,8 @@ CONFIG_ARM64_ASIMD=y
 # CONFIG_ARM64_AS_HAS_MTE is not set
 EOF
 
+echo "✅ 已向target/linux/rockchip/armv8/config-6.12安全插入 RK3528 专属配置"
+
 # Step 1: 彻底移除 rockchip/armv8/config-6.12 中的 CONFIG_ARM64_SVE=y（它不该存在）
 sed -i '/CONFIG_ARM64_SVE=y/d' target/linux/rockchip/armv8/config-6.12
 
@@ -252,7 +257,7 @@ echo "CONFIG_ARM64_ASIMD=y" >> target/linux/generic/config-6.12
 # ====== BEGIN: Predefine config via .config.override ======
 echo "🔧 Writing .config.override for u-boot-rk3528..."
 
-cat > /workdir/openwrt/.config.override << 'EOF'
+cat >> /workdir/openwrt/.config.override << 'EOF'
 # RK3528 Bootloader Stack — Auto-enabled by diy-part1.sh
 CONFIG_TARGET_MULTI_ARCH=n
 CONFIG_TARGET_ROCKCHIP_ARMV8_DEVICE_H29K=y
