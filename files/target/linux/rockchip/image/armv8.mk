@@ -32,8 +32,6 @@ define Device/hinlink_h29k
     luci-app-irqbalance luci-i18n-irqbalance-zh-cn \
     dnscrypt-proxy luci-app-dnscrypt-proxy luci-i18n-dnscrypt-proxy-zh-cn \
     irqbalance luci-app-irqbalance luci-i18n-irqbalance-zh-cn -urngd
-
-  # 👇 新增两行（必须放在 define 内部，且在 IMAGE/... 之后）
   KERNEL_SIZE := 256k
   ROOTFS_SIZE := 2048k
 endef
