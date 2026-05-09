@@ -139,15 +139,23 @@ echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC
 # ==============================================
 # 清理非法 PA_BITS 配置（RK3528 仅支持 CONFIG_ARM64_PA_BITS=40）
 # ==============================================
-sed -i '/^CONFIG_ARM64_PA_BITS_.*=/d' "$CONFIG_FILE"
-echo "✅ 已清除所有非法 CONFIG_ARM64_PA_BITS_* 行"
+# 删除 CONFIG_ARM64_PA_BITS=48
+sed -i '/CONFIG_ARM64_PA_BITS=48/d' "$CONFIG_FILE"
+
+# 删除 CONFIG_ARC_EMAC_CORE=y
+sed -i '/CONFIG_ARM64_PA_BITS_48=y/d' "$CONFIG_FILE"
+
+echo "✅ 已清理非法 PA_BITS 配置：CONFIG_ARM64_PA_BITS=48 和 CONFIG_ARC_EMAC_CORE=y 已删除"
 
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置（追加到文件末尾）
 # ==============================================
 cat >> "$CONFIG_FILE" << 'EOF'
 
-# === RK3528 H29K ESSENTIAL CONFIGURATION (APPENDED) ===
+# === 之前删除的项 ===
+# CONFIG_EMAC_ROCKCHIP is not set
+# CONFIG_ARC_EMAC_CORE is not set
+
 # ARM64 Address Space (MANDATORY per RK3528 TRM §3.2.1 & §12.5)
 CONFIG_ARM64_VA_BITS=48
 CONFIG_ARM64_VA_BITS_48=y
