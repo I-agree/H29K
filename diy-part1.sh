@@ -136,8 +136,24 @@ sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
 
 echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE  已删除"
 
-# 删除 generic/config-6.12 里的 CONFIG_ARM64_VA_BITS_48 注释行
-sed -i '/^# CONFIG_ARM64_VA_BITS_48 is not set/d' target/linux/generic/config-6.12
+# 定义文件路径
+CONFIG_FILE="target/linux/generic/config-6.12"
+
+# 1. 删除指定行
+sed -i '/^# CONFIG_ARM64_VA_BITS_48 is not set/d' "$CONFIG_FILE"
+
+# 2. 验证是否删除成功
+if grep -q "^# CONFIG_ARM64_VA_BITS_48 is not set" "$CONFIG_FILE"; then
+    echo "====================================================="
+    echo " ❌ 错误：删除 CONFIG_ARM64_VA_BITS_48 失败！"
+    echo "====================================================="
+    exit 1
+fi
+
+echo "====================================================="
+echo " ✅ 已成功删除 CONFIG_ARM64_VA_BITS_48 配置项"
+echo " ✅ 验证通过，继续编译……"
+echo "====================================================="
 
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置
