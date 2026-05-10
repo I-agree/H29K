@@ -35,12 +35,12 @@ mkdir -p "$DTS_DIR"
 
 # 下载 LEDE 原版 rk3528.dtsi（稳定curl）
 curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
-https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi \
+https://raw.githubusercontent.com/I-agree/H29K/main/123/rk3528.dtsi \
 -o "$DTS_DIR/rk3528.dtsi"
 
 # 下载 LEDE 原版 rk3528-pinctrl.dtsi（稳定curl）
 curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
-https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-pinctrl.dtsi \
+https://raw.githubusercontent.com/I-agree/H29K/main/123/rk3528-pinctrl.dtsi \
 -o "$DTS_DIR/rk3528-pinctrl.dtsi"
 
 # 验证文件是否下载成功
