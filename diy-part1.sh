@@ -529,4 +529,6 @@ fi
 
 # Step 10: Stamp
 touch "$LINUX_BUILD_DIR/.h29k-kernel-prepared"
+# ✅ 强制标记：跳过后续 kernel_prepare 的自动解压与复制（因 files/ 已就位）
+touch "$LINUX_BUILD_DIR/.prepared"
 echo "📌 Stamp written: $LINUX_BUILD_DIR/.h29k-kernel-prepared"
