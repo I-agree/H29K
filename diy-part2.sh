@@ -60,10 +60,18 @@ echo "
 ==================================================
 "
 
-# Auto-inject patch alongside your manual files
-mkdir -p /workdir/openwrt/target/linux/rockchip/patches-6.12
-curl -sL https://raw.githubusercontent.com/I-agree/H29K/main/999-fix-early-init-dt-scan-for-6.12.patch | \
-patch -p1 -d /workdir/openwrt/target/linux/rockchip -o patches-6.12/999-fix-early-init-dt-scan-for-6.12.patch
+# 修复 error: implicit declaration of function 'early_init_dt_scan'
+# 原理：补全缺失的 linux/of.h 头文件
+
+# 创建目录
+mkdir -p target/linux/rockchip/files/include/linux
+
+# 下载缺失的头文件（必须补）
+wget -O target/linux/rockchip/files/include/linux/of.h \
+https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1/include/linux/of.h
+
+wget -O target/linux/rockchip/files/include/linux/of_fdt.h \
+https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1/include/linux/of_fdt.h
 
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
