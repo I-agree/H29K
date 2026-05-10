@@ -25,7 +25,7 @@ wget -q -O $DTS_DIR/rk3528-pinctrl.dtsi $LEDE_BASE/arch/arm64/boot/dts/rockchip/
 
 # ====================== 3. 下载 原厂缺失文件（全部放对位置） ======================
 # 同级目录！！！关键修复！！！和 pinctrl 放一起
-wget -q -O $DTS_DIR/rockchip-pinconf.dtsi https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1/include/dt-bindings/pinctrl/rockchip-pinconf.dtsi
+wget -q -O $DTS_DIR/rockchip-pinconf.dtsi https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi
 
 # 补齐其他头文件（放 include）
 wget -q -O $INC_DIR/interrupt-controller/arm-gic.h $RK_BASE/interrupt-controller/arm-gic.h
