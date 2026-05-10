@@ -248,3 +248,54 @@ printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
+
+# diy-part2.sh — AFTER kernel source is extracted & before compilation
+#
+
+# 定义内核源码路径（OpenWrt 保证此时已存在）
+LINUX_SRC="/workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85"
+
+# 检查路径是否存在（防御性编程）
+if [ ! -d "$LINUX_SRC" ]; then
+    echo "❌ ERROR: Linux kernel source dir not found at $LINUX_SRC"
+    echo "   This means kernel hasn't been extracted yet — aborting config injection."
+    exit 1
+fi
+
+echo "🔧 Injecting CONFIG_OF into kernel .config..."
+
+# Step 1: 进入内核源码目录
+cd "$LINUX_SRC" || exit 1
+
+# Step 2: 确保 .config 存在（OpenWrt 已生成，但保险起见）
+if [ ! -f ".config" ]; then
+    echo "⚠️  .config missing, generating from rockchip_defconfig..."
+    make rockchip_defconfig
+fi
+
+# Step 3: 使用 OpenWrt 官方工具注入（最可靠）
+/workdir/openwrt/staging_dir/host/bin/confdef \
+    --defconfig=.config \
+    --enable OF \
+    --enable OF_EARLY_FLATTREE \
+    --enable OF_RESERVED_MEM \
+    --enable OF_ADDRESS \
+    --enable OF_IRQ \
+    --enable OF_NET \
+    --enable OF_RESERVED_MEM
+
+# Step 4: 强制重新生成 autoconf.h 和依赖（关键！）
+make oldconfig > /dev/null 2>&1
+if [ $? -ne 0 ]; then
+    echo "❌ ERROR: 'make oldconfig' failed in $LINUX_SRC"
+    exit 1
+fi
+
+# Step 5: 验证
+if grep -q "^CONFIG_OF=y" .config; then
+    echo "✅ CONFIG_OF=y confirmed. Kernel build ready."
+else
+    echo "❌ FATAL: CONFIG_OF still not enabled after oldconfig!"
+    cat .config | grep -E "^(CONFIG_OF|CONFIG_OF_EARLY_FLATTREE)"
+    exit 1
+fi
