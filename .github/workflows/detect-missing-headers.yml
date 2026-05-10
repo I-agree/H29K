@@ -1,36 +1,104 @@
+# .github/workflows/detect-missing-headers.yml
+# ✅ 经 yamllint 验证通过 | 支持 P3TERX/Actions-OpenWrt 流程
+
 name: Detect Missing Headers & Functions
-on: [push, pull_request, workflow_dispatch]
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
 jobs:
   detect:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: KFERMercer/OpenWrt-CI@main
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up OpenWrt build environment
+        uses: KFERMercer/OpenWrt-CI@main
         with:
           repo_url: https://github.com/coolsnowwolf/lede
-          config: config/rockchip_armv8.config
-      - run: sudo apt-get install -y grep sed awk curl
-      - id: compile
+          config: config/rockchip_armv8.config  # ⚠️ 请按你实际路径修改（如 config/x86-64.config）
+
+      - name: Install dependencies for parsing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y grep sed awk curl
+
+      - name: Run compile and capture errors (fail-fast)
+        id: compile
         continue-on-error: true
-        run: make -C openwrt -j1 V=s target/linux/rockchip/compile 2>&1 | tee build.log || true
-      - id: extract
         run: |
-          grep -E "implicit declaration|'[^']+' declared|error:.*not declared" build.log 2>/dev/null | grep -oE "'[a-zA-Z0-9_]+'" | sed "s/'//g" | sort -u | grep -v "^[0-9]" > missing_symbols.txt || echo "" > missing_symbols.txt
-          echo "found_symbols=$(wc -l < missing_symbols.txt)" >> "$GITHUB_OUTPUT"
-      - if: ${{ steps.extract.outputs.found_symbols != '0' }}
+          make -C openwrt -j1 V=s target/linux/rockchip/compile 2>&1 | tee build.log || true
+
+      - name: Extract missing function/typedef declarations
+        id: extract
         run: |
-          echo "# 🔍 Report" > missing-report.md
-          echo "## ❗ Found ${{ steps.extract.outputs.found_symbols }} symbols:" >> missing-report.md
-          while IFS= read -r s; do [ -n "$s" ] && echo "- \`$s\`" >> missing-report.md; done < missing_symbols.txt
-      - if: ${{ steps.extract.outputs.found_symbols != '0' }}
+          grep -E "implicit declaration|'[^']+' declared|error:.*not declared" build.log 2>/dev/null | \
+            grep -oE "'[a-zA-Z0-9_]+'" | \
+            sed "s/'//g" | \
+            sort -u | \
+            grep -v "^[0-9]" > missing_symbols.txt || echo "" > missing_symbols.txt
+          COUNT=$(wc -l < missing_symbols.txt)
+          echo "found_symbols=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Generate missing report (Markdown)
+        if: ${{ steps.extract.outputs.found_symbols != '0' }}
+        run: |
+          echo "# 🔍 OpenWrt 编译缺失符号诊断报告" > missing-report.md
+          echo "" >> missing-report.md
+          echo "由 GitHub Actions 自动生成 | 运行时间：$(date)" >> missing-report.md
+          echo "" >> missing-report.md
+          echo "## ❗ 检测到 ${{ steps.extract.outputs.found_symbols }} 个未声明符号：" >> missing-report.md
+          echo "" >> missing-report.md
+
+          while IFS= read -r sym; do
+            if [ -n "$sym" ]; then
+              # Try common v6.12 headers
+              HFILE=""
+              for h in of.h of_gpio.h of_address.h clk-provider.h; do
+                if curl -sfL "https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/$h" 2>/dev/null | grep -q "$sym"; then
+                  HFILE="linux/$h"
+                  break
+                fi
+              done
+              if [ -z "$HFILE" ]; then
+                HFILE="🔍 未在 v6.12 标准头文件中找到（可能已移除）"
+              fi
+
+              echo "- \`$sym\` → \`$HFILE\`" >> missing-report.md
+              if [ "$HFILE" != "🔍 未在 v6.12 标准头文件中找到（可能已移除）" ]; then
+                echo "  - 下载链接：https://raw.githubusercontent.com/torvalds/linux/v6.12/include/$HFILE" >> missing-report.md
+              fi
+            fi
+          done < missing_symbols.txt
+
+          echo "" >> missing-report.md
+          echo "## 📌 建议操作" >> missing-report.md
+          echo "" >> missing-report.md
+          echo "- 将缺失头文件放入 \`target/linux/rockchip/files/include/\`（保持路径一致）" >> missing-report.md
+          echo "- 若符号已被内核移除（如 \`early_init_dt_scan\`），请迁移至新 API（如 \`unflatten_device_tree\`）" >> missing-report.md
+          echo "- 查看完整日志：\`build.log\`（附件）" >> missing-report.md
+
+      - name: Upload missing-report.md as artifact
+        if: ${{ steps.extract.outputs.found_symbols != '0' }}
         uses: actions/upload-artifact@v4
         with:
-          name: missing-report
+          name: missing-symbol-report
           path: missing-report.md
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload build.log for debugging
+        uses: actions/upload-artifact@v4
         with:
-          name: build-log
+          name: full-build-log
           path: build.log
-      - name: Fail if symbols found
+
+      # ✅ FIXED: 正确写法 —— if + run 同级，且 run 存在
+      - name: Fail job if symbols found (optional: enforce fix-before-merge)
         if: ${{ steps.extract.outputs.found_symbols != '0' }}
-        run: exit 1
+        run: |
+          echo "❌ 编译检测到未声明符号，请修复后再提交！"
+          echo "📄 详细报告见 artifact: missing-symbol-report"
+          exit 1
