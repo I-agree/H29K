@@ -4,7 +4,7 @@ set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝
 
 # ======================== 【资源准备】 ========================
 # 创建开机 LOGO 存放目录
-mkdir -p files/etc/config/screen bin/targets/rockchip/armv8/
+mkdir -p files/etc/config/screen bin/targets/rockchip/armv8
 
 # 定义通用下载函数（带重试、超时、失败退出）
 download_file() {
@@ -249,62 +249,16 @@ echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
 
-# diy-part2.sh — AFTER kernel source is extracted & before compilation
-#
-
-# 定义内核源码路径（OpenWrt 保证此时已存在）
-LINUX_SRC="/workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85"
-
-# 检查路径是否存在（防御性编程）
-if [ ! -d "$LINUX_SRC" ]; then
-    echo "❌ ERROR: Linux kernel source dir not found at $LINUX_SRC"
-    echo "   This means kernel hasn't been extracted yet — aborting config injection."
-    exit 1
-fi
-
-echo "🔧 Injecting CONFIG_OF into kernel .config..."
-
-# Step 1: 进入内核源码目录
-cd "$LINUX_SRC" || exit 1
-
-# Step 2: 确保 .config 存在（OpenWrt 已生成，但保险起见）
-if [ ! -f ".config" ]; then
-    echo "⚠️  .config missing, generating from rockchip_defconfig..."
-    make rockchip_defconfig
-fi
-
-# Step 3: 使用 OpenWrt 官方工具注入（最可靠）
-/workdir/openwrt/staging_dir/host/bin/confdef \
-    --defconfig=.config \
-    --enable OF \
-    --enable OF_RESERVED_MEM \
-    --enable OF_ADDRESS \
-    --enable OF_IRQ \
-    --enable OF_NET \
-    --enable OF_OVERLAY \
-    --enable OF_SELFTEST
-
-# Step 3b: 验证 confdef 所启用的 symbol 确实存在于当前 Kconfig 中（防工具链/内核版本错配）
-for sym in OF OF_RESERVED_MEM OF_ADDRESS OF_IRQ OF_NET OF_OVERLAY OF_SELFTEST; do
-    if ! grep -q "config $sym$" "$LINUX_SRC/Kconfig" && ! grep -q "config $sym$" "$LINUX_SRC/drivers/of/Kconfig"; then
-        echo "❌ FATAL: Kconfig symbol '$sym' not found in kernel source — check kernel version or confdef toolchain!"
+# ✅ In diy-part2.sh, replace the entire kernel injection block with:
+echo "🔍 Verifying pre-injected CONFIG_OF..."
+if [ -f "/workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85/.config" ]; then
+    if grep -q "^CONFIG_OF=y" "/workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85/.config"; then
+        echo "✅ CONFIG_OF confirmed present. Proceeding to compile."
+    else
+        echo "❌ CRITICAL: Pre-injected .config missing CONFIG_OF — aborting."
         exit 1
     fi
-done
-echo "✅ All required Kconfig symbols verified."
-
-# Step 4: 强制重新生成 autoconf.h 和依赖（关键！）
-make oldconfig > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-    echo "❌ ERROR: 'make oldconfig' failed in $LINUX_SRC"
-    exit 1
-fi
-
-# Step 5: 验证
-if grep -q "^CONFIG_OF=y" .config; then
-    echo "✅ CONFIG_OF=y confirmed. Kernel build ready."
 else
-    echo "❌ FATAL: CONFIG_OF still not enabled after oldconfig!"
-    cat .config | grep -E "^(CONFIG_OF|CONFIG_OF_RESERVED_MEM|CONFIG_OF_ADDRESS)"
+    echo "❌ CRITICAL: Pre-injected kernel source missing — diy-part1.sh may have failed."
     exit 1
 fi
