@@ -1,40 +1,18 @@
 #!/bin/sh
-# ✅ PHYSICAL FIX: Force kernel into $GITHUB_WORKSPACE/dl (GitHub Actions ONLY)
-DL_DIR="$GITHUB_WORKSPACE/dl"
-mkdir -p "$DL_DIR"
-
-# Ensure OpenWrt build system uses this path
-export DL_DIR="$DL_DIR"
-echo "INFO: Using DL_DIR = $DL_DIR"
-
-# 🔧 REPAIR #1: Kernel download with format validation & multi-mirror fallback
-#   WHY: Original wget may save HTML 404/503 as .tar.xz → tar fails with "not a tar archive"
-#   HOW: Use curl + file check + trusted mirrors (TUNA mirror added for China CI stability)
-#   REF: 12 — GitHub Actions 文件路径必须用 $GITHUB_WORKSPACE；OpenWrt 镜像需冗余保障
+# 在 diy-part1.sh 开头添加：
 OPENWRT_VER="23.05.3"
 KERNEL_TARBALL="linux-6.12.85.tar.xz"
-DL_FILE="$DL_DIR/$KERNEL_TARBALL"
-MIRRORS=(
-  "https://downloads.openwrt.org/releases/$OPENWRT_VER/targets/rockchip/armv8/$KERNEL_TARBALL"
-  "https://github.com/openwrt/openwrt/releases/download/v$OPENWRT_VER/$KERNEL_TARBALL"
-  "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/$OPENWRT_VER/targets/rockchip/armv8/$KERNEL_TARBALL"
-)
+MIRROR="https://downloads.openwrt.org/releases/$OPENWRT_VER/targets/rockchip/armv8"
 
-echo "📥 Downloading $KERNEL_TARBALL with integrity check..."
-for url in "${MIRRORS[@]}"; do
-  echo "→ Trying $url"
-  if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 -o "$DL_FILE" "$url" 2>/dev/null && \
-     file "$DL_FILE" | grep -q "XZ compressed data"; then
-    echo "✅ Successfully downloaded and verified: $DL_FILE"
-    break
-  else
-    echo "❌ Failed or invalid: $url"
-    rm -f "$DL_FILE"
-  fi
-done
+# 下载并校验
+curl -fsSL "$MIRROR/SHA256SUMS" -o "$DL_DIR/SHA256SUMS"
+curl -fsSL "$MIRROR/$KERNEL_TARBALL" -o "$DL_FILE"
 
-if [ ! -s "$DL_FILE" ]; then
-  echo "❌ FATAL: All mirrors failed. Please verify OpenWrt $OPENWRT_VER release status."
+# 校验
+if sha256sum -c "$DL_DIR/SHA256SUMS" 2>/dev/null | grep -q "$KERNEL_TARBALL: OK"; then
+  echo "✅ SHA256 verified: $KERNEL_TARBALL"
+else
+  echo "❌ SHA256 verification FAILED!"
   exit 1
 fi
 
