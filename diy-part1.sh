@@ -318,80 +318,36 @@ sleep 10
 # ==================== 基础目录 ====================
 ROC_DIR="target/linux/rockchip/files"
 DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
-INC="$ROC_DIR/include/dt-bindings"
+mkdir -p "$ROC_DIR" "$DTS_DIR"
 
-mkdir -p $DTS_DIR
-mkdir -p $INC/{clock,power,pinctrl,interrupt-controller,phy,soc,thermal}
-mkdir -p $ROC_DIR/drivers
+# 1. 整目录下载 LEDE include、drivers两个文件夹里面的全部文件
+svn export --force https://github.com/coolsnowwolf/lede/trunk/target/linux/rockchip/files/include "$ROC_DIR/include"
+svn export --force https://github.com/coolsnowwolf/lede/trunk/target/linux/rockchip/files/drivers "$ROC_DIR/drivers"
 
-# ==================== 下载地址（你确认可用） ====================
-LEDE_BASE="https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files"
-RK_BASE="https://raw.githubusercontent.com/torvalds/linux/v6.12"
-
-# ==================== 1. 下载 LEDE include ====================
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $LEDE_BASE/include/dt-bindings/clock/rk3528-cru.h -o $INC/clock/rk3528-cru.h
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $LEDE_BASE/include/dt-bindings/power/rk3528-power.h -o $INC/power/rk3528-power.h
-
-# ==================== 2. 下载 LEDE drivers ====================
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $LEDE_BASE/drivers/Kconfig -o $ROC_DIR/drivers/Kconfig
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $LEDE_BASE/drivers/Makefile -o $ROC_DIR/drivers/Makefile
-
-# ==================== 3. 下载 原厂缺失头文件 ====================
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/interrupt-controller/arm-gic.h -o $INC/interrupt-controller/arm-gic.h
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/interrupt-controller/irq.h -o $INC/interrupt-controller/irq.h
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/phy/phy.h -o $INC/phy/phy.h
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/pinctrl/rockchip.h -o $INC/pinctrl/rockchip.h
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/soc/rockchip,boot-mode.h -o $INC/soc/rockchip,boot-mode.h
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/thermal/thermal.h -o $INC/thermal/thermal.h
-
-# ==================== 4. 下载 关键：rockchip-pinconf.dtsi ====================
-curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 --ipv4 \
-https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi \
--o $DTS_DIR/rockchip-pinconf.dtsi
-
-# ==================== 验证 ====================
-echo "============================================="
-echo "✅  下载完成，开始验证所有文件..."
-echo "============================================="
-
-check() {
-    [ ! -f "$1" ] && echo "❌ 缺失: $1" && exit 1
+# 2. 下载函数，追加内核头文件
+download() {
+  curl -fsSL --retry 5 --ipv4 "$1" -o "$2" || { echo "下载失败: $2"; exit 1; }
 }
+INC="$ROC_DIR/include/dt-bindings"
+mkdir -p "$INC"/{interrupt-controller,phy,pinctrl,soc,thermal}
 
-check $INC/clock/rk3528-cru.h
-check $INC/power/rk3528-power.h
-check $INC/interrupt-controller/arm-gic.h
-check $INC/interrupt-controller/irq.h
-check $INC/phy/phy.h
-check $INC/pinctrl/rockchip.h
-check $INC/soc/rockchip,boot-mode.h
-check $INC/thermal/thermal.h
-check $DTS_DIR/rockchip-pinconf.dtsi
-check $ROC_DIR/drivers/Kconfig
-check $ROC_DIR/drivers/Makefile
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/arm-gic.h "$INC"/interrupt-controller/arm-gic.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/irq.h "$INC"/interrupt-controller/irq.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/phy/phy.h "$INC"/phy/phy.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/pinctrl/rockchip.h "$INC"/pinctrl/rockchip.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/soc/rockchip,boot-mode.h "$INC"/soc/rockchip,boot-mode.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/thermal/thermal.h "$INC"/thermal/thermal.h
 
-echo "
-==================================================
-✅  所有文件下载成功！路径 100% 正确！
-✅  无递归 | 无404 | 无冲突 | 可直接编译
-==================================================
-"
+# 3. 下载 rockchip‑pinconf.dtsi
+download https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi "$DTS_DIR"/rockchip-pinconf.dtsi
 
-# ==================== 下载 setup.c + of_fdt.h ====================
-SETUP_DIR="target/linux/rockchip/files/arch/arm64/kernel"
-mkdir -p $SETUP_DIR
-mkdir -p target/linux/rockchip/files/include/linux
+# 4. 下载 setup.c + of_fdt.h
+SETUP_DIR="$ROC_DIR/arch/arm64/kernel"
+mkdir -p "$SETUP_DIR" "$ROC_DIR/include/linux"
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c "$SETUP_DIR"/setup.c
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h "$ROC_DIR/include/linux/of_fdt.h"
 
-URL_SETUP="https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c"
-URL_OF_FDT="https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h"
-
-curl -fsSL --retry 5 --ipv4 "$URL_SETUP" -o "$SETUP_DIR/setup.c"
-curl -fsSL --retry 5 --ipv4 "$URL_OF_FDT" -o "target/linux/rockchip/files/include/linux/of_fdt.h"
-
-[ -s "$SETUP_DIR/setup.c" ] || { echo "setup.c 下载失败"; exit 1; }
-[ -s "target/linux/rockchip/files/include/linux/of_fdt.h" ] || { echo "of_fdt.h 下载失败"; exit 1; }
-
-echo "✅ setup.c + of_fdt.h 下载成功"
+echo "✅ LEDE 目录完整下载 + 内核头文件追加完成"
 
 # ====== 强制兜底：确保 Kconfig 存在（Actions 环境专用）======
 mkdir -p target/linux/rockchip/files/drivers || true
