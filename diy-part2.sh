@@ -277,12 +277,21 @@ fi
 /workdir/openwrt/staging_dir/host/bin/confdef \
     --defconfig=.config \
     --enable OF \
-    --enable OF_EARLY_FLATTREE \
     --enable OF_RESERVED_MEM \
     --enable OF_ADDRESS \
     --enable OF_IRQ \
     --enable OF_NET \
-    --enable OF_RESERVED_MEM
+    --enable OF_OVERLAY \
+    --enable OF_SELFTEST
+
+# Step 3b: 验证 confdef 所启用的 symbol 确实存在于当前 Kconfig 中（防工具链/内核版本错配）
+for sym in OF OF_RESERVED_MEM OF_ADDRESS OF_IRQ OF_NET OF_OVERLAY OF_SELFTEST; do
+    if ! grep -q "config $sym$" "$LINUX_SRC/Kconfig" && ! grep -q "config $sym$" "$LINUX_SRC/drivers/of/Kconfig"; then
+        echo "❌ FATAL: Kconfig symbol '$sym' not found in kernel source — check kernel version or confdef toolchain!"
+        exit 1
+    fi
+done
+echo "✅ All required Kconfig symbols verified."
 
 # Step 4: 强制重新生成 autoconf.h 和依赖（关键！）
 make oldconfig > /dev/null 2>&1
@@ -296,6 +305,6 @@ if grep -q "^CONFIG_OF=y" .config; then
     echo "✅ CONFIG_OF=y confirmed. Kernel build ready."
 else
     echo "❌ FATAL: CONFIG_OF still not enabled after oldconfig!"
-    cat .config | grep -E "^(CONFIG_OF|CONFIG_OF_EARLY_FLATTREE)"
+    cat .config | grep -E "^(CONFIG_OF|CONFIG_OF_RESERVED_MEM|CONFIG_OF_ADDRESS)"
     exit 1
 fi
