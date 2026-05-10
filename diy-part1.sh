@@ -378,6 +378,24 @@ curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_OF_FDT" -o "targ
 
 echo "✅ setup.c + of_fdt.h 下载成功（稳定版）"
 
+mkdir -p target/linux/rockchip/files/drivers
+cat > target/linux/rockchip/files/drivers/Kconfig << 'EOF'
+# RK3528 mandatory drivers — auto-included by rockchip_defconfig
+source "drivers/clk/rockchip/Kconfig"
+source "drivers/pinctrl/rockchip/Kconfig"
+source "drivers/soc/rockchip/Kconfig"
+source "drivers/phy/rockchip/Kconfig"
+source "drivers/usb/phy/Kconfig"
+source "drivers/mmc/host/Kconfig"
+source "drivers/usb/dwc3/Kconfig"
+source "drivers/gpu/drm/rockchip/Kconfig"
+source "drivers/usb/rockchip/Kconfig"
+source "drivers/usb/phy/rockchip/Kconfig"
+source "drivers/usb/phy/rockchip-usb3phy/Kconfig"
+source "drivers/usb/phy/rockchip-emmc/Kconfig"
+source "drivers/usb/phy/rockchip-vop2/Kconfig"
+EOF
+
 # ======================== 【H29K KERNEL PREPARE: Inject CONFIG_OF BEFORE Build/Prepare】 ========================
 # 🔹 FIXED: Use $TOPDIR instead of hardcoded /workdir/openwrt/ to ensure portability across local/CI environments
 # 🔹 REF: https://openwrt.org/docs/guide-developer/build-system/use-buildsystem#host_tools
