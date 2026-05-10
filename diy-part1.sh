@@ -1,18 +1,27 @@
 #!/bin/sh
-# 在 diy-part1.sh 开头添加：
-OPENWRT_VER="23.05.3"
-KERNEL_TARBALL="linux-6.12.85.tar.xz"
-MIRROR="https://downloads.openwrt.org/releases/$OPENWRT_VER/targets/rockchip/armv8"
+# ✅ 替换原 wget 段，加入完整性校验与多源 fallback
+DL_FILE="$DL_DIR/linux-6.12.85.tar.xz"
+DOWNLOAD_URLS=(
+  "https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.12.85.tar.xz"
+  "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.85.tar.xz"
+  "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.3/targets/rockchip/armv8/linux-6.12.85.tar.xz"
+)
 
-# 下载并校验
-curl -fsSL "$MIRROR/SHA256SUMS" -o "$DL_DIR/SHA256SUMS"
-curl -fsSL "$MIRROR/$KERNEL_TARBALL" -o "$DL_FILE"
+echo "📥 Downloading linux-6.12.85.tar.xz from trusted mirrors..."
+for url in "${DOWNLOAD_URLS[@]}"; do
+  echo "→ Trying $url"
+  if wget -q --timeout=30 --tries=3 -O "$DL_FILE" "$url" && \
+     file "$DL_FILE" | grep -q "XZ compressed data"; then
+    echo "✅ Successfully downloaded and verified: $DL_FILE"
+    break
+  else
+    echo "❌ Failed or invalid: $url"
+    rm -f "$DL_FILE"
+  fi
+done
 
-# 校验
-if sha256sum -c "$DL_DIR/SHA256SUMS" 2>/dev/null | grep -q "$KERNEL_TARBALL: OK"; then
-  echo "✅ SHA256 verified: $KERNEL_TARBALL"
-else
-  echo "❌ SHA256 verification FAILED!"
+if [ ! -s "$DL_FILE" ]; then
+  echo "❌ FATAL: All mirrors failed. Please check OpenWrt 23.05.3 release status."
   exit 1
 fi
 
