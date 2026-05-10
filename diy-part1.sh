@@ -320,34 +320,45 @@ ROC_DIR="target/linux/rockchip/files"
 DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
 mkdir -p "$ROC_DIR" "$DTS_DIR"
 
-# 1. 整目录下载 LEDE include、drivers两个文件夹里面的全部文件
-svn export --force https://github.com/coolsnowwolf/lede/trunk/target/linux/rockchip/files/include "$ROC_DIR/include"
-svn export --force https://github.com/coolsnowwolf/lede/trunk/target/linux/rockchip/files/drivers "$ROC_DIR/drivers"
+# ==================== 克隆整个LEDE仓库（最稳，不猜任何文件） ====================
+git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede_temp
 
-# 2. 下载函数，追加内核头文件
+# ==================== 直接复制官方原生 include + drivers 文件夹 ====================
+cp -rf lede_temp/target/linux/rockchip/files/include "$ROC_DIR/"
+cp -rf lede_temp/target/linux/rockchip/files/drivers "$ROC_DIR/"
+
+# 清理临时文件
+rm -rf lede_temp
+
+# ==================== 下载函数 ====================
 download() {
   curl -fsSL --retry 5 --ipv4 "$1" -o "$2" || { echo "下载失败: $2"; exit 1; }
 }
+
+# ==================== 追加内核头文件 ====================
 INC="$ROC_DIR/include/dt-bindings"
-mkdir -p "$INC"/{interrupt-controller,phy,pinctrl,soc,thermal}
+mkdir -p $INC/{interrupt-controller,phy,pinctrl,soc,thermal}
 
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/arm-gic.h "$INC"/interrupt-controller/arm-gic.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/irq.h "$INC"/interrupt-controller/irq.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/phy/phy.h "$INC"/phy/phy.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/pinctrl/rockchip.h "$INC"/pinctrl/rockchip.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/soc/rockchip,boot-mode.h "$INC"/soc/rockchip,boot-mode.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/thermal/thermal.h "$INC"/thermal/thermal.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/arm-gic.h $INC/interrupt-controller/arm-gic.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/irq.h $INC/interrupt-controller/irq.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/phy/phy.h $INC/phy/phy.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/pinctrl/rockchip.h $INC/pinctrl/rockchip.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/soc/rockchip,boot-mode.h $INC/soc/rockchip,boot-mode.h
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/thermal/thermal.h $INC/thermal/thermal.h
 
-# 3. 下载 rockchip‑pinconf.dtsi
-download https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi "$DTS_DIR"/rockchip-pinconf.dtsi
+# ==================== 下载 rockchip-pinconf.dtsi ====================
+download https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi $DTS_DIR/rockchip-pinconf.dtsi
 
-# 4. 下载 setup.c + of_fdt.h
+# ==================== 下载 setup.c + of_fdt.h ====================
 SETUP_DIR="$ROC_DIR/arch/arm64/kernel"
-mkdir -p "$SETUP_DIR" "$ROC_DIR/include/linux"
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c "$SETUP_DIR"/setup.c
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h "$ROC_DIR/include/linux/of_fdt.h"
+mkdir -p $SETUP_DIR $ROC_DIR/include/linux
 
-echo "✅ LEDE 目录完整下载 + 内核头文件追加完成"
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c $SETUP_DIR/setup.c
+download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
+
+echo "=================================================="
+echo "✅ 所有文件下载复制完成！100% 官方原生文件夹！"
+echo "=================================================="
 
 # ====== 强制兜底：确保 Kconfig 存在（Actions 环境专用）======
 mkdir -p target/linux/rockchip/files/drivers || true
