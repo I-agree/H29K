@@ -356,9 +356,51 @@ mkdir -p $SETUP_DIR $ROC_DIR/include/linux
 download https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c $SETUP_DIR/setup.c
 download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
 
-echo "=================================================="
-echo "✅ 所有文件下载复制完成！100% 官方原生文件夹！"
-echo "=================================================="
+# 基础路径
+ROC_DIR="target/linux/rockchip/files"
+DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
+INC="$ROC_DIR/include/dt-bindings"
+
+echo "============================================="
+echo "  🔍 全部文件完整性检查"
+echo "============================================="
+
+# 检查文件夹
+check_dir() {
+    if [ -d "$1" ]; then echo "✅ 目录存在: $1"; else echo "❌ 目录缺失: $1"; fi
+}
+
+# 检查文件
+check_file() {
+    if [ -f "$1" ]; then echo "✅ 文件存在: $1"; else echo "❌ 文件缺失: $1"; fi
+}
+
+echo -e "\n📁 检查主文件夹"
+check_dir "$ROC_DIR/include"
+check_dir "$ROC_DIR/drivers"
+
+echo -e "\n📄 检查 LEDE 头文件"
+check_file "$INC/clock/rk3528-cru.h"
+check_file "$INC/power/rk3528-power.h"
+
+echo -e "\n📄 检查补充内核头文件"
+check_file "$INC/interrupt-controller/arm-gic.h"
+check_file "$INC/interrupt-controller/irq.h"
+check_file "$INC/phy/phy.h"
+check_file "$INC/pinctrl/rockchip.h"
+check_file "$INC/soc/rockchip,boot-mode.h"
+check_file "$INC/thermal/thermal.h"
+
+echo -e "\n📄 检查 rockchip-pinconf.dtsi"
+check_file "$DTS_DIR/rockchip-pinconf.dtsi"
+
+echo -e "\n📄 检查 setup.c + of_fdt.h"
+check_file "$ROC_DIR/arch/arm64/kernel/setup.c"
+check_file "$ROC_DIR/include/linux/of_fdt.h"
+
+echo -e "\n============================================="
+echo " ✅ 检查完成！以上全部存在即为正常"
+echo "============================================="
 
 # ====== 强制兜底：确保 Kconfig 存在（Actions 环境专用）======
 mkdir -p target/linux/rockchip/files/drivers || true
