@@ -35,13 +35,15 @@ rm -rf target/linux/generic/hack-6.12/ target/linux/bcm27xx/patches-6.12/ && mak
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_DIR"
 
-# 下载 LEDE 原版 rk3528.dtsi
-wget -q -O "$DTS_DIR/rk3528.dtsi" \
-https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi
+# 下载 LEDE 原版 rk3528.dtsi（稳定curl）
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
+https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528.dtsi \
+-o "$DTS_DIR/rk3528.dtsi"
 
-# 下载 LEDE 原版 rk3528-pinctrl.dtsi
-wget -q -O "$DTS_DIR/rk3528-pinctrl.dtsi" \
-https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-pinctrl.dtsi
+# 下载 LEDE 原版 rk3528-pinctrl.dtsi（稳定curl）
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
+https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-pinctrl.dtsi \
+-o "$DTS_DIR/rk3528-pinctrl.dtsi"
 
 # 验证文件是否下载成功
 if [ ! -s "$DTS_DIR/rk3528.dtsi" ] || [ ! -s "$DTS_DIR/rk3528-pinctrl.dtsi" ]; then
@@ -55,8 +57,9 @@ echo "✅ 成功下载 LEDE rk3528.dtsi + rk3528-pinctrl.dtsi 到正确目录"
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_SAVE_DIR"
 
-wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts \
--O "$DTS_SAVE_DIR/rk3528-hinlink-h29k.dts"
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
+https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts \
+-o "$DTS_SAVE_DIR/rk3528-hinlink-h29k.dts"
 
 # 验证是否下载成功
 if [ -f "$DTS_SAVE_DIR/rk3528-hinlink-h29k.dts" ]; then
@@ -307,23 +310,23 @@ LEDE_BASE="https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/lin
 RK_BASE="https://raw.githubusercontent.com/torvalds/linux/v6.12"
 
 # ==================== 1. 下载 LEDE include ====================
-wget -q -O $INC/clock/rk3528-cru.h       $LEDE_BASE/include/dt-bindings/clock/rk3528-cru.h
-wget -q -O $INC/power/rk3528-power.h    $LEDE_BASE/include/dt-bindings/power/rk3528-power.h
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $LEDE_BASE/include/dt-bindings/clock/rk3528-cru.h -o $INC/clock/rk3528-cru.h
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $LEDE_BASE/include/dt-bindings/power/rk3528-power.h -o $INC/power/rk3528-power.h
 
 # ==================== 2. 下载 LEDE drivers ====================
-wget -q -O $ROC_DIR/drivers/Kconfig      $LEDE_BASE/drivers/Kconfig
-wget -q -O $ROC_DIR/drivers/Makefile     $LEDE_BASE/drivers/Makefile
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $LEDE_BASE/drivers/Kconfig -o $ROC_DIR/drivers/Kconfig
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $LEDE_BASE/drivers/Makefile -o $ROC_DIR/drivers/Makefile
 
 # ==================== 3. 下载 原厂缺失头文件 ====================
-wget -q -O $INC/interrupt-controller/arm-gic.h    $RK_BASE/include/dt-bindings/interrupt-controller/arm-gic.h
-wget -q -O $INC/interrupt-controller/irq.h        $RK_BASE/include/dt-bindings/interrupt-controller/irq.h
-wget -q -O $INC/phy/phy.h                        $RK_BASE/include/dt-bindings/phy/phy.h
-wget -q -O $INC/pinctrl/rockchip.h               $RK_BASE/include/dt-bindings/pinctrl/rockchip.h
-wget -q -O $INC/soc/rockchip,boot-mode.h         $RK_BASE/include/dt-bindings/soc/rockchip,boot-mode.h
-wget -q -O $INC/thermal/thermal.h               $RK_BASE/include/dt-bindings/thermal/thermal.h
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/interrupt-controller/arm-gic.h -o $INC/interrupt-controller/arm-gic.h
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/interrupt-controller/irq.h -o $INC/interrupt-controller/irq.h
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/phy/phy.h -o $INC/phy/phy.h
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/pinctrl/rockchip.h -o $INC/pinctrl/rockchip.h
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/soc/rockchip,boot-mode.h -o $INC/soc/rockchip,boot-mode.h
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/thermal/thermal.h -o $INC/thermal/thermal.h
 
 # ==================== 4. 下载 关键：rockchip-pinconf.dtsi ====================
-wget -q -O $DTS_DIR/rockchip-pinconf.dtsi  $RK_BASE/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi -o $DTS_DIR/rockchip-pinconf.dtsi
 
 # ==================== 验证 ====================
 echo "============================================="
