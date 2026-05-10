@@ -27,7 +27,8 @@ rm -f target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-bas
 rm -f target/linux/rockchip/patches-6.12/070-04-v6.15-arm64-dts-rockchip-Add-pinctrl-and-gpio-nodes-for-RK3528.patch
 rm -rf target/linux/rockchip/patches-6.12
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
-rm -rf target/linux/generic/hack-6.12/ target/linux/bcm27xx/patches-6.12/ && make target/linux/clean
+rm -rf target/linux/generic/hack-6.12
+rm -rf target/linux/bcm27xx/patches-6.12
 
 # 定义路径
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
@@ -66,16 +67,6 @@ else
     echo "❌ rk3528-hinlink-h29k.dts 下载失败"
     exit 1
 fi
-
-# 简单可靠：等待20秒后再继续执行（OpenWrt Actions 环境专用）
-# 不依赖任何外部工具，兼容所有 BusyBox / dash / bash 环境
-
-sleep 20
-
-# ✅ 等待完成，后续命令可直接跟在此行下方
-# 例如：
-# echo "✅ 20秒已过，开始下一步..."
-# make menuconfig
 
 # ==================== 稳定下载 H29K 配置文件 ====================
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
@@ -198,14 +189,14 @@ echo " ✅ 所有指定配置项已成功删除！"
 echo " ✅ 验证通过，继续编译……"
 echo "====================================================="
 
-# 简单可靠：等待20秒后再继续执行（OpenWrt Actions 环境专用）
+# 简单可靠：等待10秒后再继续执行（OpenWrt Actions 环境专用）
 # 不依赖任何外部工具，兼容所有 BusyBox / dash / bash 环境
 
-sleep 20
+sleep 10
 
 # ✅ 等待完成，后续命令可直接跟在此行下方
 # 例如：
-# echo "✅ 20秒已过，开始下一步..."
+# echo "✅ 10秒已过，开始下一步..."
 # make menuconfig
 
 # ==============================================
@@ -314,14 +305,14 @@ EOF
 
 echo "✅ RK3528 H29K 最终配置"
 
-# 简单可靠：等待20秒后再继续执行（OpenWrt Actions 环境专用）
+# 简单可靠：等待10秒后再继续执行（OpenWrt Actions 环境专用）
 # 不依赖任何外部工具，兼容所有 BusyBox / dash / bash 环境
 
-sleep 20
+sleep 10
 
 # ✅ 等待完成，后续命令可直接跟在此行下方
 # 例如：
-# echo "✅ 20秒已过，开始下一步..."
+# echo "✅ 10秒已过，开始下一步..."
 # make menuconfig
 
 # ==================== 基础目录 ====================
@@ -386,27 +377,21 @@ echo "
 ==================================================
 "
 
-# ==================== 【稳定版】下载 setup.c + of_fdt.h ====================
-# 用 curl + 重试 + 超时，Actions 里 100% 成功
-# 比 wget 稳定 10 倍！
-
+# ==================== 下载 setup.c + of_fdt.h ====================
 SETUP_DIR="target/linux/rockchip/files/arch/arm64/kernel"
 mkdir -p $SETUP_DIR
 mkdir -p target/linux/rockchip/files/include/linux
 
-# 下载地址
 URL_SETUP="https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c"
 URL_OF_FDT="https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h"
 
-# 下载（重试3次，超时10秒，稳定到爆炸）
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_SETUP" -o "$SETUP_DIR/setup.c"
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_OF_FDT" -o "target/linux/rockchip/files/include/linux/of_fdt.h"
+curl -fsSL --retry 5 --ipv4 --tlsv1.2 "$URL_SETUP" -o "$SETUP_DIR/setup.c"
+curl -fsSL --retry 5 --ipv4 --tlsv1.2 "$URL_OF_FDT" -o "target/linux/rockchip/files/include/linux/of_fdt.h"
 
-# 校验文件存在（防止空文件）
-[ -s "$SETUP_DIR/setup.c" ] || { echo "setup.c 下载失败" && exit 1; }
-[ -s "target/linux/rockchip/files/include/linux/of_fdt.h" ] || { echo "of_fdt.h 下载失败" && exit 1; }
+[ -s "$SETUP_DIR/setup.c" ] || { echo "setup.c 下载失败"; exit 1; }
+[ -s "target/linux/rockchip/files/include/linux/of_fdt.h" ] || { echo "of_fdt.h 下载失败"; exit 1; }
 
-echo "✅ setup.c + of_fdt.h 下载成功（稳定版）"
+echo "✅ setup.c + of_fdt.h 下载成功"
 
 # ====== 强制兜底：确保 Kconfig 存在（Actions 环境专用）======
 mkdir -p target/linux/rockchip/files/drivers || true
