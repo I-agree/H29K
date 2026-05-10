@@ -23,6 +23,25 @@ echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.co
 # 正确安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
 
+# ====== 强制兜底：确保 Kconfig 存在（Actions 环境专用）======
+mkdir -p target/linux/rockchip/files/drivers || true
+cat > target/linux/rockchip/files/drivers/Kconfig << 'EOF' || true
+# RK3528 必需驱动入口
+source "drivers/clk/rockchip/Kconfig"
+source "drivers/pinctrl/rockchip/Kconfig"
+source "drivers/soc/rockchip/Kconfig"
+source "drivers/phy/rockchip/Kconfig"
+source "drivers/usb/phy/Kconfig"
+source "drivers/mmc/host/Kconfig"
+source "drivers/usb/dwc3/Kconfig"
+source "drivers/gpu/drm/rockchip/Kconfig"
+source "drivers/usb/rockchip/Kconfig"
+source "drivers/usb/phy/rockchip-usb3phy/Kconfig"
+source "drivers/usb/phy/rockchip-emmc/Kconfig"
+source "drivers/usb/phy/rockchip-vop2/Kconfig"
+EOF
+# ====== 兜底结束 ======
+
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
 rm -f target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
@@ -377,24 +396,6 @@ curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_OF_FDT" -o "targ
 [ -s "target/linux/rockchip/files/include/linux/of_fdt.h" ] || { echo "of_fdt.h 下载失败" && exit 1; }
 
 echo "✅ setup.c + of_fdt.h 下载成功（稳定版）"
-
-mkdir -p target/linux/rockchip/files/drivers
-cat > target/linux/rockchip/files/drivers/Kconfig << 'EOF'
-# RK3528 mandatory drivers — auto-included by rockchip_defconfig
-source "drivers/clk/rockchip/Kconfig"
-source "drivers/pinctrl/rockchip/Kconfig"
-source "drivers/soc/rockchip/Kconfig"
-source "drivers/phy/rockchip/Kconfig"
-source "drivers/usb/phy/Kconfig"
-source "drivers/mmc/host/Kconfig"
-source "drivers/usb/dwc3/Kconfig"
-source "drivers/gpu/drm/rockchip/Kconfig"
-source "drivers/usb/rockchip/Kconfig"
-source "drivers/usb/phy/rockchip/Kconfig"
-source "drivers/usb/phy/rockchip-usb3phy/Kconfig"
-source "drivers/usb/phy/rockchip-emmc/Kconfig"
-source "drivers/usb/phy/rockchip-vop2/Kconfig"
-EOF
 
 # ======================== 【H29K KERNEL PREPARE: Inject CONFIG_OF BEFORE Build/Prepare】 ========================
 # 🔹 FIXED: Use $TOPDIR instead of hardcoded /workdir/openwrt/ to ensure portability across local/CI environments
