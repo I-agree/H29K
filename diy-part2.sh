@@ -60,9 +60,48 @@ echo "
 ==================================================
 "
 
+# 修复 error: implicit declaration of function 'early_init_dt_scan'
+# 原理：补全缺失的 linux/of.h 头文件
+
+# 创建目录
+mkdir -p target/linux/rockchip/files/include/linux
+
+# 下载缺失的头文件（必须补）
+wget -O target/linux/rockchip/files/include/linux/of.h \
+https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1/include/linux/of.h
+
+wget -O target/linux/rockchip/files/include/linux/of_fdt.h \
+https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1/include/linux/of_fdt.h
+
+# ==============================================================================
+# 🔥 根治 early_init_dt_scan 报错（Linux 6.12 专用修复）
+# ==============================================================================
+SETUP_FILE="target/linux/rockchip/files/arch/arm64/kernel/setup.c"
+
+# 1. 先创建目录（如果不存在）
 mkdir -p target/linux/rockchip/files/arch/arm64/kernel/
-wget -O target/linux/rockchip/files/arch/arm64/kernel/setup.c \
-  https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c
+
+# 2. 写入 Linux 6.12 兼容的 setup_machine_fdt 代码
+cat > "$SETUP_FILE" << 'EOF'
+#include <linux/kernel.h>
+#include <linux/types.h>
+#include <linux/init.h>
+#include <linux/of_fdt.h>
+#include <linux/sched.h>
+#include <linux/memblock.h>
+
+#include <asm/setup.h>
+#include <asm/page.h>
+
+void __init setup_machine_fdt(void *dt_virt)
+{
+    if (!dt_virt || !early_init_dt_verify(dt_virt))
+        return;
+
+    early_init_dt_scan_nodes();
+    initrd_start = 0;
+}
+EOF
 
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
