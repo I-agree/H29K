@@ -356,6 +356,12 @@ rm -rf lede_temp
 #   WHY: Original cp -f hides "No such file" → false success → later build fails silently
 #   HOW: Check existence before cp; abort on any missing header; use explicit mkdir -p
 #   REF: 1 — $GITHUB_WORKSPACE is only writable location; 9 — actions/checkout puts repo under $GITHUB_WORKSPACE
+# <<< INSERTED: Fix kernel source dir missing BEFORE REPAIR #2 runs >>>
+LINUX_BUILD_DIR="build_dir/target-aarch64_armv8-a/linux-rockchip"
+LINUX_SRC_TARBALL="$GITHUB_WORKSPACE/dl/linux-6.12.85.tar.xz"
+[ -f "$LINUX_SRC_TARBALL" ] && tar -xf "$LINUX_SRC_TARBALL" -C "$LINUX_BUILD_DIR" --strip-components=1 2>/dev/null && ln -sf linux-6.12.85 "$LINUX_BUILD_DIR/linux-6.12" 2>/dev/null || true
+# <<< END INSERTED >>>
+
 LINUX_DIR="build_dir/target-aarch64_armv8-a/linux-rockchip/linux-6.1*/usr/include"
 if [ ! -d "$LINUX_DIR" ]; then
   echo "❌ ERROR: Kernel source dir '$LINUX_DIR' not found. Run 'make download' first OR verify kernel tarball extraction succeeded."
