@@ -314,6 +314,24 @@ sleep 10
 # echo "✅ 10秒已过，开始下一步..."
 # make menuconfig
 
+# ==============================================
+# ✅ 强制创建所有目录
+# ==============================================
+mkdir -p target/linux/rockchip/files
+mkdir -p target/linux/rockchip/files/include
+mkdir -p target/linux/rockchip/files/include/dt-bindings
+mkdir -p target/linux/rockchip/files/include/dt-bindings/clock
+mkdir -p target/linux/rockchip/files/include/dt-bindings/power
+mkdir -p target/linux/rockchip/files/include/dt-bindings/interrupt-controller
+mkdir -p target/linux/rockchip/files/include/dt-bindings/phy
+mkdir -p target/linux/rockchip/files/include/dt-bindings/pinctrl
+mkdir -p target/linux/rockchip/files/include/dt-bindings/soc
+mkdir -p target/linux/rockchip/files/include/dt-bindings/thermal
+mkdir -p target/linux/rockchip/files/include/linux
+mkdir -p target/linux/rockchip/files/drivers
+mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip
+mkdir -p target/linux/rockchip/files/arch/arm64/kernel
+
 # ==================== 基础目录 ====================
 ROC_DIR="target/linux/rockchip/files"
 DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
