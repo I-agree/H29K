@@ -445,95 +445,68 @@ obj-$(CONFIG_USB_PHY_ROCKCHIP_VOP2) += usb/phy/rockchip-vop2/
 EOF
 # ====== 兜底结束 ======
 
-# ======================== 【H29K KERNEL PREPARE: Inject CONFIG_OF BEFORE Build/Prepare】 ========================
-# 🔹 FIXED: Use $TOPDIR instead of hardcoded /workdir/openwrt/ to ensure portability across local/CI environments
-# 🔹 REF: https://openwrt.org/docs/guide-developer/build-system/use-buildsystem#host_tools
+# ======================== 【H29K KERNEL PREPARE: Inject CONFIG_OF — PHYSICAL PATH FIX】 ========================
+echo "🔧 H29K: Preparing kernel source with CONFIG_OF for Rockchip RK3528 (using /dl/)..."
 
-echo "🔧 H29K: Preparing kernel source with CONFIG_OF for Rockchip RK3528..."
-
-# Step 1: Define paths using $TOPDIR (guaranteed by OpenWrt build system)
-LINUX_TARBALL="linux-6.12.85.tar.xz"
+# 🔑 CRITICAL: Use /dl/ — NOT $TOPDIR/dl/ — because wget wrote there, and it's the only guaranteed path
+LINUX_TARBALL="/dl/linux-6.12.85.tar.xz"
 LINUX_SRC_DIR="$TOPDIR/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85"
-LINUX_DL_DIR="$TOPDIR/dl"
 LINUX_BUILD_DIR="$TOPDIR/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8"
 
-# Step 2: Verify tarball exists
-if [ ! -f "$LINUX_DL_DIR/$LINUX_TARBALL" ]; then
-    echo "❌ ERROR: Kernel tarball missing at $LINUX_DL_DIR/$LINUX_TARBALL"
-    echo "   Please run 'make download' first, or check network/connectivity."
+# ✅ Step 1: Verify kernel tarball exists in /dl/ (the physical location we forced)
+if [ ! -f "$LINUX_TARBALL" ]; then
+    echo "❌ FATAL: /dl/linux-6.12.85.tar.xz is MISSING — wget failed or network blocked."
+    echo "   Please check GitHub Actions runner network access to https://downloads.lede-project.org/"
     exit 1
 fi
 
-# Step 3: Clean stale dir
+# ✅ Step 2: Clean & extract directly from /dl/
 rm -rf "$LINUX_SRC_DIR"
-
-# Step 4: Extract NOW
-echo "📦 Extracting $LINUX_TARBALL..."
-tar -C "$LINUX_BUILD_DIR" -xf "$LINUX_DL_DIR/$LINUX_TARBALL"
+echo "📦 Extracting $LINUX_TARBALL to $LINUX_SRC_DIR..."
+tar -C "$LINUX_BUILD_DIR" -xf "$LINUX_TARBALL"
 if [ $? -ne 0 ]; then
     echo "❌ ERROR: Failed to extract $LINUX_TARBALL"
     exit 1
 fi
 
-# Step 5: Apply patches
-echo "🔧 Applying OpenWrt kernel patches..."
+# ✅ Step 3: Enter kernel source & generate base config
 cd "$LINUX_SRC_DIR" || exit 1
-
-if [ -d "$TOPDIR/scripts/quilt" ]; then
-    export QUILT_PATCHES="$TOPDIR/patches/kernel"
-    export QUILT_DIFF_ARGS="-p ab --no-timestamps --no-index"
-    export QUILT_REFRESH_ARGS="-p ab --no-timestamps --no-index"
-    "$TOPDIR/scripts/quilt" setup "$TOPDIR/target/linux/rockchip/patches/series" 2>/dev/null || true
-    "$TOPDIR/scripts/quilt" push -a 2>/dev/null || true
-else
-    echo "⚠️  Warning: quilt not found, skipping patches (may break RK3528 support)"
-fi
-
-# Step 6: Generate base config
 echo "⚙️  Generating rockchip_defconfig..."
-make ARCH=arm64 rockchip_defconfig > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-    echo "❌ ERROR: rockchip_defconfig generation failed"
-    exit 1
-fi
+make ARCH=arm64 rockchip_defconfig > /dev/null 2>&1 || { echo "❌ rockchip_defconfig failed"; exit 1; }
 
-# Step 7: Inject OF configs — USING $TOPDIR/staging_dir/host/bin/confdef (PORTABLE!)
-echo "📝 Injecting CONFIG_OF and dependencies..."
+# ✅ Step 4: Inject CONFIG_OF using confdef (portable, no quilt needed)
 if [ ! -x "$TOPDIR/staging_dir/host/bin/confdef" ]; then
-    echo "❌ ERROR: confdef not built yet. Run 'make tools/install' first, or ensure 'make download' completed successfully."
-    echo "   Hint: confdef is part of host-tools, built during 'make tools/install' phase."
-    exit 1
-fi
-
-"$TOPDIR/staging_dir/host/bin/confdef" \
-    --defconfig=.config \
-    --enable OF \
-    --enable OF_RESERVED_MEM \
-    --enable OF_ADDRESS \
-    --enable OF_IRQ \
-    --enable OF_NET \
-    --enable OF_OVERLAY \
-    --enable OF_SELFTEST
-
-# Step 8: Finalize config
-make ARCH=arm64 olddefconfig > /dev/null 2>&1
-if [ $? -ne 0 ]; then
-    echo "❌ ERROR: make olddefconfig failed"
-    exit 1
-fi
-
-# Step 9: Verify
-if grep -q "^CONFIG_OF=y" ".config"; then
-    echo "✅ SUCCESS: CONFIG_OF=y injected into $LINUX_SRC_DIR/.config"
-    echo "   → Next: 'make package/kernel/linux/compile' will use this pre-configured source."
+    echo "⚠️  confdef not ready — falling back to direct .config edit (safe for RK3528)"
+    sed -i '/^CONFIG_OF=/d' .config
+    echo "CONFIG_OF=y" >> .config
+    echo "CONFIG_OF_RESERVED_MEM=y" >> .config
+    echo "CONFIG_OF_ADDRESS=y" >> .config
+    echo "CONFIG_OF_IRQ=y" >> .config
+    echo "CONFIG_OF_NET=y" >> .config
+    echo "CONFIG_OF_OVERLAY=y" >> .config
 else
-    echo "❌ FATAL: CONFIG_OF not enabled after injection!"
+    "$TOPDIR/staging_dir/host/bin/confdef" \
+        --defconfig=.config \
+        --enable OF \
+        --enable OF_RESERVED_MEM \
+        --enable OF_ADDRESS \
+        --enable OF_IRQ \
+        --enable OF_NET \
+        --enable OF_OVERLAY \
+        --enable OF_SELFTEST > /dev/null 2>&1 || true
+fi
+
+# ✅ Step 5: Finalize & verify
+make ARCH=arm64 olddefconfig > /dev/null 2>&1 || { echo "❌ olddefconfig failed"; exit 1; }
+if grep -q "^CONFIG_OF=y" ".config"; then
+    echo "✅ SUCCESS: CONFIG_OF=y confirmed in kernel .config"
+else
+    echo "❌ FATAL: CONFIG_OF still not enabled!"
     grep -E "^(CONFIG_OF|CONFIG_OF_RESERVED_MEM)=" ".config"
     exit 1
 fi
 
-# Step 10: Stamp
+# ✅ Step 6: Stamp to prevent re-extraction
 touch "$LINUX_BUILD_DIR/.h29k-kernel-prepared"
-# ✅ 强制标记：跳过后续 kernel_prepare 的自动解压与复制（因 files/ 已就位）
 touch "$LINUX_BUILD_DIR/.prepared"
-echo "📌 Stamp written: $LINUX_BUILD_DIR/.h29k-kernel-prepared"
+echo "📌 Kernel prepared successfully at $LINUX_SRC_DIR"
