@@ -4,7 +4,6 @@ DL_FILE="$DL_DIR/linux-6.12.85.tar.xz"
 DOWNLOAD_URLS=(
   "https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.12.85.tar.xz"
   "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.85.tar.xz"
-  "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/23.05.3/targets/rockchip/armv8/linux-6.12.85.tar.xz"
 )
 
 echo "📥 Downloading linux-6.12.85.tar.xz from trusted mirrors..."
