@@ -338,22 +338,22 @@ download() {
 INC="$ROC_DIR/include/dt-bindings"
 mkdir -p $INC/{interrupt-controller,phy,pinctrl,soc,thermal}
 
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/arm-gic.h $INC/interrupt-controller/arm-gic.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/irq.h $INC/interrupt-controller/irq.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/phy/phy.h $INC/phy/phy.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/pinctrl/rockchip.h $INC/pinctrl/rockchip.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/soc/rockchip,boot-mode.h $INC/soc/rockchip,boot-mode.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/thermal/thermal.h $INC/thermal/thermal.h
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/arm-gic.h $INC/interrupt-controller/arm-gic.h
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/irq.h $INC/interrupt-controller/irq.h
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/phy.h $INC/phy/phy.h
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip.h $INC/pinctrl/rockchip.h
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip,boot-mode.h $INC/soc/rockchip,boot-mode.h
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/thermal.h $INC/thermal/thermal.h
 
 # ==================== 下载 rockchip-pinconf.dtsi ====================
-download https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi $DTS_DIR/rockchip-pinconf.dtsi
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi $DTS_DIR/rockchip-pinconf.dtsi
 
 # ==================== 下载 setup.c + of_fdt.h ====================
 SETUP_DIR="$ROC_DIR/arch/arm64/kernel"
 mkdir -p $SETUP_DIR $ROC_DIR/include/linux
 
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c $SETUP_DIR/setup.c
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/setup.c $SETUP_DIR/setup.c
+download https://raw.githubusercontent.com/I-agree/H29K/main/123/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
 
 # 基础路径
 ROC_DIR="target/linux/rockchip/files"
