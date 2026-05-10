@@ -1,26 +1,26 @@
 #!/bin/sh
-# ✅ 替换原 wget 段，加入完整性校验与多源 fallback
+DL_DIR="dl"
+mkdir -p "$DL_DIR"
 DL_FILE="$DL_DIR/linux-6.12.85.tar.xz"
-DOWNLOAD_URLS=(
-  "https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.12.85.tar.xz"
-  "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.85.tar.xz"
-)
+EXPECTED_SHA256="5e440451f36d4c2b2f8f2646a481a56e7246644e18909d96448b441454747a70"
+URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.12.85.tar.xz"
 
-echo "📥 Downloading linux-6.12.85.tar.xz from trusted mirrors..."
-for url in "${DOWNLOAD_URLS[@]}"; do
-  echo "→ Trying $url"
-  if wget -q --timeout=30 --tries=3 -O "$DL_FILE" "$url" && \
-     file "$DL_FILE" | grep -q "XZ compressed data"; then
-    echo "✅ Successfully downloaded and verified: $DL_FILE"
-    break
+echo "📥 Downloading linux-6.12.85.tar.xz from official kernel.org..."
+rm -f "$DL_FILE"
+
+# curl 稳定参数：重试5次、超时合理、静默、强制HTTPS
+if curl -fsSL --connect-timeout 25 --max-time 120 --retry 5 --retry-delay 2 -o "$DL_FILE" "$URL"; then
+  # 格式+哈希双重校验
+  if file "$DL_FILE" | grep -q "XZ compressed data" && \
+     [ "$(sha256sum "$DL_FILE" | awk '{print $1}')" = "$EXPECTED_SHA256" ]; then
+    echo "✅ Download & SHA256 verified: $DL_FILE"
   else
-    echo "❌ Failed or invalid: $url"
+    echo "❌ File corrupted or hash mismatch"
     rm -f "$DL_FILE"
+    exit 1
   fi
-done
-
-if [ ! -s "$DL_FILE" ]; then
-  echo "❌ FATAL: All mirrors failed. Please check OpenWrt 23.05.3 release status."
+else
+  echo "❌ FATAL: Download failed from kernel.org"
   exit 1
 fi
 
