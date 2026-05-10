@@ -60,18 +60,9 @@ echo "
 ==================================================
 "
 
-# 修复 error: implicit declaration of function 'early_init_dt_scan'
-# 原理：补全缺失的 linux/of.h 头文件
-
-# 创建目录
-mkdir -p target/linux/rockchip/files/include/linux
-
-# 下载缺失的头文件（必须补）
-wget -O target/linux/rockchip/files/include/linux/of.h \
-https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1/include/linux/of.h
-
-wget -O target/linux/rockchip/files/include/linux/of_fdt.h \
-https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1/include/linux/of_fdt.h
+mkdir -p target/linux/rockchip/files/arch/arm64/kernel/
+wget -O target/linux/rockchip/files/arch/arm64/kernel/setup.c \
+  https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c
 
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
