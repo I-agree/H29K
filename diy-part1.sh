@@ -375,7 +375,9 @@ curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bi
 curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/thermal/thermal.h -o $INC/thermal/thermal.h
 
 # ==================== 4. 下载 关键：rockchip-pinconf.dtsi ====================
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi -o $DTS_DIR/rockchip-pinconf.dtsi
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
+https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi \
+-o $DTS_DIR/rockchip-pinconf.dtsi
 
 # ==================== 验证 ====================
 echo "============================================="
