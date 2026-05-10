@@ -1,5 +1,10 @@
-#!/bin/bash
-#
+#!/bin/sh
+# ✅ PHYSICAL FIX: Force kernel into /dl...
+mkdir -p /dl
+wget -qO /dl/linux-6.12.85.tar.xz https://... || wget -qO /dl/linux-6.12.85.tar.xz https://...
+# === YOUR ORIGINAL diy-part1.sh CONTENT STARTS BELOW ===
+# [your original content here — e.g., cp patches/, sed configs, etc.]
+
 # https://github.com/P3TERX/Actions-OpenWrt
 # File name: diy-part1.sh
 # Description: OpenWrt DIY script part 1 (Before Update feeds)
