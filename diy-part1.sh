@@ -353,26 +353,3 @@ https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c
 # 同时下载依赖的头文件（确保完整）
 wget -O "target/linux/rockchip/files/include/linux/of_fdt.h" \
 https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h
-
-# 必须在 diy-part1.sh 中完成「配置注入」，但需配合 oldconfig
-cd /workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85
-
-# Step 1: 拷贝 Rockchip 官方 defconfig（确保基础配置存在）
-cp arch/arm64/configs/rockchip_defconfig .config
-
-# Step 2: 注入你必需的选项（使用 scripts/config 工具，最安全）
-# （OpenWrt staging_dir/host/bin/ 下自带此工具）
-/workdir/openwrt/staging_dir/host/bin/confdef \
-    --defconfig=.config \
-    --enable OF \
-    --enable OF_EARLY_FLATTREE \
-    --enable OF_RESERVED_MEM
-
-# Step 3: 强制同步（生成 autoconf.h 等）
-make oldconfig
-
-# Step 4: 验证（关键！）
-if ! grep -q "^CONFIG_OF=y" .config; then
-    echo "FATAL: CONFIG_OF not enabled!" >&2
-    exit 1
-fi
