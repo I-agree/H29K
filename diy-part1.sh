@@ -20,27 +20,6 @@
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 # 无线网卡驱动
 echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.conf.default
-# 正确安装 argon 主题
-git clone https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
-
-# ====== 强制兜底：确保 Kconfig 存在（Actions 环境专用）======
-mkdir -p target/linux/rockchip/files/drivers || true
-cat > target/linux/rockchip/files/drivers/Kconfig << 'EOF' || true
-# RK3528 必需驱动入口
-source "drivers/clk/rockchip/Kconfig"
-source "drivers/pinctrl/rockchip/Kconfig"
-source "drivers/soc/rockchip/Kconfig"
-source "drivers/phy/rockchip/Kconfig"
-source "drivers/usb/phy/Kconfig"
-source "drivers/mmc/host/Kconfig"
-source "drivers/usb/dwc3/Kconfig"
-source "drivers/gpu/drm/rockchip/Kconfig"
-source "drivers/usb/rockchip/Kconfig"
-source "drivers/usb/phy/rockchip-usb3phy/Kconfig"
-source "drivers/usb/phy/rockchip-emmc/Kconfig"
-source "drivers/usb/phy/rockchip-vop2/Kconfig"
-EOF
-# ====== 兜底结束 ======
 
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
@@ -375,7 +354,7 @@ curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bi
 curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/thermal/thermal.h -o $INC/thermal/thermal.h
 
 # ==================== 4. 下载 关键：rockchip-pinconf.dtsi ====================
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
+curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 --ipv4 --tlsv1.2 \
 https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi \
 -o $DTS_DIR/rockchip-pinconf.dtsi
 
@@ -428,6 +407,44 @@ curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_OF_FDT" -o "targ
 [ -s "target/linux/rockchip/files/include/linux/of_fdt.h" ] || { echo "of_fdt.h 下载失败" && exit 1; }
 
 echo "✅ setup.c + of_fdt.h 下载成功（稳定版）"
+
+# ====== 强制兜底：确保 Kconfig 存在（Actions 环境专用）======
+mkdir -p target/linux/rockchip/files/drivers || true
+cat > target/linux/rockchip/files/drivers/Kconfig << 'EOF' || true
+# RK3528 必需驱动入口
+source "drivers/clk/rockchip/Kconfig"
+source "drivers/pinctrl/rockchip/Kconfig"
+source "drivers/soc/rockchip/Kconfig"
+source "drivers/phy/rockchip/Kconfig"
+source "drivers/usb/phy/Kconfig"
+source "drivers/mmc/host/Kconfig"
+source "drivers/usb/dwc3/Kconfig"
+source "drivers/gpu/drm/rockchip/Kconfig"
+source "drivers/usb/rockchip/Kconfig"
+source "drivers/usb/phy/rockchip-usb3phy/Kconfig"
+source "drivers/usb/phy/rockchip-emmc/Kconfig"
+source "drivers/usb/phy/rockchip-vop2/Kconfig"
+EOF
+# ====== 兜底结束 ======
+
+# ====== 强制兜底：生成 drivers/Makefile（P3TERX Actions 必备）======
+mkdir -p target/linux/rockchip/files/drivers || true
+cat > target/linux/rockchip/files/drivers/Makefile << 'EOF'
+# RK3528 驱动编译入口（最小可用版）
+obj-$(CONFIG_ROCKCHIP_CLK) += clk/rockchip/
+obj-$(CONFIG_PINCTRL_ROCKCHIP) += pinctrl/rockchip/
+obj-$(CONFIG_SOC_ROCKCHIP) += soc/rockchip/
+obj-$(CONFIG_PHY_ROCKCHIP) += phy/rockchip/
+obj-$(CONFIG_USB_PHY_ROCKCHIP) += usb/phy/
+obj-$(CONFIG_MMC_SDHCI_ROCKCHIP) += mmc/host/
+obj-$(CONFIG_USB_DWC3_ROCKCHIP) += usb/dwc3/
+obj-$(CONFIG_DRM_ROCKCHIP) += gpu/drm/rockchip/
+obj-$(CONFIG_USB_ROCKCHIP) += usb/rockchip/
+obj-$(CONFIG_USB_PHY_ROCKCHIP_USB3PHY) += usb/phy/rockchip-usb3phy/
+obj-$(CONFIG_USB_PHY_ROCKCHIP_EMMC) += usb/phy/rockchip-emmc/
+obj-$(CONFIG_USB_PHY_ROCKCHIP_VOP2) += usb/phy/rockchip-vop2/
+EOF
+# ====== 兜底结束 ======
 
 # ======================== 【H29K KERNEL PREPARE: Inject CONFIG_OF BEFORE Build/Prepare】 ========================
 # 🔹 FIXED: Use $TOPDIR instead of hardcoded /workdir/openwrt/ to ensure portability across local/CI environments
