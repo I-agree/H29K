@@ -16,11 +16,12 @@
 # Add a feed source
 #echo 'src-git helloworld https://github.com/fw876/helloworld' >>feeds.conf.default
 #echo 'src-git passwall https://github.com/xiaorouji/openwrt-passwall' >>feeds.conf.default
+# 添加 QModem 软件源
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 # 无线网卡驱动
 echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.conf.default
 # 添加 Argon 主题源
-echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon.git;master' >> feeds.conf.default
+echo "src-git argon https://github.com/jerrykuku/luci-theme-argon.git" >> feeds.conf.default
 
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
