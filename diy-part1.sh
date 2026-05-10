@@ -379,29 +379,28 @@ curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_OF_FDT" -o "targ
 echo "✅ setup.c + of_fdt.h 下载成功（稳定版）"
 
 # ======================== 【H29K KERNEL PREPARE: Inject CONFIG_OF BEFORE Build/Prepare】 ========================
-# 🔹 Purpose: Force early extraction & config injection to avoid "source dir not found" in diy-part2.sh
-# 🔹 Why here? diy-part1.sh runs AFTER 'make download' but BEFORE 'make prepare' → perfect timing.
-# 🔹 Safety: Uses OpenWrt's own tools (tar, patch), idempotent, respects build_dir layout.
+# 🔹 FIXED: Use $TOPDIR instead of hardcoded /workdir/openwrt/ to ensure portability across local/CI environments
+# 🔹 REF: https://openwrt.org/docs/guide-developer/build-system/use-buildsystem#host_tools
 
 echo "🔧 H29K: Preparing kernel source with CONFIG_OF for Rockchip RK3528..."
 
-# Step 1: Define paths (match OpenWrt's internal logic)
+# Step 1: Define paths using $TOPDIR (guaranteed by OpenWrt build system)
 LINUX_TARBALL="linux-6.12.85.tar.xz"
-LINUX_SRC_DIR="/workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85"
-LINUX_DL_DIR="/workdir/openwrt/dl"
-LINUX_BUILD_DIR="/workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8"
+LINUX_SRC_DIR="$TOPDIR/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85"
+LINUX_DL_DIR="$TOPDIR/dl"
+LINUX_BUILD_DIR="$TOPDIR/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8"
 
-# Step 2: Verify tarball exists (OpenWrt must have downloaded it)
+# Step 2: Verify tarball exists
 if [ ! -f "$LINUX_DL_DIR/$LINUX_TARBALL" ]; then
     echo "❌ ERROR: Kernel tarball missing at $LINUX_DL_DIR/$LINUX_TARBALL"
     echo "   Please run 'make download' first, or check network/connectivity."
     exit 1
 fi
 
-# Step 3: Clean any stale extracted dir (idempotent)
+# Step 3: Clean stale dir
 rm -rf "$LINUX_SRC_DIR"
 
-# Step 4: Extract kernel source NOW (mimic OpenWrt's Build/Prepare, but earlier)
+# Step 4: Extract NOW
 echo "📦 Extracting $LINUX_TARBALL..."
 tar -C "$LINUX_BUILD_DIR" -xf "$LINUX_DL_DIR/$LINUX_TARBALL"
 if [ $? -ne 0 ]; then
@@ -409,12 +408,11 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Step 5: Apply OpenWrt's standard patches (critical! DTS, Rockchip fixes, etc.)
+# Step 5: Apply patches
 echo "🔧 Applying OpenWrt kernel patches..."
 cd "$LINUX_SRC_DIR" || exit 1
 
-# Use OpenWrt's quilt tool (same as Build/Quilt does later)
-if [ -d "$TOPDIR"/scripts/quilt ]; then
+if [ -d "$TOPDIR/scripts/quilt" ]; then
     export QUILT_PATCHES="$TOPDIR/patches/kernel"
     export QUILT_DIFF_ARGS="-p ab --no-timestamps --no-index"
     export QUILT_REFRESH_ARGS="-p ab --no-timestamps --no-index"
@@ -424,7 +422,7 @@ else
     echo "⚠️  Warning: quilt not found, skipping patches (may break RK3528 support)"
 fi
 
-# Step 6: Generate base .config using Rockchip defconfig (required before confdef)
+# Step 6: Generate base config
 echo "⚙️  Generating rockchip_defconfig..."
 make ARCH=arm64 rockchip_defconfig > /dev/null 2>&1
 if [ $? -ne 0 ]; then
@@ -432,9 +430,15 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Step 7: Inject OF configs using OpenWrt's confdef (v6.12-safe version)
+# Step 7: Inject OF configs — USING $TOPDIR/staging_dir/host/bin/confdef (PORTABLE!)
 echo "📝 Injecting CONFIG_OF and dependencies..."
-/workdir/openwrt/staging_dir/host/bin/confdef \
+if [ ! -x "$TOPDIR/staging_dir/host/bin/confdef" ]; then
+    echo "❌ ERROR: confdef not built yet. Run 'make tools/install' first, or ensure 'make download' completed successfully."
+    echo "   Hint: confdef is part of host-tools, built during 'make tools/install' phase."
+    exit 1
+fi
+
+"$TOPDIR/staging_dir/host/bin/confdef" \
     --defconfig=.config \
     --enable OF \
     --enable OF_RESERVED_MEM \
@@ -444,14 +448,14 @@ echo "📝 Injecting CONFIG_OF and dependencies..."
     --enable OF_OVERLAY \
     --enable OF_SELFTEST
 
-# Step 8: Finalize .config (equivalent to make olddefconfig)
+# Step 8: Finalize config
 make ARCH=arm64 olddefconfig > /dev/null 2>&1
 if [ $? -ne 0 ]; then
     echo "❌ ERROR: make olddefconfig failed"
     exit 1
 fi
 
-# Step 9: Verify success
+# Step 9: Verify
 if grep -q "^CONFIG_OF=y" ".config"; then
     echo "✅ SUCCESS: CONFIG_OF=y injected into $LINUX_SRC_DIR/.config"
     echo "   → Next: 'make package/kernel/linux/compile' will use this pre-configured source."
@@ -461,6 +465,6 @@ else
     exit 1
 fi
 
-# Step 10: Touch stamp to prevent re-run (idempotent)
+# Step 10: Stamp
 touch "$LINUX_BUILD_DIR/.h29k-kernel-prepared"
 echo "📌 Stamp written: $LINUX_BUILD_DIR/.h29k-kernel-prepared"
