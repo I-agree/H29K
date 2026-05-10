@@ -60,6 +60,11 @@ echo "
 ==================================================
 "
 
+# Auto-inject patch alongside your manual files
+mkdir -p /workdir/openwrt/target/linux/rockchip/patches-6.12
+curl -sL https://raw.githubusercontent.com/I-agree/H29K/main/999-fix-early-init-dt-scan-for-6.12.patch | \
+patch -p1 -d /workdir/openwrt/target/linux/rockchip -o patches-6.12/999-fix-early-init-dt-scan-for-6.12.patch
+
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
 # ======================== 【资源准备】 ========================
