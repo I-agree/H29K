@@ -1,9 +1,15 @@
 #!/bin/sh
-# ✅ PHYSICAL FIX: Force kernel into /dl...
-mkdir -p /dl
-wget -qO /dl/linux-6.12.85.tar.xz https://... || wget -qO /dl/linux-6.12.85.tar.xz https://...
-# === YOUR ORIGINAL diy-part1.sh CONTENT STARTS BELOW ===
-# [your original content here — e.g., cp patches/, sed configs, etc.]
+# ✅ PHYSICAL FIX: Force kernel into $GITHUB_WORKSPACE/dl (GitHub Actions ONLY)
+DL_DIR="$GITHUB_WORKSPACE/dl"
+mkdir -p "$DL_DIR"
+
+# Ensure OpenWrt build system uses this path
+export DL_DIR="$DL_DIR"
+echo "INFO: Using DL_DIR = $DL_DIR"
+
+# Download kernel tarball
+wget -qO "$DL_DIR/linux-6.12.85.tar.xz" https://downloads.openwrt.org/releases/23.05.3/targets/rockchip/armv8/linux-6.12.85.tar.xz || \
+wget -qO "$DL_DIR/linux-6.12.85.tar.xz" https://github.com/openwrt/openwrt/releases/download/v23.05.3/linux-6.12.85.tar.xz
 
 # https://github.com/P3TERX/Actions-OpenWrt
 # File name: diy-part1.sh
