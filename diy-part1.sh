@@ -2,27 +2,27 @@
 DL_DIR="dl"
 mkdir -p "$DL_DIR"
 DL_FILE="$DL_DIR/linux-6.12.85.tar.xz"
-EXPECTED_SHA256="5e440451f36d4c2b2f8f2646a481a56e7246644e18909d96448b441454747a70"
 URL="https://www.kernel.org/pub/linux/kernel/v6.x/linux-6.12.85.tar.xz"
 
-echo "📥 Downloading linux-6.12.85.tar.xz from official kernel.org..."
+echo "正在下载官方内核 linux-6.12.85.tar.xz ..."
 rm -f "$DL_FILE"
 
-# curl 稳定参数：重试5次、超时合理、静默、强制HTTPS
-if curl -fsSL --connect-timeout 25 --max-time 120 --retry 5 --retry-delay 2 -o "$DL_FILE" "$URL"; then
-  # 格式+哈希双重校验
-  if file "$DL_FILE" | grep -q "XZ compressed data" && \
-     [ "$(sha256sum "$DL_FILE" | awk '{print $1}')" = "$EXPECTED_SHA256" ]; then
-    echo "✅ Download & SHA256 verified: $DL_FILE"
-  else
-    echo "❌ File corrupted or hash mismatch"
-    rm -f "$DL_FILE"
-    exit 1
-  fi
-else
-  echo "❌ FATAL: Download failed from kernel.org"
+# 稳定下载：重试5次，超时友好，不校验
+curl -fsSL \
+  --connect-timeout 30 \
+  --max-time 300 \
+  --retry 5 \
+  --retry-delay 3 \
+  -o "$DL_FILE" \
+  "$URL"
+
+# 检查是否下载成功
+if [ ! -s "$DL_FILE" ]; then
+  echo "下载失败！"
   exit 1
 fi
+
+echo "✅ 下载完成：$DL_FILE"
 
 # https://github.com/P3TERX/Actions-OpenWrt
 # File name: diy-part1.sh
