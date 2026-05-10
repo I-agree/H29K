@@ -66,26 +66,37 @@ else
     exit 1
 fi
 
+# ==================== 稳定下载 H29K 配置文件 ====================
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
-wget -O package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-wget -O target/linux/rockchip/image/hinlink_h29k_defconfig https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/hinlink_h29k_defconfig
-[ -f package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig ] && [ -f target/linux/rockchip/image/hinlink_h29k_defconfig ] || { echo "❌ H29K config download failed" >&2; exit 1; }
 
-# 下载纯净版 armv8.mk 替换，只保留 rk3528 + hinlink_h29k
+# 下载地址
+URL_UBOOT_DEF="https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
+URL_IMAGE_DEF="https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/hinlink_h29k_defconfig"
+URL_ARMV8_MK="https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/armv8.mk"
+
+# 下载（curl 稳定版）
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_UBOOT_DEF" -o "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_IMAGE_DEF" -o "target/linux/rockchip/image/hinlink_h29k_defconfig"
+
+# 校验两个 defconfig
+[ -s "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig" ] || { echo "❌ U-Boot defconfig 下载失败" >&2; exit 1; }
+[ -s "target/linux/rockchip/image/hinlink_h29k_defconfig" ]         || { echo "❌ Image defconfig 下载失败" >&2; exit 1; }
+
+echo "✅ H29K 两个配置文件下载成功"
+
+# ==================== 稳定下载 armv8.mk ====================
 MK_FILE="target/linux/rockchip/image/armv8.mk"
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_ARMV8_MK" -o "$MK_FILE"
 
-# 下载 raw 原始文件
-wget -O "$MK_FILE" https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/armv8.mk
-
-# 校验下载是否成功
+# 校验文件非空
 if [ ! -s "$MK_FILE" ]; then
-    echo "ERROR: 下载 armv8.mk 失败，终止编译"
+    echo "❌ 下载 armv8.mk 失败，终止编译"
     exit 1
 fi
 
 # 校验不包含 hinlink_h28k
 if grep -q "hinlink_h28k" "$MK_FILE"; then
-    echo "ERROR: armv8.mk 包含 hinlink_h28k，终止编译"
+    echo "❌ ERROR: armv8.mk 包含 hinlink_h28k，终止编译"
     exit 1
 fi
 
