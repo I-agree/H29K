@@ -22,7 +22,7 @@ echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.co
 # 添加 Argon 主题源
 echo 'src-git argon https://github.com/jerrykuku/luci-theme-argon.git;master' >> feeds.conf.default
 # RK3528专用rockchip-kernel
-echo 'src-git rockchip-kernel https://github.com/rockchip-linux/kernel.git;rockchip-linux-6.12' >> feeds.conf.default
+echo 'src-git rockchip-kernel https://github.com/rockchip-linux/kernel.git;develop-6.1' >> feeds.conf.default
 
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
