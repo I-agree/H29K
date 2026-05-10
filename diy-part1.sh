@@ -455,7 +455,7 @@ EOF
 echo "🔧 H29K: Preparing kernel source with CONFIG_OF for Rockchip RK3528 (using /dl/)..."
 
 # 🔑 CRITICAL: Use /dl/ — NOT $TOPDIR/dl/ — because wget wrote there, and it's the only guaranteed path
-LINUX_TARBALL="/dl/linux-6.12.85.tar.xz"
+LINUX_TARBALL="$GITHUB_WORKSPACE/dl/linux-6.12.85.tar.xz"
 LINUX_SRC_DIR="$TOPDIR/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85"
 LINUX_BUILD_DIR="$TOPDIR/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8"
 
