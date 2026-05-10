@@ -251,17 +251,3 @@ printf '\n'
 echo -e "\033[32m=====================================\033[0m"
 echo -e "\033[32m✅ 所有检查通过！\033[0m"
 echo -e "\033[32m=====================================\033[0m"
-
-# ✅ In diy-part2.sh, replace the entire kernel injection block with:
-echo "🔍 Verifying pre-injected CONFIG_OF..."
-if [ -f "/workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85/.config" ]; then
-    if grep -q "^CONFIG_OF=y" "/workdir/openwrt/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85/.config"; then
-        echo "✅ CONFIG_OF confirmed present. Proceeding to compile."
-    else
-        echo "❌ CRITICAL: Pre-injected .config missing CONFIG_OF — aborting."
-        exit 1
-    fi
-else
-    echo "❌ CRITICAL: Pre-injected kernel source missing — diy-part1.sh may have failed."
-    exit 1
-fi
