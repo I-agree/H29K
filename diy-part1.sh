@@ -27,6 +27,7 @@ git clone https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
 # 1. 清理OpenWrt原生冲突DTS和补丁
 rm -rf target/linux/rockchip/patches-6.12
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
+rm -rf target/linux/generic/hack-6.12/ target/linux/bcm27xx/patches-6.12/ && make target/linux/clean
 
 # 定义路径
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
