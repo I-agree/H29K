@@ -88,6 +88,16 @@ else
     exit 1
 fi
 
+# 简单可靠：等待20秒后再继续执行（OpenWrt Actions 环境专用）
+# 不依赖任何外部工具，兼容所有 BusyBox / dash / bash 环境
+
+sleep 20
+
+# ✅ 等待完成，后续命令可直接跟在此行下方
+# 例如：
+# echo "✅ 20秒已过，开始下一步..."
+# make menuconfig
+
 # ==================== 稳定下载 H29K 配置文件 ====================
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
 
@@ -209,6 +219,16 @@ echo " ✅ 所有指定配置项已成功删除！"
 echo " ✅ 验证通过，继续编译……"
 echo "====================================================="
 
+# 简单可靠：等待20秒后再继续执行（OpenWrt Actions 环境专用）
+# 不依赖任何外部工具，兼容所有 BusyBox / dash / bash 环境
+
+sleep 20
+
+# ✅ 等待完成，后续命令可直接跟在此行下方
+# 例如：
+# echo "✅ 20秒已过，开始下一步..."
+# make menuconfig
+
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置（追加到文件末尾）
 # ==============================================
@@ -314,6 +334,16 @@ CONFIG_PACKAGE_kmod-rockchip-emmc=y
 EOF
 
 echo "✅ RK3528 H29K 最终配置"
+
+# 简单可靠：等待20秒后再继续执行（OpenWrt Actions 环境专用）
+# 不依赖任何外部工具，兼容所有 BusyBox / dash / bash 环境
+
+sleep 20
+
+# ✅ 等待完成，后续命令可直接跟在此行下方
+# 例如：
+# echo "✅ 20秒已过，开始下一步..."
+# make menuconfig
 
 # ==================== 基础目录 ====================
 ROC_DIR="target/linux/rockchip/files"
