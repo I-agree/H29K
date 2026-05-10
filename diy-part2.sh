@@ -11,7 +11,7 @@ mkdir -p $ROC_DIR/drivers
 
 # ==================== 下载地址（你确认可用） ====================
 LEDE_BASE="https://raw.githubusercontent.com/coolsnowwolf/lede/master/target/linux/rockchip/files"
-RK_BASE="https://raw.githubusercontent.com/rockchip-linux/kernel/develop-6.1"
+RK_BASE="https://raw.githubusercontent.com/torvalds/linux/v6.12"
 
 # ==================== 1. 下载 LEDE include ====================
 wget -q -O $INC/clock/rk3528-cru.h       $LEDE_BASE/include/dt-bindings/clock/rk3528-cru.h
