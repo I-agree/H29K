@@ -7,9 +7,36 @@ mkdir -p "$DL_DIR"
 export DL_DIR="$DL_DIR"
 echo "INFO: Using DL_DIR = $DL_DIR"
 
-# Download kernel tarball
-wget -qO "$DL_DIR/linux-6.12.85.tar.xz" https://downloads.openwrt.org/releases/23.05.3/targets/rockchip/armv8/linux-6.12.85.tar.xz || \
-wget -qO "$DL_DIR/linux-6.12.85.tar.xz" https://github.com/openwrt/openwrt/releases/download/v23.05.3/linux-6.12.85.tar.xz
+# 🔧 REPAIR #1: Kernel download with format validation & multi-mirror fallback
+#   WHY: Original wget may save HTML 404/503 as .tar.xz → tar fails with "not a tar archive"
+#   HOW: Use curl + file check + trusted mirrors (TUNA mirror added for China CI stability)
+#   REF: 12 — GitHub Actions 文件路径必须用 $GITHUB_WORKSPACE；OpenWrt 镜像需冗余保障
+OPENWRT_VER="23.05.3"
+KERNEL_TARBALL="linux-6.12.85.tar.xz"
+DL_FILE="$DL_DIR/$KERNEL_TARBALL"
+MIRRORS=(
+  "https://downloads.openwrt.org/releases/$OPENWRT_VER/targets/rockchip/armv8/$KERNEL_TARBALL"
+  "https://github.com/openwrt/openwrt/releases/download/v$OPENWRT_VER/$KERNEL_TARBALL"
+  "https://mirrors.tuna.tsinghua.edu.cn/openwrt/releases/$OPENWRT_VER/targets/rockchip/armv8/$KERNEL_TARBALL"
+)
+
+echo "📥 Downloading $KERNEL_TARBALL with integrity check..."
+for url in "${MIRRORS[@]}"; do
+  echo "→ Trying $url"
+  if curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 15 -o "$DL_FILE" "$url" 2>/dev/null && \
+     file "$DL_FILE" | grep -q "XZ compressed data"; then
+    echo "✅ Successfully downloaded and verified: $DL_FILE"
+    break
+  else
+    echo "❌ Failed or invalid: $url"
+    rm -f "$DL_FILE"
+  fi
+done
+
+if [ ! -s "$DL_FILE" ]; then
+  echo "❌ FATAL: All mirrors failed. Please verify OpenWrt $OPENWRT_VER release status."
+  exit 1
+fi
 
 # https://github.com/P3TERX/Actions-OpenWrt
 # File name: diy-part1.sh
@@ -339,15 +366,37 @@ cp -rf lede_temp/target/linux/rockchip/files/include $ROC_DIR/
 cp -rf lede_temp/target/linux/rockchip/files/drivers $ROC_DIR/
 rm -rf lede_temp
 
-# 2. 直接复制 OpenWrt 官方内核自带头文件（不下载、零报错、最稳定）
+# 🔧 REPAIR #2: Safe dt-bindings copy with error interruption (replaces original cp block)
+#   WHY: Original cp -f hides "No such file" → false success → later build fails silently
+#   HOW: Check existence before cp; abort on any missing header; use explicit mkdir -p
+#   REF: 1 — $GITHUB_WORKSPACE is only writable location; 9 — actions/checkout puts repo under $GITHUB_WORKSPACE
 LINUX_DIR="build_dir/target-aarch64_armv8-a/linux-rockchip/linux-6.1*/usr/include"
+if [ ! -d "$LINUX_DIR" ]; then
+  echo "❌ ERROR: Kernel source dir '$LINUX_DIR' not found. Run 'make download' first OR verify kernel tarball extraction succeeded."
+  exit 1
+fi
 
-cp -f $LINUX_DIR/dt-bindings/interrupt-controller/arm-gic.h $INC/interrupt-controller/
-cp -f $LINUX_DIR/dt-bindings/interrupt-controller/irq.h $INC/interrupt-controller/
-cp -f $LINUX_DIR/dt-bindings/phy/phy.h $INC/phy/
-cp -f $LINUX_DIR/dt-bindings/pinctrl/rockchip.h $INC/pinctrl/
-cp -f $LINUX_DIR/dt-bindings/soc/rockchip,boot-mode.h $INC/soc/
-cp -f $LINUX_DIR/dt-bindings/thermal/thermal.h $INC/thermal/
+HEADERS=(
+  "dt-bindings/interrupt-controller/arm-gic.h"
+  "dt-bindings/interrupt-controller/irq.h"
+  "dt-bindings/phy/phy.h"
+  "dt-bindings/pinctrl/rockchip.h"
+  "dt-bindings/soc/rockchip,boot-mode.h"
+  "dt-bindings/thermal/thermal.h"
+)
+
+for hdr in "${HEADERS[@]}"; do
+  src="$LINUX_DIR/$hdr"
+  dst="$INC/$(dirname "$hdr")/"
+  mkdir -p "$dst"
+  if [ ! -f "$src" ]; then
+    echo "❌ MISSING HEADER: $src"
+    echo "   Hint: Check if kernel tarball was extracted correctly (see 'tar -xf' step below)."
+    exit 1
+  fi
+  cp -f "$src" "$dst"
+done
+echo "✅ Successfully synced 6 dt-bindings headers from kernel source."
 
 # 3. 下载唯一必须的外部文件（rockchip-pinconf）
 curl -fsSL --retry 5 --ipv4 \
@@ -431,8 +480,10 @@ rm -rf "$LINUX_SRC_DIR"
 echo "📦 Extracting $LINUX_TARBALL to $LINUX_SRC_DIR..."
 tar -C "$LINUX_BUILD_DIR" -xf "$LINUX_TARBALL"
 if [ $? -ne 0 ]; then
-    echo "❌ ERROR: Failed to extract $LINUX_TARBALL — corrupted download or insufficient disk space?"
-    exit 1
+  echo "❌ ERROR: Failed to extract $LINUX_TARBALL — corrupted download or insufficient disk space?"
+  echo "   DEBUG: File type is $(file "$LINUX_TARBALL" 2>/dev/null || echo 'unknown')"
+  echo "   DEBUG: File size is $(ls -lh "$LINUX_TARBALL" 2>/dev/null | awk '{print $5}')"
+  exit 1
 fi
 
 # ✅ Step 3: Enter kernel source & generate base config
