@@ -345,7 +345,7 @@ curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bi
 curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 $RK_BASE/include/dt-bindings/thermal/thermal.h -o $INC/thermal/thermal.h
 
 # ==================== 4. 下载 关键：rockchip-pinconf.dtsi ====================
-curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 --ipv4 --tlsv1.2 \
+curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 --ipv4 \
 https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi \
 -o $DTS_DIR/rockchip-pinconf.dtsi
 
@@ -385,8 +385,8 @@ mkdir -p target/linux/rockchip/files/include/linux
 URL_SETUP="https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c"
 URL_OF_FDT="https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h"
 
-curl -fsSL --retry 5 --ipv4 --tlsv1.2 "$URL_SETUP" -o "$SETUP_DIR/setup.c"
-curl -fsSL --retry 5 --ipv4 --tlsv1.2 "$URL_OF_FDT" -o "target/linux/rockchip/files/include/linux/of_fdt.h"
+curl -fsSL --retry 5 --ipv4 "$URL_SETUP" -o "$SETUP_DIR/setup.c"
+curl -fsSL --retry 5 --ipv4 "$URL_OF_FDT" -o "target/linux/rockchip/files/include/linux/of_fdt.h"
 
 [ -s "$SETUP_DIR/setup.c" ] || { echo "setup.c 下载失败"; exit 1; }
 [ -s "target/linux/rockchip/files/include/linux/of_fdt.h" ] || { echo "of_fdt.h 下载失败"; exit 1; }
