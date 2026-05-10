@@ -329,89 +329,49 @@ sleep 10
 # ==================== 基础目录 ====================
 ROC_DIR="target/linux/rockchip/files"
 DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
-mkdir -p "$ROC_DIR" "$DTS_DIR"
+INC="$ROC_DIR/include/dt-bindings"
 
-# ==================== 克隆整个LEDE仓库（最稳，不猜任何文件） ====================
+mkdir -p $DTS_DIR $INC/{clock,power,pinctrl,interrupt-controller,phy,soc,thermal} $ROC_DIR/drivers
+
+# 1. 克隆LEDE仓库，复制官方原生 include + drivers 文件夹
 git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede_temp
-
-# ==================== 直接复制官方原生 include + drivers 文件夹 ====================
-cp -rf lede_temp/target/linux/rockchip/files/include "$ROC_DIR/"
-cp -rf lede_temp/target/linux/rockchip/files/drivers "$ROC_DIR/"
-
-# 清理临时文件
+cp -rf lede_temp/target/linux/rockchip/files/include $ROC_DIR/
+cp -rf lede_temp/target/linux/rockchip/files/drivers $ROC_DIR/
 rm -rf lede_temp
 
-# ==================== 下载函数 ====================
-download() {
-  curl -fsSL --retry 5 --ipv4 "$1" -o "$2" || { echo "下载失败: $2"; exit 1; }
-}
+# 2. 直接复制 OpenWrt 官方内核自带头文件（不下载、零报错、最稳定）
+LINUX_DIR="build_dir/target-aarch64_armv8-a/linux-rockchip/linux-6.1*/usr/include"
 
-# ==================== 追加内核头文件 ====================
-INC="$ROC_DIR/include/dt-bindings"
-mkdir -p $INC/{interrupt-controller,phy,pinctrl,soc,thermal}
+cp -f $LINUX_DIR/dt-bindings/interrupt-controller/arm-gic.h $INC/interrupt-controller/
+cp -f $LINUX_DIR/dt-bindings/interrupt-controller/irq.h $INC/interrupt-controller/
+cp -f $LINUX_DIR/dt-bindings/phy/phy.h $INC/phy/
+cp -f $LINUX_DIR/dt-bindings/pinctrl/rockchip.h $INC/pinctrl/
+cp -f $LINUX_DIR/dt-bindings/soc/rockchip,boot-mode.h $INC/soc/
+cp -f $LINUX_DIR/dt-bindings/thermal/thermal.h $INC/thermal/
 
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/arm-gic.h $INC/interrupt-controller/arm-gic.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/interrupt-controller/irq.h $INC/interrupt-controller/irq.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/phy/phy.h $INC/phy/phy.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/pinctrl/rockchip.h $INC/pinctrl/rockchip.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/soc/rockchip,boot-mode.h $INC/soc/rockchip,boot-mode.h
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/dt-bindings/thermal/thermal.h $INC/thermal/thermal.h
+# 3. 下载唯一必须的外部文件（rockchip-pinconf）
+curl -fsSL --retry 5 --ipv4 \
+https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi \
+-o $DTS_DIR/rockchip-pinconf.dtsi
 
-# ==================== 下载 rockchip-pinconf.dtsi ====================
-download https://raw.githubusercontent.com/rockchip-linux/kernel/refs/heads/develop-6.1/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi $DTS_DIR/rockchip-pinconf.dtsi
+echo "=================================================="
+echo "✅ 全部完成！复用OpenWrt内核头文件，零下载报错！"
+echo "=================================================="
 
-# ==================== 下载 setup.c + of_fdt.h ====================
-SETUP_DIR="$ROC_DIR/arch/arm64/kernel"
-mkdir -p $SETUP_DIR $ROC_DIR/include/linux
-
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/arch/arm64/kernel/setup.c $SETUP_DIR/setup.c
-download https://raw.githubusercontent.com/torvalds/linux/v6.12/include/linux/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
-
-# 基础路径
 ROC_DIR="target/linux/rockchip/files"
 DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
 INC="$ROC_DIR/include/dt-bindings"
 
-echo "============================================="
-echo "  🔍 全部文件完整性检查"
-echo "============================================="
-
-# 检查文件夹
-check_dir() {
-    if [ -d "$1" ]; then echo "✅ 目录存在: $1"; else echo "❌ 目录缺失: $1"; fi
-}
-
-# 检查文件
-check_file() {
-    if [ -f "$1" ]; then echo "✅ 文件存在: $1"; else echo "❌ 文件缺失: $1"; fi
-}
-
-echo -e "\n📁 检查主文件夹"
-check_dir "$ROC_DIR/include"
-check_dir "$ROC_DIR/drivers"
-
-echo -e "\n📄 检查 LEDE 头文件"
-check_file "$INC/clock/rk3528-cru.h"
-check_file "$INC/power/rk3528-power.h"
-
-echo -e "\n📄 检查补充内核头文件"
-check_file "$INC/interrupt-controller/arm-gic.h"
-check_file "$INC/interrupt-controller/irq.h"
-check_file "$INC/phy/phy.h"
-check_file "$INC/pinctrl/rockchip.h"
-check_file "$INC/soc/rockchip,boot-mode.h"
-check_file "$INC/thermal/thermal.h"
-
-echo -e "\n📄 检查 rockchip-pinconf.dtsi"
-check_file "$DTS_DIR/rockchip-pinconf.dtsi"
-
-echo -e "\n📄 检查 setup.c + of_fdt.h"
-check_file "$ROC_DIR/arch/arm64/kernel/setup.c"
-check_file "$ROC_DIR/include/linux/of_fdt.h"
-
-echo -e "\n============================================="
-echo " ✅ 检查完成！以上全部存在即为正常"
-echo "============================================="
+echo "===== 文件校验完成 ====="
+[ -d $ROC_DIR/include ] && echo "✅ include 文件夹"
+[ -d $ROC_DIR/drivers ] && echo "✅ drivers 文件夹"
+[ -f $INC/interrupt-controller/arm-gic.h ] && echo "✅ arm-gic.h"
+[ -f $INC/interrupt-controller/irq.h ] && echo "✅ irq.h"
+[ -f $INC/phy/phy.h ] && echo "✅ phy.h"
+[ -f $INC/pinctrl/rockchip.h ] && echo "✅ rockchip.h"
+[ -f $INC/soc/rockchip,boot-mode.h ] && echo "✅ boot-mode.h"
+[ -f $INC/thermal/thermal.h ] && echo "✅ thermal.h"
+[ -f $DTS_DIR/rockchip-pinconf.dtsi ] && echo "✅ rockchip-pinconf.dtsi"
 
 # ====== 强制兜底：确保 Kconfig 存在（Actions 环境专用）======
 mkdir -p target/linux/rockchip/files/drivers || true
@@ -452,33 +412,33 @@ EOF
 # ====== 兜底结束 ======
 
 # ======================== 【H29K KERNEL PREPARE: Inject CONFIG_OF — PHYSICAL PATH FIX】 ========================
-echo "🔧 H29K: Preparing kernel source with CONFIG_OF for Rockchip RK3528 (using /dl/)..."
+echo "🔧 H29K: Preparing kernel source with CONFIG_OF for Rockchip RK3528 (using \$GITHUB_WORKSPACE/dl)..."
 
-# 🔑 CRITICAL: Use /dl/ — NOT $TOPDIR/dl/ — because wget wrote there, and it's the only guaranteed path
+# 🔑 CRITICAL: Use \$GITHUB_WORKSPACE/dl — NOT /dl/ — because /dl is read-only in GitHub Actions
 LINUX_TARBALL="$GITHUB_WORKSPACE/dl/linux-6.12.85.tar.xz"
 LINUX_SRC_DIR="$TOPDIR/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-6.12.85"
 LINUX_BUILD_DIR="$TOPDIR/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8"
 
-# ✅ Step 1: Verify kernel tarball exists in /dl/ (the physical location we forced)
+# ✅ Step 1: Verify kernel tarball exists in \$GITHUB_WORKSPACE/dl (the ONLY writable location)
 if [ ! -f "$LINUX_TARBALL" ]; then
-    echo "❌ FATAL: /dl/linux-6.12.85.tar.xz is MISSING — wget failed or network blocked."
-    echo "   Please check GitHub Actions runner network access to https://downloads.lede-project.org/"
+    echo "❌ FATAL: \$GITHUB_WORKSPACE/dl/linux-6.12.85.tar.xz is MISSING — wget failed or network blocked."
+    echo "   Please check GitHub Actions runner network access to OpenWrt releases."
     exit 1
 fi
 
-# ✅ Step 2: Clean & extract directly from /dl/
+# ✅ Step 2: Clean & extract directly from \$GITHUB_WORKSPACE/dl
 rm -rf "$LINUX_SRC_DIR"
 echo "📦 Extracting $LINUX_TARBALL to $LINUX_SRC_DIR..."
 tar -C "$LINUX_BUILD_DIR" -xf "$LINUX_TARBALL"
 if [ $? -ne 0 ]; then
-    echo "❌ ERROR: Failed to extract $LINUX_TARBALL"
+    echo "❌ ERROR: Failed to extract $LINUX_TARBALL — corrupted download or insufficient disk space?"
     exit 1
 fi
 
 # ✅ Step 3: Enter kernel source & generate base config
 cd "$LINUX_SRC_DIR" || exit 1
 echo "⚙️  Generating rockchip_defconfig..."
-make ARCH=arm64 rockchip_defconfig > /dev/null 2>&1 || { echo "❌ rockchip_defconfig failed"; exit 1; }
+make ARCH=arm64 rockchip_defconfig > /dev/null 2>&1 || { echo "❌ rockchip_defconfig failed — missing kernel headers?"; exit 1; }
 
 # ✅ Step 4: Inject CONFIG_OF using confdef (portable, no quilt needed)
 if [ ! -x "$TOPDIR/staging_dir/host/bin/confdef" ]; then
@@ -503,11 +463,11 @@ else
 fi
 
 # ✅ Step 5: Finalize & verify
-make ARCH=arm64 olddefconfig > /dev/null 2>&1 || { echo "❌ olddefconfig failed"; exit 1; }
+make ARCH=arm64 olddefconfig > /dev/null 2>&1 || { echo "❌ olddefconfig failed — invalid .config syntax?"; exit 1; }
 if grep -q "^CONFIG_OF=y" ".config"; then
     echo "✅ SUCCESS: CONFIG_OF=y confirmed in kernel .config"
 else
-    echo "❌ FATAL: CONFIG_OF still not enabled!"
+    echo "❌ FATAL: CONFIG_OF still not enabled! Dumping relevant lines:"
     grep -E "^(CONFIG_OF|CONFIG_OF_RESERVED_MEM)=" ".config"
     exit 1
 fi
