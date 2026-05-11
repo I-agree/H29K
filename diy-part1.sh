@@ -394,7 +394,7 @@ mkdir -p target/linux/rockchip/files/include/dt-bindings/thermal
 mkdir -p target/linux/rockchip/files/include/linux
 mkdir -p target/linux/rockchip/files/drivers
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip
-mkdir -p target/linux/rockchip/files/arch/arm64/kernel
+# mkdir -p target/linux/rockchip/files/arch/arm64/kernel
 
 # ==================== 基础目录 ====================
 ROC_DIR="target/linux/rockchip/files"
@@ -431,11 +431,11 @@ download https://raw.githubusercontent.com/I-agree/H29K/main/123/thermal.h $INC/
 download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi $DTS_DIR/rockchip-pinconf.dtsi
 
 # ==================== 下载 setup.c + of_fdt.h ====================
-SETUP_DIR="$ROC_DIR/arch/arm64/kernel"
-mkdir -p $SETUP_DIR $ROC_DIR/include/linux
+# SETUP_DIR="$ROC_DIR/arch/arm64/kernel"
+# mkdir -p $SETUP_DIR $ROC_DIR/include/linux
 
-#download https://raw.githubusercontent.com/I-agree/H29K/main/123/setup.c $SETUP_DIR/setup.c
-#download https://raw.githubusercontent.com/I-agree/H29K/main/123/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
+# download https://raw.githubusercontent.com/I-agree/H29K/main/123/setup.c $SETUP_DIR/setup.c
+# download https://raw.githubusercontent.com/I-agree/H29K/main/123/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
 
 # 基础路径
 ROC_DIR="target/linux/rockchip/files"
