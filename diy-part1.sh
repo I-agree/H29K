@@ -486,10 +486,11 @@ echo "============================================="
 # ==============================================================================
 # 修复 gpio-button-hotplug 驱动：适配内核 6.12（删除 broadcast_uevent）
 # ==============================================================================
-# 1. 先创建目录
+echo "【DIY】更新 gpio-button-hotplug 驱动至 6.12 兼容版"
+
+# 1. 先创建目录（你提醒的关键步骤）
 mkdir -p package/kernel/gpio-button-hotplug/src/
 
 # 2. 下载官方新版驱动（无 broadcast_uevent，内核 6.12 专用）
-echo "【DIY】替换新版按键热插拔驱动 (6.12兼容)"
-SRC="package/kernel/gpio-button-hotplug/src/gpio-button-hotplug.c"
-wget -O "$SRC" https://raw.githubusercontent.com/I-agree/H29K/main/123/gpio-button-hotplug.c
+wget -O package/kernel/gpio-button-hotplug/src/gpio-button-hotplug.c \
+https://raw.githubusercontent.com/I-agree/H29K/main/123/gpio-button-hotplug.c
