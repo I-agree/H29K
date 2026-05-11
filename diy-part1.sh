@@ -39,6 +39,7 @@ rm -f target/linux/qualcommax/patches-6.12/0911-arm64-cmdline-replacement.patch
 rm -f target/linux/ipq806x/patches-6.12/902-ARM-decompressor-support-for-ATAGs-rootblock-parsing.patch
 rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
 rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
+rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
 
 # 定义路径
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
