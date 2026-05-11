@@ -164,9 +164,9 @@ while true; do
     if [ -z "$QUOTE" ]; then
       # 🔹 本地名言库（UTF-8 短句，适配 MiSans 渲染）
       QUOTES=(
-        "山高水长，行则将至"
-        "心之所向，素履以往"
-        "静水流深，厚积薄发"
+        "山林从不向四季起誓"
+        "惜我者，我惜之；懂我者，我幸之。"
+        "真诚是永远的必杀技"
       )
       # 🔹 随机选取一条（BusyBox shuf 兼容写法）
       RAND_IDX=$((RANDOM % ${#QUOTES[@]}))
