@@ -28,6 +28,17 @@ rm -rf target/linux/rockchip/patches-6.12
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
 rm -rf target/linux/generic/hack-6.12
 rm -rf target/linux/bcm27xx/patches-6.12
+rm -f target/linux/generic/hack-6.18/920-device_tree_cmdline.patch
+rm -f target/linux/ipq806x/patches-6.12/901-02-ARM-decompressor-add-option-to-ignore-MEM-ATAGs.patch
+rm -f target/linux/mpc85xx/patches-6.12/102-powerpc-add-cmdline-override.patch
+rm -f package/boot/uboot-mediatek/patches/280-image-fdt-save-name-of-FIT-configuration-in-chosen-node.patch
+rm -f target/linux/generic/hack-6.12/920-device_tree_cmdline.patch
+rm -f target/linux/mpc85xx/patches-6.18/102-powerpc-add-cmdline-override.patch
+rm -f target/linux/mediatek/patches-6.18/901-arm-add-cmdline-override.patch
+rm -f target/linux/qualcommax/patches-6.12/0911-arm64-cmdline-replacement.patch
+rm -f target/linux/ipq806x/patches-6.12/902-ARM-decompressor-support-for-ATAGs-rootblock-parsing.patch
+rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
+rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
 
 # 定义路径
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
@@ -103,6 +114,44 @@ fi
 
 echo "✅ 已下载并替换 armv8.mk 成功"
 echo "✅ 已校验：无 hinlink_h28k，仅保留 rk3528 + hinlink_h29k"
+
+# ==============================
+# 【强制限定补丁作用域】
+# ==============================
+# 定义正确目录
+TARGET_DIR="target/linux/rockchip"
+mkdir -p $TARGET_DIR
+
+# 下载你指定的官方原版 Makefile
+echo "正在下载 rockchip Makefile ..."
+curl -L --retry 5 \
+https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/Makefile \
+-o $TARGET_DIR/Makefile
+
+# 检查是否下载成功
+if [ -f "$TARGET_DIR/Makefile" ]; then
+    echo -e "\n✅ 下载成功：$TARGET_DIR/Makefile"
+else
+    echo -e "\n❌ 下载失败"
+    exit 1
+fi
+
+# ==============================
+# 验证：是否包含【强制限定补丁作用域】
+# ==============================
+echo -e "\n============================================="
+echo "  检查结果：是否强制限定补丁作用域"
+echo -e "=============================================\n"
+
+grep -q "强制限定补丁作用域" $TARGET_DIR/Makefile
+if [ $? -eq 0 ]; then
+    echo "✅ 已确认：包含 强制限定补丁作用域 配置"
+    echo "    作用：仅应用 rockchip 专属补丁，禁止其他平台污染"
+else
+    echo "❌ 未找到"
+fi
+
+echo -e "\n=============================================\n"
 
 # ==============================================
 # 定制 uboot-rockchip：替换 rk3528 默认配置 + 添加 H29K
