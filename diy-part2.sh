@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# 正确安装 argon 主题
-git clone https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
-
 set -euo pipefail  # 🔥 关键修复：任一命令失败立即终止，杜绝静默错误
 
 # ======================== 【资源准备】 ========================
