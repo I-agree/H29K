@@ -41,6 +41,18 @@ rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
 rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
 rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
 
+# === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
+# Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
+rm -f "$BUILD_DIR"/target-*/linux-*/drivers/of/fdt.c
+# Remove fdt.o reference from drivers/of/Makefile (added by bcm27xx/950-*.patch)
+sed -i '/fdt\.o/d' "$BUILD_DIR"/target-*/linux-*/drivers/of/Makefile 2>/dev/null
+# Remove CONFIG_OF_CONFIGFS line (side effect of bcm27xx/950-*.patch)
+sed -i '/CONFIG_OF_CONFIGFS/d' "$BUILD_DIR"/target-*/linux-*/drivers/of/Kconfig 2>/dev/null
+# Restore original of_fdt.h (remove early_init_dt_* declarations injected by 920-*.patch)
+sed -i '/early_init_dt_verify/d; /early_init_dt_scan/d' "$BUILD_DIR"/target-*/linux-*/include/linux/of_fdt.h 2>/dev/null
+# Ensure no stale .o/.ko files remain (defensive cleanup)
+find "$BUILD_DIR"/target-*/linux-*/drivers/of/ -name "fdt.*" -delete 2>/dev/null
+
 # 定义路径
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_DIR"
