@@ -265,8 +265,10 @@ sleep 10
 # ==============================================
 # 为 Hinlink H29K 添加内核驱动配置（追加到文件末尾）
 # ==============================================
-cat >> "$CONFIG_FILE" << 'EOF'
+# 定义配置文件路径
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
+cat >> "$CONFIG_FILE" << 'EOF'
 # === 之前删除的项 ===
 # CONFIG_EMAC_ROCKCHIP is not set
 # CONFIG_ARC_EMAC_CORE is not set
@@ -430,13 +432,6 @@ download https://raw.githubusercontent.com/I-agree/H29K/main/123/thermal.h $INC/
 # ==================== 下载 rockchip-pinconf.dtsi ====================
 download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi $DTS_DIR/rockchip-pinconf.dtsi
 
-# ==================== 下载 setup.c + of_fdt.h ====================
-# SETUP_DIR="$ROC_DIR/arch/arm64/kernel"
-# mkdir -p $SETUP_DIR $ROC_DIR/include/linux
-
-# download https://raw.githubusercontent.com/I-agree/H29K/main/123/setup.c $SETUP_DIR/setup.c
-# download https://raw.githubusercontent.com/I-agree/H29K/main/123/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
-
 # 基础路径
 ROC_DIR="target/linux/rockchip/files"
 DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
@@ -475,22 +470,6 @@ check_file "$INC/thermal/thermal.h"
 echo -e "\n📄 检查 rockchip-pinconf.dtsi"
 check_file "$DTS_DIR/rockchip-pinconf.dtsi"
 
-#echo -e "\n📄 检查 setup.c + of_fdt.h"
-#check_file "$ROC_DIR/arch/arm64/kernel/setup.c"
-#check_file "$ROC_DIR/include/linux/of_fdt.h"
-
 echo -e "\n============================================="
 echo " ✅ 检查完成！以上全部存在即为正常"
 echo "============================================="
-
-# ==============================================================================
-# 修复 gpio-button-hotplug 驱动：适配内核 6.12（删除 broadcast_uevent）
-# ==============================================================================
-echo "【DIY】更新 gpio-button-hotplug 驱动至 6.12 兼容版"
-
-# 1. 先创建目录（你提醒的关键步骤）
-mkdir -p package/kernel/gpio-button-hotplug/src/
-
-# 2. 下载官方新版驱动（无 broadcast_uevent，内核 6.12 专用）
-wget -O package/kernel/gpio-button-hotplug/src/gpio-button-hotplug.c \
-https://raw.githubusercontent.com/I-agree/H29K/main/123/gpio-button-hotplug.c
