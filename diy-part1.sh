@@ -435,7 +435,7 @@ SETUP_DIR="$ROC_DIR/arch/arm64/kernel"
 mkdir -p $SETUP_DIR $ROC_DIR/include/linux
 
 download https://raw.githubusercontent.com/I-agree/H29K/main/123/setup.c $SETUP_DIR/setup.c
-download https://raw.githubusercontent.com/I-agree/H29K/main/123/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
+#download https://raw.githubusercontent.com/I-agree/H29K/main/123/of_fdt.h $ROC_DIR/include/linux/of_fdt.h
 
 # 基础路径
 ROC_DIR="target/linux/rockchip/files"
@@ -477,7 +477,7 @@ check_file "$DTS_DIR/rockchip-pinconf.dtsi"
 
 echo -e "\n📄 检查 setup.c + of_fdt.h"
 check_file "$ROC_DIR/arch/arm64/kernel/setup.c"
-check_file "$ROC_DIR/include/linux/of_fdt.h"
+#check_file "$ROC_DIR/include/linux/of_fdt.h"
 
 echo -e "\n============================================="
 echo " ✅ 检查完成！以上全部存在即为正常"
