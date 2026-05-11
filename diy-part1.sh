@@ -482,3 +482,8 @@ check_file "$DTS_DIR/rockchip-pinconf.dtsi"
 echo -e "\n============================================="
 echo " ✅ 检查完成！以上全部存在即为正常"
 echo "============================================="
+
+# 强制替换为适配 Linux 6.12 的 gpio-button-hotplug（无broadcast_uevent）
+echo "【DIY】替换新版按键热插拔驱动 (6.12兼容)"
+SRC="package/kernel/gpio-button-hotplug/src/gpio-button-hotplug.c"
+wget -O "$SRC" https://raw.githubusercontent.com/I-agree/H29K/main/123/gpio-button-hotplug.c
