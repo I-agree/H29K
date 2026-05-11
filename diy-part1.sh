@@ -19,6 +19,8 @@
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 # 无线网卡驱动
 echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.conf.default
+# 正确安装 argon 主题
+git clone https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
 
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
