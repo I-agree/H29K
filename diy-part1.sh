@@ -34,10 +34,10 @@ sed -i '/define KernelPackage\/dma-buf/,/endef/{
   s|^\s*AUTOLOAD:=\$(call AutoLoad,20,dma-shared-buffer)|  AUTOLOAD:=|
 }' package/kernel/linux/modules/other.mk
 
-# 清空 sound-core 全局文件与加载列表，制作空包，同 dma-buf 解法
-sed -i '/define KernelPackage\/sound-core/,/endef/{
-  /^  FILES:=/c\  FILES:=
-  /^  AUTOLOAD:=/c\  AUTOLOAD:=
+# 终极精致空包：kmod-sound-core（无语法错误、无警告、不影响依赖）
+sed -i '/define KernelPackage\/sound-core/,/^endef/{
+  s/^\(  FILES:=\).*/\1/
+  s/^\(  AUTOLOAD:=\).*/\1/
 }' package/kernel/linux/modules/sound.mk
 
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
