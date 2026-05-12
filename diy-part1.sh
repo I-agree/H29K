@@ -22,6 +22,18 @@ echo 'src-git aic8800 https://github.com/radxa-pkg/aic8800.git;main' >> feeds.co
 # 正确安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
 
+# ==============================================================================
+# 终极修复 kmod-dma-buf 死循环：
+# 1. 保留内核 CONFIG_DMA_SHARED_BUFFER=y  → 屏幕/DRM 100%正常
+# 2. 清空 FILES 和 AUTOLOAD → 不找 .ko 文件，不报错
+# 3. 生成空的合法 ipk → 满足所有依赖，不影响任何程序
+# 4. 无需 CONFIG_PACKAGE_kmod-dma-buf=n → 彻底安全
+# ==============================================================================
+sed -i '/define KernelPackage\/dma-buf/,/endef/{
+  s|^\s*FILES:=\$(LINUX_DIR)/drivers/dma-buf/dma-shared-buffer.ko|  FILES:=|
+  s|^\s*AUTOLOAD:=\$(call AutoLoad,20,dma-shared-buffer)|  AUTOLOAD:=|
+}' package/kernel/linux/modules/other.mk
+
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
 rm -f target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
@@ -366,7 +378,6 @@ CONFIG_TRUSTED_FIRMWARE_A="rk3528"
 CONFIG_PACKAGE_kmod-rockchip-drm-vop2=y
 CONFIG_PACKAGE_kmod-rockchip-usb3phy=y
 CONFIG_PACKAGE_kmod-rockchip-emmc=y
-CONFIG_PACKAGE_kmod-dma-buf=n
 EOF
 
 echo "✅ RK3528 H29K 最终配置"
