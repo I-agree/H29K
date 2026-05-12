@@ -442,6 +442,7 @@
 };
 
 &gpio_keys {
+    compatible = "gpio-keys-polled";
     status = "okay";
     poll-interval = <20>;
 
