@@ -441,8 +441,8 @@
     status = "okay";
 };
 
-keys {
-    compatible = "gpio-keys-polled";
+&gpio_keys {
+    status = "okay";
     poll-interval = <20>;
 
     reset {
