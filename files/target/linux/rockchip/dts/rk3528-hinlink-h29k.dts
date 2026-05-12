@@ -441,16 +441,14 @@
     status = "okay";
 };
 
-&gpio {
-    keys {
-        compatible = "gpio-keys-polled";
-        poll-interval = <20>;
+keys {
+    compatible = "gpio-keys-polled";
+    poll-interval = <20>;
 
-        reset {
-            label = "reset";
-            gpios = <&gpio4 RK_PC1 GPIO_ACTIVE_LOW>; // ← 注意：H29K RESET 实际接 GPIO4_C1（即 GPIO15）
-            linux,code = <KEY_RESTART>;
-            debounce-interval = <20>;
-        };
+    reset {
+        label = "reset";
+        gpios = <&gpio4 RK_PC1 GPIO_ACTIVE_LOW>;
+        linux,code = <KEY_RESTART>;
+        debounce-interval = <20>;
     };
 };
