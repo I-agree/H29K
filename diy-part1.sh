@@ -366,6 +366,7 @@ CONFIG_TRUSTED_FIRMWARE_A="rk3528"
 CONFIG_PACKAGE_kmod-rockchip-drm-vop2=y
 CONFIG_PACKAGE_kmod-rockchip-usb3phy=y
 CONFIG_PACKAGE_kmod-rockchip-emmc=y
+CONFIG_PACKAGE_kmod-dma-buf=n
 EOF
 
 echo "✅ RK3528 H29K 最终配置"
