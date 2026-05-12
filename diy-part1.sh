@@ -35,10 +35,10 @@ sed -i '/define KernelPackage\/dma-buf/,/endef/{
 }' package/kernel/linux/modules/other.mk
 
 # 清空 sound-core 全局文件与加载列表，制作空包，同 dma-buf 解法
-sed -i '
-s|^SOUNDCORE_FILES ?=.*|SOUNDCORE_FILES ?=|
-s|^SOUNDCORE_LOAD ?=.*|SOUNDCORE_LOAD ?=|
-' package/kernel/linux/modules/sound.mk
+sed -i '/define KernelPackage\/sound-core/,/endef/{
+  /^  FILES:=/c\  FILES:=
+  /^  AUTOLOAD:=/c\  AUTOLOAD:=
+}' package/kernel/linux/modules/sound.mk
 
 # ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
 # 1. 清理OpenWrt原生冲突DTS和补丁
