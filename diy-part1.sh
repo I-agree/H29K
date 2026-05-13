@@ -450,24 +450,6 @@ sleep 10
 # echo "✅ 10秒已过，开始下一步..."
 # make menuconfig
 
-# ==============================================
-# ✅ 强制创建所有目录
-# ==============================================
-mkdir -p target/linux/rockchip/files
-mkdir -p target/linux/rockchip/files/include
-mkdir -p target/linux/rockchip/files/include/dt-bindings
-mkdir -p target/linux/rockchip/files/include/dt-bindings/clock
-mkdir -p target/linux/rockchip/files/include/dt-bindings/power
-mkdir -p target/linux/rockchip/files/include/dt-bindings/interrupt-controller
-mkdir -p target/linux/rockchip/files/include/dt-bindings/phy
-mkdir -p target/linux/rockchip/files/include/dt-bindings/pinctrl
-mkdir -p target/linux/rockchip/files/include/dt-bindings/soc
-mkdir -p target/linux/rockchip/files/include/dt-bindings/thermal
-mkdir -p target/linux/rockchip/files/include/linux
-mkdir -p target/linux/rockchip/files/drivers
-mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip
-# mkdir -p target/linux/rockchip/files/arch/arm64/kernel
-
 # ==================== 基础目录 ====================
 ROC_DIR="target/linux/rockchip/files"
 DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
@@ -482,22 +464,6 @@ cp -rf lede_temp/target/linux/rockchip/files/drivers "$ROC_DIR/"
 
 # 清理临时文件
 rm -rf lede_temp
-
-# ==================== 下载函数 ====================
-download() {
-  curl -fsSL --retry 5 --ipv4 "$1" -o "$2" || { echo "下载失败: $2"; exit 1; }
-}
-
-# ==================== 追加内核头文件 ====================
-INC="$ROC_DIR/include/dt-bindings"
-mkdir -p $INC/{interrupt-controller,phy,pinctrl,soc,thermal}
-
-download https://raw.githubusercontent.com/I-agree/H29K/main/123/arm-gic.h $INC/interrupt-controller/arm-gic.h
-download https://raw.githubusercontent.com/I-agree/H29K/main/123/irq.h $INC/interrupt-controller/irq.h
-download https://raw.githubusercontent.com/I-agree/H29K/main/123/phy.h $INC/phy/phy.h
-download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip.h $INC/pinctrl/rockchip.h
-download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip,boot-mode.h $INC/soc/rockchip,boot-mode.h
-download https://raw.githubusercontent.com/I-agree/H29K/main/123/thermal.h $INC/thermal/thermal.h
 
 # ==================== 下载 rockchip-pinconf.dtsi ====================
 download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi $DTS_DIR/rockchip-pinconf.dtsi
@@ -528,14 +494,6 @@ check_dir "$ROC_DIR/drivers"
 echo -e "\n📄 检查 LEDE 头文件"
 check_file "$INC/clock/rk3528-cru.h"
 check_file "$INC/power/rk3528-power.h"
-
-echo -e "\n📄 检查补充内核头文件"
-check_file "$INC/interrupt-controller/arm-gic.h"
-check_file "$INC/interrupt-controller/irq.h"
-check_file "$INC/phy/phy.h"
-check_file "$INC/pinctrl/rockchip.h"
-check_file "$INC/soc/rockchip,boot-mode.h"
-check_file "$INC/thermal/thermal.h"
 
 echo -e "\n📄 检查 rockchip-pinconf.dtsi"
 check_file "$DTS_DIR/rockchip-pinconf.dtsi"
