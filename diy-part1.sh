@@ -450,23 +450,68 @@ sleep 10
 # echo "✅ 10秒已过，开始下一步..."
 # make menuconfig
 
-# ==================== 基础目录 ====================
-ROC_DIR="target/linux/rockchip/files"
-DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
-mkdir -p "$ROC_DIR" "$DTS_DIR"
+# ==============================
+# RK3528 压缩包文件自动部署 - 带安全校验
+# ==============================
 
-# ==================== 克隆整个LEDE仓库（最稳，不猜任何文件） ====================
-git clone --depth=1 https://github.com/coolsnowwolf/lede.git lede_temp
+# 定义路径
+ZIP_URL="https://raw.githubusercontent.com/I-agree/H29K/main/123/lede-target-linux-rockchip-files.zip"
+TARGET_DIR="/workdir/openwrt/target/linux/rockchip/files"
+ZIP_FILE="${TARGET_DIR}/lede-target-linux-rockchip-files.zip"
 
-# ==================== 直接复制官方原生 include + drivers 文件夹 ====================
-cp -rf lede_temp/target/linux/rockchip/files/include "$ROC_DIR/"
-cp -rf lede_temp/target/linux/rockchip/files/drivers "$ROC_DIR/"
+# 1. 创建目录
+mkdir -p ${TARGET_DIR}
 
-# 清理临时文件
-rm -rf lede_temp
+# 2. 下载文件
+echo "正在下载 RK3528 原厂驱动文件..."
+wget --no-check-certificate -q -O "${ZIP_FILE}" "${ZIP_URL}"
 
-# ==================== 下载 rockchip-pinconf.dtsi ====================
-download https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi $DTS_DIR/rockchip-pinconf.dtsi
+# 3. 验证文件是否下载成功
+if [ ! -f "${ZIP_FILE}" ]; then
+    echo "错误：文件下载失败！"
+    exit 1
+fi
+
+# 4. 验证 ZIP 有效性（关键校验）
+echo "正在校验文件完整性..."
+unzip -tq "${ZIP_FILE}"
+if [ $? -ne 0 ]; then
+    echo "错误：ZIP 文件损坏！"
+    exit 1
+fi
+
+# 5. 解压覆盖（强制、安静）
+echo "正在解压到目标路径：${TARGET_DIR}"
+unzip -o -q "${ZIP_FILE}" -d "${TARGET_DIR}"
+
+# 6. 验证关键目录是否存在
+echo "正在验证最终结构..."
+if [ -d "${TARGET_DIR}/drivers" ] && [ -d "${TARGET_DIR}/include" ]; then
+    echo "✅ RK3528 原厂文件部署成功！"
+else
+    echo "❌ 部署失败：目录结构不完整"
+    exit 1
+fi
+
+# 7. 清理临时文件
+rm -f "${ZIP_FILE}"
+
+echo "所有操作完成！"
+
+# 下载 rockchip-pinconf.dtsi 到 RK3528 设备树正确目录
+DTS_DIR="/workdir/openwrt/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+mkdir -p $DTS_DIR
+
+wget --no-check-certificate -q -O "$DTS_DIR/rockchip-pinconf.dtsi" \
+https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi
+
+# 校验文件是否存在
+if [ -f "$DTS_DIR/rockchip-pinconf.dtsi" ]; then
+    echo "✅ 成功下载 rockchip-pinconf.dtsi 到正确路径"
+else
+    echo "❌ 下载失败！"
+    exit 1
+fi
 
 # 基础路径
 ROC_DIR="target/linux/rockchip/files"
