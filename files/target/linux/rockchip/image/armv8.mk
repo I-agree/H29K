@@ -21,7 +21,6 @@ define Device/hinlink_h29k
   DEVICE_UBOOT_IMAGE := u-boot-rockchip-hinlink_h29k.bin
   DEVICE_COMPAT_VERSION := 25.12.85
   SUPPORTED_DEVICES := hinlink_h29k
-  DEVICE_KERNEL_IMAGE := fit
   IMAGE/sysupgrade.img.gz := fit | append-rootfs | pad-rootfs | check-size | gzip
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
