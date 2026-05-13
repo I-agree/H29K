@@ -451,49 +451,48 @@ sleep 10
 # make menuconfig
 
 # ==============================
-# RK3528 压缩包文件自动部署 - 带安全校验
+# RK3528 压缩包文件自动部署（正确路径版）
 # ==============================
 
-# 定义路径
+# 正确路径（相对路径，100% 适配 OpenWrt 编译）
+TARGET_DIR="target/linux/rockchip/files"
 ZIP_URL="https://raw.githubusercontent.com/I-agree/H29K/main/123/lede-target-linux-rockchip-files.zip"
-TARGET_DIR="/workdir/openwrt/target/linux/rockchip/files"
 ZIP_FILE="${TARGET_DIR}/lede-target-linux-rockchip-files.zip"
 
-# 1. 创建目录
+# 创建目录
 mkdir -p ${TARGET_DIR}
 
-# 2. 下载文件
-echo "正在下载 RK3528 原厂驱动文件..."
-wget --no-check-certificate -q -O "${ZIP_FILE}" "${ZIP_URL}"
+# 下载
+echo "正在下载 RK3528 驱动文件..."
+wget -q --no-check-certificate -O "${ZIP_FILE}" "${ZIP_URL}"
 
-# 3. 验证文件是否下载成功
+# 校验文件是否存在
 if [ ! -f "${ZIP_FILE}" ]; then
-    echo "错误：文件下载失败！"
+    echo "❌ 下载失败！"
     exit 1
 fi
 
-# 4. 验证 ZIP 有效性（关键校验）
+# 校验 ZIP 完整性
 echo "正在校验文件完整性..."
 unzip -tq "${ZIP_FILE}"
 if [ $? -ne 0 ]; then
-    echo "错误：ZIP 文件损坏！"
+    echo "❌ 文件损坏！"
     exit 1
 fi
 
-# 5. 解压覆盖（强制、安静）
-echo "正在解压到目标路径：${TARGET_DIR}"
+# 解压
+echo "正在解压文件..."
 unzip -o -q "${ZIP_FILE}" -d "${TARGET_DIR}"
 
-# 6. 验证关键目录是否存在
-echo "正在验证最终结构..."
+# 验证最终结构
 if [ -d "${TARGET_DIR}/drivers" ] && [ -d "${TARGET_DIR}/include" ]; then
     echo "✅ RK3528 原厂文件部署成功！"
 else
-    echo "❌ 部署失败：目录结构不完整"
+    echo "❌ 部署失败！目录结构错误"
     exit 1
 fi
 
-# 7. 清理临时文件
+# 清理
 rm -f "${ZIP_FILE}"
 
 echo "所有操作完成！"
