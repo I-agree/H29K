@@ -6,7 +6,7 @@
 #include <dt-bindings/input/input.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
-#include <dt-bindings/interrupt-controller/arm-gic.h> // ← 新增：确保 IRQ_TYPE_* 定义可用
+#include <dt-bindings/interrupt-controller/arm-gic.h>
 
 #include "rk3528.dtsi"
 
@@ -32,7 +32,7 @@
 
     ir-receiver {
         compatible = "gpio-ir-receiver";
-        gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
+        gpios = <&gpio4 RK_PC6 ACTIVE_LOW>;
         pinctrl-names = "default";
         pinctrl-0 = <&ir_int_pin>;
     };
@@ -44,17 +44,17 @@
 
         4g {
             label = "red:4g";
-            gpios = <&gpio4 RK_PC0 GPIO_ACTIVE_LOW>;
+            gpios = <&gpio4 RK_PC0 ACTIVE_LOW>;
         };
 
         5g {
             label = "blue:5g";
-            gpios = <&gpio4 RK_PC3 GPIO_ACTIVE_LOW>;
+            gpios = <&gpio4 RK_PC3 ACTIVE_LOW>;
         };
 
         led_work: work {
             label = "green:work";
-            gpios = <&gpio4 RK_PB7 GPIO_ACTIVE_LOW>;
+            gpios = <&gpio4 RK_PB7 ACTIVE_LOW>;
         };
     };
 
@@ -62,7 +62,7 @@
         compatible = "rfkill-gpio";
         label = "rfkill-modem";
         radio-type = "wwan";
-        reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
+        reset-gpios = <&gpio4 RK_PB4 ACTIVE_LOW>;
     };
 
     sdio_pwrseq: sdio-pwrseq {
@@ -71,7 +71,7 @@
         pinctrl-0 = <&wifi_reg_on>;
         post-power-on-delay-ms = <100>;
         power-off-delay-us = <5000000>;
-        reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
+        reset-gpios = <&gpio1 RK_PA6 ACTIVE_LOW>;
     };
 
     vcc5v0_sys: vcc5v0-sys {
@@ -106,7 +106,7 @@
     vcc_3v3_lcd: vcc-3v3-lcd {
         compatible = "regulator-fixed";
         enable-active-high;
-        gpio = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+        gpio = <&gpio0 RK_PA0 ACTIVE_HIGH>;
         regulator-name = "vcc_3v3_lcd";
         regulator-min-microvolt = <3300000>;
         regulator-max-microvolt = <3300000>;
@@ -116,7 +116,7 @@
 
     vcc3v3_sd: vcc3v3-sd {
         compatible = "regulator-fixed";
-        gpio = <&gpio4 RK_PA1 GPIO_ACTIVE_LOW>;
+        gpio = <&gpio4 RK_PA1 ACTIVE_LOW>;
         regulator-name = "vcc3v3_sd";
         regulator-always-on;
         regulator-boot-on;
@@ -137,7 +137,7 @@
 
     vccio_sd: vccio-sd {
         compatible = "regulator-gpio";
-        gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
+        gpios = <&gpio4 RK_PB6 ACTIVE_HIGH>;
         regulator-name = "vccio_sd";
         regulator-min-microvolt = <1800000>;
         regulator-max-microvolt = <3300000>;
@@ -188,6 +188,21 @@
         regulator-boot-on;
         regulator-settling-time-up-us = <250>;
     };
+
+    // ✅ 修复：这里改成 gpio-keys （不带&，新建节点）
+    gpio-keys {
+        compatible = "gpio-keys-polled";
+        poll-interval = <20>;
+        status = "okay";
+
+        reset {
+            label = "reset";
+            gpios = <&gpio4 RK_PC1 ACTIVE_LOW>;
+            linux,code = <KEY_RESTART>;
+            debounce-interval = <20>;
+            autorepeat;
+        };
+    };
 };
 
 &combphy {
@@ -223,7 +238,7 @@
     phy-supply = <&vcc_3v3>;
     snps,reset-active-low;
     snps,reset-delays-us = <0 20000 100000>;
-    snps,reset-gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
+    snps,reset-gpio = <&gpio4 RK_PC2 ACTIVE_LOW>;
     status = "okay";
 };
 
@@ -235,7 +250,6 @@
 &i2c1 {
     status = "okay";
 
-    // ✅ FT6236 TOUCH PANEL — PRODUCTION READY (Verified: H29K Rev.B + FT6236 DS v1.4)
     ft6236@38 {
         compatible = "focaltech,ft6236";
         reg = <0x38>;
@@ -258,21 +272,21 @@
 &pinctrl {
     ir {
         ir_int_pin: ir-int-pin {
-            rockchip,pins = <4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_up>;
+            rockchip,pins = <4 RK_PC6 GPIO &pcfg_pull_up>;
         };
     };
 
     leds {
         led_4g_en: led-4g-en {
-            rockchip,pins = <4 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
+            rockchip,pins = <4 RK_PC0 GPIO &pcfg_pull_none>;
         };
 
         led_5g_en: led-5g-en {
-            rockchip,pins = <4 RK_PC3 RK_FUNC_GPIO &pcfg_pull_none>;
+            rockchip,pins = <4 RK_PC3 GPIO &pcfg_pull_none>;
         };
 
         led_work_en: led-work-en {
-            rockchip,pins = <4 RK_PB7 RK_FUNC_GPIO &pcfg_pull_none>;
+            rockchip,pins = <4 RK_PB7 GPIO &pcfg_pull_none>;
         };
     };
 
@@ -284,24 +298,23 @@
         };
 
         lcd_rs_pin: lcd-rs-pin {
-            rockchip,pins = <1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up>;
+            rockchip,pins = <1 RK_PB4 GPIO &pcfg_pull_up>;
         };
     };
 
     wifi {
         wifi_reg_on: wifi-reg-on {
-            rockchip,pins = <1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
+            rockchip,pins = <1 RK_PA6 GPIO &pcfg_pull_none>;
         };
 
         wl_wake_host: wl-wake-host {
-            rockchip,pins = <1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_down>;
+            rockchip,pins = <1 RK_PA7 GPIO &pcfg_pull_down>;
         };
     };
 
-    // ✅ FT6236 INTERRUPT PIN — GPIO1_A2 (Free, Pull-Up, Edge-Falling)
     ft6236 {
         ft6236_int_pin: ft6236-int-pin {
-            rockchip,pins = <1 RK_PA2 RK_FUNC_GPIO &pcfg_pull_up>;
+            rockchip,pins = <1 RK_PA2 GPIO &pcfg_pull_up>;
         };
     };
 };
@@ -386,8 +399,8 @@
         buswidth = <8>;
         pinctrl-names = "default";
         pinctrl-0 = <&lcd_rs_pin>;
-        dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
-        led-gpios = <&gpio0 RK_PA1 GPIO_ACTIVE_HIGH>;
+        dc-gpios = <&gpio1 RK_PB4 ACTIVE_HIGH>;
+        led-gpios = <&gpio0 RK_PA1 ACTIVE_HIGH>;
         spi-max-frequency = <15000000>;
         power-supply = <&vcc_3v3_lcd>;
     };
@@ -440,17 +453,4 @@
 &usb_host0_xhci {
     dr_mode = "host";
     status = "okay";
-};
-
-&gpio_keys {
-    compatible = "gpio-keys-polled";
-    status = "okay";
-    poll-interval = <20>;
-
-    reset {
-        label = "reset";
-        gpios = <&gpio4 RK_PC1 GPIO_ACTIVE_LOW>;
-        linux,code = <KEY_RESTART>;
-        debounce-interval = <20>;
-    };
 };
