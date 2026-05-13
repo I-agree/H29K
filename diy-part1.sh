@@ -499,7 +499,7 @@ rm -f "${ZIP_FILE}"
 echo "所有操作完成！"
 
 # 下载 rockchip-pinconf.dtsi 到 RK3528 设备树正确目录
-DTS_DIR="/workdir/openwrt/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p $DTS_DIR
 
 wget --no-check-certificate -q -O "$DTS_DIR/rockchip-pinconf.dtsi" \
