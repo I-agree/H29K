@@ -19,7 +19,6 @@ define Device/hinlink_h29k
   KERNEL_LOADADDR := 0x00280000
   KERNEL_ENTRYADDR := 0x00280000
   DEVICE_UBOOT_IMAGE := u-boot-rockchip-hinlink_h29k.bin
-  DEVICE_COMPAT_VERSION := 25.12.85
   SUPPORTED_DEVICES := hinlink_h29k
   IMAGE/sysupgrade.img.gz := fit | append-rootfs | pad-rootfs | check-size | gzip
   DEVICE_PACKAGES := \
