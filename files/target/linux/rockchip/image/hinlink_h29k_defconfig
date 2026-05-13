@@ -21,7 +21,6 @@ DEVICE_PACKAGES:= \
     dnscrypt-proxy \
     luci-app-dnscrypt-proxy \
     luci-i18n-dnscrypt-proxy-zh_Hans
-IMAGE_SIZE:=64m
 KERNEL_LOADADDR:=0x00280000
 KERNEL_ENTRYADDR:=0x00280000
 LUCI_DEFAULT_THEME:=argon
