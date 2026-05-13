@@ -13,6 +13,7 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
+  DEVICE_DTS_DIR := ../dts
   TRUSTED_FIRMWARE_A := rk3528
   UBOOT_CONFIG := hinlink_h29k
   KERNEL_LOADADDR := 0x00280000
@@ -20,8 +21,8 @@ define Device/hinlink_h29k
   DEVICE_UBOOT_IMAGE := u-boot-rockchip-hinlink_h29k.bin
   DEVICE_COMPAT_VERSION := 25.12.85
   SUPPORTED_DEVICES := hinlink_h29k
-  IMAGE/boot.bin := boot-scr | boot-kernel | boot-dtb
-  IMAGE/sysupgrade.img.gz := boot.bin | append-rootfs | pad-rootfs | check-size | gzip
+  DEVICE_KERNEL_IMAGE := fit
+  IMAGE/sysupgrade.img.gz := fit | append-rootfs | pad-rootfs | check-size | gzip
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
     kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
