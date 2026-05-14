@@ -457,7 +457,7 @@ sleep 10
 wget -O target/linux/rockchip/image/Makefile https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/Makefile
 
 # 2. 自动验证 IMAGE 行是否正确
-grep -q "fit | append-rootfs | pad-rootfs | check-size | gzip" target/linux/rockchip/image/Makefile
+grep -q "boot-common | boot-script | append-rootfs | pad-rootfs | check-size | gzip" target/linux/rockchip/image/Makefile
 
 # 3. 输出验证结果
 if [ $? -eq 0 ]; then
