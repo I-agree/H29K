@@ -451,6 +451,22 @@ sleep 10
 # make menuconfig
 
 # ==============================
+# 适配H29K的打包流水线
+# ==============================
+# 1. 下载并覆盖到正确路径
+wget -O target/linux/rockchip/image/Makefile https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/Makefile
+
+# 2. 自动验证 IMAGE 行是否正确
+grep -q "fit | append-rootfs | pad-rootfs | check-size | gzip" target/linux/rockchip/image/Makefile
+
+# 3. 输出验证结果
+if [ $? -eq 0 ]; then
+    echo -e "\033[32m✅ 验证成功：Makefile 已正确修改，打包规则完全符合要求！\033[0m"
+else
+    echo -e "\033[31m❌ 验证失败：文件内容不匹配，请检查！\033[0m"
+fi
+
+# ==============================
 # RK3528 压缩包文件自动部署（正确路径版）
 # ==============================
 
