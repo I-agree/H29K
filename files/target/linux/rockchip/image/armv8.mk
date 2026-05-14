@@ -19,6 +19,7 @@ define Device/hinlink_h29k
   KERNEL_ENTRYADDR := 0x00280000
   DEVICE_UBOOT_IMAGE := u-boot-rockchip-hinlink_h29k.bin
   SUPPORTED_DEVICES := hinlink_h29k
+  IMAGE/sysupgrade.img.gz := fit | append-rootfs | pad-rootfs | check-size | gzip
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
     kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
