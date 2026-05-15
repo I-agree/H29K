@@ -57,7 +57,7 @@ define Device/Default
   KERNEL_LOADADDR :=
   BOOT_SCRIPT :=
   IMAGES := sysupgrade.img.gz
-  IMAGE/sysupgrade.img.gz = boot-common | boot-script $$(BOOT_SCRIPT) | pine64-img | gzip | append-metadata
+  IMAGE/sysupgrade.img.gz = boot-common | boot-script | pine64-img | gzip
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
   UBOOT_DEVICE_NAME = $(lastword $(subst _, ,$(1)))-$$(SOC)
