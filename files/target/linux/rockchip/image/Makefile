@@ -21,20 +21,20 @@ endef
 
 define Build/boot-script
     # Make an U-boot image and copy it to the boot partition
-    mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
+    mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr  # ← ✅ L18: arm → arm64
 endef
 
-# --- ✅ STEP 1: REPLACE ORIGINAL Build/pine64-img (17 lines added, 4 lines removed) ---
+# --- ✅ STEP 1: REPLACE ORIGINAL Build/pine64-img (MINIMAL FIX) ---
 define Build/pine64-img
     # Build 0.img: 64MB FAT32 boot partition containing kernel.img, dtb, boot.scr
     rm -f $(KDIR)/0.img
     dd if=/dev/zero of=$(KDIR)/0.img bs=1M count=64
     mkfs.vfat -F32 -n BOOT --invariant $(KDIR)/0.img
     mkdir -p $(KDIR)/h29k-boot
-    $(CP) $@.boot/kernel.img $(KDIR)/h29k-boot/hinlink_h29k-kernel.bin
-    $(CP) $(DTS_DIR)/rockchip/$(DEVICE_DTS).dtb $(KDIR)/h29k-boot/rk3528-hinlink-h29k.dtb
+    $(CP) $@.boot/kernel.img $(KDIR)/h29k-boot/kernel.img  # ← ✅ L32: hinlink_h29k-kernel.bin → kernel.img
+    $(CP) $(KDIR)/image-$(firstword $(subst _, ,$(DEVICE_DTS))).dtb $(KDIR)/h29k-boot/rockchip.dtb  # ← ✅ L33: 路径+名称双修正
     $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
-    mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
+    mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/kernel.img $(KDIR)/h29k-boot/rockchip.dtb $(KDIR)/h29k-boot/boot.scr ::/  # ← ✅ L36: * → 显式列表，杜绝污染
 
     # Build 1.img: 1024MB ext4 system partition from $(IMAGE_ROOTFS)
     rm -f $(KDIR)/1.img
