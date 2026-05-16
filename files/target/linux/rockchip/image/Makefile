@@ -42,7 +42,7 @@ define Build/pine64-img
 
     # Step 2: Build 1.img
     rm -f $(KDIR)/1.img
-    $(STAGING_DIR_HOST)/bin/mksquashfs \
+    $(STAGING_DIR_HOST)/bin/mksquashfs-ng \
         $(STAGING_DIR_ROOT) \
         $(KDIR)/1.img \
         -comp zstd \
