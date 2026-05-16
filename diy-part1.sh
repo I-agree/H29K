@@ -554,6 +554,14 @@ fi
 # ====================== 验证结束 ======================
 echo -e "\n✅ H29K default.bootscript 部署完成！"
 
+# 强制替换 tools/squashfs4/Makefile（来自 H29K 仓库）
+mkdir -p tools/squashfs4
+wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/tools/squashfs4/Makefile -O tools/squashfs4/Makefile
+
+# 验证文件是否替换成功
+echo "=== 验证 squashfs4 Makefile ==="
+grep -q "squashfs4" tools/squashfs4/Makefile && echo "✅ squashfs4 Makefile 替换成功" || exit 1
+
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
 echo "============================================="
