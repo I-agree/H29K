@@ -78,7 +78,7 @@ define Device/Default
     KERNEL = kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(DEVICE_DTS).dtb
     KERNEL_LOADADDR :=
     BOOT_SCRIPT :=
-    IMAGES := squashfs-sysupgrade.img
+    IMAGES := squashfs-sysupgrade.img.gz
     IMAGE/squashfs-sysupgrade.img.gz = boot-common | boot-script | pine64-img | gzip
     DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
     DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
