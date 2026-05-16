@@ -16,8 +16,15 @@ define Build/boot-common
     mkdir -p $@.boot
 
     $(CP) $(IMAGE_KERNEL) $@.boot/kernel.img
-    # Copy DTB: use DEVICE_DTS as base, strip prefix if needed (e.g., "rk3528-hinlink-h29k" → "hinlink-h29k")
-    $(CP) $(KDIR)/image-$(subst rk3528-,,$(DEVICE_DTS)).dtb $@.boot/rockchip.dtb
+
+    # ✅ PROVEN BY BUILD LOG: DTB is named 'image-$(DEVICE_DTS).dtb'
+    #    e.g., for DEVICE_DTS = rk3528-hinlink-h29k → file: image-rk3528-hinlink-h29k.dtb
+    if [ ! -f "$(KDIR)/image-$(DEVICE_DTS).dtb" ]; then \
+        echo "ERROR: DTB not found — expected: $(KDIR)/image-$(DEVICE_DTS).dtb" >&2; \
+        echo "Hint: Ensure 'target/linux/rockchip/dts/$(DEVICE_DTS).dts' exists and compiles cleanly." >&2; \
+        exit 1; \
+    fi
+    $(CP) $(KDIR)/image-$(DEVICE_DTS).dtb $@.boot/rockchip.dtb
 endef
 
 define Build/boot-script
@@ -57,7 +64,7 @@ endef
 ### Devices ###
 define Device/Default
     PROFILES := Default
-    KERNEL = kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+    KERNEL = kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(DEVICE_DTS).dtb
     KERNEL_LOADADDR :=
     BOOT_SCRIPT :=
     IMAGES := sysupgrade.img.gz
