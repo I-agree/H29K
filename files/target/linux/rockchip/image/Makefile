@@ -32,7 +32,7 @@ define Build/boot-script
     mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
-# --- ✅ Build/pine64-img: NOW WITH SQUASHFS ROOTFS ---
+# --- ✅ Build/pine64-img: NOW OUTPUTS RAW .img (for later gzip) ---
 define Build/pine64-img
     # Step 1: Build 0.img — FAT32 boot partition (64MB) — unchanged
     rm -f $(KDIR)/0.img
@@ -66,10 +66,9 @@ define Build/pine64-img
         -b 256K \
         -fixed-time 0
 
-    # Step 3: Package as squashfs-sysupgrade.img (NOT .gz) — matches OpenWrt naming convention
+    # Step 3: Package as RAW squashfs-sysupgrade.img (NO compression) — for external gzip
     rm -f $(BIN_DIR)/openwrt-rockchip-armv8-$(DEVICE_NAME)-squashfs-sysupgrade.img
-    $(TAR) -cf - -C $(KDIR) 0.img 1.img | \
-        $(STAGING_DIR_HOST)/bin/lzma -zc > $(BIN_DIR)/openwrt-rockchip-armv8-$(DEVICE_NAME)-squashfs-sysupgrade.img
+    $(TAR) -cf - -C $(KDIR) 0.img 1.img > $(BIN_DIR)/openwrt-rockchip-armv8-$(DEVICE_NAME)-squashfs-sysupgrade.img
 endef
 
 ### Devices ###
