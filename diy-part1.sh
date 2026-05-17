@@ -554,6 +554,11 @@ fi
 # ====================== 验证结束 ======================
 echo -e "\n✅ H29K default.bootscript 部署完成！"
 
+# === Pre-embed mksquashfs-ng for rockchip image build (OpenWrt 25.12.2) ===
+mkdir -p "$PWD/staging_dir/host/bin"
+curl -fsSL https://downloads.openwrt.org/releases/25.12.2/targets/rockchip/armv8/openwrt-imagebuilder-25.12.2-rockchip-armv8.Linux-x86_64.tar.xz | \
+tar -xJ --strip-components=3 -C "$PWD/staging_dir/host/bin" 'openwrt-imagebuilder-25.12.2-rockchip-armv8.Linux-x86_64/staging_dir/host/bin/mksquashfs-ng'
+
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
 echo "============================================="
