@@ -2,7 +2,7 @@
 
 include $(TOPDIR)/rules.mk
 
-# 👇【关键修复】强制 target/linux/install 等待 tools/squashfs/install 完成
+# 👇【关键修复】强制 target/linux/install 等待 tools/squashfs4/install 完成
 HOST_BUILD_DEPENDS += squashfs4/host
 
 BOARD:=rockchip
