@@ -30,6 +30,11 @@ endef
 
 # --- ✅ 厂家同款格式：单个 img 包，解压直接是 img ---
 define Build/pine64-img
+    # 👇 【云编译关键修复】强制编译并安装 mksquashfs
+    #    确保 $(STAGING_DIR_HOST)/bin/mksquashfs 在调用前 100% 存在且可执行
+    #    （OpenWrt 默认不安装 squashfs 工具，因 CONFIG_TARGET_ROOTFS_SQUASHFS 被禁用）
+    $(MAKE) -C $(TOPDIR) tools/squashfs/{compile,install} V=0 || { echo "❌ FATAL: Failed to build & install mksquashfs for pine64-img"; exit 1; }
+
     # Step 1: Build 0.img
     rm -f $(KDIR)/0.img
     dd if=/dev/zero of=$(KDIR)/0.img bs=1M count=64
