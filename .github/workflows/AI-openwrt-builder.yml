@@ -1,13 +1,13 @@
 #
 # https://github.com/P3TERX/Actions-OpenWrt
 #
-# 文件: .github/workflows/openwrt-bulder.yml
-# 描述: 使用 GitHub Actions 构建 OpenWrt 固件
+# File: .github/workflows/openwrt-bulder.yml
+# Description: Build OpenWrt using GitHub Actions
 #
-# 版权 (c) 2019-2024 P3TERX <https://p3terx.com>
+# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
 #
-# 此为自由软件，遵循 MIT 许可证。
-# 详见 /LICENSE 获取更多信息。
+# This is free software, licensed under the MIT License.
+# See /LICENSE for more information.
 #
 
 name: OpenWrt 构建器
@@ -19,8 +19,6 @@ on:
 env:
   REPO_URL: https://github.com/openwrt/openwrt
   REPO_BRANCH: openwrt-25.12
-  SQUASHFS_COMP: "zstd"
-  SQUASHFS_BLOCK_SIZE: "256k"
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: rk3528-hinlink-h29k.config
   DIY_P1_SH: diy-part1.sh
@@ -35,7 +33,7 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-    - name: 检出代码
+    - name: 检出源码
       uses: actions/checkout@main
 
     - name: 初始化构建环境
@@ -52,27 +50,27 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: 克隆源码
+    - name: 克隆 OpenWrt 源码
       working-directory: /workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 加载自定义 feeds
+    - name: 加载自定义软件源
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: 更新 feeds 列表
+    - name: 更新软件源索引
       run: cd openwrt && ./scripts/feeds update -a
 
-    - name: 安装 feeds 软件包
+    - name: 安装软件源组件
       run: cd openwrt && ./scripts/feeds install -a
 
-    - name: 加载自定义配置
+    - name: 加载自定义配置文件
       run: |
         [ -e files ] && mv files openwrt/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
@@ -80,7 +78,7 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 下载源码包（dl/）
+    - name: 下载依赖软件包
       id: package
       run: |
         cd openwrt
@@ -89,38 +87,29 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    # ✅ 【关键修复】小幅度添加：强制构建 squashfs-ng 工具（支持 zstd 压缩必需）
-    #     → 解决编译完成但无法生成 sysupgrade.bin.zstd 的问题
-    #     → 不修改 .config，不重跑编译，仅补工具链缺失
-    - name: 构建 squashfs-ng（zstd 打包必需工具）
-      run: |
-        cd openwrt
-        echo ">>> 正在构建 squashfs-ng 工具（启用 zstd 压缩支持）..."
-        make tools/squashfs-ng/compile -j1 V=s || { echo "❌ squashfs-ng 构建失败！请确认已启用 CONFIG_PACKAGE_squashfs-ng=y"; exit 1; }
-
-    - name: 编译固件
+    - name: 编译固件镜像
       id: compile
       run: |
         cd openwrt
-        echo -e "$(nproc) 线程并行编译中..."
+        echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    - name: 检查磁盘空间
-      if: "!cancelled()"
+    - name: 检查磁盘空间使用情况
+      if: (!cancelled())
       run: df -hT
 
-    - name: 上传 bin 目录（原始输出）
+    - name: 上传 bin 目录（含全部构建产物）
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: openwrt/bin
 
-    - name: 整理固件文件（清理 packages/）
+    - name: 整理固件输出目录
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
@@ -129,7 +118,7 @@ jobs:
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: 上传固件目录（精简后）
+    - name: 上传固件输出目录
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
@@ -145,7 +134,7 @@ jobs:
         [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: 发布固件到 GitHub Release
+    - name: 上传固件至 GitHub Release
       uses: softprops/action-gh-release@master
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
@@ -155,13 +144,13 @@ jobs:
         body_path: release.txt
         files: ${{ env.FIRMWARE }}/*
 
-    - name: 清理旧的 workflow 运行记录
+    - name: 清理历史工作流运行记录
       uses: Mattraks/delete-workflow-runs@main
       with:
         retain_days: 0
         keep_minimum_runs: 2
 
-    - name: 删除旧的 GitHub Release（保留最新 3 个）
+    - name: 清理旧版 GitHub Release
       uses: dev-drprasad/delete-older-releases@master
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
