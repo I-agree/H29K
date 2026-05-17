@@ -46,8 +46,13 @@ jobs:
         sudo docker image prune --all --force
         sudo -E apt-get -qq update
         sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
-        # ✅ 【新增】安装 squashfs-ng 编译依赖（zstd/lzma/lzo 是必需的）
+        # ✅ 【新增】安装 squashfs-ng 必需依赖（Ubuntu 22.04 默认不带 zstd/lzma/lzo 头文件）
         sudo -E apt-get -qq install -y libzstd-dev liblzma-dev liblzo2-dev
+        # ✅ 【新增】创建系统库符号链接（解决 -lzstd 等链接失败问题）
+        sudo ln -sf /usr/lib/x86_64-linux-gnu/libzstd.so /usr/lib/libzstd.so
+        sudo ln -sf /usr/lib/x86_64-linux-gnu/liblzma.so /usr/lib/liblzma.so
+        sudo ln -sf /usr/lib/x86_64-linux-gnu/liblzo2.so /usr/lib/liblzo2.so
+        sudo ln -sf /usr/lib/x86_64-linux-gnu/libz.so /usr/lib/libz.so
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
@@ -91,15 +96,20 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    # ✅ 【新增】强制编译并安装 squashfs-ng 工具（关键！CONFIG_SQUASHFS_NG=y 依赖它）
-    #    → 必须在 'Compile the firmware' 步骤之前执行，否则 mksquashfs-ng 不会出现在 staging_dir/host/bin/
-    #    → 使用 -j$(nproc) 加速，失败时自动降级为单线程重试
-    - name: Compile and install mksquashfs-ng
+    # ✅ 【关键修复】强制编译 squashfs-ng（已适配 Ubuntu 22.04 + GCC-11）
+    #    → 自动降级 C 标准为 gnu17（GCC 11 兼容）
+    #    → 显式添加系统头文件和库路径
+    #    → 使用 -j1 V=s 确保错误可查，失败立即终止
+    - name: Compile and install mksquashfs-ng (Ubuntu 22.04 fix)
       run: |
         cd openwrt
+        echo ">>> Patching squashfs-ng Makefile for GCC-11 compatibility..."
+        sed -i 's/-std=gnu2x/-std=gnu17/g' tools/squashfs-ng/Makefile
+        sed -i '/^CFLAGS +=/a CFLAGS += -I/usr/include' tools/squashfs-ng/Makefile
+        sed -i '/^LDFLAGS +=/a LDFLAGS += -L/usr/lib -lzstd -llzma -llzo2 -lz' tools/squashfs-ng/Makefile
         echo ">>> Compiling tools/squashfs-ng..."
-        make tools/squashfs-ng/compile -j$(nproc) || (echo "⚠️  Parallel compile failed, retrying with -j1..." && make tools/squashfs-ng/compile -j1)
-        echo ">>> Installing mksquashfs-ng to staging_dir/host/bin..."
+        make tools/squashfs-ng/compile -j1 V=s 2>&1 | tee /tmp/squashfs-ng-build.log || { echo "❌ mksquashfs-ng build failed!"; cat /tmp/squashfs-ng-build.log; exit 1; }
+        echo ">>> Installing to staging_dir/host/bin..."
         make tools/squashfs-ng/install
 
     - name: Compile the firmware
