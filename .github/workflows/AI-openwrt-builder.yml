@@ -52,7 +52,7 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
 
-    - name: 克隆 OpenWrt 源码
+    - name: 克隆源码
       working-directory: /workdir
       run: |
         df -hT $PWD
@@ -80,14 +80,7 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    # ✅ 【关键新增】提前准备工具链（确保 tools/squashfs-ng 存在，避免后续编译报错）
-    - name: 准备构建工具（拉取 squashfs-ng 等）
-      run: |
-        cd openwrt
-        echo ">>> 正在执行 'make tools/prepare' 以下载 tools/squashfs-ng..."
-        make tools/prepare -j1 V=s || { echo "❌ tools/prepare 执行失败！"; exit 1; }
-
-    - name: 下载源码包（dl/ 目录）
+    - name: 下载源码包（dl/）
       id: package
       run: |
         cd openwrt
@@ -95,6 +88,15 @@ jobs:
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
+
+    # ✅ 【关键修复】小幅度添加：强制构建 squashfs-ng 工具（支持 zstd 压缩必需）
+    #     → 解决编译完成但无法生成 sysupgrade.bin.zstd 的问题
+    #     → 不修改 .config，不重跑编译，仅补工具链缺失
+    - name: 构建 squashfs-ng（zstd 打包必需工具）
+      run: |
+        cd openwrt
+        echo ">>> 正在构建 squashfs-ng 工具（启用 zstd 压缩支持）..."
+        make tools/squashfs-ng/compile -j1 V=s || { echo "❌ squashfs-ng 构建失败！请确认已启用 CONFIG_PACKAGE_squashfs-ng=y"; exit 1; }
 
     - name: 编译固件
       id: compile
