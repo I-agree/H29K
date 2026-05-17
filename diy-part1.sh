@@ -62,9 +62,6 @@ rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-argum
 rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
 rm -rf target/linux/airoha
 
-# ===彻底禁用 squashfs4
-sed -i 's/^tools-y += squashfs4$/# tools-y += squashfs4/' tools/Makefile
-
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
 rm -f "$BUILD_DIR"/target-*/linux-*/drivers/of/fdt.c
