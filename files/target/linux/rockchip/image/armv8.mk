@@ -27,7 +27,6 @@ define Device/hinlink_h29k
     luci-app-irqbalance luci-i18n-irqbalance-zh-cn \
     dnscrypt-proxy luci-app-dnscrypt-proxy luci-i18n-dnscrypt-proxy-zh-cn \
     irqbalance luci-app-irqbalance luci-i18n-irqbalance-zh-cn
-  SQUASHFS_COMP := zstd
   SQUASHFS_BLOCK_SIZE := 256k
 endef
 TARGET_DEVICES += hinlink_h29k
