@@ -18,7 +18,8 @@ define Device/hinlink_h29k
   KERNEL_LOADADDR := 0x00280000
   KERNEL_ENTRYADDR := 0x00280000
   IMAGES := sysupgrade.img.gz
-  IMAGE/sysupgrade.img.gz := boot-common | boot-script | pine64-img
+  IMAGE/sysupgrade.img := boot-common | boot-script | pine64-img
+  IMAGE/sysupgrade.img.gz := sysupgrade.img
   gzip := gzip -9n
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
