@@ -52,11 +52,11 @@ define Device/Default
     KERNEL = kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(DEVICE_DTS).dtb
     KERNEL_LOADADDR := 0x00280000
     BOOT_SCRIPT := default
-    
     DEVICE_DTS_DIR := $$(DTS_DIR)/rockchip
     DEVICE_DTS := $$(SOC)-$(lastword $(subst _, ,$(1)))
     UBOOT_DEVICE_NAME := $(lastword $(subst _, ,$(1)))-$$(SOC)
 endef
 
 include $(SUBTARGET).mk
+
 $(eval $(call BuildImage))
