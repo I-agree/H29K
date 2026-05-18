@@ -55,11 +55,6 @@ define Device/Default
     KERNEL_LOADADDR := 0x00280000
     BOOT_SCRIPT := default
     
-    # ✅ 修复：强制走你的自定义镜像流程
-    IMAGES := sysupgrade.img.gz
-    IMAGE/sysupgrade.img.gz = boot-common | boot-script | pine64-img
-    gzip = gzip -9n
-
     DEVICE_DTS_DIR := $$(DTS_DIR)/rockchip
     DEVICE_DTS := $$(SOC)-$(lastword $(subst _, ,$(1)))
     UBOOT_DEVICE_NAME := $(lastword $(subst _, ,$(1)))-$$(SOC)
