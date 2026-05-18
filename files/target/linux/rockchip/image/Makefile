@@ -41,14 +41,6 @@ define Build/pine64-img
     mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
 
     # ------------------------------
-    # 唯一正确：检查已存在的 root.squashfs
-    # ------------------------------
-    if [ ! -f "$(KDIR)/root.squashfs" ]; then \
-        echo "ERROR: root.squashfs 不存在！"; \
-        false; \
-    fi
-
-    # ------------------------------
     # 直接拼接：0.img + root.squashfs = 完整厂家固件
     # ------------------------------
     cat $(KDIR)/0.img $(KDIR)/root.squashfs > $@
