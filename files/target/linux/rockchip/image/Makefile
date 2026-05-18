@@ -40,20 +40,17 @@ define Build/pine64-img
     $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
     mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
 
-    # ==============================
-    # ✅ 只校验：OpenWrt 生成的 1.img 是否存在
-    # ==============================
-    if [ ! -f "$(KDIR)/1.img" ]; then \
+    # ✅ 正确做法：从 OpenWrt 官方输出目录取 root.squashfs，并直接用于拼接
+    if [ ! -f "$(BIN_DIR)/root.squashfs" ]; then \
         echo "====================================================="; \
-        echo "ERROR: 1.img NOT FOUND! OpenWrt did not generate it!"; \
-        echo "PATH: $(KDIR)/1.img"; \
+        echo "ERROR: 'root.squashfs' missing — build rootfs first!"; \
+        echo "Expected: $(BIN_DIR)/root.squashfs"; \
+        echo "Run: make target/linux/rockchip/compile"; \
         echo "====================================================="; \
         false; \
     fi
-
-    # ==============================
-    # ✅ 直接拼接：0.img(boot) + 1.img(rootfs)
-    # ==============================
+    # Build 1.img from official rootfs (no intermediate copy needed, but explicit for clarity)
+    cp "$(BIN_DIR)/root.squashfs" $(KDIR)/1.img
     cat $(KDIR)/0.img $(KDIR)/1.img > $@
 endef
 
