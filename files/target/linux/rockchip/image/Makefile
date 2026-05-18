@@ -40,21 +40,20 @@ define Build/pine64-img
     $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
     mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
 
-    # ✅ 强制校验 root.squashfs 存在性（失败时清晰报错）
-    if [ ! -f "$(KDIR)/root.squashfs" ]; then \
+    # ==============================
+    # ✅ 只校验：OpenWrt 生成的 1.img 是否存在
+    # ==============================
+    if [ ! -f "$(KDIR)/1.img" ]; then \
         echo "====================================================="; \
-        echo "  ERROR: 'root.squashfs' NOT FOUND!"; \
-        echo "  Expected at: $(KDIR)/root.squashfs"; \
-        echo "  HINT: Ensure 'CONFIG_TARGET_ROOTFS_SQUASHFS=y' is set, and run 'make target/linux/rockchip/compile' first."; \
+        echo "ERROR: 1.img NOT FOUND! OpenWrt did not generate it!"; \
+        echo "PATH: $(KDIR)/1.img"; \
         echo "====================================================="; \
         false; \
     fi
 
-    # Step 2: 使用官方生成的 SquashFS rootfs
-    rm -f $(KDIR)/1.img
-    cp $(KDIR)/root.squashfs $(KDIR)/1.img
-
-    # 拼接成厂家可直刷的完整镜像
+    # ==============================
+    # ✅ 直接拼接：0.img(boot) + 1.img(rootfs)
+    # ==============================
     cat $(KDIR)/0.img $(KDIR)/1.img > $@
 endef
 
