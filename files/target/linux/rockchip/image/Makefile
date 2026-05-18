@@ -40,17 +40,9 @@ define Build/pine64-img
     $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
     mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
 
-    # Step 2: Build 1.img — using official squashfs4 + xz (no zstd, no mksquashfs-ng)
+    # Step 2: 使用官方生成的 SquashFS rootfs（不再自己重新打包）
     rm -f $(KDIR)/1.img
-    $(STAGING_DIR_HOST)/bin/mksquashfs \
-        $(STAGING_DIR_ROOT) \
-        $(KDIR)/1.img \
-        -comp xz \
-        -no-xattrs \
-        -noappend \
-        -root-owned \
-        -b 256K \
-        -fixed-time 0
+    cp $(KDIR)/root.squashfs $(KDIR)/1.img
 
     # ==============================
     # ✅ 关键修改：厂家格式（非tar）
