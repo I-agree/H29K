@@ -40,6 +40,17 @@ define Build/pine64-img
     $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
     mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
 
+    # ==============================================
+    # ✅ 在这里加入验证：root.squashfs 必须存在！
+    # ==============================================
+    @if [ ! -f "$(KDIR)/root.squashfs" ]; then \
+        echo "====================================================="; \
+        echo "  ERROR: root.squashfs 未生成！编译终止！"; \
+        echo "  路径: $(KDIR)/root.squashfs"; \
+        echo "====================================================="; \
+        exit 1; \
+    fi
+
     # Step 2: 使用官方生成的 SquashFS rootfs
     rm -f $(KDIR)/1.img
     cp $(KDIR)/root.squashfs $(KDIR)/1.img
