@@ -40,13 +40,11 @@ define Build/pine64-img
     $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
     mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
 
-    # Step 2: 使用官方生成的 SquashFS rootfs（不再自己重新打包）
+    # Step 2: 使用官方生成的 SquashFS rootfs
     rm -f $(KDIR)/1.img
     cp $(KDIR)/root.squashfs $(KDIR)/1.img
 
-    # ==============================
-    # ✅ 关键修改：厂家格式（非tar）
-    # ==============================
+    # 拼接成厂家可直刷的完整镜像
     cat $(KDIR)/0.img $(KDIR)/1.img > $@
 endef
 
@@ -56,13 +54,16 @@ define Device/Default
     KERNEL = kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(DEVICE_DTS).dtb
     KERNEL_LOADADDR := 0x00280000
     BOOT_SCRIPT := default
+    
+    # ✅ 修复：强制走你的自定义镜像流程
     IMAGES := sysupgrade.img.gz
-    IMAGE/sysupgrade.img.gz = boot-common | boot-script | pine64-img | gzip
-    DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
-    DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
-    UBOOT_DEVICE_NAME = $(lastword $(subst _, ,$(1)))-$$(SOC)
+    IMAGE/sysupgrade.img.gz = boot-common | boot-script | pine64-img
+    gzip = gzip -9n
+
+    DEVICE_DTS_DIR := $$(DTS_DIR)/rockchip
+    DEVICE_DTS := $$(SOC)-$(lastword $(subst _, ,$(1)))
+    UBOOT_DEVICE_NAME := $(lastword $(subst _, ,$(1)))-$$(SOC)
 endef
 
 include $(SUBTARGET).mk
-
 $(eval $(call BuildImage))
