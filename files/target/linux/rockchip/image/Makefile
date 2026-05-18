@@ -28,7 +28,7 @@ define Build/boot-script
     mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
-# --- ✅ 厂家同款格式：单个 img 包，解压直接是 img ---
+# --- ✅ 厂家同款格式：单个 img 包 ---
 define Build/pine64-img
     # Step 1: Build 0.img
     rm -f $(KDIR)/0.img
