@@ -30,22 +30,6 @@ endef
 
 # --- ✅ 厂家同款格式：单个 img 包，解压直接是 img ---
 define Build/pine64-img
-    # 👇 【云编译强兼容修复】调用顶层 tools/Makefile 的标准 install target
-    #    ✅ tools/squashfs4/install 是 OpenWrt 官方定义的合法 target
-    #    ✅ 自动依赖 compile → 构建 + 安装原子完成
-    #    ❌ $(MAKE) -C $(TOPDIR)/tools/squashfs4 install 是非法的（无该 target）
-    $(MAKE) -w -s -C $(TOPDIR) tools/squashfs4/install || { \
-        echo "❌ FATAL: Failed to build & install mksquashfs from tools/squashfs4"; \
-        exit 1; \
-    }
-
-    # 👇 【防御性校验】确保 mksquashfs 真正可用（防 staging_dir 权限/符号链接异常）
-    if ! [ -x "$(STAGING_DIR_HOST)/bin/mksquashfs" ]; then \
-        echo "❌ FATAL: $(STAGING_DIR_HOST)/bin/mksquashfs not found or not executable"; \
-        ls -l "$(STAGING_DIR_HOST)/bin/mksquashfs" 2>/dev/null || echo "(file missing)"; \
-        exit 1; \
-    fi
-
     # Step 1: Build 0.img
     rm -f $(KDIR)/0.img
     dd if=/dev/zero of=$(KDIR)/0.img bs=1M count=64
