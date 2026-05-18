@@ -40,18 +40,18 @@ define Build/pine64-img
     $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
     mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
 
-    # ✅ 正确做法：从 OpenWrt 官方输出目录取 root.squashfs，并直接用于拼接
-    if [ ! -f "$(BIN_DIR)/root.squashfs" ]; then \
-        echo "====================================================="; \
-        echo "ERROR: 'root.squashfs' missing — build rootfs first!"; \
-        echo "Expected: $(BIN_DIR)/root.squashfs"; \
-        echo "Run: make target/linux/rockchip/compile"; \
-        echo "====================================================="; \
+    # ------------------------------
+    # 唯一正确：检查已存在的 root.squashfs
+    # ------------------------------
+    if [ ! -f "$(KDIR)/root.squashfs" ]; then \
+        echo "ERROR: root.squashfs 不存在！"; \
         false; \
     fi
-    # Build 1.img from official rootfs (no intermediate copy needed, but explicit for clarity)
-    cp "$(BIN_DIR)/root.squashfs" $(KDIR)/1.img
-    cat $(KDIR)/0.img $(KDIR)/1.img > $@
+
+    # ------------------------------
+    # 直接拼接：0.img + root.squashfs = 完整厂家固件
+    # ------------------------------
+    cat $(KDIR)/0.img $(KDIR)/root.squashfs > $@
 endef
 
 ### Devices ###
