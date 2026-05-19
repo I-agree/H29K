@@ -21,7 +21,7 @@ define Build/boot-common
 		echo "ERROR: DTB not found — expected: $(KDIR)/image-$(DEVICE_DTS).dtb" >&2; \
 		exit 1; \
 	fi
-	$(CP) $(KDIR)/image-$(DEVICE_DTS).dtb $@.boot/rockchip.dtb
+	$(CP) $(KDIR)/image-$(DEVICE_DTS).dtb $@.boot/$(DEVICE_DTS).dtb
 endef
 
 define Build/boot-script
@@ -43,7 +43,7 @@ define Build/pine64-img
 	rm -f $(KDIR)/0.img $(KDIR)/0.img.raw
 	# 1.1 生成干净 32MB 空白镜像（无脏数据）
 	dd if=/dev/zero of=$(KDIR)/0.img.raw bs=4K count=8192 status=none
-	mkfs.vfat -F32 -n BOOT --invariant $(KDIR)/0.img.raw
+	mkfs.vfat -F32 -s 64 -h 63 -n BOOT --invariant $(KDIR)/0.img.raw
 	# 写入 boot 文件
 	mkdir -p $(KDIR)/bootfiles
 	$(CP) $@.boot/* $(KDIR)/bootfiles/
@@ -54,9 +54,10 @@ define Build/pine64-img
 	printf "\x52\x4B\x41\x46" | dd of=$(KDIR)/rkaf.hdr bs=1 seek=0 conv=notrunc status=none
 	printf "\x00\x00\x01\x00" | dd of=$(KDIR)/rkaf.hdr bs=1 seek=4 conv=notrunc status=none # 32MB = 65536 扇区
 
-	# 1.3 终极正确：先补齐raw为严格32MB，再写入RKAF头，保证总大小=32MB、RKAF完整
-	dd if=$(KDIR)/0.img.raw of=$(KDIR)/0.img bs=4K count=8192 conv=sync status=none
-	dd if=$(KDIR)/rkaf.hdr of=$(KDIR)/0.img bs=1 seek=0 conv=notrunc status=none
+	# 1.3 32MB、RKAF完整
+	# 计算总大小：12 + 33554432 = 33554444
+	TOTAL_SIZE=$$(($(stat -c "%s" $(KDIR)/rkaf.hdr) + $(stat -c "%s" $(KDIR)/0.img.raw)))
+	cat $(KDIR)/rkaf.hdr $(KDIR)/0.img.raw | dd of=$(KDIR)/0.img bs=1 count=$$TOTAL_SIZE conv=notrunc status=none
 
 	# ==============================================
 	# Step 2: 制作 干净 1.img (RKAF + squashfs，seek=1 修正)
