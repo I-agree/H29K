@@ -30,31 +30,50 @@ endef
 
 # --- ✅ 厂家同款格式：单个 img 包 ---
 define Build/pine64-img
-    # Step1: 制作原厂标准32MB 0.img（4K对齐，FAT32 BOOT）
+    # ==============================================
+    # ROCKCHIP 原厂标准：
+    # 1. 0.img = RKAF + FAT32 boot (4K对齐)
+    # 2. 1.img = RKAF + squashfs (4K对齐)
+    # 3. 整机 = MBR + 原厂偏移 + RKAF分区
+    # ==============================================
+
+    # --------------------------
+    # Step 1: 制作 32MB RKAF boot 分区 (0.img)
+    # --------------------------
     rm -f $(KDIR)/0.img
+    # 32MB 4K对齐
     dd if=/dev/zero of=$(KDIR)/0.img bs=4K count=8192 status=none
     mkfs.vfat -F32 -n BOOT --invariant $(KDIR)/0.img
-    mkdir -p $(KDIR)/h29k-boot
-    $(CP) $@.boot/kernel.img $(KDIR)/h29k-boot/kernel.img
-    $(CP) $@.boot/rockchip.dtb $(KDIR)/h29k-boot/rockchip.dtb
-    $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
-    mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
+    # 写入内核、设备树、boot.scr
+    mkdir -p $(KDIR)/boot-files
+    $(CP) $@.boot/* $(KDIR)/boot-files/
+    mcopy -i $(KDIR)/0.img $(KDIR)/boot-files/* ::/
+    # RKAF 封装（Rockchip 强制）
+    echo -n -e "\x52\x4B\x41\x46" >> $(KDIR)/0.img.tmp
+    cat $(KDIR)/0.img >> $(KDIR)/0.img.tmp
+    mv $(KDIR)/0.img.tmp $(KDIR)/0.img
 
-    # Step2: root.squashfs 4K对齐 → 1.img（原厂系统分区镜像）
+    # --------------------------
+    # Step 2: 制作 带 RKAF header 的 1.img（核心修复）
+    # --------------------------
     rm -f $(KDIR)/1.img
-    dd if=$(KDIR)/root.squashfs of=$(KDIR)/1.img bs=4K conv=sync status=none
+    # 写入 RKAF 魔术头 (0x46414B52 = "RKAF")
+    echo -n -e "\x52\x4B\x41\x46" > $(KDIR)/1.img
+    # 4K对齐追加 squashfs（真正的系统分区）
+    dd if=$(KDIR)/root.squashfs of=$(KDIR)/1.img bs=4K conv=sync seek=1 status=none
 
-    # Step3: 构建【和原厂完全一致的MBR+偏移布局】（BootROM可识别）
+    # --------------------------
+    # Step 3: 构建整机 MBR 固件（BootROM 可识别）
+    # --------------------------
     rm -f $@
-    # 1. 总镜像 = 32MB头部空白 + 0.img(32M) + 64M间隙空白 + 1.img
-    dd if=/dev/zero of=$@ bs=1M count=128 status=none
+    dd if=/dev/zero of=$@ bs=1M count=1 status=none
     parted -s $@ mklabel msdos
-    # 0分区：32MB~64MB（32MB大小，对应原厂0.img）
+    # 分区1：boot (RKAF)
     parted -s $@ mkpart primary linux 32M 64M
-    dd if=$(KDIR)/0.img of=$@ bs=4K seek=$((32*1024*1024/4096)) conv=notrunc status=none
-    # 1分区：96MB开始（32+32+64），对应原厂1.img偏移
+    dd if=$(KDIR)/0.img of=$@ bs=4K seek=8192 conv=notrunc status=none
+    # 分区2：rootfs (RKAF + squashfs)
     parted -s $@ mkpart primary linux 96M 100%
-    dd if=$(KDIR)/1.img of=$@ bs=4K seek=$((96*1024*1024/4096)) conv=notrunc status=none
+    dd if=$(KDIR)/1.img of=$@ bs=4K seek=24576 conv=notrunc status=none
 endef
 
 ### Devices ###
