@@ -30,9 +30,9 @@ endef
 
 # --- ✅ 厂家同款格式：单个 img 包 ---
 define Build/pine64-img
-    # 1. 制作标准4K对齐 64MB BOOT分区镜像 0.img（FAT32）
+    # Step1: 制作原厂标准32MB 0.img（4K对齐，FAT32 BOOT）
     rm -f $(KDIR)/0.img
-    dd if=/dev/zero of=$(KDIR)/0.img bs=4K count=16384 status=none
+    dd if=/dev/zero of=$(KDIR)/0.img bs=4K count=8192 status=none
     mkfs.vfat -F32 -n BOOT --invariant $(KDIR)/0.img
     mkdir -p $(KDIR)/h29k-boot
     $(CP) $@.boot/kernel.img $(KDIR)/h29k-boot/kernel.img
@@ -40,20 +40,21 @@ define Build/pine64-img
     $(CP) $@.boot/boot.scr $(KDIR)/h29k-boot/boot.scr
     mcopy -i $(KDIR)/0.img $(KDIR)/h29k-boot/* ::/
 
-    # 2. 4K对齐处理root.squashfs → 标准分区镜像1.img（不删root.squashfs）
+    # Step2: root.squashfs 4K对齐 → 1.img（原厂系统分区镜像）
+    rm -f $(KDIR)/1.img
     dd if=$(KDIR)/root.squashfs of=$(KDIR)/1.img bs=4K conv=sync status=none
 
-    # 3. 构建整机固件：MBR分区表 + 0.img(boot) + 1.img(rootfs)，BootROM可识别
+    # Step3: 构建【和原厂完全一致的MBR+偏移布局】（BootROM可识别）
     rm -f $@
-    # 空镜像 + MBR分区表
-    dd if=/dev/zero of=$@ bs=1M count=1 status=none
+    # 1. 总镜像 = 32MB头部空白 + 0.img(32M) + 64M间隙空白 + 1.img
+    dd if=/dev/zero of=$@ bs=1M count=128 status=none
     parted -s $@ mklabel msdos
-    # BOOT分区：1M~65M（64MB，严格4K对齐）
-    parted -s $@ mkpart primary fat32 1M 65M
-    dd if=$(KDIR)/0.img of=$@ bs=4K seek=$((1*1024*1024/4096)) conv=notrunc status=none
-    # ROOTFS分区：65M起，4K对齐
-    parted -s $@ mkpart primary squashfs 65M 100%
-    dd if=$(KDIR)/1.img of=$@ bs=4K seek=$((65*1024*1024/4096)) conv=notrunc status=none
+    # 0分区：32MB~64MB（32MB大小，对应原厂0.img）
+    parted -s $@ mkpart primary linux 32M 64M
+    dd if=$(KDIR)/0.img of=$@ bs=4K seek=$((32*1024*1024/4096)) conv=notrunc status=none
+    # 1分区：96MB开始（32+32+64），对应原厂1.img偏移
+    parted -s $@ mkpart primary linux 96M 100%
+    dd if=$(KDIR)/1.img of=$@ bs=4K seek=$((96*1024*1024/4096)) conv=notrunc status=none
 endef
 
 ### Devices ###
