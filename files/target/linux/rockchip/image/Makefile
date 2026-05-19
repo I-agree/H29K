@@ -84,10 +84,10 @@ define Build/pine64-img
 	dd if=/dev/zero of=$@ bs=1M count=1 status=none
 	parted -s $@ mklabel msdos
 	# 0.img @ 32MB → seek=8192 (4K)
-	parted -s $@ mkpart primary linux 32M 64M
+	parted -s $@ mkpart primary fat32 32M 64M
 	dd if=$(KDIR)/0.img of=$@ bs=4K seek=8192 conv=notrunc status=none
 	# 1.img @ 96MB → seek=24576 (4K)
-	parted -s $@ mkpart primary linux 96M 100%
+	parted -s $@ mkpart primary squashfs 96M 100%
 	dd if=$(KDIR)/1.img of=$@ bs=4K seek=24576 conv=notrunc status=none
 
 	# 清理临时文件
