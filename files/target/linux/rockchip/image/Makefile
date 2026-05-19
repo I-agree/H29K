@@ -54,8 +54,9 @@ define Build/pine64-img
 	printf "\x52\x4B\x41\x46" | dd of=$(KDIR)/rkaf.hdr bs=1 seek=0 conv=notrunc status=none
 	printf "\x00\x00\x01\x00" | dd of=$(KDIR)/rkaf.hdr bs=1 seek=4 conv=notrunc status=none # 32MB = 65536 扇区
 
-	# 1.3 合并 = 干净 RKAF + 干净分区
-	cat $(KDIR)/rkaf.hdr $(KDIR)/0.img.raw | dd of=$(KDIR)/0.img bs=4K count=8192 conv=sync status=none
+	# 1.3 终极正确：先补齐raw为严格32MB，再写入RKAF头，保证总大小=32MB、RKAF完整
+	dd if=$(KDIR)/0.img.raw of=$(KDIR)/0.img bs=4K count=8192 conv=sync status=none
+	dd if=$(KDIR)/rkaf.hdr of=$(KDIR)/0.img bs=1 seek=0 conv=notrunc status=none
 
 	# ==============================================
 	# Step 2: 制作 干净 1.img (RKAF + squashfs，seek=1 修正)
