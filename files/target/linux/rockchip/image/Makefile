@@ -81,7 +81,7 @@ define Build/pine64-img
 	# Step3: 写入整机镜像（原厂偏移 100% 匹配）
 	# ==============================================
 	rm -f $@
-	dd if=/dev/zero of=$@ bs=1M count=1 status=none
+	dd if=/dev/zero of=$@ bs=1M count=128 status=none
 	parted -s $@ mklabel msdos
 	# 0.img @ 32MB → seek=8192 (4K)
 	parted -s $@ mkpart primary 32M 64M
