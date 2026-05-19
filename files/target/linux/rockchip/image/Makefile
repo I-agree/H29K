@@ -83,12 +83,12 @@ define Build/pine64-img
 	rm -f $@
 	dd if=/dev/zero of=$@ bs=1M count=128 status=none
 	parted -s $@ mklabel msdos
-	# 0.img @ 32MB → seek=8192 (4K)
-	parted -s $@ mkpart primary 32M 64M
+	# ✅ 0.img @ 32MiB → 33554432 bytes = LBA 65536 → seek=8192 (4K)
+	parted -s $@ mkpart primary 33554432B 67108864B
 	parted -s $@ set 1 boot on 
 	dd if=$(KDIR)/0.img of=$@ bs=4K seek=8192 conv=notrunc status=none
-	# 1.img @ 96MB → seek=24576 (4K)
-	parted -s $@ mkpart primary 96M 100%
+	# ✅ 1.img @ 96MiB → 100663296 bytes = LBA 196608 → seek=24576 (4K)
+	parted -s $@ mkpart primary 100663296B 100%
 	dd if=$(KDIR)/1.img of=$@ bs=4K seek=24576 conv=notrunc status=none
 
 	# 清理临时文件
