@@ -59,8 +59,8 @@ define Build/pine64-img
 	RKAF_SIZE := $(shell stat -c "%s" $(KDIR)/rkaf.hdr 2>/dev/null || echo "0")
 	IMG_RAW_SIZE := $(shell stat -c "%s" $(KDIR)/0.img.raw 2>/dev/null || echo "0")
 	if [ "$$RKAF_SIZE" = "0" ] || [ "$$IMG_RAW_SIZE" = "0" ]; then \
-        echo "ERROR: Failed to get size of rkaf.hdr or 0.img.raw" >&2; \
-        exit 1; \
+		echo "ERROR: Failed to get size of rkaf.hdr or 0.img.raw" >&2; \
+		exit 1; \
 	fi
 	TOTAL_SIZE := $(shell echo $$(($$RKAF_SIZE + $$IMG_RAW_SIZE)))
 	cat $(KDIR)/rkaf.hdr $(KDIR)/0.img.raw | dd of=$(KDIR)/0.img bs=1 count=$$TOTAL_SIZE conv=notrunc status=none
