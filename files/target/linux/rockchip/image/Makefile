@@ -28,28 +28,23 @@ define Build/boot-script
 	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
-# --- ✅ 厂家同款格式：单个 img 包，FAT32 版本 ---
+# --- ✅ 厂家同款格式：单个 img 包，纯FAT32的0.img，不带RKAF ---
 define Build/pine64-img
-	# ==============================
-	# RKAF 12字节 标准头（官方）
-	# 00-03: RKAF
-	# 04-07: 扇区数(LE, 512字节/扇区)
-	# 08-11: 00 00 00 00
-	# ==============================
-
 	# ==============================================
-	# Step 1: 制作 0.img（纯FAT32 CHS，严格32MiB，不带RKAF）
+	# Step 1: 制作 0.img（纯FAT32，严格32MiB，无分区表，无RKAF头）
 	# ==============================================
-	rm -f $(KDIR)/0.img $(KDIR)/0.img.raw
-	dd if=/dev/zero of=$(KDIR)/0.img.raw bs=4K count=8192 status=none
-	mkfs.vfat -F32 -s 64 -h 63 -n BOOT --invariant $(KDIR)/0.img.raw
+	rm -f $(KDIR)/0.img
+	# 直接创建 32MiB 的零填充文件（4K*8192=32MiB）
+	dd if=/dev/zero of=$(KDIR)/0.img bs=4K count=8192 status=none
+	# 格式化FAT32，参数和官方保持一致
+	mkfs.vfat -F32 -s 64 -h 63 -n BOOT --invariant $(KDIR)/0.img
+	# 拷贝文件到FAT分区
 	mkdir -p $(KDIR)/bootfiles
 	$(CP) $@.boot/* $(KDIR)/bootfiles/
-	mcopy -i $(KDIR)/0.img.raw $(KDIR)/bootfiles/* ::/
-	cp $(KDIR)/0.img.raw $(KDIR)/0.img
+	mcopy -i $(KDIR)/0.img $(KDIR)/bootfiles/* ::/
 
 	# ==============================================
-	# Step 2: 制作 1.img (RKAF头 + squashfs，官方格式)
+	# Step 2: 制作 1.img (保留原逻辑，不修改)
 	# ==============================================
 	rm -f $(KDIR)/1.img
 	SIZE=$$(wc -c < $(KDIR)/root.squashfs); \
@@ -65,23 +60,26 @@ define Build/pine64-img
 	dd if=$(KDIR)/root.squashfs of=$(KDIR)/1.img bs=4K seek=1 conv=sync status=none
 
 	# ==============================================
-	# Step3: 制作整机镜像（官方分区布局）
+	# Step3: 制作整机镜像（官方分区布局，修正偏移写入）
 	# ==============================================
 	rm -f $@
+	# 128MiB 空白镜像，和你设备匹配
 	dd if=/dev/zero of=$@ bs=1M count=128 status=none
 	parted -s $@ mklabel msdos
 
-	# 分区1: boot (32M ~ 64M)
+	# 分区1: boot (32MiB ~ 64MiB)
 	parted -s $@ mkpart primary fat32 33554432B 67108864B
 	parted -s $@ set 1 boot on
-	dd if=$(KDIR)/0.img of=$@ bs=4K seek=8192 conv=notrunc status=none
+	# 写入0.img，偏移32MiB（33554432B），直接覆盖，避免分区表残留
+	dd if=$(KDIR)/0.img of=$@ bs=1M seek=32 conv=notrunc status=none
 
-	# 分区2: rootfs (96M起)
+	# 分区2: rootfs (96MiB起)
 	parted -s $@ mkpart primary 100663296B 100%
-	dd if=$(KDIR)/1.img of=$@ bs=4K seek=24576 conv=notrunc status=none
+	# 写入1.img，偏移96MiB（100663296B）
+	dd if=$(KDIR)/1.img of=$@ bs=1M seek=96 conv=notrunc status=none
 
-	# 清理
-	rm -rf $(KDIR)/bootfiles $(KDIR)/*.raw
+	# 清理临时文件
+	rm -rf $(KDIR)/bootfiles
 endef
 
 ### Devices ###
