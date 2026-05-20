@@ -54,16 +54,16 @@ define Build/pine64-img
 	printf "\x52\x4B\x41\x46" | dd of=$(KDIR)/rkaf.hdr bs=1 seek=0 conv=notrunc status=none
 	printf "\x00\x00\x01\x00" | dd of=$(KDIR)/rkaf.hdr bs=1 seek=4 conv=notrunc status=none # 32MB = 65536 扇区
 
-    # 1.3 32MB、RKAF完整（✅ 修复 TOTAL_SIZE 计算）
-    # 获取文件大小（加容错）
-    RKAF_SIZE := $(shell stat -c "%s" $(KDIR)/rkaf.hdr 2>/dev/null || echo "0")
-    IMG_RAW_SIZE := $(shell stat -c "%s" $(KDIR)/0.img.raw 2>/dev/null || echo "0")
-    if [ "$$RKAF_SIZE" = "0" ] || [ "$$IMG_RAW_SIZE" = "0" ]; then \
+	# 1.3 32MB、RKAF完整（✅ 修复 TOTAL_SIZE 计算）
+	# 获取文件大小（加容错）
+	RKAF_SIZE := $(shell stat -c "%s" $(KDIR)/rkaf.hdr 2>/dev/null || echo "0")
+	IMG_RAW_SIZE := $(shell stat -c "%s" $(KDIR)/0.img.raw 2>/dev/null || echo "0")
+	if [ "$$RKAF_SIZE" = "0" ] || [ "$$IMG_RAW_SIZE" = "0" ]; then \
         echo "ERROR: Failed to get size of rkaf.hdr or 0.img.raw" >&2; \
         exit 1; \
-    fi
-    TOTAL_SIZE := $(shell echo $$(($$RKAF_SIZE + $$IMG_RAW_SIZE)))
-    cat $(KDIR)/rkaf.hdr $(KDIR)/0.img.raw | dd of=$(KDIR)/0.img bs=1 count=$$TOTAL_SIZE conv=notrunc status=none
+	fi
+	TOTAL_SIZE := $(shell echo $$(($$RKAF_SIZE + $$IMG_RAW_SIZE)))
+	cat $(KDIR)/rkaf.hdr $(KDIR)/0.img.raw | dd of=$(KDIR)/0.img bs=1 count=$$TOTAL_SIZE conv=notrunc status=none
 
 	# ==============================================
 	# Step 2: 制作 干净 1.img (RKAF + squashfs，seek=1 修正)
