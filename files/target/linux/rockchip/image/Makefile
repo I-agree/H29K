@@ -38,22 +38,18 @@ define Build/pine64-img
 	# ==============================
 
 	# ==============================================
-	# Step 1: 制作 0.img（纯FAT32 CHS，严格32MiB，不带RKAF，可直接解压）
+	# Step 1: 制作 0.img（纯FAT32 CHS，严格32MiB，不带RKAF）
 	# ==============================================
 	rm -f $(KDIR)/0.img $(KDIR)/0.img.raw
-	# 1.1 生成严格32MiB 4K对齐空白镜像
 	dd if=/dev/zero of=$(KDIR)/0.img.raw bs=4K count=8192 status=none
-	# ✅ Rockchip BootROM 兼容 FAT32 CHS 传统BPB，Windows可解压
-	mkfs.vfat -F32 -R 32 -s 64 -h 63 -n BOOT --invariant $(KDIR)/0.img.raw
-	# 写入 boot 文件
+	mkfs.vfat -F32 -s 64 -h 63 -n BOOT --invariant $(KDIR)/0.img.raw
 	mkdir -p $(KDIR)/bootfiles
 	$(CP) $@.boot/* $(KDIR)/bootfiles/
 	mcopy -i $(KDIR)/0.img.raw $(KDIR)/bootfiles/* ::/
-	# ✅ 0.img = 纯FAT32，严格33554432字节，**不带RKAF头**，直接可解压
 	cp $(KDIR)/0.img.raw $(KDIR)/0.img
 
 	# ==============================================
-	# Step 2: 制作 1.img (RKAF + squashfs，seek=1 4K对齐)
+	# Step 2: 制作 1.img (RKAF头 + squashfs，官方格式)
 	# ==============================================
 	rm -f $(KDIR)/1.img
 	SIZE=$$(wc -c < $(KDIR)/root.squashfs); \
@@ -66,28 +62,26 @@ define Build/pine64-img
 	dd if=/dev/zero of=$(KDIR)/1.img bs=1 count=12 status=none; \
 	printf "\x52\x4B\x41\x46" | dd of=$(KDIR)/1.img bs=1 seek=0 conv=notrunc status=none; \
 	printf "\\x$$(printf "%02x" $$B0)\\x$$(printf "%02x" $$B1)\\x$$(printf "%02x" $$B2)\\x$$(printf "%02x" $$B3)" | dd of=$(KDIR)/1.img bs=1 seek=4 conv=notrunc status=none; \
-	\
-	dd if=$(KDIR)/root.squashfs of=$(KDIR)/1.img bs=4K conv=sync seek=1 status=none
+	dd if=$(KDIR)/root.squashfs of=$(KDIR)/1.img bs=4K seek=1 conv=sync status=none
 
 	# ==============================================
-	# Step3: 整机镜像，RKAF头写在分区起始，0.img纯FAT32写入
+	# Step3: 制作整机镜像（官方分区布局）
 	# ==============================================
 	rm -f $@
 	dd if=/dev/zero of=$@ bs=1M count=128 status=none
 	parted -s $@ mklabel msdos
-	# 0.img 分区：32MiB ~ 64MiB
-	parted -s $@ mkpart primary 33554432B 67108864B
+
+	# 分区1: boot (32M ~ 64M)
+	parted -s $@ mkpart primary fat32 33554432B 67108864B
 	parted -s $@ set 1 boot on
-	# ✅ 在分区最开头写入RKAF头（整机镜像层面，不进0.img内部）
-	printf "\x52\x4B\x41\x46\x00\x00\x01\x00\x00\x00\x00\x00" | dd of=$@ bs=1 seek=33554432 conv=notrunc status=none
-	# 写入纯FAT32的0.img
 	dd if=$(KDIR)/0.img of=$@ bs=4K seek=8192 conv=notrunc status=none
-	# 1.img 分区：96MiB 开始
+
+	# 分区2: rootfs (96M起)
 	parted -s $@ mkpart primary 100663296B 100%
 	dd if=$(KDIR)/1.img of=$@ bs=4K seek=24576 conv=notrunc status=none
 
-	# 清理临时文件
-	rm -rf $(KDIR)/*.raw $(KDIR)/bootfiles
+	# 清理
+	rm -rf $(KDIR)/bootfiles $(KDIR)/*.raw
 endef
 
 ### Devices ###
