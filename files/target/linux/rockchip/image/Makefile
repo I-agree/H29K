@@ -28,13 +28,13 @@ define Build/boot-script
 	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
-# --- ✅ 厂家同款格式：单个 img 包，纯FAT32的0.img，不带RKAF ---
+# --- ✅ 厂家同款格式：单个 img 包，0.img/1.img 直接拼接，不带 parted 分区表干扰 ---
 define Build/pine64-img
 	# ==============================================
-	# Step 1: 制作 0.img（纯FAT32，严格32MiB，无分区表，无RKAF头）
+	# Step 1: 制作 0.img（纯FAT32，严格32MiB，无任何额外头）
 	# ==============================================
 	rm -f $(KDIR)/0.img
-	# 直接创建 32MiB 的零填充文件（4K*8192=32MiB）
+	# 直接创建 32MiB 零填充文件（4K*8192=32MiB，天然4K对齐）
 	dd if=/dev/zero of=$(KDIR)/0.img bs=4K count=8192 status=none
 	# 格式化FAT32，参数和官方保持一致
 	mkfs.vfat -F32 -s 64 -h 63 -n BOOT --invariant $(KDIR)/0.img
@@ -60,23 +60,13 @@ define Build/pine64-img
 	dd if=$(KDIR)/root.squashfs of=$(KDIR)/1.img bs=4K seek=1 conv=sync status=none
 
 	# ==============================================
-	# Step3: 制作整机镜像（官方分区布局，修正偏移写入）
+	# Step3: 直接拼接 0.img + 1.img，不使用 parted
 	# ==============================================
 	rm -f $@
-	# 128MiB 空白镜像，和你设备匹配
-	dd if=/dev/zero of=$@ bs=1M count=128 status=none
-	parted -s $@ mklabel msdos
-
-	# 分区1: boot (32MiB ~ 64MiB)
-	parted -s $@ mkpart primary fat32 33554432B 67108864B
-	parted -s $@ set 1 boot on
-	# 写入0.img，偏移32MiB（33554432B），直接覆盖，避免分区表残留
-	dd if=$(KDIR)/0.img of=$@ bs=1M seek=32 conv=notrunc status=none
-
-	# 分区2: rootfs (96MiB起)
-	parted -s $@ mkpart primary 100663296B 100%
-	# 写入1.img，偏移96MiB（100663296B）
-	dd if=$(KDIR)/1.img of=$@ bs=1M seek=96 conv=notrunc status=none
+	# 先写 0.img（32MiB）
+	cat $(KDIR)/0.img > $@
+	# 再写 1.img（从 32MiB 位置开始，4K 对齐）
+	cat $(KDIR)/1.img >> $@
 
 	# 清理临时文件
 	rm -rf $(KDIR)/bootfiles
