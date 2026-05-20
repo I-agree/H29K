@@ -18,7 +18,10 @@ fi
 
 setenv bootargs "console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} ro rootwait"
 
-# ✅ 你的 boot 是 FAT32 格式，必须用 fatload（关键修改）
+# ==============================
+# ✅ 完美适配你的 0.img（纯 FAT32）
+# ==============================
 fatload ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img
+fatload ${devtype} ${devnum}:1 ${fdt_addr_r} ${soc}-hinlink-h29k.dtb
 
-bootm ${kernel_addr_r}
+bootm ${kernel_addr_r} - ${fdt_addr_r}
