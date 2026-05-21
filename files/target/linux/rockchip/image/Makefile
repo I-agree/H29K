@@ -42,11 +42,4 @@ define Device/Default
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
 endef
 
-define Device/hinlink_h29k
-  SOC := rk3528
-  SUPPORTED_DEVICES := hinlink,h29k
-  KERNEL = kernel-bin | gzip
-  IMAGE/sysupgrade.img := boot-common | boot-script | h29k-img
-endef
-
 $(eval $(call BuildImage))
