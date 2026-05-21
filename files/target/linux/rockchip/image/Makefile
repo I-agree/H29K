@@ -25,7 +25,7 @@ define Build/h29k-img
 	mcopy -i $(KDIR)/boot.img $@.boot/* ::/
 
 	rm -f $@
-	dd if=/dev/zero of=$@ bs=1M count 256
+	dd if=/dev/zero of=$@ bs=1M count=128
 	parted -s $@ mklabel msdos
 	parted -s $@ mkpart primary fat32 1MiB 33MiB
 	parted -s $@ mkpart primary 33MiB 100%
