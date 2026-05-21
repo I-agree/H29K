@@ -56,7 +56,7 @@ define Build/pine64-img
 	# 分区2：rootfs 从 32MB 开始
 	# --------------------------
 	parted -s $@ mkpart primary fat32 1MiB 33MiB
-	parted -s $@ mkpart primary squashfs 33MiB 100%
+	parted -s $@ mkpart primary 33MiB 100%
 	parted -s $@ set 1 boot on
 
 	# 写入 boot
