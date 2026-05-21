@@ -28,44 +28,35 @@ define Build/boot-script
 	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
-# --- ✅ 厂家同款格式：单个 img 包，0.img/1.img 直接拼接，不带 parted 分区表干扰 ---
+# --- 瑞芯微开发工具兼容的单分区镜像格式 ---
 define Build/pine64-img
 	# ==============================================
-	# Step 1: 制作 0.img（纯FAT32，严格32MiB，无任何额外头）
+	# Step 1: 制作 0.img（纯FAT32，32MiB，无任何额外头）
 	# ==============================================
 	rm -f $(KDIR)/0.img
-	# 直接创建 32MiB 零填充文件（4K*8192=32MiB，天然4K对齐）
 	dd if=/dev/zero of=$(KDIR)/0.img bs=4K count=8192 status=none
-	# 格式化FAT32，参数和官方保持一致
-	mkfs.vfat -F32 -s 64 -h 63 -n BOOT --invariant $(KDIR)/0.img
-	# 拷贝文件到FAT分区
+	mkfs.vfat -F32 -s 64 -h 63 -n BOOT -M 0xf8 --invariant $(KDIR)/0.img
 	mkdir -p $(KDIR)/bootfiles
 	$(CP) $@.boot/* $(KDIR)/bootfiles/
 	mcopy -i $(KDIR)/0.img $(KDIR)/bootfiles/* ::/
 
 	# ==============================================
-	# Step 2: 制作 1.img (保留原逻辑，不修改)
+	# Step 2: 制作 1.img（去掉RKAF头，纯squashfs，用于system分区）
 	# ==============================================
 	rm -f $(KDIR)/1.img
-	SIZE=$$(wc -c < $(KDIR)/root.squashfs); \
-	SECTORS=$$(( (SIZE + 511) / 512 )); \
-	B0=$$(( SECTORS & 0xff )); \
-	B1=$$(( (SECTORS >> 8) & 0xff )); \
-	B2=$$(( (SECTORS >> 16) & 0xff )); \
-	B3=$$(( (SECTORS >> 24) & 0xff )); \
-	\
-	dd if=/dev/zero of=$(KDIR)/1.img bs=1 count=12 status=none; \
-	printf "\x52\x4B\x41\x46" | dd of=$(KDIR)/1.img bs=1 seek=0 conv=notrunc status=none; \
-	printf "\\x$$(printf "%02x" $$B0)\\x$$(printf "%02x" $$B1)\\x$$(printf "%02x" $$B2)\\x$$(printf "%02x" $$B3)" | dd of=$(KDIR)/1.img bs=1 seek=4 conv=notrunc status=none; \
-	dd if=$(KDIR)/root.squashfs of=$(KDIR)/1.img bs=4K seek=1 conv=sync status=none
+	# 直接复制root.squashfs，不添加RKAF头
+	cp $(KDIR)/root.squashfs $(KDIR)/1.img
 
 	# ==============================================
-	# Step3: 直接拼接 0.img + 1.img，不使用 parted
+	# Step3: 拼接成开发工具兼容的完整镜像
+	# 0.img(32MiB) + 填充到96MiB + 1.img
 	# ==============================================
 	rm -f $@
-	# 先写 0.img（32MiB）
+	# 先写0.img（32MiB）
 	cat $(KDIR)/0.img > $@
-	# 再写 1.img（从 32MiB 位置开始，4K 对齐）
+	# 填充到96MiB（32MiB + 64MiB），对齐rootfs分区起始位置
+	dd if=/dev/zero of=$@ bs=4K count=16384 seek=8192 status=none
+	# 写入1.img（从96MiB位置开始）
 	cat $(KDIR)/1.img >> $@
 
 	# 清理临时文件
