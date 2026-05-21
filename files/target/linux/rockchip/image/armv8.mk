@@ -17,6 +17,9 @@ define Device/hinlink_h29k
   UBOOT_CONFIG := hinlink_h29k
   KERNEL_LOADADDR := 0x00280000
   KERNEL_ENTRYADDR := 0x00280000
+  KERNEL = kernel-bin | gzip
+  IMAGES := sysupgrade.img
+  IMAGE/sysupgrade.img := boot-common | boot-script | h29k-img
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
     kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
