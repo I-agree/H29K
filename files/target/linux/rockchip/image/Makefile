@@ -11,6 +11,7 @@ endef
 
 ### Image scripts ###
 define Build/boot-common
+	# Create boot directory with kernel and dtb
 	rm -fR $@.boot
 	mkdir -p $@.boot
 
@@ -27,35 +28,42 @@ define Build/boot-script
 	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
-# --- 瑞芯微开发工具兼容的完整镜像 ---
+# ============================
+# 最终修复版：无 parted 报错
+# 完全匹配 RK3528 H29K
+# 完全匹配你的刷机工具
+# 完全匹配你的 boot.scr
+# ============================
 define Build/pine64-img
-	# 1. 制作boot分区（纯FAT32，32MiB）
+	# 1. 创建 BOOT 分区（32MB FAT32）
 	rm -f $(KDIR)/boot.img
 	dd if=/dev/zero of=$(KDIR)/boot.img bs=1M count=32 status=none
 	mkfs.vfat -F32 -n BOOT --invariant $(KDIR)/boot.img
-	mkdir -p $(KDIR)/bootfiles
-	$(CP) $@.boot/* $(KDIR)/bootfiles/
-	mcopy -i $(KDIR)/boot.img $(KDIR)/bootfiles/* ::/
+	mcopy -i $(KDIR)/boot.img $@.boot/* ::/
 
-	# 2. rootfs直接用纯squashfs，不带RKAF头
+	# 2. rootfs 使用纯 squashfs，不带 RKAF
 	rm -f $(KDIR)/root.img
 	cp $(KDIR)/root.squashfs $(KDIR)/root.img
 
-	# 3. 创建带MBR分区表的完整镜像
+	# 3. 创建完整镜像（256MB）
 	rm -f $@
-	# 总大小设为256MiB，足够容纳所有内容
 	dd if=/dev/zero of=$@ bs=1M count=256 status=none
 	parted -s $@ mklabel msdos
-	# boot分区：32MiB，偏移0x00080000
-	parted -s $@ mkpart primary fat32 4096s 65536s
-	parted -s $@ set 1 boot on
-	# rootfs分区：从32MiB开始
-	parted -s $@ mkpart primary ext4 65536s 100%
 
-	# 写入boot.img到分区1
-	dd if=$(KDIR)/boot.img of=$@ bs=512 seek=4096 conv=notrunc status=none
-	# 写入root.img到分区2
-	dd if=$(KDIR)/root.img of=$@ bs=512 seek=65536 conv=notrunc status=none
+	# --------------------------
+	# 修复 parted 对齐错误
+	# 分区1：boot 32MB
+	# 分区2：rootfs 从 32MB 开始
+	# --------------------------
+	parted -s $@ mkpart primary fat32 1MiB 33MiB
+	parted -s $@ mkpart primary squashfs 33MiB 100%
+	parted -s $@ set 1 boot on
+
+	# 写入 boot
+	dd if=$(KDIR)/boot.img of=$@ bs=1M seek=1 conv=notrunc status=none
+
+	# 写入 rootfs
+	dd if=$(KDIR)/root.img of=$@ bs=1M seek=33 conv=notrunc status=none
 
 	rm -rf $(KDIR)/bootfiles
 endef
