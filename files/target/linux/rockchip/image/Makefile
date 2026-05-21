@@ -11,7 +11,6 @@ endef
 
 ### Image scripts ###
 define Build/boot-common
-	# Create boot directory with kernel and dtb
 	rm -fR $@.boot
 	mkdir -p $@.boot
 
@@ -28,38 +27,36 @@ define Build/boot-script
 	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
-# --- 瑞芯微开发工具兼容的单分区镜像格式 ---
+# --- 瑞芯微开发工具兼容的完整镜像 ---
 define Build/pine64-img
-	# ==============================================
-	# Step 1: 制作 0.img（纯FAT32，32MiB，无任何额外头）
-	# ==============================================
-	rm -f $(KDIR)/0.img
-	dd if=/dev/zero of=$(KDIR)/0.img bs=4K count=8192 status=none
-	mkfs.vfat -F32 -s 64 -h 63 -n BOOT -M 0xf8 --invariant $(KDIR)/0.img
+	# 1. 制作boot分区（纯FAT32，32MiB）
+	rm -f $(KDIR)/boot.img
+	dd if=/dev/zero of=$(KDIR)/boot.img bs=1M count=32 status=none
+	mkfs.vfat -F32 -n BOOT --invariant $(KDIR)/boot.img
 	mkdir -p $(KDIR)/bootfiles
 	$(CP) $@.boot/* $(KDIR)/bootfiles/
-	mcopy -i $(KDIR)/0.img $(KDIR)/bootfiles/* ::/
+	mcopy -i $(KDIR)/boot.img $(KDIR)/bootfiles/* ::/
 
-	# ==============================================
-	# Step 2: 制作 1.img（去掉RKAF头，纯squashfs，用于system分区）
-	# ==============================================
-	rm -f $(KDIR)/1.img
-	# 直接复制root.squashfs，不添加RKAF头
-	cp $(KDIR)/root.squashfs $(KDIR)/1.img
+	# 2. rootfs直接用纯squashfs，不带RKAF头
+	rm -f $(KDIR)/root.img
+	cp $(KDIR)/root.squashfs $(KDIR)/root.img
 
-	# ==============================================
-	# Step3: 拼接成开发工具兼容的完整镜像
-	# 0.img(32MiB) + 填充到96MiB + 1.img
-	# ==============================================
+	# 3. 创建带MBR分区表的完整镜像
 	rm -f $@
-	# 先写0.img（32MiB）
-	cat $(KDIR)/0.img > $@
-	# 填充到96MiB（32MiB + 64MiB），对齐rootfs分区起始位置
-	dd if=/dev/zero of=$@ bs=4K count=16384 seek=8192 status=none
-	# 写入1.img（从96MiB位置开始）
-	cat $(KDIR)/1.img >> $@
+	# 总大小设为256MiB，足够容纳所有内容
+	dd if=/dev/zero of=$@ bs=1M count=256 status=none
+	parted -s $@ mklabel msdos
+	# boot分区：32MiB，偏移0x00080000
+	parted -s $@ mkpart primary fat32 4096s 65536s
+	parted -s $@ set 1 boot on
+	# rootfs分区：从32MiB开始
+	parted -s $@ mkpart primary ext4 65536s 100%
 
-	# 清理临时文件
+	# 写入boot.img到分区1
+	dd if=$(KDIR)/boot.img of=$@ bs=512 seek=4096 conv=notrunc status=none
+	# 写入root.img到分区2
+	dd if=$(KDIR)/root.img of=$@ bs=512 seek=65536 conv=notrunc status=none
+
 	rm -rf $(KDIR)/bootfiles
 endef
 
