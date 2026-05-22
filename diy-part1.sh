@@ -458,7 +458,7 @@ sleep 10
 wget -O target/linux/rockchip/image/Makefile https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/Makefile
 
 # 2. 自动验证 IMAGE 行是否正确
-grep -q "KERNEL_LOADADDR := 0x00280000" target/linux/rockchip/image/Makefile
+grep -q "h29k-img" target/linux/rockchip/image/Makefile
 
 # 3. 输出验证结果
 if [ $? -eq 0 ]; then
