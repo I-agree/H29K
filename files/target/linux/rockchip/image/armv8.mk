@@ -15,8 +15,8 @@ define Device/hinlink_h29k
   DEVICE_DTS := rk3528-hinlink-h29k
   TRUSTED_FIRMWARE_A := rk3528
   UBOOT_CONFIG := hinlink_h29k
-  KERNEL_LOADADDR := 0x00280000
-  KERNEL_ENTRYADDR := 0x00280000
+  KERNEL_LOADADDR := 0x00200000
+  KERNEL_ENTRYADDR := 0x00200000
   KERNEL = kernel-bin
   IMAGES := sysupgrade.img
   IMAGE/sysupgrade.img := boot-common | boot-script | h29k-img
