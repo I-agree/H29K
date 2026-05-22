@@ -45,18 +45,16 @@ endef
 
 # ======================= 1:1 复刻原厂分区结构的h29k-img =======================
 define Build/h29k-img
-	# 1. 创建与原厂一致的EXT4 boot分区（关闭64bit特性，兼容老U-Boot）
 	rm -f $(KDIR)/boot.img
-	mkfs.ext4 -L kernel -d $@.boot -F -O ^64bit -O ^huge_file $(KDIR)/boot.img 32M
+	# 关键：关闭所有现代特性，只保留 ext2/3/4 基础特性
+	mkfs.ext4 -L kernel -d $@.boot -F -O ^64bit,^huge_file,^metadata_csum,^orphan_file,^ea_inode,^dir_index $(KDIR)/boot.img 32M
 
-	# 2. 创建完整镜像，匹配原厂MBR分区表
 	rm -f $@
 	dd if=/dev/zero of=$@ bs=512 count=1237872 conv=sparse
 	parted -s $@ mklabel msdos
 	parted -s $@ mkpart primary ext4 1MiB 33MiB
 	parted -s $@ mkpart primary ext4 33MiB 100%
 
-	# 3. 写入分区数据
 	dd if=$(KDIR)/boot.img of=$@ bs=1M seek=1 conv=notrunc
 	dd if=$(IMAGE_ROOTFS) of=$@ bs=1M seek=33 conv=notrunc
 endef
