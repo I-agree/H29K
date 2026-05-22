@@ -21,7 +21,7 @@ DEVICE_PACKAGES:= \
     dnscrypt-proxy \
     luci-app-dnscrypt-proxy \
     luci-i18n-dnscrypt-proxy-zh_Hans
-KERNEL_LOADADDR:=0x00280000
-KERNEL_ENTRYADDR:=0x00280000
+KERNEL_LOADADDR:=0x00200000
+KERNEL_ENTRYADDR:=0x00200000
 LUCI_DEFAULT_THEME:=argon
 LUCI_DEFAULT_LANG:=zh_Hans
