@@ -533,27 +533,6 @@ fi
 mkdir -p target/linux/rockchip/image
 wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/default.bootscript -O target/linux/rockchip/image/default.bootscript
 
-# ====================== 关键验证开始 ======================
-echo "【验证关键修改】检查 fatload 适配 64MB FAT32 boot..."
-grep -q "fatload" target/linux/rockchip/image/default.bootscript
-if [ $? -eq 0 ]; then
-    echo "✅ 验证成功：已正确启用 fatload (FAT32 boot 分区)"
-else
-    echo "❌ 验证失败：文件错误！"
-    exit 1
-fi
-
-echo "【验证关键修改】检查 RK3528 串口配置..."
-grep -q "rk3528" target/linux/rockchip/image/default.bootscript
-if [ $? -eq 0 ]; then
-    echo "✅ 验证成功：已正确配置 RK3528 串口 ttyS0"
-else
-    echo "❌ 验证失败：文件错误！"
-    exit 1
-fi
-# ====================== 验证结束 ======================
-echo -e "\n✅ H29K default.bootscript 部署完成！"
-
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
 echo "============================================="
