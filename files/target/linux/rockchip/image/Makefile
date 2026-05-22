@@ -51,12 +51,11 @@ define Build/h29k-img
 	$(KDIR)/boot.img 32M
 
 	rm -f $@
-	dd if=/dev/zero of=$@ bs=512 count=262144 conv=sparse
-	parted -s $@ mklabel msdos
-	parted -s $@ mkpart primary ext4 1MiB 33MiB
-	parted -s $@ mkpart primary ext4 33MiB 100%
-
+	# 128MB空白镜像
+	dd if=/dev/zero of=$@ bs=1M count=128 conv=sparse
+	# 1MiB偏移写入boot分区
 	dd if=$(KDIR)/boot.img of=$@ bs=1M seek=1 conv=notrunc
+	# 33MiB偏移写入根分区
 	dd if=$(IMAGE_ROOTFS) of=$@ bs=1M seek=33 conv=notrunc
 endef
 
