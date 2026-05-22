@@ -46,17 +46,16 @@ endef
 # ======================= 1:1 复刻原厂分区结构的h29k-img =======================
 define Build/h29k-img
 	rm -f $(KDIR)/boot.img
-	# 1:1 复刻原厂EXT4，只保留它支持的特性
 	mkfs.ext4 -L kernel -b 4096 -d $@.boot -F \
-		-O ^64bit,^metadata_csum,^dir_index,^has_journal,^flex_bg,^sparse_super2,^orphan_file,^ea_inode \
-		$(KDIR)/boot.img 32M
+	-O ^64bit,^metadata_csum,^dir_index,^has_journal,^flex_bg,^sparse_super2,^orphan_file,^ea_inode \
+	$(KDIR)/boot.img 32M
 
-	# 用 tune2fs 强制开启原厂需要的特性，确保和原厂完全一致
 	tune2fs -O ext_attr,resize_inode,filetype,extents,sparse_super,large_file,gdt_csum $(KDIR)/boot.img
 	tune2fs -O ^has_journal,^metadata_csum,^dir_index,^flex_bg $(KDIR)/boot.img
 
 	rm -f $@
-	dd if=/dev/zero of=$@ bs=512 count=1237872 conv=sparse
+	# 128MB 总大小（你要的大小！）
+	dd if=/dev/zero of=$@ bs=512 count=262144 conv=sparse
 	parted -s $@ mklabel msdos
 	parted -s $@ mkpart primary ext4 1MiB 33MiB
 	parted -s $@ mkpart primary ext4 33MiB 100%
