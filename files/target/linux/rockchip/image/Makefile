@@ -50,11 +50,7 @@ define Build/h29k-img
 	-O ^64bit,^metadata_csum,^dir_index,^has_journal,^flex_bg,^sparse_super2,^orphan_file,^ea_inode \
 	$(KDIR)/boot.img 32M
 
-	tune2fs -O ext_attr,resize_inode,filetype,extents,sparse_super,large_file,gdt_csum $(KDIR)/boot.img
-	tune2fs -O ^has_journal,^metadata_csum,^dir_index,^flex_bg $(KDIR)/boot.img
-
 	rm -f $@
-	# 128MB 总大小（你要的大小！）
 	dd if=/dev/zero of=$@ bs=512 count=262144 conv=sparse
 	parted -s $@ mklabel msdos
 	parted -s $@ mkpart primary ext4 1MiB 33MiB
