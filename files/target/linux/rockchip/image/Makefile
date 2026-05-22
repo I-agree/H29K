@@ -46,19 +46,13 @@ endef
 # ======================= 1:1 复刻原厂分区结构的h29k-img =======================
 define Build/h29k-img
 	rm -f $(KDIR)/boot.img
-	# 1:1 复刻原厂EXT4，彻底关闭所有会导致乱码的特性
+	# 1:1 复刻原厂EXT4，只保留它支持的特性
 	mkfs.ext4 -L kernel -d $@.boot -F \
-		-O ^64bit \
-		-O ^metadata_csum \
-		-O ^dir_index \
-		-O ^has_journal \
-		-O ^flex_bg \
-		-O ^sparse_super2 \
-		-O ^orphan_file \
-		-O ^ea_inode \
+		-O ^64bit,^metadata_csum,^dir_index,^has_journal,^flex_bg,^sparse_super2,^orphan_file,^ea_inode \
 		$(KDIR)/boot.img 32M
 
-	# 用 tune2fs 二次强制清除所有额外特性，确保和原厂完全一致
+	# 用 tune2fs 强制开启原厂需要的特性，确保和原厂完全一致
+	tune2fs -O ext_attr,resize_inode,filetype,extents,sparse_super,large_file,gdt_csum $(KDIR)/boot.img
 	tune2fs -O ^has_journal,^metadata_csum,^dir_index,^flex_bg $(KDIR)/boot.img
 
 	rm -f $@
