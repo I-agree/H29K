@@ -47,7 +47,7 @@ endef
 define Build/h29k-img
 	rm -f $(KDIR)/boot.img
 	# 关键：关闭所有现代特性，只保留 ext2/3/4 基础特性
-	mkfs.ext4 -L kernel -d $@.boot -F -O ^64bit,^huge_file,^metadata_csum,^orphan_file,^ea_inode,^dir_index $(KDIR)/boot.img 32M
+	mkfs.ext4 -L kernel -d $@.boot -F -O ^64bit -O ^huge_file -O ^metadata_csum -O ^dir_index $(KDIR)/boot.img 32M
 
 	rm -f $@
 	dd if=/dev/zero of=$@ bs=512 count=1237872 conv=sparse
