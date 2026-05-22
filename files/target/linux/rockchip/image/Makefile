@@ -11,7 +11,7 @@ endef
 
 ### Image scripts ###
 define Build/boot-common
-	# 官方原版逻辑 + 输出 dtb 为 rockchip.dtb（匹配原厂）
+	# 1:1 复刻原厂boot分区文件结构
 	rm -fR $@.boot
 	mkdir -p $@.boot
 
@@ -20,7 +20,7 @@ define Build/boot-common
 endef
 
 define Build/boot-script
-	# Make an U-boot image and copy it to the boot partition
+	# 适配ARM64架构，生成原厂格式的boot.scr
 	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
@@ -43,17 +43,20 @@ define Build/pine64-img
 	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc
 endef
 
-# ======================= 你定制的 h29k-img（EXT4 分区，完全对齐原厂）=======================
+# ======================= 1:1 复刻原厂分区结构的h29k-img =======================
 define Build/h29k-img
+	# 1. 创建与原厂一致的EXT4 boot分区（关闭64bit特性，兼容老U-Boot）
 	rm -f $(KDIR)/boot.img
-	mkfs.ext4 -d $@.boot -F $(KDIR)/boot.img 32M
+	mkfs.ext4 -L kernel -d $@.boot -F -O ^64bit -O ^huge_file $(KDIR)/boot.img 32M
 
+	# 2. 创建完整镜像，匹配原厂MBR分区表
 	rm -f $@
-	dd if=/dev/zero of=$@ bs=1M count=128
+	dd if=/dev/zero of=$@ bs=512 count=1237872 conv=sparse
 	parted -s $@ mklabel msdos
 	parted -s $@ mkpart primary ext4 1MiB 33MiB
 	parted -s $@ mkpart primary ext4 33MiB 100%
 
+	# 3. 写入分区数据
 	dd if=$(KDIR)/boot.img of=$@ bs=1M seek=1 conv=notrunc
 	dd if=$(IMAGE_ROOTFS) of=$@ bs=1M seek=33 conv=notrunc
 endef
