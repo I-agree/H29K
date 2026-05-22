@@ -46,20 +46,28 @@ endef
 
 # ====================== 你自定义的函数 ======================
 define Build/h29k-img
-	rm -f $(KDIR)/boot.img
-	dd if=/dev/zero of=$(KDIR)/boot.img bs=1M count=32
-	mkfs.vfat -F 32 -n BOOT $(KDIR)/boot.img
-	mcopy -i $(KDIR)/boot.img $@.boot/* ::/
+	# 1. 创建 boot 分区（ext4 格式，和原厂一致）
+	rm -rf $(KDIR)/boot
+	mkdir -p $(KDIR)/boot
+	cp -r $@.boot/* $(KDIR)/boot/
+	mkfs.ext4 -L "boot" -d $(KDIR)/boot $(KDIR)/boot.img 32M
 
+	# 2. 创建根文件系统分区
+	rm -rf $(KDIR)/root
+	mkdir -p $(KDIR)/root
+	mkfs.ext4 -L "root" -d $(KDIR)/root $(KDIR)/root.img 96M
+	dd if=$(IMAGE_ROOTFS) of=$(KDIR)/root.img conv=notrunc
+
+	# 3. 构建完整镜像
 	rm -f $@
 	dd if=/dev/zero of=$@ bs=1M count=128
 	parted -s $@ mklabel msdos
-	parted -s $@ mkpart primary fat32 1MiB 33MiB
-	parted -s $@ mkpart primary 33MiB 100%
-	parted -s $@ set 1 boot on
+	parted -s $@ mkpart primary ext4 1MiB 33MiB
+	parted -s $@ mkpart primary ext4 33MiB 100%
 
+	# 4. 写入分区内容
 	dd if=$(KDIR)/boot.img of=$@ bs=1M seek=1 conv=notrunc
-	dd if=$(KDIR)/root.squashfs of=$@ bs=1M seek=33 conv=notrunc
+	dd if=$(KDIR)/root.img of=$@ bs=1M seek=33 conv=notrunc
 endef
 # ===========================================================
 
