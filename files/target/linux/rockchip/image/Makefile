@@ -47,7 +47,7 @@ endef
 define Build/h29k-img
 	rm -f $(KDIR)/boot.img
 	# 1:1 复刻原厂EXT4，只保留它支持的特性
-	mkfs.ext4 -L kernel -d $@.boot -F \
+	mkfs.ext4 -L kernel -b 4096 -d $@.boot -F \
 		-O ^64bit,^metadata_csum,^dir_index,^has_journal,^flex_bg,^sparse_super2,^orphan_file,^ea_inode \
 		$(KDIR)/boot.img 32M
 
