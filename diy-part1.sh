@@ -426,7 +426,7 @@ CONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y
 # CONFIG_ARM64_EPHEMERAL_PAGE_TABLES is not set
 # CONFIG_PACKAGE_u-boot-rk3528 is not set
 # CONFIG_PACKAGE_u-boot-rk3528-tpl is not set
-CONFIG_TRUSTED_FIRMWARE_A="rk3528"
+# CONFIG_TRUSTED_FIRMWARE_A is not set
 
 EOF
 
