@@ -528,7 +528,7 @@ wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/r
 # 定义路径
 DEST_DIR="target/linux/rockchip/image"
 DEST_FILE="${DEST_DIR}/H29K-Boot-Loader.bin"
-DOWNLOAD_URL="https://github.com/I-agree/H29K/raw/main/H29K-Boot-Loader.bin"
+DOWNLOAD_URL="https://raw.githubusercontent.com/I-agree/H29K/main/H29K-Boot-Loader.bin"
 
 # 1. 创建目录（如果不存在）
 mkdir -p "${DEST_DIR}"
