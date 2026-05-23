@@ -32,8 +32,8 @@ printf '\n'
 # 创建配置文件目录（安全）
 mkdir -p files/etc
 
-# 生成 input-event-daemon 配置（使用 files/ 目录，P3TERX 标准方式）
-cat > files/etc/input-event-daemon.conf <<EOF
+# 生成 input-event-daemon 配置（原样写入，不解析任何字符，100%安全）
+cat > files/etc/input-event-daemon.conf <<'EOF'
 /dev/input/event0
 115:1:/bin/button hotplug reset pressed
 115:0:/bin/button hotplug reset released
