@@ -19,7 +19,7 @@ endef
 
 define Build/boot-script
 	# 编译 U-boot 专用的引导脚本 boot.scr
-	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
+	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
 # =====================================================================
