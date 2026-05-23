@@ -19,7 +19,7 @@ endef
 
 define Build/boot-script
 	# 编译 U-boot 专用的引导脚本 boot.scr
-	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
+	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
 # =====================================================================
@@ -38,7 +38,7 @@ define Build/h29k-img
 	ROOTFSSIZE=$$(($$4 / 512)); \
 	dd if=/dev/zero of=$@ bs=512 seek=$$ROOTFSOFFSET count=$$ROOTFSSIZE conv=notrunc; \
 	rm -f $@.kernel.img; \
-	mke2fs -F -t ext4 -b 4096 -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )); \
+	mke2fs -F -t ext4 -b 4096 -O ^64bit,^metadata_csum,^flex_bg,^huge_file -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )); \
 	dd if=$@.kernel.img of=$@ bs=512 seek=$$KERNELOFFSET conv=notrunc; \
 	dd if=$(IMAGE_ROOTFS) of=$@ bs=512 seek=$$ROOTFSOFFSET conv=notrunc; \
 	if [ ! -f "$(TOPDIR)/target/linux/rockchip/image/H29K-Boot-Loader.bin" ]; then \
