@@ -133,8 +133,6 @@ printf '\n'
 echo "✅ 已配置 MiSans 为默认中文字体，构建后生效"
 
 # ======================== 【屏幕脚本（procd 服务化）】 ========================
-# ✅ 修复点8：弃用 /etc/rc.local（OpenWrt 22.03+ 已废弃），改用 procd 服务管理
-#    优势：启动时机可控、日志可查、状态可监控、重启安全
 mkdir -p files/etc/init.d
 cat > files/etc/init.d/h29k-screen <<'EOF'
 #!/bin/sh /etc/rc.common
@@ -157,7 +155,7 @@ service_triggers() {
 EOF
 chmod +x files/etc/init.d/h29k-screen
 
-# 屏幕主脚本（保持原逻辑，仅路径适配）
+# 屏幕主脚本（🔥 已彻底重构，完美兼容 BusyBox ash，干掉所有 Bashism 数组语法）
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
@@ -176,18 +174,16 @@ while true; do
     RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}')
     [ -z "$RSRP" ] && RSRP="Search"
 
-    # ✅ 网络名言（带超时）→ 失败则 fallback 到本地预存名言（3条）
+    # ✅ 网络名言（带超时）→ 失败则 fallback 到本地预存名言
     QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | cut -c 1-25)
     if [ -z "$QUOTE" ]; then
-      # 🔹 本地名言库（UTF-8 短句，适配 MiSans 渲染）
-      QUOTES=(
-        "山林从不向四季起誓"
-        "惜我者，我惜之；懂我者，我幸之。"
-        "真诚是永远的必杀技"
-      )
-      # 🔹 随机选取一条（BusyBox shuf 兼容写法）
-      RAND_IDX=$((RANDOM % ${#QUOTES[@]}))
-      QUOTE="${QUOTES[$RAND_IDX]}"
+      # 🔹 POSIX 标准时间戳取模，完美平替 $RANDOM，完美契合 BusyBox ash
+      RAND_IDX=$(($(date +%s) % 3))
+      case "$RAND_IDX" in
+        0) QUOTE="山林从不向四季起誓" ;;
+        1) QUOTE="惜我者，我惜之；懂我者，我幸之。" ;;
+        2) QUOTE="真诚是永远的必杀技" ;;
+      esac
     fi
 
     convert "$LOGO_DIR/LOGO3.jpg" -fill "rgba(0,0,0,0.7)" -draw "rectangle 0 60 240 240" \
