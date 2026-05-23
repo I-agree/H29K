@@ -26,6 +26,23 @@ for i in 1 2 3; do
 done
 
 printf '\n'
+# ==========================================================================
+# 配置 input-event-daemon 转发按键事件 → 兼容 OpenWrt 原生 button 脚本
+# ==========================================================================
+# 创建配置文件目录（安全）
+mkdir -p files/etc
+
+# 生成 input-event-daemon 配置（使用 files/ 目录，P3TERX 标准方式）
+cat > files/etc/input-event-daemon.conf <<EOF
+/dev/input/event0
+115:1:/bin/button hotplug reset pressed
+115:0:/bin/button hotplug reset released
+EOF
+
+# 开机自启（写入 files/ 目录，确保编译进固件）
+mkdir -p files/etc/rc.d
+ln -sf ../init.d/input-event-daemon files/etc/rc.d/S99input-event-daemon
+
 # ======================== 【离线复制字体：MiSans-Regular.ttf】 ========================
 # 🔹 源文件：diy-part2.sh 与 fonts/ 同级 → dirname "$0" 即仓库根
 SRC_FONT="$(dirname "$0")/fonts/MiSans-Regular.ttf"
