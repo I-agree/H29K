@@ -23,7 +23,7 @@ define Build/boot-script
 endef
 
 # =====================================================================
-# 🚀 深度定制：HINLINK H29K 策略 B（无缝预埋型）唯一指定打包宏
+# 🚀 HINLINK H29K 独占：策略 B（无缝预埋 + 严格熔断）核心打包宏
 # =====================================================================
 define Build/h29k-img
 	# 1. 自动将当前设备树文件（.dtb）命名为 rockchip.dtb 塞入 boot 目录
@@ -38,7 +38,7 @@ define Build/h29k-img
 	ROOTFSOFFSET=$$(($$3 / 512)); \
 	ROOTFSSIZE=$$(($$4 / 512)); \
 	\
-	# 3. 预先向复合镜像中注入全零数据块填充 rootfs 空间（防止物理大小因 SquashFS 压缩而收缩）
+	# 3. 预先向复合镜像中注入全零数据块填充 rootfs 空间
 	dd if=/dev/zero of=$@ bs=512 seek=$$ROOTFSOFFSET count=$$ROOTFSSIZE conv=notrunc; \
 	\
 	# 4. 在免 root 权限下，调用 mke2fs 工具将 $@.boot 文件夹封装成标准的 Ext4 块镜像文件
@@ -49,8 +49,7 @@ define Build/h29k-img
 	dd if=$@.kernel.img of=$@ bs=512 seek=$$KERNELOFFSET conv=notrunc; \
 	dd if=$(IMAGE_ROOTFS) of=$@ bs=512 seek=$$ROOTFSOFFSET conv=notrunc; \
 	\
-	# 6. 🔒 策略 B 强校验断言机制（Strict Mode）：
-	# 必须检测到由 diy-part1.sh 放入的 H29K-Boot-Loader.bin，否则立刻熔断报错！
+	# 6. 🔒 策略 B 强校验断言：必须检测到由 diy-part1.sh 放入的引导文件，否则立刻熔断报错！
 	if [ ! -f "$(TOPDIR)/target/linux/rockchip/image/H29K-Boot-Loader.bin" ]; then \
 		echo "======================================================================="; \
 		echo "❌ [H29K 编译熔断报错] 未在 target/linux/rockchip/image/ 下找到引导文件！"; \
@@ -74,11 +73,13 @@ endef
 ### Devices ###
 define Device/Default
   PROFILES := Default
-  KERNEL = kernel-bin | lzma | fit lzma $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  # 🎯 核心控制 1：内核保持裸流未压缩状态，封装进 FIT 镜像 (fit none)
+  KERNEL = kernel-bin | fit none $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
   KERNEL_LOADADDR :=
   BOOT_SCRIPT :=
+  # 🎯 核心控制 2：声明输出格式为方便下载的 .img.gz 压缩包
   IMAGES := sysupgrade.img.gz
-  # 👈 核心修改：此处彻底砍掉全局默认的打包逻辑，默认所有机型全部经过我们的 h29k-img 宏进行安全校验打包
+  # 🎯 核心控制 3：在预埋完引导程序后，加上 | gzip 压缩链，输出最终的压缩固件
   IMAGE/sysupgrade.img.gz = boot-common | boot-script $$(BOOT_SCRIPT) | h29k-img | gzip | append-metadata
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
