@@ -516,13 +516,35 @@ https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi
 if [ -f "$DTS_DIR/rockchip-pinconf.dtsi" ]; then
     echo "✅ 成功下载 rockchip-pinconf.dtsi 到正确路径"
 else
-    echo "❌ 下载失败！"
+    echo "❌ 下载rockchip-pinconf.dtsi失败！"
     exit 1
 fi
 
 # 下载 H29K 专用 default.bootscript（仅 1 个文件）
 mkdir -p target/linux/rockchip/image
 wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/default.bootscript -O target/linux/rockchip/image/default.bootscript
+
+# 下载 H29K-Boot-Loader.bin 启动文件并校验是否存在
+# 定义路径
+DEST_DIR="target/linux/rockchip/image"
+DEST_FILE="${DEST_DIR}/H29K-Boot-Loader.bin"
+DOWNLOAD_URL="https://github.com/I-agree/H29K/raw/main/H29K-Boot-Loader.bin"
+
+# 1. 创建目录（如果不存在）
+mkdir -p "${DEST_DIR}"
+
+# 2. 下载文件
+echo "正在下载 H29K-Boot-Loader.bin ..."
+wget -q --show-progress -O "${DEST_FILE}" "${DOWNLOAD_URL}"
+
+# 3. 验证文件是否存在且不为空
+if [ -f "${DEST_FILE}" ] && [ -s "${DEST_FILE}" ]; then
+    echo "✅ 下载H29K-Boot-Loader.bin成功：${DEST_FILE}"
+    ls -lh "${DEST_FILE}"
+else
+    echo "❌ 下载H29K-Boot-Loader.bin失败或文件为空！"
+    exit 1
+fi
 
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
