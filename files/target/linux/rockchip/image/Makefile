@@ -45,18 +45,35 @@ endef
 
 # ======================= 1:1 复刻原厂分区结构的h29k-img =======================
 define Build/h29k-img
+	# 1. 制作boot分区镜像（和原厂完全一致的EXT4参数）
 	rm -f $(KDIR)/boot.img
 	mkfs.ext4 -L kernel -b 4096 -d $@.boot -F \
 	-O ^64bit,^metadata_csum,^dir_index,^has_journal,^flex_bg,^sparse_super2,^orphan_file,^ea_inode \
 	$(KDIR)/boot.img 32M
 
+	# 2. 准备root分区镜像（直接用OpenWrt生成的SquashFS）
+	rm -f $(KDIR)/root.img
+	cp $(IMAGE_ROOTFS) $(KDIR)/root.img
+
+	# 3. 创建空白镜像，大小和原厂一致（约608MiB，确保能放下两个分区）
 	rm -f $@
-	# 128MB空白镜像
-	dd if=/dev/zero of=$@ bs=1M count=128 conv=sparse
-	# 1MiB偏移写入boot分区
-	dd if=$(KDIR)/boot.img of=$@ bs=1M seek=1 conv=notrunc
-	# 33MiB偏移写入根分区
-	dd if=$(IMAGE_ROOTFS) of=$@ bs=1M seek=33 conv=notrunc
+	dd if=/dev/zero of=$@ bs=1M count=608 conv=sparse
+
+	# 4. 用sfdisk创建和原厂一模一样的MBR分区表
+	# 扇区大小512字节，对应偏移：
+	# 32MiB = 65536 sectors
+	# 96MiB = 196608 sectors
+	echo 'label: dos
+label-id: 0x14146824
+unit: sectors
+first-lba: 2048
+
+start=65536, size=65536, type=83
+start=196608, size=1048576, type=83' | sfdisk $@
+
+	# 5. 按偏移写入分区数据，和原厂完全对齐
+	dd if=$(KDIR)/boot.img of=$@ bs=1M seek=32 conv=notrunc
+	dd if=$(KDIR)/root.img of=$@ bs=1M seek=96 conv=notrunc
 endef
 
 ### Devices ###
