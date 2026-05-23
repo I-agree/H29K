@@ -18,6 +18,7 @@ define Device/hinlink_h29k
   KERNEL_LOADADDR := 0x00200000
   KERNEL_ENTRYADDR := 0x00200000
   KERNEL = kernel-bin
+  BOOT_SCRIPT := default
   IMAGES := sysupgrade.img
   IMAGE/sysupgrade.img := boot-common | boot-script | h29k-img
   DEVICE_PACKAGES := \
