@@ -13,7 +13,6 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
-  TRUSTED_FIRMWARE_A := rk3528
   UBOOT_CONFIG := hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink_h29k-rk3528
   KERNEL_LOADADDR := 0x00200000
