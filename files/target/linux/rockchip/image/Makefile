@@ -18,8 +18,8 @@ define Build/boot-common
 endef
 
 define Build/boot-script
-	# 编译 U-boot 专用的引导脚本 boot.scr
-	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
+	# 🎯 坑一修复：恢复为标准的 arm64 架构，防止 U-Boot 报架构错误拒绝执行
+	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),default).bootscript $@.boot/boot.scr
 endef
 
 # =====================================================================
@@ -38,7 +38,8 @@ define Build/h29k-img
 	ROOTFSSIZE=$$(($$4 / 512)); \
 	dd if=/dev/zero of=$@ bs=512 seek=$$ROOTFSOFFSET count=$$ROOTFSSIZE conv=notrunc; \
 	rm -f $@.kernel.img; \
-	mke2fs -F -t ext4 -b 4096 -O ^64bit,^metadata_csum,^flex_bg,^huge_file,^has_journal,^dir_index -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )); \
+	# 🎯 坑二修复：追加禁用 ^dir_nlink,^extra_isize 并强制开启 gdt_csum，达成与原厂 1:1 像素级特性对齐
+	mke2fs -F -t ext4 -b 4096 -O ^64bit,^metadata_csum,^flex_bg,^huge_file,^has_journal,^dir_index,^dir_nlink,^extra_isize,gdt_csum -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )); \
 	dd if=$@.kernel.img of=$@ bs=512 seek=$$KERNELOFFSET conv=notrunc; \
 	dd if=$(IMAGE_ROOTFS) of=$@ bs=512 seek=$$ROOTFSOFFSET conv=notrunc; \
 	if [ ! -f "$(TOPDIR)/target/linux/rockchip/image/H29K-Boot-Loader.bin" ]; then \
@@ -60,14 +61,11 @@ endef
 ### Devices ###
 define Device/Default
   PROFILES := Default
-  # 🎯 完美适配 booti：剥离 FIT 外壳，直接输出纯净、未压缩的原始 ARM64 内核二进制流
   KERNEL = kernel-bin
   KERNEL_LOADADDR :=
   BOOT_SCRIPT :=
-  # 🎯 声明输出格式为方便下载的 .img.gz 压缩包
   IMAGES := sysupgrade.img.gz
-  # 🎯 在预埋完引导程序后，加上 | gzip 压缩链，输出最终的压缩固件
-  IMAGE/sysupgrade.img.gz = boot-common | boot-script $$(BOOT_SCRIPT) | h29k-img | gzip | append-metadata
+  IMAGE/sysupgrade.img.gz = boot-common | boot-script $$(BOOT_SCRIPT) | h29k-img | gzip
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
   UBOOT_DEVICE_NAME = $(lastword $(subst _, ,$(1)))-$$(SOC)
