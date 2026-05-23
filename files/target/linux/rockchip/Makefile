@@ -35,7 +35,8 @@ endef
 
 include $(INCLUDE_DIR)/target.mk
 
-DEFAULT_PACKAGES += uboot-envtools partx-utils e2fsprogs mkf2fs kmod-input-gpio-keys
+DEFAULT_PACKAGES += uboot-envtools partx-utils e2fsprogs mkf2fs kmod-input-gpio-keys input-event-daemon
+
 
 KERNELNAME:=Image dtbs
 
