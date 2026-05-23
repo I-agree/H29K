@@ -60,13 +60,13 @@ endef
 ### Devices ###
 define Device/Default
   PROFILES := Default
-  # 🎯 核心控制 1：内核保持裸流未压缩状态，封装进 FIT 镜像 (fit none)
-  KERNEL = kernel-bin | fit none $$(KDIR)/image-$$(firstword $$(DEVICE_DTS)).dtb
+  # 🎯 完美适配 booti：剥离 FIT 外壳，直接输出纯净、未压缩的原始 ARM64 内核二进制流
+  KERNEL = kernel-bin
   KERNEL_LOADADDR :=
   BOOT_SCRIPT :=
-  # 🎯 核心控制 2：声明输出格式为方便下载的 .img.gz 压缩包
+  # 🎯 声明输出格式为方便下载的 .img.gz 压缩包
   IMAGES := sysupgrade.img.gz
-  # 🎯 核心控制 3：在预埋完引导程序后，加上 | gzip 压缩链，输出最终的压缩固件
+  # 🎯 在预埋完引导程序后，加上 | gzip 压缩链，输出最终的压缩固件
   IMAGE/sysupgrade.img.gz = boot-common | boot-script $$(BOOT_SCRIPT) | h29k-img | gzip | append-metadata
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
