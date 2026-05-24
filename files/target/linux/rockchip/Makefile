@@ -13,7 +13,7 @@ HOST_BUILD_DEPENDS += squashfs4/host
 KERNEL_PATCHVER:=6.12
 
 define Target/Description
-    Build firmware image for Rockchip SoC devices.
+	Build firmware image for Rockchip SoC devices.
 endef
 
 include $(INCLUDE_DIR)/target.mk
