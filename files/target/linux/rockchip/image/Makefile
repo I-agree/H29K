@@ -31,7 +31,7 @@ define Build/h29k-img
 	ROOTFSSIZE=$$(($$4 / 512)) && \
 	dd if=/dev/zero of=$@ bs=512 seek=$$ROOTFSOFFSET count=$$ROOTFSSIZE conv=notrunc && \
 	rm -f $@.kernel.img && \
-	mke2fs -F -t ext4 -b 4096 -O ^64bit,^metadata_csum,^flex_bg,^huge_file,^has_journal,^dir_index,^dir_nlink,^extra_isize,gdt_csum -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )) && \
+	mke2fs -F -t ext4 -b 4096 -O ^64bit,^metadata_csum,^flex_bg,^huge_file,^has_journal,^dir_index -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )) && \
 	dd if=$@.kernel.img of=$@ bs=512 seek=$$KERNELOFFSET conv=notrunc && \
 	dd if=$(KDIR)/root.squashfs of=$@ bs=512 seek=$$ROOTFSOFFSET conv=notrunc && \
 	if [ ! -f "$(TOPDIR)/target/linux/rockchip/image/H29K-Boot-Loader.bin" ]; then \
