@@ -17,7 +17,7 @@ define Device/hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink_h29k-rk3528
   KERNEL_LOADADDR := 0x00200000
   KERNEL_ENTRYADDR := 0x00200000
-  BOOT_SCRIPT := default
+  BOOT_SCRIPT := mmc
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-aic8800-sdio dnsmasq-full \
     kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
