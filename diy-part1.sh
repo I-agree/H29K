@@ -150,40 +150,17 @@ echo "✅ 已下载并替换 armv8.mk 成功"
 echo "✅ 已校验：无 hinlink_h28k，仅保留 rk3528 + hinlink_h29k"
 
 # ==============================
-# 【强制限定补丁作用域】
+# 【安装squashfs4】
 # ==============================
 # 定义正确目录
 TARGET_DIR="target/linux/rockchip"
 mkdir -p $TARGET_DIR
 
-# 下载你指定的官方原版 Makefile
+# 下载指定的官方原版修改的Makefile
 echo "正在下载 rockchip Makefile ..."
 curl -L --retry 5 \
 https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/Makefile \
 -o $TARGET_DIR/Makefile
-
-# 检查是否下载成功
-if [ -f "$TARGET_DIR/Makefile" ]; then
-    echo -e "\n✅ 下载成功：$TARGET_DIR/Makefile"
-else
-    echo -e "\n❌ 下载失败"
-    exit 1
-fi
-
-# ==============================
-# 验证：是否包含【强制限定补丁作用域】
-# ==============================
-echo -e "\n============================================="
-echo "  检查结果：是否强制限定补丁作用域"
-echo -e "=============================================\n"
-
-grep -q "强制限定补丁作用域" $TARGET_DIR/Makefile
-if [ $? -eq 0 ]; then
-    echo "✅ 已确认：包含 强制限定补丁作用域 配置"
-    echo "    作用：仅应用 rockchip 专属补丁，禁止其他平台污染"
-else
-    echo "❌ 未找到"
-fi
 
 echo -e "\n=============================================\n"
 
@@ -448,7 +425,7 @@ sleep 10
 wget -O target/linux/rockchip/image/Makefile https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/Makefile
 
 # 2. 自动验证 IMAGE 行是否正确
-grep -q "h29k-img" target/linux/rockchip/image/Makefile
+grep -q "智能识别 Binman 合体固件或传统拆分固件" target/linux/rockchip/image/Makefile
 
 # 3. 输出验证结果
 if [ $? -eq 0 ]; then
