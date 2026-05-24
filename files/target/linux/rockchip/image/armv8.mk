@@ -14,7 +14,7 @@ define Device/hinlink_h29k
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
   UBOOT_CONFIG := hinlink_h29k
-  UBOOT_DEVICE_NAME := hinlink_h29k-rk3528
+  UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   KERNEL_LOADADDR := 0x00200000
   KERNEL_ENTRYADDR := 0x00200000
   BOOT_SCRIPT := mmc
