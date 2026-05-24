@@ -40,9 +40,15 @@ define Build/pine64-img
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
 		32768
 
-	# Copy the idbloader and the u-boot image to the image at sector 0x40 and 0x4000
-	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img of="$@" seek=64 conv=notrunc
-	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb of="$@" seek=16384 conv=notrunc
+	# 🛠️ 核心修改：智能识别 Binman 合体固件或传统拆分固件
+	if [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
+		echo "Found Binman combined image, flashing..."; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc; \
+	else \
+		echo "Binman image not found, falling back to split legacy images..."; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img of="$@" seek=64 conv=notrunc; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb of="$@" seek=16384 conv=notrunc; \
+	fi
 endef
 
 define Build/pine64-bin
