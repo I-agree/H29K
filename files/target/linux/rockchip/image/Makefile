@@ -58,7 +58,7 @@ define Device/Default
   IMAGE/sysupgrade.img.gz = boot-common | boot-script $$(BOOT_SCRIPT) | h29k-img | gzip
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
-  UBOOT_DEVICE_NAME = $(lastword $(subst _, ,$(1))-$$(SOC)
+  UBOOT_DEVICE_NAME = $(lastword $(subst _, ,$(1)))-$$(SOC)
 endef
 
 include $(SUBTARGET).mk
