@@ -524,6 +524,10 @@ fi
 mkdir -p target/linux/rockchip/image
 wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/mmc.bootscript -O target/linux/rockchip/image/mmc.bootscript
 
+# 下载 H29K 专用 gen_image_generic.sh（仅 1 个文件）
+mkdir -p scripts
+wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/scripts/gen_image_generic.sh -O scripts/gen_image_generic.sh
+
 # 下载 H29K-Boot-Loader.bin 启动文件并校验是否存在
 # 定义路径
 DEST_DIR="target/linux/rockchip/image"
