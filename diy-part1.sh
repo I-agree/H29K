@@ -520,9 +520,9 @@ else
     exit 1
 fi
 
-# 下载 H29K 专用 default.bootscript（仅 1 个文件）
+# 下载 H29K 专用 mmc.bootscript（仅 1 个文件）
 mkdir -p target/linux/rockchip/image
-wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/default.bootscript -O target/linux/rockchip/image/default.bootscript
+wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/mmc.bootscript -O target/linux/rockchip/image/mmc.bootscript
 
 # 下载 H29K-Boot-Loader.bin 启动文件并校验是否存在
 # 定义路径
