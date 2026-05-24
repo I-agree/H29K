@@ -19,7 +19,7 @@ define Build/boot-script
 endef
 
 # =====================================================================
-# 🚀 HINLINK H29K 独占：策略 B（无缝预埋 + 严格熔断）核心打包宏
+# 🚀 HINLINK H29K 独占：策略 B（特性强制清零 + 严格熔断）核心打包宏
 # =====================================================================
 define Build/h29k-img
 	$(CP) $(KDIR)/image-$(DEVICE_DTS).dtb $@.boot/rockchip.dtb && \
@@ -31,7 +31,7 @@ define Build/h29k-img
 	ROOTFSSIZE=$$(($$4 / 512)) && \
 	dd if=/dev/zero of=$@ bs=512 seek=$$ROOTFSOFFSET count=$$ROOTFSSIZE conv=notrunc && \
 	rm -f $@.kernel.img && \
-	mke2fs -F -t ext4 -b 4096 -O ^64bit,^metadata_csum,^flex_bg,^huge_file,^has_journal,^dir_index,^orphan_file,^metadata_csum_seed -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )) && \
+	mke2fs -F -t ext4 -b 4096 -O none,filetype,sparse_super,dir_index,extents -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )) && \
 	dd if=$@.kernel.img of=$@ bs=512 seek=$$KERNELOFFSET conv=notrunc && \
 	dd if=$(KDIR)/root.squashfs of=$@ bs=512 seek=$$ROOTFSOFFSET conv=notrunc && \
 	if [ ! -f "$(TOPDIR)/target/linux/rockchip/image/H29K-Boot-Loader.bin" ]; then \
