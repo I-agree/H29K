@@ -11,54 +11,67 @@ endef
 
 ### Image scripts ###
 define Build/boot-common
-	rm -fR $@.boot && mkdir -p $@.boot && $(CP) $(IMAGE_KERNEL) $@.boot/kernel.img
+	# This creates a new folder copies the dtb (as rockchip.dtb) 
+	# and the kernel image (as kernel.img)
+	rm -fR $@.boot
+	mkdir -p $@.boot
+
+	$(CP) $(KDIR)/image-$(firstword $(notdir $(DEVICE_DTS))).dtb $@.boot/rockchip.dtb
+	$(CP) $(IMAGE_KERNEL) $@.boot/kernel.img
 endef
 
 define Build/boot-script
-	# 🛠️ 唯一核心修改点：原版此处缺省为 default.bootscript
-	# 现将其修正为 mmc.bootscript，从而让系统无缝调用官方带有 RK3528 独占控制台(ttyS0)和 1.5M 波特率的引导脚本
-	mkimage -A arm64 -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),mmc).bootscript $@.boot/boot.scr
+	# Make an U-boot image and copy it to the boot partition
+	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),mmc).bootscript $@.boot/boot.scr
 endef
 
-# =====================================================================
-# 🚀 HINLINK H29K 独占：策略 B（特性强制清零 + 严格熔断）核心打包宏
-# =====================================================================
-define Build/h29k-img
-	$(CP) $(KDIR)/image-$(DEVICE_DTS).dtb $@.boot/rockchip.dtb && \
-	set `ptgen -o $@ -h 16 -s 63 -l 32768 \
-		-p $(CONFIG_TARGET_KERNEL_PARTSIZE)m \
-		-p $(CONFIG_TARGET_ROOTFS_PARTSIZE)m` && \
-	KERNELOFFSET=$$(($$1 / 512)) && \
-	ROOTFSOFFSET=$$(($$3 / 512)) && \
-	ROOTFSSIZE=$$(($$4 / 512)) && \
-	dd if=/dev/zero of=$@ bs=512 seek=$$ROOTFSOFFSET count=$$ROOTFSSIZE conv=notrunc && \
-	rm -f $@.kernel.img && \
-	mke2fs -F -t ext4 -b 4096 -O none,filetype,sparse_super,dir_index,extents -L kernel -d $@.boot $@.kernel.img $$(( $(CONFIG_TARGET_KERNEL_PARTSIZE) * 256 )) && \
-	dd if=$@.kernel.img of=$@ bs=512 seek=$$KERNELOFFSET conv=notrunc && \
-	dd if=$(KDIR)/root.squashfs of=$@ bs=512 seek=$$ROOTFSOFFSET conv=notrunc && \
-	if [ ! -f "$(TOPDIR)/target/linux/rockchip/image/H29K-Boot-Loader.bin" ]; then \
-		echo "======================================================================="; \
-		echo "❌ [H29K 编译熔断报错] 未在 target/linux/rockchip/image/ 下找到引导文件！"; \
-		echo "======================================================================="; \
-		exit 1; \
-	fi && \
-	echo "============= [H29K STRATEGY B ENFORCED] =============" && \
-	echo "🚀 成功捕获预置引导文件: H29K-Boot-Loader.bin" && \
-	dd if="$(TOPDIR)/target/linux/rockchip/image/H29K-Boot-Loader.bin" of="$@" seek=64 conv=notrunc && \
-	rm -f $@.kernel.img
+define Build/pine64-img
+	# Creates the final SD/eMMC images, 
+	# combining boot partition, root partition as well as the u-boot bootloader
+
+	# Generate a new partition table in $@ with 32 MiB of 
+	# alignment padding for the idbloader and u-boot to fit:
+	# http://opensource.rock-chips.com/wiki_Boot_option#Boot_flow
+	#
+	# U-Boot SPL expects the U-Boot ITB to be located at sector 0x4000 (8 MiB) on the MMC storage
+	PADDING=1 $(SCRIPT_DIR)/gen_image_generic.sh \
+		$@ \
+		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
+		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
+		32768
+
+	# Copy the idbloader and the u-boot image to the image at sector 0x40 and 0x4000
+	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img of="$@" seek=64 conv=notrunc
+	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb of="$@" seek=16384 conv=notrunc
+endef
+
+define Build/pine64-bin
+	# Typical Rockchip boot flow with Rockchip miniloader
+	# Rockchp idbLoader which is combinded by Rockchip ddr init bin
+	# and miniloader bin from Rockchip rkbin project
+
+	# Generate a new partition table in $@ with 32 MiB of alignment
+	# padding for the idbloader, uboot and trust image to fit:
+	# http://opensource.rock-chips.com/wiki_Boot_option#Boot_flow
+	PADDING=1 $(SCRIPT_DIR)/gen_image_generic.sh \
+		$@ \
+		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
+		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
+		32768
+
+	# Copy the idbloader, uboot and trust image to the image at sector 0x40, 0x4000 and 0x6000
+	dd if="$(STAGING_DIR_IMAGE)"/$(SOC)-idbloader.bin of="$@" seek=64 conv=notrunc
+	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-uboot.img of="$@" seek=16384 conv=notrunc
+	dd if="$(STAGING_DIR_IMAGE)"/$(SOC)-trust.bin of="$@" seek=24576 conv=notrunc
 endef
 
 ### Devices ###
 define Device/Default
   PROFILES := Default
-  KERNEL = kernel-bin
-  KERNEL_LOADADDR :=
-  BOOT_SCRIPT :=
+  KERNEL := kernel-bin
   IMAGES := sysupgrade.img.gz
-  IMAGE/sysupgrade.img.gz = boot-common | boot-script $$(BOOT_SCRIPT) | h29k-img | gzip
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
-  UBOOT_DEVICE_NAME = $(lastword $(subst _, ,$(1)))-$$(SOC)
 endef
 
 include $(SUBTARGET).mk
