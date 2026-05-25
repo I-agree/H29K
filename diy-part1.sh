@@ -161,39 +161,9 @@ https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/
 
 echo -e "\n=============================================\n"
 
-# ==============================================
-# 定制 uboot-rockchip：替换 rk3528 默认配置 + 添加 H29K
-# ==============================================
-sed -i '/^define U-Boot\/rk3528\/Default/,/^endef/d' package/boot/uboot-rockchip/Makefile
-
-# 将新设备添加到 UBOOT_TARGETS 编译列表
-sed -i '/hinlink-h28k-rk3528/a\
-  hinlink-h29k-rk3528 \\\
-' package/boot/uboot-rockchip/Makefile
-
-# 插入新的 rk3528/Default
-sed -i '/# RK3528 boards/a\
-define U-Boot/rk3528/Default\n\
-  BUILD_SUBTARGET:=armv8\n\
-  DEPENDS:=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3528\n\
-  ATF:=rk3528_bl31_v1.20.elf\n\
-  # ⚠️ Default TPL is for reference only — DO NOT use for H29K\n\
-  TPL:=rk3528_ddr_1056MHz_v1.11.bin\n\
-endef\n\
-' package/boot/uboot-rockchip/Makefile
-
-# 插入 hinlink-h29k-rk3528 设备定义
-sed -i '/^define U-Boot\/radxa-e20c-rk3528/i\
-define U-Boot/hinlink-h29k-rk3528\n\
-  $(U-Boot/rk3528/Default)\n\
-  NAME:=HINLINK H29K\n\
-  BUILD_DEVICES:= \\\n\
-    hinlink_h29k\n\
-  UBOOT_CONFIG:=hinlink_h29k_defconfig\n\
-  UBOOT_DTS:=rk3528-hinlink-h29k\n\
-  TPL:=rk3528_ddr_1056MHz_v1.11.bin\n\
-endef\n\
-' package/boot/uboot-rockchip/Makefile
+# 下载 H29K 专用 uboot-rockchip Makefile 到正确目录
+wget -O package/boot/uboot-rockchip/Makefile \
+https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/Makefile
 
 # ==============================================
 # 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
