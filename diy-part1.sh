@@ -176,6 +176,20 @@ else
     exit 1
 fi
 
+# 下载修复 uboot-tools 的 Makefile
+echo "正在下载 uboot-tools 修复文件 ..."
+wget -q --show-progress --retry=3 --timeout=10 \
+-O package/boot/uboot-tools/Makefile \
+https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-tools/Makefile
+
+# 验证是否下载成功
+if [ -s package/boot/uboot-tools/Makefile ]; then
+    echo -e "\033[42;37m 下载成功 ✅ uboot-tools 已修复 \033[0m"
+else
+    echo -e "\033[41;37m 下载失败 ❌ 请检查网络 \033[0m"
+    exit 1
+fi
+
 # ==============================================
 # 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
 # ==============================================
