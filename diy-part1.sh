@@ -112,6 +112,21 @@ else
     exit 1
 fi
 
+# 下载 rockchip-pinconf.dtsi 到 RK3528 设备树正确目录
+DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+mkdir -p $DTS_DIR
+
+wget --no-check-certificate -q -O "$DTS_DIR/rockchip-pinconf.dtsi" \
+https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi
+
+# 校验文件是否存在
+if [ -f "$DTS_DIR/rockchip-pinconf.dtsi" ]; then
+    echo "✅ 成功下载 rockchip-pinconf.dtsi 到正确路径"
+else
+    echo "❌ 下载rockchip-pinconf.dtsi失败！"
+    exit 1
+fi
+
 # ==================== 稳定下载 H29K 配置文件 ====================
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
 
@@ -473,21 +488,6 @@ fi
 rm -f "${ZIP_FILE}"
 
 echo "所有操作完成！"
-
-# 下载 rockchip-pinconf.dtsi 到 RK3528 设备树正确目录
-DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
-mkdir -p $DTS_DIR
-
-wget --no-check-certificate -q -O "$DTS_DIR/rockchip-pinconf.dtsi" \
-https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi
-
-# 校验文件是否存在
-if [ -f "$DTS_DIR/rockchip-pinconf.dtsi" ]; then
-    echo "✅ 成功下载 rockchip-pinconf.dtsi 到正确路径"
-else
-    echo "❌ 下载rockchip-pinconf.dtsi失败！"
-    exit 1
-fi
 
 # 下载 H29K 专用 mmc.bootscript（仅 1 个文件）
 mkdir -p target/linux/rockchip/image
