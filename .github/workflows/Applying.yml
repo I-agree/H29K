@@ -1,0 +1,92 @@
+name: OpenWrt Build - 自动扫描所有补丁失败
+on:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: openwrt-25.12
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@main
+
+    - name: 初始化编译环境
+      run: |
+        sudo apt update -y
+        sudo apt full-upgrade -y
+        sudo apt install -y \
+          build-essential cmake flex bison g++ gcc-multilib \
+          libncurses5-dev libncursesw5-dev libssl-dev libelf-dev \
+          git wget curl unzip bzip2 p7zip-full cpio rsync
+
+    - name: 下载 OpenWrt 源码
+      run: |
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        cd openwrt
+
+    - name: 加载 feeds & 运行 diy-part1.sh
+      run: |
+        cd openwrt
+        [ -f ../$FEEDS_CONF ] && mv -f ../$FEEDS_CONF ./feeds.conf
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+        [ -f ../$DIY_P1_SH ] && chmod +x ../$DIY_P1_SH && ../$DIY_P1_SH
+
+    - name: 运行 diy-part2.sh & 加载配置
+      run: |
+        cd openwrt
+        [ -f ../$CONFIG_FILE ] && mv -f ../$CONFIG_FILE ./.config
+        [ -f ../$DIY_P2_SH ] && chmod +x ../$DIY_P2_SH && ../$DIY_P2_SH
+        make defconfig
+
+    - name: 编译 - 自动收集所有补丁失败（不中断）
+      run: |
+        cd openwrt
+        LOG="build.log"
+        FAILED="failed_patches.txt"
+        rm -f $FAILED
+        touch $FAILED
+
+        # 核心：编译不中断，捕获所有补丁失败
+        make V=sc 2>&1 | tee $LOG | while IFS= read -r line; do
+          echo "$line"
+          if [[ "$line" =~ ^Patch\ failed!\ \ Please\ fix\ (.*)\! ]]; then
+            PATCH="${BASH_REMATCH[1]}"
+            echo "❌ FAIL: $PATCH"
+            echo "$PATCH" >> $FAILED
+          fi
+        done
+
+        # 输出最终结果
+        echo -e "\n\033[1;32m========================================"
+        echo " 🚨 本次编译 全部打不进去的补丁（共 $(cat $FAILED | wc -l) 个）"
+        echo -e "========================================\033[0m"
+        cat $FAILED | sort -u | tee $FAILED
+        echo -e "\033[1;32m========================================\033[0m"
+
+        # 上传补丁列表
+        mv -f $FAILED ../
+
+    - name: 上传失败补丁列表
+      uses: actions/upload-artifact@v4
+      with:
+        name: failed-patches
+        path: failed_patches.txt
+
+    - name: 上传固件
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenWrt-rockchip-rk3528-h29k
+        path: openwrt/bin/targets/rockchip/armv8/*
