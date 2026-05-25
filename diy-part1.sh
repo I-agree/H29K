@@ -117,18 +117,15 @@ mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
 
 # 下载地址
 URL_UBOOT_DEF="https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
-URL_IMAGE_DEF="https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/hinlink_h29k_defconfig"
 URL_ARMV8_MK="https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/armv8.mk"
 
 # 下载（curl 稳定版）
 curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_UBOOT_DEF" -o "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_IMAGE_DEF" -o "target/linux/rockchip/image/hinlink_h29k_defconfig"
 
-# 校验两个 defconfig
+# 校验defconfig
 [ -s "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig" ] || { echo "❌ U-Boot defconfig 下载失败" >&2; exit 1; }
-[ -s "target/linux/rockchip/image/hinlink_h29k_defconfig" ]         || { echo "❌ Image defconfig 下载失败" >&2; exit 1; }
 
-echo "✅ H29K 两个配置文件下载成功"
+echo "✅ H29K 配置文件defconfig下载成功"
 
 # ==================== 稳定下载 armv8.mk ====================
 MK_FILE="target/linux/rockchip/image/armv8.mk"
