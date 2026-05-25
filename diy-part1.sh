@@ -74,53 +74,6 @@ sed -i '/early_init_dt_verify/d; /early_init_dt_scan/d' "$BUILD_DIR"/target-*/li
 # Ensure no stale .o/.ko files remain (defensive cleanup)
 find "$BUILD_DIR"/target-*/linux-*/drivers/of/ -name "fdt.*" -delete 2>/dev/null
 
-# ==========================================================================
-# 🎯 全面切换为 LEDE rk3528.dtsi 核心（带网络防空、容错与 U-Boot 同步注入）
-# ==========================================================================
-
-# 1. 路径定义（一次定义，全局通用）
-DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
-mkdir -p "$DTS_DIR"
-
-echo "📥 开始下载 LEDE 核心设备树组件（带重试机制）..."
-
-# 下载 rk3528.dtsi
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
-  https://raw.githubusercontent.com/I-agree/H29K/main/123/rk3528.dtsi \
-  -o "$DTS_DIR/rk3528.dtsi"
-
-# 下载 rk3528-pinctrl.dtsi
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
-  https://raw.githubusercontent.com/I-agree/H29K/main/123/rk3528-pinctrl.dtsi \
-  -o "$DTS_DIR/rk3528-pinctrl.dtsi"
-
-# 下载 rockchip-pinconf.dtsi
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
-  https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi \
-  -o "$DTS_DIR/rockchip-pinconf.dtsi"
-
-# 2. 严格的“防空包/防失效”合并校验
-if [ ! -s "$DTS_DIR/rk3528.dtsi" ] || [ ! -s "$DTS_DIR/rk3528-pinctrl.dtsi" ] || [ ! -s "$DTS_DIR/rockchip-pinconf.dtsi" ]; then
-    echo "❌ 核心 DTSI 文件下载失败或文件为空（网络触发异常），停止编译！"
-    exit 1
-fi
-
-echo "✅ 成功下载并验证全套 LEDE rk3528 核心设备树组件！"
-
-# 3. 🎯 终极闭环：强制将上面验证通过的 LEDE 核心同步给 U-Boot 编译树
-# 这一步保证了 U-Boot 在打完官方基础补丁后，能够无缝吃下你刚下载好的新核心文件
-cat << 'EOF' >> package/boot/uboot-rockchip/Makefile
-
-# 🛠️ H29K 专属全套 LEDE 设备树定点强力注入 U-Boot
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	@echo "🚀 [H29K 注入] 正在将内核验证通过的 LEDE 核心 dtsi 强行同步至 U-Boot 源码树..."
-	mkdir -p $(PKG_BUILD_DIR)/arch/arm/dts/
-	cp -f $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528* $(PKG_BUILD_DIR)/arch/arm/dts/
-	cp -f $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi $(PKG_BUILD_DIR)/arch/arm/dts/
-endef
-EOF
-
 # 下载指定 dts 到目标目录，带校验
 DTS_SAVE_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_SAVE_DIR"
@@ -510,6 +463,53 @@ wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/scripts/gen_im
 # 完美的双修补丁：一份在内核，一份给 U-Boot
 mkdir -p package/boot/uboot-rockchip/dts
 cp target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts
+
+# ==========================================================================
+# 🎯 全面切换为 LEDE rk3528.dtsi 核心（带网络防空、容错与 U-Boot 同步注入）
+# ==========================================================================
+
+# 1. 路径定义
+DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
+mkdir -p "$DTS_DIR"
+
+echo "📥 开始下载 LEDE 核心设备树组件（带重试机制）..."
+
+# 下载 rk3528.dtsi
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
+  https://raw.githubusercontent.com/I-agree/H29K/main/123/rk3528.dtsi \
+  -o "$DTS_DIR/rk3528.dtsi"
+
+# 下载 rk3528-pinctrl.dtsi
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
+  https://raw.githubusercontent.com/I-agree/H29K/main/123/rk3528-pinctrl.dtsi \
+  -o "$DTS_DIR/rk3528-pinctrl.dtsi"
+
+# 下载 rockchip-pinconf.dtsi
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
+  https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi \
+  -o "$DTS_DIR/rockchip-pinconf.dtsi"
+
+# 2. 严格的“防空包/防失效”合并校验
+if [ ! -s "$DTS_DIR/rk3528.dtsi" ] || [ ! -s "$DTS_DIR/rk3528-pinctrl.dtsi" ] || [ ! -s "$DTS_DIR/rockchip-pinconf.dtsi" ]; then
+    echo "❌ 核心 DTSI 文件下载失败或文件为空（网络触发异常），停止编译！"
+    exit 1
+fi
+
+echo "✅ 成功下载并验证全套 LEDE rk3528 核心设备树组件！"
+
+# 3. 🎯 终极闭环：强制将上面验证通过的 LEDE 核心同步给 U-Boot 编译树
+# 这一步保证了 U-Boot 在打完官方基础补丁后，能够无缝吃下你刚下载好的新核心文件
+cat << 'EOF' >> package/boot/uboot-rockchip/Makefile
+
+# 🛠️ H29K 专属全套 LEDE 设备树定点强力注入 U-Boot
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	@echo "🚀 [H29K 注入] 正在将内核验证通过的 LEDE 核心 dtsi 强行同步至 U-Boot 源码树..."
+	mkdir -p $(PKG_BUILD_DIR)/arch/arm/dts/
+	cp -f $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528* $(PKG_BUILD_DIR)/arch/arm/dts/
+	cp -f $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi $(PKG_BUILD_DIR)/arch/arm/dts/
+endef
+EOF
 
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
