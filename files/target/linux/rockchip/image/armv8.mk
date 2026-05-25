@@ -26,7 +26,6 @@ define Device/hinlink_h29k
     luci-theme-argon imagemagick imagemagick-jpeg imagemagick-png imagemagick-gif curl \
     luci-i18n-base-zh-cn luci-i18n-opkg-zh-cn luci-i18n-firewall-zh-cn \
     luci-app-bbr luci-i18n-bbr-zh-cn luci-mod-admin-full \
-    luci-app-irqbalance luci-i18n-irqbalance-zh-cn \
     dnscrypt-proxy luci-app-dnscrypt-proxy luci-i18n-dnscrypt-proxy-zh-cn \
     irqbalance luci-app-irqbalance luci-i18n-irqbalance-zh-cn u-boot-hinlink-h29k-rk3528
 endef
