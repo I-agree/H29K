@@ -29,7 +29,6 @@ printf '\n'
 # ==========================================================================
 # 配置 input-event-daemon 转发按键事件 → 兼容 OpenWrt 原生 button 脚本
 # ==========================================================================
-# 创建配置文件目录（安全）
 mkdir -p files/etc
 
 # 生成 input-event-daemon 配置（原样写入，不解析任何字符，100%安全）
@@ -39,25 +38,15 @@ cat > files/etc/input-event-daemon.conf <<'EOF'
 115:0:/bin/button hotplug reset released
 EOF
 
-# 开机自启（写入 files/ 目录，确保编译进固件）
-mkdir -p files/etc/rc.d
-ln -sf ../init.d/input-event-daemon files/etc/rc.d/S99input-event-daemon
-
 # ======================== 【离线复制字体：MiSans-Regular.ttf】 ========================
-# 🔹 源文件：diy-part2.sh 与 fonts/ 同级 → dirname "$0" 即仓库根
 SRC_FONT="$(dirname "$0")/fonts/MiSans-Regular.ttf"
-
-# 🔹 目标路径：OpenWrt 固件内标准位置
 DST_FONT="files/usr/share/fonts/truetype/MiSans-Regular.ttf"
 
-# 创建目标目录（安全，幂等）
 mkdir -p "$(dirname "$DST_FONT")"
 
-# ✅ 关键校验：检查源文件是否存在（CI 友好）
 if [ ! -f "$SRC_FONT" ]; then
   echo "❌ 错误：字体文件未找到！请确认："
-  echo "   • fonts/MiSans-Regular.ttf 已提交到 Git（运行：git ls-files fonts/MiSans-Regular.ttf）"
-  echo "   • 当前工作目录正确（应在仓库根目录下执行此脚本）"
+  echo "   • fonts/MiSans-Regular.ttf 已提交到 Git"
   echo "   • 查找路径：$SRC_FONT"
   exit 1
 fi
@@ -68,7 +57,6 @@ if [[ ! -r "$SRC_FONT" ]]; then
   exit 1
 fi
 
-# 复制并校验
 cp -f "$SRC_FONT" "$DST_FONT"
 
 if [[ ! -s "$DST_FONT" ]]; then
@@ -76,30 +64,23 @@ if [[ ! -s "$DST_FONT" ]]; then
   exit 1
 fi
 
-# Magic Number 校验（TTF/OTF）
-MAGIC=$(head -c 4 "$DST_FONT" 2>/dev/null | xxd -p 2>/dev/null | tr -d '\n')
+# 🔥 核心修复：用 Linux 原生 od 代替 xxd，防止编译宿主机因没有 xxd 导致 pipefail 崩溃
+MAGIC=$(head -c 4 "$DST_FONT" 2>/dev/null | od -t x1 -An | tr -d ' \n')
 if [[ "$MAGIC" != "00010000" ]] && [[ "$MAGIC" != "4f54544f" ]]; then
   echo -e "\033[31m❌ 错误：'$DST_FONT' 不是有效的 TTF/OTF 字体（Magic: $MAGIC）\033[0m"
   exit 1
 fi
 
 chmod 644 "$DST_FONT"
-echo "✅ 字体复制成功：$DST_FONT"
-echo "   → 构建后路径：/usr/share/fonts/truetype/MiSans-Regular.ttf"
+echo "✅ 字体复制并校验成功：$DST_FONT"
 
-echo "[OK] MiSans-Regular.ttf 已安装到固件内"
-
-
-# ======================== 【设为系统默认中文MiSans-Regular.ttf字体】 ========================
-# ✅ 原理：通过 fontconfig 规则，让所有 <family>serif</family>、<family>sans-serif</family>、<family>monospace</family>
-#        的中文文本自动 fallback 到 MiSans-Regular.ttf（OpenWrt 默认使用 fontconfig 2.13+）
+# ======================== 【设为系统默认中文字体】 ========================
 mkdir -p files/etc/fonts/conf.d
 
 cat > files/etc/fonts/conf.d/99-misans-default.conf <<'EOF'
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
 <fontconfig>
-  <!-- 将 MiSans 设为中文字体首选 -->
   <match target="pattern">
     <test name="lang" compare="contains">
       <string>zh</string>
@@ -108,7 +89,6 @@ cat > files/etc/fonts/conf.d/99-misans-default.conf <<'EOF'
       <string>MiSans</string>
     </edit>
   </match>
-  <!-- 全局 fallback：当请求 sans-serif/serif 时，优先使用 MiSans -->
   <alias>
     <family>sans-serif</family>
     <prefer>
@@ -129,8 +109,6 @@ cat > files/etc/fonts/conf.d/99-misans-default.conf <<'EOF'
 EOF
 
 printf '\n'
-# ✅ 构建时预生成 fonts.cache（避免首次启动卡顿，兼容 BusyBox 环境）
-echo "✅ 已配置 MiSans 为默认中文字体，构建后生效"
 
 # ======================== 【屏幕脚本（procd 服务化）】 ========================
 mkdir -p files/etc/init.d
@@ -155,7 +133,7 @@ service_triggers() {
 EOF
 chmod +x files/etc/init.d/h29k-screen
 
-# 屏幕主脚本（🔥 已彻底重构，完美兼容 BusyBox ash，干掉所有 Bashism 数组语法）
+# 屏幕主脚本
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
@@ -166,18 +144,13 @@ sleep 12
 for i in 1 2 3; do [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -f "$LOGO_DIR/LOGO$i.jpg" && sleep 0.8; done
 
 while true; do
-    # ==============================
-    # 动态获取 cdc-wdm 设备（兼容多模组）
-    # ==============================
     WDM_DEV=$(ls /dev/cdc-wdm* 2>/dev/null | head -n1)
     WDM_DEV=${WDM_DEV:-/dev/cdc-wdm0}
     RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}')
     [ -z "$RSRP" ] && RSRP="Search"
 
-    # ✅ 网络名言（带超时）→ 失败则 fallback 到本地预存名言
     QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | cut -c 1-25)
     if [ -z "$QUOTE" ]; then
-      # 🔹 POSIX 标准时间戳取模，完美平替 $RANDOM，完美契合 BusyBox ash
       RAND_IDX=$(($(date +%s) % 3))
       case "$RAND_IDX" in
         0) QUOTE="山林从不向四季起誓" ;;
@@ -198,7 +171,6 @@ EOF
 chmod +x files/usr/bin/h29k_screen.sh
 
 # ======================== 【系统默认设置（UCI）】 ========================
-# ✅ 修复点9：启用 h29k-screen 服务（替代 rc.local）
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k <<'EOF'
 #!/bin/sh
@@ -215,7 +187,12 @@ uci commit system
 # ✅ 禁用 ModemManager（避免与 uqmi/uqmic 冲突）
 /etc/init.d/modemmanager disable
 
-# ✅ 启用自定义屏幕服务（procd 方式，安全可靠）
+# ✅ 🔥 优化：改用标准 uci-defaults 方式安全激活按键守护进程，杜绝硬编码链接冲突
+if [ -f "/etc/init.d/input-event-daemon" ]; then
+    /etc/init.d/input-event-daemon enable
+fi
+
+# ✅ 启用自定义屏幕服务
 /etc/init.d/h29k-screen enable
 
 exit 0
@@ -223,10 +200,9 @@ EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
 printf '\n'
-# ======================== 【H29K 强制2项校验 · 失败立即终止编译】 ========================
-echo "🔍 开始 H29K 构建前置3重校验..."
+# ======================== 【H29K 强制校验】 ========================
+echo "🔍 开始 H29K 构建前置 2 重校验..."
 
-# ✅ 校验1：设备定义已写入 armv8.mk
 DEVICE_NAME="hinlink_h29k"
 MK_FILE="target/linux/rockchip/image/armv8.mk"
 if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
@@ -235,10 +211,6 @@ if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
 fi
 echo -e "\033[32m[通过] 设备定义已写入 armv8.mk\033[0m"
 
-# ✅ 校验2：防止 diy-part1.sh 下载失败、路径错误或被其他脚本误删，导致后续编译静默出错
+[ -f package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig ] || { echo "❌ 错误：U-Boot 配置文件缺失！" >&2; exit 1; }
 
-# 检查 U-Boot 配置文件：应位于 package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig
-[ -f package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig ] || { echo "❌ 错误：U-Boot 配置文件缺失！请检查 diy-part1.sh 是否执行成功，或手动运行 wget 下载" >&2; exit 1; }
-
-# 全部通过 → 输出友好提示，继续构建流程
-echo "✅ 成功：H29K 配置文件均已就位，构建流程将继续..."
+echo "✅ 成功：H29K 配置文件均已就位，结合完美闭环！"
