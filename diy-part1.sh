@@ -122,7 +122,6 @@ if grep -q "hinlink_h28k" "$MK_FILE"; then
 fi
 
 echo "✅ 已下载并替换 armv8.mk 成功"
-echo "✅ 已校验：无 hinlink_h28k，仅保留 rk3528 + hinlink_h29k"
 
 # ==============================
 # 【安装squashfs4】
