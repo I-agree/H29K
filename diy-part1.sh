@@ -192,8 +192,8 @@ define U-Boot/hinlink-h29k-rk3528\n\
   NAME:=HINLINK H29K\n\
   BUILD_DEVICES:= \\\n\
     hinlink_h29k\n\
-  UBOOT_CONFIG:=rk3528/hinlink_h29k_defconfig\n\
-  UBOOT_DTS:=rockchip/rk3528-hinlink-h29k\n\
+  UBOOT_CONFIG:=hinlink_h29k_defconfig\n\
+  UBOOT_DTS:=rk3528-hinlink-h29k\n\
   TPL:=rk3528_ddr_1056MHz_v1.11.bin\n\
 endef\n\
 ' package/boot/uboot-rockchip/Makefile
