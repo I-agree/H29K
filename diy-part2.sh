@@ -159,11 +159,14 @@ while true; do
       esac
     fi
 
-    convert "$LOGO_DIR/LOGO3.jpg" -fill "rgba(0,0,0,0.7)" -draw "rectangle 0 60 240 240" \
-    -font "$FONT" -fill "#00FF00" -pointsize 45 -annotate +35+130 "$RSRP" \
-    -fill white -pointsize 15 -annotate +160+130 "dB" \
-    -fill "#222222" -draw "rectangle 0 195 240 240" \
-    -fill "#CCCCCC" -pointsize 14 -annotate +10+225 "${QUOTE:-H29K Ready}" "$TMP_IMG"
+    # 🔥 核心修复：ImageMagick 320x172 宽屏分辨率精准自适应适配
+    convert "$LOGO_DIR/LOGO3.jpg" -resize 320x172\! \
+    -fill "rgba(0,0,0,0.6)" -draw "rectangle 0 20 320 130" \
+    -font "$FONT" -fill "#00FF00" -pointsize 48 -annotate +40+95 "$RSRP" \
+    -fill white -pointsize 16 -annotate +215+95 "dB" \
+    -fill "#1a1a1a" -draw "rectangle 0 140 320 172" \
+    -fill "#CCCCCC" -pointsize 13 -annotate +15+161 "${QUOTE:-H29K Ready}" "$TMP_IMG"
+    
     fbv -f "$TMP_IMG"
     sleep 25
 done
