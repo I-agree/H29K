@@ -496,20 +496,6 @@ fi
 
 echo "✅ 成功下载并验证全套 LEDE rk3528 核心设备树组件！"
 
-# 3. 🎯 终极闭环：强制将上面验证通过的 LEDE 核心同步给 U-Boot 编译树
-# 这一步保证了 U-Boot 在打完官方基础补丁后，能够无缝吃下你刚下载好的新核心文件
-cat << 'EOF' >> package/boot/uboot-rockchip/Makefile
-
-# 🛠️ H29K 专属全套 LEDE 设备树定点强力注入 U-Boot
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	@echo "🚀 [H29K 注入] 正在将内核验证通过的 LEDE 核心 dtsi 强行同步至 U-Boot 源码树..."
-	mkdir -p $(PKG_BUILD_DIR)/arch/arm/dts/
-	cp -f $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528* $(PKG_BUILD_DIR)/arch/arm/dts/
-	cp -f $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi $(PKG_BUILD_DIR)/arch/arm/dts/
-endef
-EOF
-
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
 echo "============================================="
