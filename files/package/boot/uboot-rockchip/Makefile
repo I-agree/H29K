@@ -23,12 +23,11 @@ define U-Boot/Default
   HIDDEN:=1
 endef
 
-
 # RK3528 boards
 
 define U-Boot/rk3528/Default
   BUILD_SUBTARGET:=armv8
-  DEPENDS:=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3528
+  DEPENDS:=+trusted-firmware-a-rk3528
   ATF:=rk3528_bl31_v1.20.elf
   TPL:=rk3528_ddr_1056MHz_v1.11.bin
 endef
@@ -52,12 +51,8 @@ UBOOT_MAKE_FLAGS += \
   BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
   $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
-define Build/InstallDev
-	$(INSTALL_DIR) $(STAGING_DIR_IMAGE)
-	$(CP) $(PKG_BUILD_DIR)/u-boot-rockchip.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot-rockchip.bin
-endef
-
 define Package/u-boot/install/default
+	$(CP) $(PKG_BUILD_DIR)/u-boot-rockchip.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot-rockchip.bin
 endef
 
 $(eval $(call BuildPackage/U-Boot))
