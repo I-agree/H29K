@@ -161,9 +161,29 @@ https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/
 
 echo -e "\n=============================================\n"
 
-# 下载 H29K 专用 uboot-rockchip Makefile 到正确目录
-wget -O package/boot/uboot-rockchip/Makefile \
+# 下载 H29K 专用 uboot-rockchip Makefile
+echo "正在下载 H29K U-Boot Makefile..."
+wget -q --retry=3 --timeout=10 \
+-O package/boot/uboot-rockchip/Makefile \
 https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/Makefile
+
+# ====================== 【严格验证】 ======================
+MAKEFILE_PATH="package/boot/uboot-rockchip/Makefile"
+
+# 1. 验证文件存在且不为空
+if [ ! -s "$MAKEFILE_PATH" ]; then
+    echo -e "\033[41;37m 错误：Makefile 下载失败或为空 \033[0m"
+    exit 1
+fi
+
+# 2. 验证 UBOOT_TARGETS 是否正确包含 hinlink-h29k-rk3528
+if grep -q "UBOOT_TARGETS.*hinlink-h29k-rk3528" "$MAKEFILE_PATH"; then
+    echo -e "\033[42;37m 验证成功 ✅ UBOOT_TARGETS 配置正确 \033[0m"
+    echo "目标设备：hinlink-h29k-rk3528"
+else
+    echo -e "\033[41;37m 错误 ❌ UBOOT_TARGETS 配置不正确 \033[0m"
+    exit 1
+fi
 
 # ==============================================
 # 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
