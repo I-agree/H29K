@@ -51,15 +51,16 @@ UBOOT_MAKE_FLAGS += \
   BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
   $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
-# 🚀 【核心新增】文件重组与强行注入机制
+# 🚀 【核心修正】内嵌 LEDE 核心 dtsi 强行注入与文件重组机制
 define Build/Prepare
-	# 1. 先让系统正常解压标准的 U-Boot 源码
 	$(call Build/Prepare/Default)
-	# 2. 把你的自定义 defconfig 复制到 U-Boot 源码的 configs 目录
+	# 1. 复制自定义 defconfig 和基础 DTS 文件
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig $(PKG_BUILD_DIR)/configs/
-	# 3. 把你的自定义 DTS 复制到 U-Boot 源码的 arch/arm/dts 目录
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/arch/arm/dts/
-	# 4. 关键：把你的 DTS 名字追加到 U-Boot 的设备树编译名录中，确保它被编译
+	# 2. 强行将内核下载并验证通过的全新 LEDE 核心 dtsi 组件同步注入 U-Boot 源码树
+	$(CP) $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi $(PKG_BUILD_DIR)/arch/arm/dts/
+	$(CP) $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rockchip-pinconf.dtsi $(PKG_BUILD_DIR)/arch/arm/dts/
+	# 3. 将新设备树追加到 U-Boot 编译名录
 	echo 'dtb-y += rk3528-hinlink-h29k.dtb' >> $(PKG_BUILD_DIR)/arch/arm/dts/Makefile
 endef
 
