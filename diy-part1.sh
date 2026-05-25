@@ -112,10 +112,6 @@ else
     exit 1
 fi
 
-# 完美的双修补丁：一份在内核，一份给 U-Boot
-mkdir -p package/boot/uboot-rockchip/dts
-cp target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts
-
 # ==================== 稳定下载 H29K 配置文件 ====================
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
 
@@ -507,6 +503,10 @@ wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/r
 # 下载 H29K 专用 gen_image_generic.sh（仅 1 个文件）
 mkdir -p scripts
 wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/scripts/gen_image_generic.sh -O scripts/gen_image_generic.sh
+
+# 完美的双修补丁：一份在内核，一份给 U-Boot
+mkdir -p package/boot/uboot-rockchip/dts
+cp target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts
 
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
