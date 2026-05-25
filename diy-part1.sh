@@ -44,6 +44,7 @@ sed -i '/define KernelPackage\/sound-core/,/^endef/{
 # 1. 清理OpenWrt原生冲突DTS和补丁
 rm -f target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
 rm -f target/linux/rockchip/patches-6.12/070-04-v6.15-arm64-dts-rockchip-Add-pinctrl-and-gpio-nodes-for-RK3528.patch
+rm -f target/linux/rockchip/patches-6.12/107-board-rockchip-add-HINLINK-H28K.patch
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
 rm -rf target/linux/generic/hack-6.12
 rm -rf target/linux/bcm27xx/patches-6.12
