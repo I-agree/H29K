@@ -40,6 +40,23 @@ sed -i '/define KernelPackage\/sound-core/,/^endef/{
   s/^\(  AUTOLOAD:=\).*/\1/
 }' package/kernel/linux/modules/sound.mk
 
+# 1. 清理OpenWrt原生冲突补丁
+rm -rf target/linux/generic/hack-6.12
+rm -rf target/linux/bcm27xx/patches-6.12
+rm -f target/linux/generic/hack-6.18/920-device_tree_cmdline.patch
+rm -f target/linux/ipq806x/patches-6.12/901-02-ARM-decompressor-add-option-to-ignore-MEM-ATAGs.patch
+rm -f target/linux/mpc85xx/patches-6.12/102-powerpc-add-cmdline-override.patch
+rm -f package/boot/uboot-mediatek/patches/280-image-fdt-save-name-of-FIT-configuration-in-chosen-node.patch
+rm -f target/linux/generic/hack-6.12/920-device_tree_cmdline.patch
+rm -f target/linux/mpc85xx/patches-6.18/102-powerpc-add-cmdline-override.patch
+rm -f target/linux/mediatek/patches-6.18/901-arm-add-cmdline-override.patch
+rm -f target/linux/qualcommax/patches-6.12/0911-arm64-cmdline-replacement.patch
+rm -f target/linux/ipq806x/patches-6.12/902-ARM-decompressor-support-for-ATAGs-rootblock-parsing.patch
+rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
+rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
+rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
+rm -rf target/linux/airoha
+
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
 rm -f "$BUILD_DIR"/target-*/linux-*/drivers/of/fdt.c
