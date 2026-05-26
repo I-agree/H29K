@@ -70,7 +70,140 @@ rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
 rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
 rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
 rm -rf target/linux/airoha
-rm -rf target/linux/rockchip/patches-6.12
+# rm -rf target/linux/rockchip/patches-6.12
+
+# 自动删除所有 RK3588 / RK3576 无关补丁（适配 RK3528 H29K）
+rm -f target/linux/rockchip/patches-6.12/001-01-v6.13-arm64-dts-rockchip-Split-up-RK3588-s-PCIe-pinctrls.patch
+rm -f target/linux/rockchip/patches-6.12/001-02-v6.13-arm64-dts-rockchip-Add-HDMI0-node-to-rk3588.patch
+rm -f target/linux/rockchip/patches-6.12/001-03-v6.15-arm64-dts-rockchip-Use-dma-noncoherent-in-base-RK358.patch
+rm -f target/linux/rockchip/patches-6.12/001-04-v6.15-arm64-dts-rockchip-Enable-HDMI0-PHY-clk-provider-on-.patch
+rm -f target/linux/rockchip/patches-6.12/001-05-v6.15-arm64-dts-rockchip-Add-HDMI0-PHY-PLL-clock-source-to.patch
+rm -f target/linux/rockchip/patches-6.12/001-06-v6.15-arm64-dts-rockchip-Fix-label-name-of-hdptxphy-for-RK.patch
+rm -f target/linux/rockchip/patches-6.12/001-07-v6.15-arm64-dts-rockchip-Add-PHY-node-for-HDMI1-TX-port-on.patch
+rm -f target/linux/rockchip/patches-6.12/001-08-v6.15-arm64-dts-rockchip-Add-HDMI1-node-on-RK3588.patch
+rm -f target/linux/rockchip/patches-6.12/001-09-v6.15-arm64-dts-rockchip-Enable-HDMI1-PHY-clk-provider-on-.patch
+rm -f target/linux/rockchip/patches-6.12/001-10-v6.15-arm64-dts-rockchip-Add-HDMI1-PHY-PLL-clock-source-to.patch
+rm -f target/linux/rockchip/patches-6.12/001-11-v6.15-arm64-dts-rockchip-Add-rng-node-to-RK3588.patch
+rm -f target/linux/rockchip/patches-6.12/001-12-v6.15-arm64-dts-rockchip-Add-HDMI-audio-outputs-for-rk3588.patch
+rm -f target/linux/rockchip/patches-6.12/001-13-v6.15-arm64-dts-rockchip-Add-GPU-power-domain-regulator-de.patch
+rm -f target/linux/rockchip/patches-6.12/001-14-v6.15-arm64-dts-rockchip-change-rng-reset-id-back-to-its-c.patch
+rm -f target/linux/rockchip/patches-6.12/001-15-v6.15-arm64-dts-rockchip-Add-device-tree-support-for-HDMI-.patch
+rm -f target/linux/rockchip/patches-6.12/001-16-v6.19-arm64-dts-rockchip-add-eMMC-CQE-support-for-rk3588.patch
+
+rm -f target/linux/rockchip/patches-6.12/002-01-v6.13-arm64-dts-rockchip-add-and-enable-gpu-node-for-Radxa.patch
+rm -f target/linux/rockchip/patches-6.12/002-02-v6.13-arm64-dts-rockchip-Enable-HDMI0-on-rock-5a.patch
+rm -f target/linux/rockchip/patches-6.12/002-03-v6.13-arm64-dts-rockchip-sort-rk3588s-rock5a-properly-in-M.patch
+rm -f target/linux/rockchip/patches-6.12/002-04-v6.13-arm64-dts-rockchip-adapt-regulator-nodenames-to-pref.patch
+rm -f target/linux/rockchip/patches-6.12/002-05-v6.15-arm64-dts-rockchip-Fix-label-name-of-hdptxphy-for-RK.patch
+rm -f target/linux/rockchip/patches-6.12/002-06-v6.15-arm64-dts-rockchip-Add-GPU-power-domain-regulator-de.patch
+
+rm -f target/linux/rockchip/patches-6.12/003-01-v6.13-arm64-dts-rockchip-Switch-to-hp-det-gpios.patch
+rm -f target/linux/rockchip/patches-6.12/003-02-v6.13-arm64-dts-rockchip-Enable-HDMI0-on-rock-5b.patch
+rm -f target/linux/rockchip/patches-6.12/003-03-v6.13-arm64-dts-rockchip-adapt-regulator-nodenames-to-pref.patch
+rm -f target/linux/rockchip/patches-6.12/003-04-v6.13-arm64-dts-rockchip-rename-rfkill-label-for-Radxa-ROC.patch
+rm -f target/linux/rockchip/patches-6.12/003-05-v6.15-arm64-dts-rockchip-Fix-label-name-of-hdptxphy-for-RK.patch
+rm -f target/linux/rockchip/patches-6.12/003-06-v6.15-arm64-dts-rockchip-Enable-HDMI1-on-rock-5b.patch
+rm -f target/linux/rockchip/patches-6.12/003-07-v6.15-arm64-dts-rockchip-Enable-HDMI-audio-outputs-for-Roc.patch
+rm -f target/linux/rockchip/patches-6.12/003-08-v6.15-arm64-dts-rockchip-Add-GPU-power-domain-regulator-de.patch
+rm -f target/linux/rockchip/patches-6.12/003-09-v6.15-arm64-dts-rockchip-Enable-HDMI-receiver-on-rock-5b.patch
+rm -f target/linux/rockchip/patches-6.12/003-10-v6.16-arm64-dts-rockchip-Add-vcc-supply-to-SPI-flash-on-rk.patch
+rm -f target/linux/rockchip/patches-6.12/003-11-v6.16-arm64-dts-rockchip-move-rock-5b-to-include-file.patch
+rm -f target/linux/rockchip/patches-6.12/003-12-v6.16-arm64-dts-rockchip-add-Rock-5B.patch
+rm -f target/linux/rockchip/patches-6.12/003-13-v6.17-arm64-dts-rockchip-rename-rk3588-rock-5b.dtsi.patch
+rm -f target/linux/rockchip/patches-6.12/003-14-v6.17-arm64-dts-rockchip-move-common-ROCK-5B-nodes-into-ow.patch
+rm -f target/linux/rockchip/patches-6.12/003-15-v6.17-arm64-dts-rockchip-add-ROCK-5T-device-tree.patch
+rm -f target/linux/rockchip/patches-6.12/003-16-v6.17-arm64-dts-rockchip-fix-USB-on-RADXA-ROCK-5T.patch
+rm -f target/linux/rockchip/patches-6.12/003-17-v6.17-arm64-dts-rockchip-fix-second-M.2-slot-on-ROCK-5T.patch
+
+rm -f target/linux/rockchip/patches-6.12/004-01-v6.13-arm64-dts-rockchip-Switch-to-hp-det-gpios.patch
+rm -f target/linux/rockchip/patches-6.12/004-02-v6.13-arm64-dts-rockchip-fix-the-pcie-refclock-oscillator-.patch
+rm -f target/linux/rockchip/patches-6.12/004-03-v6.14-arm64-dts-rockchip-slow-down-emmc-freq-for-rock-5-it.patch
+rm -f target/linux/rockchip/patches-6.12/004-04-v6.15-arm64-dts-rockchip-add-hdmi1-support-to-ROCK-5-ITX.patch
+rm -f target/linux/rockchip/patches-6.12/004-05-v6.15-arm64-dts-rockchip-Add-GPU-power-domain-regulator-de.patch
+
+rm -f target/linux/rockchip/patches-6.12/005-01-v6.13-arm64-dts-rockchip-add-Radxa-ROCK-5C.patch
+rm -f target/linux/rockchip/patches-6.12/005-02-v6.15-arm64-dts-rockchip-Add-finer-grained-PWM-states-for-.patch
+rm -f target/linux/rockchip/patches-6.12/005-03-v6.15-arm64-dts-rockchip-Enable-automatic-fan-control-on-R.patch
+rm -f target/linux/rockchip/patches-6.12/005-04-v6.15-arm64-dts-rockchip-Fix-label-name-of-hdptxphy-for-RK.patch
+rm -f target/linux/rockchip/patches-6.12/005-05-v6.15-arm64-dts-rockchip-switch-Rock-5C-to-PMIC-based-TSHU.patch
+rm -f target/linux/rockchip/patches-6.12/005-06-v6.15-arm64-dts-rockchip-Add-GPU-power-domain-regulator-de.patch
+
+rm -f target/linux/rockchip/patches-6.12/006-01-v6.14-arm64-dts-rockchip-Add-Radxa-E52C.patch
+
+rm -f target/linux/rockchip/patches-6.12/031-01-v6.15-dt-bindings-reset-Add-SCMI-reset-IDs-for-RK3588.patch
+rm -f target/linux/rockchip/patches-6.12/031-02-v6.15-dt-bindings-rng-add-binding-for-Rockchip-RK3588-RNG.patch
+rm -f target/linux/rockchip/patches-6.12/031-03-v6.15-dt-bindings-rng-rockchip-rk3588-rng-Drop-unnecessary.patch
+rm -f target/linux/rockchip/patches-6.12/031-04-v6.15-hwrng-rockchip-store-dev-pointer-in-driver-struct.patch
+rm -f target/linux/rockchip/patches-6.12/031-05-v6.15-hwrng-rockchip-eliminate-some-unnecessary-dereferenc.patch
+rm -f target/linux/rockchip/patches-6.12/031-06-v6.15-hwrng-rockchip-add-support-for-rk3588-s-standalone-T.patch
+rm -f target/linux/rockchip/patches-6.12/031-07-v6.16-hwrng-rockchip-add-support-for-RK3576-s-RNG.patch
+
+rm -f target/linux/rockchip/patches-6.12/032-01-v6.14-clk-rockchip-support-clocks-registered-late.patch
+rm -f target/linux/rockchip/patches-6.12/032-02-v6.14-clk-rockchip-rk3588-register-GATE_LINK-later.patch
+rm -f target/linux/rockchip/patches-6.12/032-03-v6.14-clk-rockchip-expose-rockchip_clk_set_lookup.patch
+rm -f target/linux/rockchip/patches-6.12/032-04-v6.14-clk-rockchip-implement-linked-gate-clock-support.patch
+rm -f target/linux/rockchip/patches-6.12/032-05-v6.14-clk-rockchip-rk3588-drop-RK3588_LINKED_CLK.patch
+rm -f target/linux/rockchip/patches-6.12/032-06-v6.14-clk-rockchip-rk3588-make-refclko25m_ethX-critical.patch
+rm -f target/linux/rockchip/patches-6.12/032-07-v6.15-clk-rockchip-rk3568-mark-hclk_vi-as-critical.patch
+rm -f target/linux/rockchip/patches-6.12/032-08-v6.16-clk-rockchip-rk3588-Add-PLL-rate-for-1500-MHz.patch
+rm -f target/linux/rockchip/patches-6.12/032-09-v6.16-clk-rockchip-Drop-empty-init-callback-for-rk3588-PLL-type.patch
+
+rm -f target/linux/rockchip/patches-6.12/032-10-v6.15-soc-rockchip-add-header-for-suspend-mode-SIP-interface.patch
+rm -f target/linux/rockchip/patches-6.12/032-11-v6.15-clk-rockchip-rk3576-define-clk_otp_phy_g.patch
+rm -f target/linux/rockchip/patches-6.12/032-12-v6.15-dt-bindings-clock-rk3576-add-SCMI-clocks.patch
+rm -f target/linux/rockchip/patches-6.12/032-13-v6.16-dt-bindings-clock-rk3576-add-IOC-gated-clocks.patch
+rm -f target/linux/rockchip/patches-6.12/032-14-v6.16-clk-rockchip-introduce-auxiliary-GRFs.patch
+rm -f target/linux/rockchip/patches-6.12/032-15-v6.16-clk-rockchip-introduce-GRF-gates.patch
+rm -f target/linux/rockchip/patches-6.12/032-16-v6.16-clk-rockchip-add-GATE_GRFs-for-SAI-MCLKOUT-to-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/032-17-v6.16-clk-rockchip-rk3576-add-missing-slab-h-include.patch
+
+rm -f target/linux/rockchip/patches-6.12/033-01-v6.15-pmdomain-rockchip-Add-smc-call-to-inform-firmware.patch
+rm -f target/linux/rockchip/patches-6.12/033-02-v6.15-pmdomain-rockchip-Check-if-SMC-could-be-handled-by-TA.patch
+rm -f target/linux/rockchip/patches-6.12/033-03-v6.15-pmdomain-rockchip-Fix-build-error.patch
+
+rm -f target/linux/rockchip/patches-6.12/034-01-v6.17-thermal-drivers-rockchip-Rename-rk_tsadcv3_tshut_mode.patch
+rm -f target/linux/rockchip/patches-6.12/034-02-v6.17-thermal-drivers-rockchip-Support-RK3576-SoC-in-the-therma.patch
+rm -f target/linux/rockchip/patches-6.12/034-03-v6.17-thermal-drivers-rockchip-Support-reading-trim-values-from.patch
+
+rm -f target/linux/rockchip/patches-6.12/036-03-v6.13-phy-rockchip-inno-usb2-Add-usb2-phys-support-for-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/036-04-v6.13-phy-rockchip-usbdp-add-rk3576-device-match-data.patch
+rm -f target/linux/rockchip/patches-6.12/036-05-v6.14-phy-rockchip-naneng-combo-add-rk3576-support.patch
+
+rm -f target/linux/rockchip/patches-6.12/037-01-v6.15-scsi-ufs-core-Export-ufshcd_dme_reset-and.patch
+rm -f target/linux/rockchip/patches-6.12/037-02-v6.15-scsi-ufs-rockchip-Initial-support-for-UFS.patch
+rm -f target/linux/rockchip/patches-6.12/037-03-v6.15-scsi-ufs-rockchip-Fix-devm_clk_bulk_get_all_enabled.patch
+rm -f target/linux/rockchip/patches-6.12/037-04-v6.19-mmc-sdhci-of-dwcmshc-Add-command-queue-support-for-rockch.patch
+rm -f target/linux/rockchip/patches-6.12/037-05-v6.19-mmc-sdhci-of-dwcmshc-Fix-command-queue-support-for-RK3576.patch
+rm -f target/linux/rockchip/patches-6.12/037-06-v6.19-mmc-sdhci-of-dwcmshc-Disable-internal-clock-auto-gate-for.patch
+rm -f target/linux/rockchip/patches-6.12/037-07-v6.19-mmc-sdhci-of-dwcmshc-reduce-CIT-for-better-performance.patch
+
+rm -f target/linux/rockchip/patches-6.12/050-01-v6.13-arm64-dts-rockchip-Add-rk3576-SoC-base-DT.patch
+rm -f target/linux/rockchip/patches-6.12/050-02-v6.14-arm64-dts-rockchip-Add-rk3576-naneng-combphy-nodes.patch
+rm -f target/linux/rockchip/patches-6.12/050-03-v6.14-arm64-dts-rockchip-add-usb-related-nodes-for-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-04-v6.15-arm64-dts-rockchip-add-rk3576-otp-node.patch
+rm -f target/linux/rockchip/patches-6.12/050-05-v6.15-scsi-arm64-dts-rockchip-Add-UFS-support-for-RK3576-SoC.patch
+rm -f target/linux/rockchip/patches-6.12/050-06-v6.15-arm64-dts-rockchip-Add-vop-for-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-07-v6.15-arm64-dts-rockchip-Add-hdmi-for-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-08-v6.15-arm64-dts-rockchip-Add-SFC-nodes-for-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-09-v6.15-arm64-dts-rockchip-fix-RK3576-SCMI-clock-IDs.patch
+rm -f target/linux/rockchip/patches-6.12/050-10-v6.16-arm64-dts-rockchip-Add-rk3576-pcie-nodes.patch
+rm -f target/linux/rockchip/patches-6.12/050-11-v6.16-arm64-dts-rockchip-add-SATA-nodes-to-RK3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-12-v6.16-arm64-dts-rockchip-add-RK3576-RNG-node.patch
+rm -f target/linux/rockchip/patches-6.12/050-13-v6.16-arm64-dts-rockchip-Add-RK3576-SAI-nodes.patch
+rm -f target/linux/rockchip/patches-6.12/050-14-v6.16-arm64-dts-rockchip-Add-RK3576-HDMI-audio.patch
+rm -f target/linux/rockchip/patches-6.12/050-15-v6.16-arm64-dts-rockchip-Add-missing-SFC-power-domains-to-rk357.patch
+rm -f target/linux/rockchip/patches-6.12/050-16-v6.16-arm64-dts-rockchip-fix-rk3576-pcie-unit-addresses.patch
+rm -f target/linux/rockchip/patches-6.12/050-17-v6.16-arm64-dts-rockchip-move-rk3576-pinctrl-node-outside-the.patch
+rm -f target/linux/rockchip/patches-6.12/050-18-v6.16-arm64-dts-rockchip-remove-a-double-empty-line-from-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-19-v6.16-arm64-dts-rockchip-fix-rk3576-pcie1-linux-pci-domain.patch
+rm -f target/linux/rockchip/patches-6.12/050-20-v6.17-arm64-dts-rockchip-add-SDIO-controller-on-RK3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-21-v6.17-arm64-dts-rockchip-Enable-HDMI-PHY-clk-provider-on-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-22-v6.17-arm64-dts-rockchip-Add-HDMI-PHY-PLL-clock-source-to-VOP2.patch
+rm -f target/linux/rockchip/patches-6.12/050-23-v6.17-arm64-dts-rockchip-Add-thermal-nodes-to-RK3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-24-v6.17-arm64-dts-rockchip-Add-thermal-trim-OTP-and-tsadc-nodes.patch
+rm -f target/linux/rockchip/patches-6.12/050-25-v6.17-arm64-dts-rockchip-add-mipi-dcphy-to-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-26-v6.17-arm64-dts-rockchip-add-the-dsi-controller-to-rk3576.patch
+rm -f target/linux/rockchip/patches-6.12/050-27-v6.17-arm64-dts-rockchip-Enable-RK3576-watchdog.patch
 
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
