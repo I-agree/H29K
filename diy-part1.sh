@@ -102,6 +102,53 @@ rm -f target/linux/rockchip/patches-6.12/031-01-v6.15-dt-bindings-reset-Add-SCMI
 rm -f target/linux/rockchip/patches-6.12/031-02-v6.15-dt-bindings-rng-add-binding-for-Rockchip-RK3588-RNG.patch
 rm -f target/linux/rockchip/patches-6.12/031-03-v6.15-dt-bindings-rng-rockchip-rk3588-rng-Drop-unnecessary-compatible-string.patch
 
+# RK3588 全系列第三方开发板
+rm -f target/linux/rockchip/patches-6.12/000-01-v6.12-arm64-dts-rockchip-add-cpu-supply-for-rk3588.patch
+rm -f target/linux/rockchip/patches-6.12/000-02-v6.12-arm64-dts-rockchip-fix-rk3588-pwm-regulator.patch
+rm -f target/linux/rockchip/patches-6.12/000-03-v6.12-arm64-dts-rockchip-rk3588-fix-sdmmc-power-supply.patch
+rm -f target/linux/rockchip/patches-6.12/000-04-v6.12-arm64-dts-rockchip-rk3588-add-thermal-zones.patch
+rm -f target/linux/rockchip/patches-6.12/000-05-v6.12-arm64-dts-rockchip-rk3588-add-pcie-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-06-v6.12-arm64-dts-rockchip-rk3588-add-usb-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-07-v6.12-arm64-dts-rockchip-rk3588-add-hdmi-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-08-v6.12-arm64-dts-rockchip-rk3588-add-mipi-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-09-v6.12-arm64-dts-rockchip-rk3588-add-dp-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-10-v6.12-arm64-dts-rockchip-rk3588-add-gpu-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-11-v6.12-arm64-dts-rockchip-rk3588-add-npu-power-domain.patch
+
+# NanoPi R3S / R4S
+rm -f target/linux/rockchip/patches-6.12/007-05-v6.13-arm64-dts-rockchip-enable-eMMC-HS200-mode-for-NanoPi-R3S.patch
+rm -f target/linux/rockchip/patches-6.12/007-06-v6.13-arm64-dts-rockchip-reorder-mmc-aliases-for-NanoPi-R3S.patch
+rm -f target/linux/rockchip/patches-6.12/020-v6.20-arm64-dts-rockchip-fix-rk3566-nanopi-r4s-power-regulator.patch
+
+# NanoPC T6
+rm -f target/linux/rockchip/patches-6.12/009-v6.13-arm64-dts-rockchip-enable-USB3-on-NanoPC-T6.patch
+
+# LinkEase EasePi R1
+rm -f target/linux/rockchip/patches-6.12/010-v6.19-arm64-dts-rockchip-add-LinkEase-EasePi-R1.patch
+
+# FriendlyElec CM3588
+rm -f target/linux/rockchip/patches-6.12/011-v6.19-arm64-dts-rockchip-add-FriendlyElec-CM3588.patch
+
+# Radxa Rock 5A / 5B / ROCK3
+rm -f target/linux/rockchip/patches-6.12/012-v6.19-arm64-dts-rockchip-add-Radxa-Rock-5A-5B.patch
+rm -f target/linux/rockchip/patches-6.12/013-v6.19-arm64-dts-rockchip-add-Radxa-ROCK3.patch
+
+# Firefly ROC-RK3588-PC
+rm -f target/linux/rockchip/patches-6.12/014-v6.19-arm64-dts-rockchip-add-Firefly-ROC-RK3588-PC.patch
+
+# Indiedroid Nova
+rm -f target/linux/rockchip/patches-6.12/015-v6.19-arm64-dts-rockchip-add-Indiedroid-Nova.patch
+
+# Orange Pi 5 / 5B / 5 Plus
+rm -f target/linux/rockchip/patches-6.12/016-v6.19-arm64-dts-rockchip-add-Orange-Pi-5-5B.patch
+rm -f target/linux/rockchip/patches-6.12/017-v6.19-arm64-dts-rockchip-add-Orange-Pi-5-Plus.patch
+
+# Mixtile Blade 3
+rm -f target/linux/rockchip/patches-6.12/018-v6.19-arm64-dts-rockchip-add-Mixtile-Blade-3.patch
+
+# Pine64 Quartz64
+rm -f target/linux/rockchip/patches-6.12/019-v6.19-arm64-dts-rockchip-add-Pine64-Quartz64.patch
+
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
 rm -f "$BUILD_DIR"/target-*/linux-*/drivers/of/fdt.c
