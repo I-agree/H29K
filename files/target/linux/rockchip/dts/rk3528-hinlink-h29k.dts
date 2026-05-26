@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 // Hinlink H29K Board DTS — Production-Ready v1.2 (2026-05-08)
-// ✅ Verified against: H29K PCB Rev.B, RK3528 TRM v2.3, Linux 6.12.85, hinlink_h29k_defconfig
+// ✅ Verified against: H29K PCB Rev.B, RK3528 TRM v2.3, Linux 6.12.85, hinlink-h29k-rk3528_defconfig
 
 /dts-v1/;
 #include <dt-bindings/gpio/gpio.h>
