@@ -214,6 +214,6 @@ if ! grep -q "$DEVICE_NAME" "$MK_FILE"; then
 fi
 echo -e "\033[32m[通过] 设备定义已写入 armv8.mk\033[0m"
 
-[ -f package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig ] || { echo "❌ 错误：U-Boot 配置文件缺失！" >&2; exit 1; }
+[ -f package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig ] || { echo "❌ 错误：U-Boot 配置文件缺失！" >&2; exit 1; }
 
 echo "✅ 成功：H29K 配置文件均已就位，结合完美闭环！"
