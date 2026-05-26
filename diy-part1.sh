@@ -407,6 +407,23 @@ wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/r
 mkdir -p scripts
 wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/scripts/gen_image_generic.sh -O scripts/gen_image_generic.sh
 
-# 完美的双修补丁：一份在内核，一份给 U-Boot
-mkdir -p package/boot/uboot-rockchip/dts
-cp target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts
+# 下载 H29K 专用 U-Boot 专属 DTS
+# 定义路径
+DTS_DEST_DIR="package/boot/uboot-rockchip/dts"
+DTS_FILE="$DTS_DEST_DIR/rk3528-hinlink-h29k.dts"
+DTS_URL="https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
+
+# 1. 创建目录（不存在则自动建）
+mkdir -p "$DTS_DEST_DIR"
+
+# 2. 下载 DTS 文件
+echo "下载 H29K U-BOOT DTS..."
+wget -q -O "$DTS_FILE" "$DTS_URL"
+
+# 3. 验证文件是否下载成功
+if [ -f "$DTS_FILE" ] && [ -s "$DTS_FILE" ]; then
+    echo "✅ 成功：rk3528-hinlink-h29k.dts 已下载并放置到 $DTS_DEST_DIR"
+else
+    echo "❌ 失败：DTS 文件下载失败或为空"
+    exit 1
+fi
