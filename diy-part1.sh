@@ -72,7 +72,7 @@ rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
 rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
 rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
 rm -rf target/linux/airoha
-rm -rf target/linux/rockchip/patches-6.12
+# rm -rf target/linux/rockchip/patches-6.12
 
 # 自动删除所有 RK3588 / RK3576 无关补丁（适配 RK3528 H29K）
 rm -f target/linux/rockchip/patches-6.12/001-01-v6.13-arm64-dts-rockchip-Split-up-RK3588-s-PCIe-pinctrls.patch
