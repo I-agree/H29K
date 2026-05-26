@@ -237,14 +237,14 @@ fi
 mkdir -p package/boot/uboot-rockchip/configs/ target/linux/rockchip/image/
 
 # 下载地址
-URL_UBOOT_DEF="https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
+URL_UBOOT_DEF="https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig"
 URL_ARMV8_MK="https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/armv8.mk"
 
 # 下载（curl 稳定版）
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_UBOOT_DEF" -o "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig"
+curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$URL_UBOOT_DEF" -o "package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig"
 
 # 校验defconfig
-[ -s "package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig" ] || { echo "❌ U-Boot defconfig 下载失败" >&2; exit 1; }
+[ -s "package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig" ] || { echo "❌ U-Boot defconfig 下载失败" >&2; exit 1; }
 
 echo "✅ H29K 配置文件defconfig下载成功"
 
