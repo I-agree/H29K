@@ -46,6 +46,7 @@ rm -f target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-bas
 rm -f target/linux/rockchip/patches-6.12/070-04-v6.15-arm64-dts-rockchip-Add-pinctrl-and-gpio-nodes-for-RK3528.patch
 rm -f target/linux/rockchip/patches-6.12/031-04-v6.15-hwrng-rockchip-store-dev-pointer-in-driver-struct.patch
 rm -f target/linux/rockchip/patches-6.12/031-05-v6.15-hwrng-rockchip-eliminate-some-unnecessary-dereferenc.patch
+rm -f target/linux/rockchip/patches-6.12/031-06-v6.15-hwrng-rockchip-add-support-for-rk3588-s-standalone-T.patch
 rm -f target/linux/rockchip/patches-6.12/101-arm64-dts-rockchip-Add-HINLINK-H28K.patch
 rm -f package/boot/uboot-rockchip/patches/107-board-rockchip-add-HINLINK-H28K.patch
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
