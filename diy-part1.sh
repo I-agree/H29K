@@ -51,6 +51,7 @@ rm -f target/linux/rockchip/patches-6.12/031-07-v6.16-hwrng-rockchip-add-support
 rm -f target/linux/rockchip/patches-6.12/031-03-v6.15-dt-bindings-rng-rockchip-rk3588-rng-Drop-unnecessary.patch
 rm -f target/linux/rockchip/patches-6.12/032-20-v6.15-clk-rockchip-Add-clock-controller-driver-for-RK3528-SoC.patch
 rm -f target/linux/rockchip/patches-6.12/032-21-v6.15-clk-rockchip-rk3528-Add-reset-lookup-table.patch
+rm -f target/linux/rockchip/patches-6.12/032-24-v6.16-clk-rockchip-Support-MMC-clocks-in-GRF-region.patch
 rm -f target/linux/rockchip/patches-6.12/101-arm64-dts-rockchip-Add-HINLINK-H28K.patch
 rm -f package/boot/uboot-rockchip/patches/107-board-rockchip-add-HINLINK-H28K.patch
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
