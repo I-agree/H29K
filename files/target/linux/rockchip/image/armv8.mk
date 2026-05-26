@@ -15,8 +15,7 @@ define Device/hinlink_h29k
   DEVICE_DTS := rk3528-hinlink-h29k
   UBOOT_CONFIG := hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
-  KERNEL_LOADADDR := 0x00200000
-  KERNEL_ENTRYADDR := 0x00200000
+  KERNEL_LOADADDR := 0x03000000
   BOOT_SCRIPT := mmc
   IMAGE/sysupgrade.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
   DEVICE_PACKAGES := \
