@@ -40,61 +40,9 @@ sed -i '/define KernelPackage\/sound-core/,/^endef/{
   s/^\(  AUTOLOAD:=\).*/\1/
 }' package/kernel/linux/modules/sound.mk
 
-# ====================== 方案：全套切换为LEDE rk3528.dtsi + rk3528-pinctrl.dtsi ======================
-# 1. 清理OpenWrt原生冲突DTS和补丁
-rm -f target/linux/rockchip/patches-6.12/070-01-v6.13-arm64-dts-rockchip-Add-base-DT-for-rk3528-SoC.patch
-rm -f target/linux/rockchip/patches-6.12/070-04-v6.15-arm64-dts-rockchip-Add-pinctrl-and-gpio-nodes-for-RK3528.patch
-rm -f target/linux/rockchip/patches-6.12/031-04-v6.15-hwrng-rockchip-store-dev-pointer-in-driver-struct.patch
-rm -f target/linux/rockchip/patches-6.12/031-05-v6.15-hwrng-rockchip-eliminate-some-unnecessary-dereferenc.patch
-rm -f target/linux/rockchip/patches-6.12/031-06-v6.15-hwrng-rockchip-add-support-for-rk3588-s-standalone-T.patch
-rm -f target/linux/rockchip/patches-6.12/031-07-v6.16-hwrng-rockchip-add-support-for-RK3576-s-RNG.patch
-rm -f target/linux/rockchip/patches-6.12/031-03-v6.15-dt-bindings-rng-rockchip-rk3588-rng-Drop-unnecessary.patch
-rm -f target/linux/rockchip/patches-6.12/032-20-v6.15-clk-rockchip-Add-clock-controller-driver-for-RK3528-SoC.patch
-rm -f target/linux/rockchip/patches-6.12/032-21-v6.15-clk-rockchip-rk3528-Add-reset-lookup-table.patch
-rm -f target/linux/rockchip/patches-6.12/032-24-v6.16-clk-rockchip-Support-MMC-clocks-in-GRF-region.patch
-rm -f target/linux/rockchip/patches-6.12/032-25-v6.16-clk-rockchip-Pass-NULL-as-reg-pointer-when-registering-GR.patch
-rm -f target/linux/rockchip/patches-6.12/032-26-v6.16-clk-rockchip-rk3528-Add-SD-SDIO-tuning-clocks-in-GRF.patch
-rm -f target/linux/rockchip/patches-6.12/032-27-v6.16-clk-rockchip-rk3528-add-slab-h-header-include.patch
+# ====================== 清理OpenWrt原生冲突DTS和补丁 ======================
 rm -f target/linux/rockchip/patches-6.12/101-arm64-dts-rockchip-Add-HINLINK-H28K.patch
 rm -f package/boot/uboot-rockchip/patches/107-board-rockchip-add-HINLINK-H28K.patch
-rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
-rm -rf target/linux/generic/hack-6.12
-rm -rf target/linux/bcm27xx/patches-6.12
-rm -f target/linux/generic/hack-6.18/920-device_tree_cmdline.patch
-rm -f target/linux/ipq806x/patches-6.12/901-02-ARM-decompressor-add-option-to-ignore-MEM-ATAGs.patch
-rm -f target/linux/mpc85xx/patches-6.12/102-powerpc-add-cmdline-override.patch
-rm -f package/boot/uboot-mediatek/patches/280-image-fdt-save-name-of-FIT-configuration-in-chosen-node.patch
-rm -f target/linux/generic/hack-6.12/920-device_tree_cmdline.patch
-rm -f target/linux/mpc85xx/patches-6.18/102-powerpc-add-cmdline-override.patch
-rm -f target/linux/mediatek/patches-6.18/901-arm-add-cmdline-override.patch
-rm -f target/linux/qualcommax/patches-6.12/0911-arm64-cmdline-replacement.patch
-rm -f target/linux/ipq806x/patches-6.12/902-ARM-decompressor-support-for-ATAGs-rootblock-parsing.patch
-rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
-rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
-rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
-rm -rf target/linux/airoha
-# rm -rf target/linux/rockchip/patches-6.12
-
-# ==============================================
-# 1. 删除所有非 RK3528 内核补丁
-# ==============================================
-rm -f target/linux/rockchip/patches-6.12/*RK3588*.patch
-rm -f target/linux/rockchip/patches-6.12/*rk3588*.patch
-rm -f target/linux/rockchip/patches-6.12/*RK3576*.patch
-rm -f target/linux/rockchip/patches-6.12/*rk3576*.patch
-rm -f target/linux/rockchip/patches-6.12/*RK3582*.patch
-rm -f target/linux/rockchip/patches-6.12/*rk3582*.patch
-
-# 删除所有其他机型补丁（H28K / NanoPC / Radxa / LinkEase 等）
-rm -f target/linux/rockchip/patches-6.12/*H28K*.patch
-rm -f target/linux/rockchip/patches-6.12/*NanoPC*.patch
-rm -f target/linux/rockchip/patches-6.12/*Radxa*.patch
-rm -f target/linux/rockchip/patches-6.12/*LinkEase*.patch
-rm -f target/linux/rockchip/patches-6.12/*Lunzn*.patch
-rm -f target/linux/rockchip/patches-6.12/*EasePi*.patch
-
-# 删除所有 -dts-rockchip- 补丁
-rm -f target/linux/rockchip/patches-6.12/*-dts-rockchip-*.patch
 
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
@@ -498,37 +446,19 @@ mkdir -p package/boot/uboot-rockchip/dts
 cp target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts
 
 # ==========================================================================
-# 🎯 全面切换为 LEDE rk3528.dtsi 核心（带网络防空、容错与 U-Boot 同步注入）
+# 🎯 全面切换为 rockchip-pinconf.dtsi 核心（带网络防空、容错与 U-Boot 同步注入）
 # ==========================================================================
 
 # 1. 路径定义
 DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
 mkdir -p "$DTS_DIR"
 
-echo "📥 开始下载 LEDE 核心设备树组件（带重试机制）..."
-
-# 下载 rk3528.dtsi
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
-  https://raw.githubusercontent.com/I-agree/H29K/main/123/rk3528.dtsi \
-  -o "$DTS_DIR/rk3528.dtsi"
-
-# 下载 rk3528-pinctrl.dtsi
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
-  https://raw.githubusercontent.com/I-agree/H29K/main/123/rk3528-pinctrl.dtsi \
-  -o "$DTS_DIR/rk3528-pinctrl.dtsi"
-
 # 下载 rockchip-pinconf.dtsi
 curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
   https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi \
   -o "$DTS_DIR/rockchip-pinconf.dtsi"
 
-# 2. 严格的“防空包/防失效”合并校验
-if [ ! -s "$DTS_DIR/rk3528.dtsi" ] || [ ! -s "$DTS_DIR/rk3528-pinctrl.dtsi" ] || [ ! -s "$DTS_DIR/rockchip-pinconf.dtsi" ]; then
-    echo "❌ 核心 DTSI 文件下载失败或文件为空（网络触发异常），停止编译！"
-    exit 1
-fi
-
-echo "✅ 成功下载并验证全套 LEDE rk3528 核心设备树组件！"
+echo "✅ 成功下载rockchip-pinconf.dtsi！"
 
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
