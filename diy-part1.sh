@@ -399,53 +399,6 @@ else
     echo -e "\033[31m❌ 验证失败：文件内容不匹配，请检查！\033[0m"
 fi
 
-# ==============================
-# RK3528 压缩包文件自动部署（正确路径版）
-# ==============================
-
-# 正确路径（相对路径，100% 适配 OpenWrt 编译）
-TARGET_DIR="target/linux/rockchip/files"
-ZIP_URL="https://raw.githubusercontent.com/I-agree/H29K/main/123/lede-target-linux-rockchip-files.zip"
-ZIP_FILE="${TARGET_DIR}/lede-target-linux-rockchip-files.zip"
-
-# 创建目录
-mkdir -p ${TARGET_DIR}
-
-# 下载
-echo "正在下载 RK3528 驱动文件..."
-wget -q --no-check-certificate -O "${ZIP_FILE}" "${ZIP_URL}"
-
-# 校验文件是否存在
-if [ ! -f "${ZIP_FILE}" ]; then
-    echo "❌ 下载失败！"
-    exit 1
-fi
-
-# 校验 ZIP 完整性
-echo "正在校验文件完整性..."
-unzip -tq "${ZIP_FILE}"
-if [ $? -ne 0 ]; then
-    echo "❌ 文件损坏！"
-    exit 1
-fi
-
-# 解压
-echo "正在解压文件..."
-unzip -o -q "${ZIP_FILE}" -d "${TARGET_DIR}"
-
-# 验证最终结构
-if [ -d "${TARGET_DIR}/drivers" ] && [ -d "${TARGET_DIR}/include" ]; then
-    echo "✅ RK3528 原厂文件部署成功！"
-else
-    echo "❌ 部署失败！目录结构错误"
-    exit 1
-fi
-
-# 清理
-rm -f "${ZIP_FILE}"
-
-echo "所有操作完成！"
-
 # 下载 H29K 专用 mmc.bootscript（仅 1 个文件）
 mkdir -p target/linux/rockchip/image
 wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/image/mmc.bootscript -O target/linux/rockchip/image/mmc.bootscript
@@ -457,33 +410,3 @@ wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/scripts/gen_im
 # 完美的双修补丁：一份在内核，一份给 U-Boot
 mkdir -p package/boot/uboot-rockchip/dts
 cp target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts
-
-echo "============================================="
-echo "  🔍 全部文件完整性检查"
-echo "============================================="
-# 基础路径
-ROC_DIR="target/linux/rockchip/files"
-DTS_DIR="$ROC_DIR/arch/arm64/boot/dts/rockchip"
-INC="$ROC_DIR/include/dt-bindings"
-
-# 检查文件夹
-check_dir() {
-    if [ -d "$1" ]; then echo "✅ 目录存在: $1"; else echo "❌ 目录缺失: $1"; fi
-}
-
-# 检查文件
-check_file() {
-    if [ -f "$1" ]; then echo "✅ 文件存在: $1"; else echo "❌ 文件缺失: $1"; fi
-}
-
-echo -e "\n📁 检查主文件夹"
-check_dir "$ROC_DIR/include"
-check_dir "$ROC_DIR/drivers"
-
-echo -e "\n📄 检查 LEDE 头文件"
-check_file "$INC/clock/rk3528-cru.h"
-check_file "$INC/power/rk3528-power.h"
-
-echo -e "\n============================================="
-echo " ✅ 检查完成！以上全部存在即为正常"
-echo "============================================="
