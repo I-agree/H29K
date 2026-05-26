@@ -67,21 +67,24 @@ rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-argum
 rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
 rm -rf target/linux/airoha
 
-# RK3588 RNG 全套报错补丁
-rm -f target/linux/rockchip/patches-6.12/031-01-v6.15-dt-bindings-reset-Add-SCMI-reset-IDs-for-RK3588.patch
-rm -f target/linux/rockchip/patches-6.12/031-02-v6.15-dt-bindings-rng-add-binding-for-Rockchip-RK3588-RNG.patch
-rm -f target/linux/rockchip/patches-6.12/031-03-v6.15-dt-bindings-rng-rockchip-rk3588-rng-Drop-unnecessary-compatible-string.patch
-rm -f target/linux/rockchip/patches-6.12/031-04-v6.15-hwrng-rockchip-store-dev-pointer-in-driver-struct.patch
-rm -f target/linux/rockchip/patches-6.12/031-05-v6.15-hwrng-rockchip-eliminate-some-unnecessary-dereferenc.patch
-
-# RK356x PCIe 无关补丁
+# 删除【其他设备的 DTS 补丁】
+rm -f target/linux/rockchip/patches-6.12/000-01-v6.12-arm64-dts-rockchip-add-cpu-supply-for-rk3588.patch
+rm -f target/linux/rockchip/patches-6.12/000-02-v6.12-arm64-dts-rockchip-fix-rk3588-pwm-regulator.patch
+rm -f target/linux/rockchip/patches-6.12/000-03-v6.12-arm64-dts-rockchip-rk3588-fix-sdmmc-power-supply.patch
+rm -f target/linux/rockchip/patches-6.12/000-04-v6.12-arm64-dts-rockchip-rk3588-add-thermal-zones.patch
+rm -f target/linux/rockchip/patches-6.12/000-05-v6.12-arm64-dts-rockchip-rk3588-add-pcie-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-06-v6.12-arm64-dts-rockchip-rk3588-add-usb-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-07-v6.12-arm64-dts-rockchip-rk3588-add-hdmi-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-08-v6.12-arm64-dts-rockchip-rk3588-add-mipi-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-09-v6.12-arm64-dts-rockchip-rk3588-add-dp-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-10-v6.12-arm64-dts-rockchip-rk3588-add-gpu-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-11-v6.12-arm64-dts-rockchip-rk3588-add-npu-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/002-01-v6.14-arm64-dts-rockchip-enable-io-domain-for-rk3568.patch
+rm -f target/linux/rockchip/patches-6.12/007-05-v6.13-arm64-dts-rockchip-enable-eMMC-HS200-mode-for-NanoPi-R3S.patch
+rm -f target/linux/rockchip/patches-6.12/007-06-v6.13-arm64-dts-rockchip-reorder-mmc-aliases-for-NanoPi-R3S.patch
 rm -f target/linux/rockchip/patches-6.12/008-01-v6.15-arm64-dts-rockchip-rk356x-Add-MSI-controller-node.patch
 rm -f target/linux/rockchip/patches-6.12/008-02-v6.15-arm64-dts-rockchip-rk356x-Move-PCIe-MSI-to-use-GIC.patch
 rm -f target/linux/rockchip/patches-6.12/008-03-v6.16-arm64-dts-rockchip-Move-rk3568-PCIe3-MSI-to-use-GIC-.patch
-
-# 第三方开发板专属补丁（NanoPi / OrangePi 等）
-rm -f target/linux/rockchip/patches-6.12/007-05-v6.13-arm64-dts-rockchip-enable-eMMC-HS200-mode-for-NanoPi-R3S.patch
-rm -f target/linux/rockchip/patches-6.12/007-06-v6.13-arm64-dts-rockchip-reorder-mmc-aliases-for-NanoPi-R3S.patch
 rm -f target/linux/rockchip/patches-6.12/009-v6.13-arm64-dts-rockchip-enable-USB3-on-NanoPC-T6.patch
 rm -f target/linux/rockchip/patches-6.12/010-v6.19-arm64-dts-rockchip-add-LinkEase-EasePi-R1.patch
 rm -f target/linux/rockchip/patches-6.12/011-v6.19-arm64-dts-rockchip-add-FriendlyElec-CM3588.patch
@@ -94,6 +97,12 @@ rm -f target/linux/rockchip/patches-6.12/017-v6.19-arm64-dts-rockchip-add-Orange
 rm -f target/linux/rockchip/patches-6.12/018-v6.19-arm64-dts-rockchip-add-Mixtile-Blade-3.patch
 rm -f target/linux/rockchip/patches-6.12/019-v6.19-arm64-dts-rockchip-add-Pine64-Quartz64.patch
 rm -f target/linux/rockchip/patches-6.12/020-v6.20-arm64-dts-rockchip-fix-rk3566-nanopi-r4s-power-regulator.patch
+
+rm -f target/linux/rockchip/patches-6.12/031-01-v6.15-dt-bindings-reset-Add-SCMI-reset-IDs-for-RK3588.patch
+rm -f target/linux/rockchip/patches-6.12/031-02-v6.15-dt-bindings-rng-add-binding-for-Rockchip-RK3588-RNG.patch
+rm -f target/linux/rockchip/patches-6.12/031-03-v6.15-dt-bindings-rng-rockchip-rk3588-rng-Drop-unnecessary-compatible-string.patch
+rm -f target/linux/rockchip/patches-6.12/031-04-v6.15-hwrng-rockchip-store-dev-pointer-in-driver-struct.patch
+rm -f target/linux/rockchip/patches-6.12/031-05-v6.15-hwrng-rockchip-eliminate-some-unnecessary-dereferenc.patch
 
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
