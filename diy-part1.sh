@@ -54,6 +54,7 @@ rm -f target/linux/rockchip/patches-6.12/032-21-v6.15-clk-rockchip-rk3528-Add-re
 rm -f target/linux/rockchip/patches-6.12/032-24-v6.16-clk-rockchip-Support-MMC-clocks-in-GRF-region.patch
 rm -f target/linux/rockchip/patches-6.12/032-25-v6.16-clk-rockchip-Pass-NULL-as-reg-pointer-when-registering-GR.patch
 rm -f target/linux/rockchip/patches-6.12/032-26-v6.16-clk-rockchip-rk3528-Add-SD-SDIO-tuning-clocks-in-GRF.patch
+rm -f target/linux/rockchip/patches-6.12/032-27-v6.16-clk-rockchip-rk3528-add-slab-h-header-include.patch
 rm -f target/linux/rockchip/patches-6.12/101-arm64-dts-rockchip-Add-HINLINK-H28K.patch
 rm -f package/boot/uboot-rockchip/patches/107-board-rockchip-add-HINLINK-H28K.patch
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
