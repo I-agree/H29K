@@ -53,6 +53,7 @@ rm -f target/linux/rockchip/patches-6.12/032-20-v6.15-clk-rockchip-Add-clock-con
 rm -f target/linux/rockchip/patches-6.12/032-21-v6.15-clk-rockchip-rk3528-Add-reset-lookup-table.patch
 rm -f target/linux/rockchip/patches-6.12/032-24-v6.16-clk-rockchip-Support-MMC-clocks-in-GRF-region.patch
 rm -f target/linux/rockchip/patches-6.12/032-25-v6.16-clk-rockchip-Pass-NULL-as-reg-pointer-when-registering-GR.patch
+rm -f target/linux/rockchip/patches-6.12/032-26-v6.16-clk-rockchip-rk3528-Add-SD-SDIO-tuning-clocks-in-GRF.patch
 rm -f target/linux/rockchip/patches-6.12/101-arm64-dts-rockchip-Add-HINLINK-H28K.patch
 rm -f package/boot/uboot-rockchip/patches/107-board-rockchip-add-HINLINK-H28K.patch
 rm -rf target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi
@@ -71,7 +72,7 @@ rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
 rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
 rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
 rm -rf target/linux/airoha
-# rm -rf target/linux/rockchip/patches-6.12
+rm -rf target/linux/rockchip/patches-6.12
 
 # 自动删除所有 RK3588 / RK3576 无关补丁（适配 RK3528 H29K）
 rm -f target/linux/rockchip/patches-6.12/001-01-v6.13-arm64-dts-rockchip-Split-up-RK3588-s-PCIe-pinctrls.patch
