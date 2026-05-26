@@ -67,96 +67,30 @@ jobs:
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: 下载依赖软件包
-      id: package
       run: |
         cd openwrt
         make defconfig
         make download -j8
-        find dl -size -1024c -exec ls -l {} \;
-        find dl -size -1024c -exec rm -f {} \;
 
-    - name: 编译（仅输出补丁日志，不溢出）
-      id: compile
+    - name: 仅应用所有补丁（永不中断，捕获全部失败，日志极少）
       run: |
         cd openwrt
-        FAILED_PATCHES="$GITHUB_WORKSPACE/failed_patches.txt"
+        export FAILED_PATCHES="$GITHUB_WORKSPACE/failed_patches.txt"
         rm -f "$FAILED_PATCHES"
         touch "$FAILED_PATCHES"
 
-        make -j$(nproc) V=sc 2>&1 | grep -E '^Applying|^Patch failed!' | while IFS= read -r line; do
-          echo "$line"
-          if [[ "$line" =~ ^Patch\ failed!\ \ Please\ fix\ (.*)\! ]]; then
-            echo "${BASH_REMATCH[1]}" >> "$FAILED_PATCHES"
-          fi
-        done || true
+        make prepare V=sc 2>&1 > >(
+            grep -E '^Applying|^Patch failed!' | while read line; do
+                echo "$line"
+                if [[ "$line" =~ ^Patch\ failed!\ \ Please\ fix\ (.*)\! ]]; then
+                    echo "${BASH_REMATCH[1]}" >> "$FAILED_PATCHES"
+                fi
+            done
+        )
+        true
 
-        echo "status=success" >> $GITHUB_OUTPUT
-        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME || true
-        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV || true
-        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV || true
-
-    - name: 上传失败补丁列表
+    - name: 上传所有失败补丁列表
       uses: actions/upload-artifact@main
       with:
         name: failed-patches
         path: failed_patches.txt
-
-    - name: 检查磁盘空间使用情况
-      if: (!cancelled())
-      run: df -hT
-
-    - name: 上传 bin 目录
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
-      with:
-        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: openwrt/bin
-
-    - name: 整理固件输出目录
-      id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
-      run: |
-        cd openwrt/bin/targets/*/*
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: 上传固件输出目录
-      uses: actions/upload-artifact@main
-      if: steps.organize.outputs.status == 'success' && !cancelled()
-      with:
-        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
-
-    - name: 生成发布版本标签
-      id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      run: |
-        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
-        touch release.txt
-        echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: 上传固件至 GitHub Release
-      uses: softprops/action-gh-release@master
-      if: steps.tag.outputs.status == 'success' && !cancelled()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
-
-    - name: 清理历史工作流运行记录
-      uses: Mattraks/delete-workflow-runs@main
-      with:
-        retain_days: 0
-        keep_minimum_runs: 2
-
-    - name: 清理旧版 GitHub Release
-      uses: dev-drprasad/delete-older-releases@master
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      with:
-        keep_latest: 3
-        delete_tags: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
