@@ -40,10 +40,6 @@ sed -i '/define KernelPackage\/sound-core/,/^endef/{
   s/^\(  AUTOLOAD:=\).*/\1/
 }' package/kernel/linux/modules/sound.mk
 
-# ====================== 清理OpenWrt原生冲突DTS和补丁 ======================
-rm -f target/linux/rockchip/patches-6.12/101-arm64-dts-rockchip-Add-HINLINK-H28K.patch
-rm -f package/boot/uboot-rockchip/patches/107-board-rockchip-add-HINLINK-H28K.patch
-
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
 rm -f "$BUILD_DIR"/target-*/linux-*/drivers/of/fdt.c
