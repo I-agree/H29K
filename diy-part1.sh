@@ -101,8 +101,6 @@ rm -f target/linux/rockchip/patches-6.12/020-v6.20-arm64-dts-rockchip-fix-rk3566
 rm -f target/linux/rockchip/patches-6.12/031-01-v6.15-dt-bindings-reset-Add-SCMI-reset-IDs-for-RK3588.patch
 rm -f target/linux/rockchip/patches-6.12/031-02-v6.15-dt-bindings-rng-add-binding-for-Rockchip-RK3588-RNG.patch
 rm -f target/linux/rockchip/patches-6.12/031-03-v6.15-dt-bindings-rng-rockchip-rk3588-rng-Drop-unnecessary-compatible-string.patch
-rm -f target/linux/rockchip/patches-6.12/031-04-v6.15-hwrng-rockchip-store-dev-pointer-in-driver-struct.patch
-rm -f target/linux/rockchip/patches-6.12/031-05-v6.15-hwrng-rockchip-eliminate-some-unnecessary-dereferenc.patch
 
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
