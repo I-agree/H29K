@@ -239,6 +239,10 @@
 		sdmmc_vol_ctrl_h: sdmmc-vol-ctrl-h {
 			rockchip,pins = <4 RK_PB6 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
+		
+		uart0m0_xfer: uart0m0-xfer {
+			bootph-all;
+		};
 	};
 };
 
@@ -282,6 +286,62 @@
 
 &usb2phy {
 	status = "okay";
+};
+
+// ========================================================
+// 🚀 U-Boot 特性注入（确保 TPL/SPL 阶段硬件不丢包卡死）
+// ========================================================
+
+&chosen {
+	bootph-all;
+};
+
+&uart0 {
+	bootph-all;
+};
+
+&pinctrl {
+	bootph-all;
+};
+
+&sdhci {
+	bootph-pre-ram;
+};
+
+&sdmmc {
+	bootph-pre-ram;
+};
+
+&sdmmc_pwren_l {
+	bootph-pre-ram;
+};
+
+&sdmmc_vol_ctrl_h {
+	bootph-pre-ram;
+};
+
+&vcc3v3_sd {
+	bootph-pre-ram;
+};
+
+&vccio_sd {
+	bootph-pre-ram;
+};
+
+&pwm1 {
+	bootph-all;
+};
+
+&pwm2 {
+	bootph-all;
+};
+
+&vdd_arm {
+	bootph-all;
+};
+
+&vdd_logic {
+	bootph-all;
 };
 
 &usb2phy_host {
