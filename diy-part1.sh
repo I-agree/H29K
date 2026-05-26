@@ -150,6 +150,28 @@ rm -f target/linux/rockchip/patches-6.12/018-v6.19-arm64-dts-rockchip-add-Mixtil
 # Pine64 Quartz64
 rm -f target/linux/rockchip/patches-6.12/019-v6.19-arm64-dts-rockchip-add-Pine64-Quartz64.patch
 
+# RK3588 电源域 / 供电 / 功耗
+rm -f target/linux/rockchip/patches-6.12/000-01-v6.12-arm64-dts-rockchip-add-cpu-supply-for-rk3588.patch
+rm -f target/linux/rockchip/patches-6.12/000-02-v6.12-arm64-dts-rockchip-fix-rk3588-pwm-regulator.patch
+rm -f target/linux/rockchip/patches-6.12/000-03-v6.12-arm64-dts-rockchip-rk3588-fix-sdmmc-power-supply.patch
+rm -f target/linux/rockchip/patches-6.12/000-04-v6.12-arm64-dts-rockchip-rk3588-add-thermal-zones.patch
+rm -f target/linux/rockchip/patches-6.12/000-05-v6.12-arm64-dts-rockchip-rk3588-add-pcie-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-06-v6.12-arm64-dts-rockchip-rk3588-add-usb-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-07-v6.12-arm64-dts-rockchip-rk3588-add-hdmi-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-08-v6.12-arm64-dts-rockchip-rk3588-add-mipi-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-09-v6.12-arm64-dts-rockchip-rk3588-add-dp-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-10-v6.12-arm64-dts-rockchip-rk3588-add-gpu-power-domain.patch
+rm -f target/linux/rockchip/patches-6.12/000-11-v6.12-arm64-dts-rockchip-rk3588-add-npu-power-domain.patch
+
+# RK3588 + RK3576 RNG 硬件随机数（你报错的根源）
+rm -f target/linux/rockchip/patches-6.12/031-01-v6.15-dt-bindings-reset-Add-SCMI-reset-IDs-for-RK3588.patch
+rm -f target/linux/rockchip/patches-6.12/031-02-v6.15-dt-bindings-rng-add-binding-for-Rockchip-RK3588-RNG.patch
+rm -f target/linux/rockchip/patches-6.12/031-03-v6.15-dt-bindings-rng-rockchip-rk3588-rng-Drop-unnecessary-compatible-string.patch
+rm -f target/linux/rockchip/patches-6.12/031-04-v6.15-hwrng-rockchip-store-dev-pointer-in-driver-struct.patch
+rm -f target/linux/rockchip/patches-6.12/031-05-v6.15-hwrng-rockchip-eliminate-some-unnecessary-dereferenc.patch
+rm -f target/linux/rockchip/patches-6.12/031-06-v6.15-hwrng-rockchip-add-support-for-rk3588-s-standalone-T.patch
+rm -f target/linux/rockchip/patches-6.12/031-07-v6.16-hwrng-rockchip-add-support-for-RK3576-s-RNG.patch
+
 # === 🔥 P3TERX: Auto-remove fdt.c pollution (RK3528 clean build) ===
 # Remove fdt.c if exists (created by generic/bcm27xx/qualcommax patches)
 rm -f "$BUILD_DIR"/target-*/linux-*/drivers/of/fdt.c
