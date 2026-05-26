@@ -55,7 +55,7 @@ UBOOT_MAKE_FLAGS += \
 define Build/Prepare
 	$(call Build/Prepare/Default)
 	# 1. 复制自定义 defconfig 和基础 DTS 文件
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink_h29k_defconfig $(PKG_BUILD_DIR)/configs/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/arch/arm/dts/
 	# 2. 强行将内核下载并验证通过的全新 LEDE 核心 dtsi 组件同步注入 U-Boot 源码树
 	$(CP) $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528*.dtsi $(PKG_BUILD_DIR)/arch/arm/dts/
