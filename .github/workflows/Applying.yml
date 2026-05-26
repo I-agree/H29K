@@ -1,4 +1,4 @@
-name: OpenWrt 构建器
+name: 捕获失败补丁路径
 
 on:
   repository_dispatch:
