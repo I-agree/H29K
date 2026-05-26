@@ -162,191 +162,111 @@ else
     exit 1
 fi
 
-# ==============================================
-# 清理 Rockchip 旧网卡驱动（RK3528/H29K 不需要）
-# ==============================================
+# ==============================================================================
+# 🎯 针对单机型 H29K 进行内核配置（config-6.12）的强力清洗与外科手术式精简
+# ==============================================================================
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
-# 删除 CONFIG_EMAC_ROCKCHIP=y
-sed -i '/CONFIG_EMAC_ROCKCHIP=y/d' "$CONFIG_FILE"
+# 1. 彻底抹除原文件中与 H29K 严重冲突、重复或会导致覆盖失效的底层选项
+sed -i '/CONFIG_EMAC_ROCKCHIP/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ARC_EMAC_CORE/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ARM64_PA_BITS/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ROCKCHIP_IOMMU/d' "$CONFIG_FILE"
+sed -i '/CONFIG_CMA_SIZE_MBYTES/d' "$CONFIG_FILE"
+sed -i '/CONFIG_CRYPTO_DEV_ROCKCHIP/d' "$CONFIG_FILE"
+sed -i '/CONFIG_UNMAP_KERNEL_AT_EL0/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ARM64_TAGGED_ADDR_ABI/d' "$CONFIG_FILE"
+sed -i '/CONFIG_COMPAT_32BIT_TIME/d' "$CONFIG_FILE"
+sed -i '/CONFIG_RODATA_FULL_DEFAULT_ENABLED/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ARM64_ERRATUM_1530923/d' "$CONFIG_FILE"
+sed -i '/CONFIG_ARM64_ERRATUM_858921/d' "$CONFIG_FILE"
 
-# 删除 CONFIG_ARC_EMAC_CORE=y
-sed -i '/CONFIG_ARC_EMAC_CORE=y/d' "$CONFIG_FILE"
-
-echo "✅ 已清理无用网卡配置：CONFIG_EMAC_ROCKCHIP 和 CONFIG_ARC_EMAC_CORE 已删除"
-
-# ==============================================
-# 清理非法 PA_BITS 配置（RK3528 仅支持 CONFIG_ARM64_PA_BITS=40）
-# ==============================================
-# 删除 CONFIG_ARM64_PA_BITS=48
-sed -i '/CONFIG_ARM64_PA_BITS=48/d' "$CONFIG_FILE"
-
-# 删除 CONFIG_ARC_EMAC_CORE=y
-sed -i '/CONFIG_ARM64_PA_BITS_48=y/d' "$CONFIG_FILE"
-
-echo "✅ 已清理非法 PA_BITS 配置：CONFIG_ARM64_PA_BITS=48 和 CONFIG_ARC_EMAC_CORE=y 已删除"
-
-# 定义配置文件路径
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
-# 批量删除指定的配置项
-sed -i '/CONFIG_ARM64_TAGGED_ADDR_ABI=y/d' "$CONFIG_FILE"
-sed -i '/CONFIG_COMPAT_32BIT_TIME=y/d' "$CONFIG_FILE"
-sed -i '/CONFIG_UNMAP_KERNEL_AT_EL0=y/d' "$CONFIG_FILE"
-sed -i '/CONFIG_RODATA_FULL_DEFAULT_ENABLED=y/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ROCKCHIP_IOMMU=y/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ARM64_ERRATUM_1530923=y/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ARM64_ERRATUM_858921=y/d' "$CONFIG_FILE"
-
-# 验证所有配置项是否删除成功
+# 2. 脚本自带的原生合规性验证（保持 Actions 流程不熔断）
 if grep -qE "CONFIG_ARM64_TAGGED_ADDR_ABI=y|CONFIG_COMPAT_32BIT_TIME=y|CONFIG_UNMAP_KERNEL_AT_EL0=y|CONFIG_RODATA_FULL_DEFAULT_ENABLED=y|CONFIG_ROCKCHIP_IOMMU=y|CONFIG_ARM64_ERRATUM_1530923=y|CONFIG_ARM64_ERRATUM_858921=y" "$CONFIG_FILE"; then
     echo "====================================================="
-    echo " ❌ 错误：部分配置项删除失败，请检查！"
+    echo " ❌ 错误：部分冲突配置项清洗失败，终止编译！"
     echo "====================================================="
     exit 1
 fi
 
 echo "====================================================="
-echo " ✅ 所有指定配置项已成功删除！"
-echo " ✅ 验证通过，继续编译……"
+echo " ✅ 历史冲突配置彻底洗净，验证通过！开始注入 H29K 专属核心框架..."
 echo "====================================================="
 
-# 简单可靠：等待10秒后再继续执行（OpenWrt Actions 环境专用）
-# 不依赖任何外部工具，兼容所有 BusyBox / dash / bash 环境
-
-sleep 10
-
-# ✅ 等待完成，后续命令可直接跟在此行下方
-# 例如：
-# echo "✅ 10秒已过，开始下一步..."
-# make menuconfig
-
-# ==============================================
-# 为 Hinlink H29K 添加内核驱动配置（追加到文件末尾）
-# ==============================================
-# 定义配置文件路径
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
+# ==============================================================================
+# 🚀 注入 H29K 专属硬核内核配置（针对 Linux 6.12 Mainline 完美闭环优化）
+# ==============================================================================
 cat >> "$CONFIG_FILE" << 'EOF'
-# === 之前删除的项 ===
-# CONFIG_EMAC_ROCKCHIP is not set
-# CONFIG_ARC_EMAC_CORE is not set
 
-# === RK3528 核心必需 ===
+# === RK3528 核心与平台级别底座驱动 ===
 CONFIG_ROCKCHIP_RK3528=y
 CONFIG_SOC_RK3528=y
-CONFIG_ARM64_4K_PAGES=y
-CONFIG_ARM64_EPAN=y
-CONFIG_ARM64_PAN=y
-CONFIG_ARM64_VHE=y
 CONFIG_ARM64_PA_BITS_40=y
 CONFIG_ARM64_VA_BITS_48=y
-CONFIG_ARM64_ASIMD=y
 CONFIG_CLK_RK3528_PLL=y
 CONFIG_CLK_RK3528_ACLK_PERI=y
 CONFIG_CLK_RK3528_HCLK_PERI=y
 CONFIG_CLK_RK3528_PCLK_PERI=y
 CONFIG_CLK_RK3528_ACLK_CPU=y
+CONFIG_ROCKCHIP_RK3528_PMU=y
+CONFIG_ROCKCHIP_SECURE_BOOT=y
+CONFIG_ROCKCHIP_TRUSTED_FOUNDATION=y
+CONFIG_ROCKCHIP_USB3PHY=y
+CONFIG_ROCKCHIP_EMMC=y
+CONFIG_ROCKCHIP_CLK_RK3528=y
 
-# === 显示 DRM ST7789V V2 ===
-CONFIG_DRM_PANEL_SIMPLE=y
-CONFIG_DRM_PANEL_ST7789V_V2=y
+# --- 现代 DRM 显示架构与 ST7789V 屏幕驱动 ---
 CONFIG_DRM_ROCKCHIP_VOP2=y
-# CONFIG_DRM_ROCKCHIP_INNO_HDMI is not set
-# CONFIG_DRM_ANALOGIX_DP is not set
-# CONFIG_FB is not set
+CONFIG_ROCKCHIP_DRM_VOP2=y
+CONFIG_ROCKCHIP_VOP2_KMS=y
+CONFIG_DRM_PANEL_SIMPLE=y
+CONFIG_DRM_PANEL_ST7789V=y
+CONFIG_DRM_PANEL_ST7789V_V2=y
+# 💡 核心修复：强行开启 DRM 对传统 Framebuffer 的完美模拟，确保应用层 fbv 工具能正常打开 /dev/fb0
+CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_DRM_FBDEV_OVERALLOC=100
 
-# === 触控 FT6236 ===
-CONFIG_INPUT=y
+# --- 触控 FT6236 驱动支持 ---
 CONFIG_INPUT_MISC=y
 CONFIG_INPUT_POLLDEV=y
 CONFIG_TOUCHSCREEN_FT6236=y
 
-# === SPI 总线 ===
-CONFIG_SPI=y
-CONFIG_SPI_MASTER=y
-CONFIG_SPI_ROCKCHIP_SPI=y
-CONFIG_BACKLIGHT_CLASS_DEVICE=y
-CONFIG_BACKLIGHT_PWM=y
-CONFIG_REGULATOR=y
-CONFIG_REGULATOR_FIXED_VOLTAGE=y
-
-# === USB DWC3 ===
-CONFIG_USB_DWC3=y
-CONFIG_USB_DWC3_HOST=y
+# --- 高速接口外设底层协议栈 ---
 CONFIG_USB_DWC3_GADGET=y
 CONFIG_USB_DWC3_ROCKCHIP=y
 CONFIG_USB_DWC3_ROCKCHIP_PHY_V2=y
-
-# === MMC/SDIO/WIFI ===
-CONFIG_MMC=y
-CONFIG_MMC_BLOCK=y
-CONFIG_MMC_SDHCI=y
-CONFIG_MMC_SDHCI_PLTFM=y
 CONFIG_MMC_SDHCI_ROCKCHIP=y
 CONFIG_MMC_SDHCI_OF_ROCKCHIP_V2=y
 
-# === 网络 TCP & QoS ===
-CONFIG_TCP_CONG_ADVANCED=y
-CONFIG_TCP_CONG_BBR=y
-CONFIG_TCP_CONG_CUBIC=y
-CONFIG_DEFAULT_TCP_CONG="bbr"
-CONFIG_NET_SCHED=y
-CONFIG_NET_SCH_FQ=y
-CONFIG_NET_SCH_FQ_CODEL=y
-CONFIG_DEFAULT_QDISC="fq"
-
-# === RK3528 平台驱动 ===
-CONFIG_ROCKCHIP_RK3528_PMU=y
-CONFIG_ROCKCHIP_DRM_VOP2=y
-CONFIG_ROCKCHIP_VOP2_KMS=y
-CONFIG_ROCKCHIP_USB3PHY=y
-CONFIG_ROCKCHIP_EMMC=y
-CONFIG_ROCKCHIP_CLK_RK3528=y
-CONFIG_ROCKCHIP_SECURE_BOOT=y
-CONFIG_ROCKCHIP_TRUSTED_FOUNDATION=y
-
-# === 硬件加密 ===
+# --- 硬件级加密引擎安全加速 (Crypto) ---
 CONFIG_CRYPTO_DEV_ROCKCHIP=y
 CONFIG_CRYPTO_DEV_ROCKCHIP_AES=y
 CONFIG_CRYPTO_DEV_ROCKCHIP_SHA=y
 CONFIG_CRYPTO_DEV_ROCKCHIP_TRNG=y
 
-# === 视频硬解 VPU ===
-CONFIG_VIDEO_ROCKCHIP_VPU=y
-CONFIG_VIDEO_ROCKCHIP_VPU_DEC=y
-CONFIG_VIDEO_ROCKCHIP_VPU_ENC=y
+# --- 视频硬解 VPU 核心媒体框架（配合 ffmpeg-rkmpp） ---
 CONFIG_MEDIA_SUPPORT=y
 CONFIG_MEDIA_CONTROLLER=y
 CONFIG_VIDEO_DEV=y
+CONFIG_VIDEO_ROCKCHIP_VPU=y
+CONFIG_VIDEO_ROCKCHIP_VPU_DEC=y
+CONFIG_VIDEO_ROCKCHIP_VPU_ENC=y
 
-# === DMA & CMA ===
-CONFIG_DMA_SHARED_BUFFER=y
+# --- 强行开辟 320MB 连续物理内存（CMA），彻底喂饱硬解和高速屏幕刷新 ---
 CONFIG_CMA_SIZE_MBYTES=320
 
-# === 地址空间（强制） ===
-# CONFIG_ARM64_VA_BITS_52 is not set
-# CONFIG_ARM64_PA_BITS_36 is not set
-# CONFIG_ARM64_PA_BITS_42 is not set
-# CONFIG_ARM64_PA_BITS_48 is not set
+# --- 网络超高并发 TCP BBR + FQ 核心底层直接内建 ---
+CONFIG_TCP_CONG_ADVANCED=y
+CONFIG_TCP_CONG_BBR=y
+CONFIG_DEFAULT_TCP_CONG="bbr"
+CONFIG_NET_SCHED=y
+CONFIG_NET_SCH_FQ=y
+CONFIG_DEFAULT_QDISC="fq"
 
-# === 必须关闭的无用功能 ===
-# CONFIG_ROCKCHIP_RGA is not set
-# CONFIG_ROCKCHIP_IOMMU is not set
-# CONFIG_ROCKCHIP_DW_HDMI is not set
-# CONFIG_PCIE_ROCKCHIP_HOST is not set
-# CONFIG_SND is not set
-# CONFIG_SND_SOC is not set
-# CONFIG_SND_SOC_ROCKCHIP is not set
-# CONFIG_SND_SOC_ROCKCHIP_I2S is not set
-# CONFIG_BT is not set
-# CONFIG_MFD_RK808 is not set
-# CONFIG_ROCKCHIP_DMC_RK3588 is not set
-
-# === END RK3528 CONFIGURATION ===
+# === END H29K CONFIGURATION ===
 EOF
 
-echo "✅ 已向 $CONFIG_FILE 安全追加 RK3528 H29K 全套配置（含 VA_BITS/PA_BITS/DRM/VOP2/Secure Boot）"
+echo "✅ 已向 $CONFIG_FILE 安全注入 H29K 专属完全体内核配置技术栈"
 
 # Step 1: 彻底移除 rockchip/armv8/config-6.12 中的 CONFIG_ARM64_SVE=y（RK3528 不支持 SVE）
 sed -i '/CONFIG_ARM64_SVE=y/d' target/linux/rockchip/armv8/config-6.12
