@@ -458,21 +458,6 @@ wget -q https://raw.githubusercontent.com/I-agree/H29K/main/files/scripts/gen_im
 mkdir -p package/boot/uboot-rockchip/dts
 cp target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts
 
-# ==========================================================================
-# 🎯 全面切换为 rockchip-pinconf.dtsi 核心（带网络防空、容错与 U-Boot 同步注入）
-# ==========================================================================
-
-# 1. 路径定义
-DTS_DIR="target/linux/rockchip/files/arch/arm64/boot/dts/rockchip"
-mkdir -p "$DTS_DIR"
-
-# 下载 rockchip-pinconf.dtsi
-curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 \
-  https://raw.githubusercontent.com/I-agree/H29K/main/123/rockchip-pinconf.dtsi \
-  -o "$DTS_DIR/rockchip-pinconf.dtsi"
-
-echo "✅ 成功下载rockchip-pinconf.dtsi！"
-
 echo "============================================="
 echo "  🔍 全部文件完整性检查"
 echo "============================================="
@@ -498,9 +483,6 @@ check_dir "$ROC_DIR/drivers"
 echo -e "\n📄 检查 LEDE 头文件"
 check_file "$INC/clock/rk3528-cru.h"
 check_file "$INC/power/rk3528-power.h"
-
-echo -e "\n📄 检查 rockchip-pinconf.dtsi"
-check_file "$DTS_DIR/rockchip-pinconf.dtsi"
 
 echo -e "\n============================================="
 echo " ✅ 检查完成！以上全部存在即为正常"
