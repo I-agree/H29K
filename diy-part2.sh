@@ -150,7 +150,7 @@ while true; do
     RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}' | head -n1)
     [ -z "$RSRP" ] && RSRP="Search"
 
-    QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | cut -c 1-25)
+    QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | tr -d '\r\n' | cut -c 1-25)
     if [ -z "$QUOTE" ]; then
       RAND_IDX=$(($(date +%s) % 3))
       case "$RAND_IDX" in
