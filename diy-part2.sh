@@ -141,6 +141,7 @@ FONT="/usr/share/fonts/truetype/MiSans-Regular.ttf"
 TMP_IMG="/tmp/screen_final.jpg"
 LOGO_DIR="/etc/config/screen"
 sleep 12
+fc-cache -f /usr/share/fonts/truetype/ 2>/dev/null
 for i in 1 2 3; do [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -f "$LOGO_DIR/LOGO$i.jpg" && sleep 0.8; done
 
 while true; do
