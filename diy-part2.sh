@@ -147,7 +147,7 @@ for i in 1 2 3; do [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -f "$LOGO_DIR/LOGO$i.jpg
 while true; do
     WDM_DEV=$(ls /dev/cdc-wdm* 2>/dev/null | head -n1)
     WDM_DEV=${WDM_DEV:-/dev/cdc-wdm0}
-    RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}')
+    RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}' | head -n1)
     [ -z "$RSRP" ] && RSRP="Search"
 
     QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | cut -c 1-25)
