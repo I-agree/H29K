@@ -7,7 +7,7 @@ CONFIG_ARCH_ROCKCHIP=y
 CONFIG_SYS_SOC="rockchip"
 CONFIG_TEXT_BASE=0x00200000
 
-# === 黄金尺寸内存池 ===
+# === 🧱 黄金尺寸内存池 ===
 # 16MB (0x1000000) 堆空间，完美契合 KERNEL_LOADADDR := 0x03000000
 CONFIG_SYS_MALLOC_LEN=0x1000000
 CONFIG_SYS_MALLOC_F_LEN=0x4000
@@ -81,8 +81,8 @@ CONFIG_ENV_SIZE=0x8000
 CONFIG_SYS_REDUNDAND_ENVIRONMENT=y
 CONFIG_ENV_OFFSET_REDUND=0x3f0000
 
-# 深度对齐：注入完全体环境变量，带控制台传递与大内存不踩踏划分规范
-CONFIG_EXTRA_ENV_SETTINGS="kernel_addr_r=0x03000000\0fdt_addr_r=0x0a000000\0ramdisk_addr_r=0x0a200000\0bootargs=root=/dev/mmcblk0p2 rootwait earlycon=uart8250,mmio32,0xff9f0000 console=ttyS2,1500000n8\0"
+# 🚀 终极修正：注入 soc=rk3528 变量以完美触发脚本，同时剔除冲突且多余的硬编码 bootargs
+CONFIG_EXTRA_ENV_SETTINGS="soc=rk3528\0kernel_addr_r=0x03000000\0fdt_addr_r=0x0a000000\0ramdisk_addr_r=0x0a200000\0"
 
 # === 常用主线命令集 ===
 CONFIG_CMD_BOOTI=y
