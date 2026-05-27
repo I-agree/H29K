@@ -133,23 +133,31 @@ service_triggers() {
 EOF
 chmod +x files/etc/init.d/h29k-screen
 
-# 屏幕主脚本
+# 屏幕主脚本（带全局异常容错机制）
 mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
 FONT="/usr/share/fonts/truetype/MiSans-Regular.ttf"
 TMP_IMG="/tmp/screen_final.jpg"
 LOGO_DIR="/etc/config/screen"
+
+# 开机安全延时，等待系统初始化、网卡驱动挂载
 sleep 12
 fc-cache -f /usr/share/fonts/truetype/ 2>/dev/null
-for i in 1 2 3; do [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -f "$LOGO_DIR/LOGO$i.jpg" && sleep 0.8; done
+
+# 播放开机动画动画（如果文件存在）
+for i in 1 2 3; do 
+    [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -f "$LOGO_DIR/LOGO$i.jpg" && sleep 0.8
+done
 
 while true; do
+    # 1. 动态获取 5G 模块网卡状态（加单行过滤保护）
     WDM_DEV=$(ls /dev/cdc-wdm* 2>/dev/null | head -n1)
     WDM_DEV=${WDM_DEV:-/dev/cdc-wdm0}
     RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}' | head -n1)
     [ -z "$RSRP" ] && RSRP="Search"
 
+    # 2. 动态抓取网络一言文案（加换行符清洗与超时防护）
     QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | tr -d '\r\n' | cut -c 1-25)
     if [ -z "$QUOTE" ]; then
       RAND_IDX=$(($(date +%s) % 3))
@@ -160,15 +168,20 @@ while true; do
       esac
     fi
 
-    # 🔥 核心修复：ImageMagick 320x172 宽屏分辨率精准自适应适配
-    convert "$LOGO_DIR/LOGO3.jpg" -resize 320x172\! \
-    -fill "rgba(0,0,0,0.6)" -draw "rectangle 0 20 320 130" \
-    -font "$FONT" -fill "#00FF00" -pointsize 48 -annotate +40+95 "$RSRP" \
-    -fill white -pointsize 16 -annotate +215+95 "dB" \
-    -fill "#1a1a1a" -draw "rectangle 0 140 320 172" \
-    -fill "#CCCCCC" -pointsize 13 -annotate +15+161 "${QUOTE:-H29K Ready}" "$TMP_IMG"
+    # 3. 核心图像渲染与安全保护（防止因底图缺失、图层错误引发脚本意外崩溃）
+    if [ -f "$LOGO_DIR/LOGO3.jpg" ]; then
+        convert "$LOGO_DIR/LOGO3.jpg" -resize 320x172\! \
+        -fill "rgba(0,0,0,0.6)" -draw "rectangle 0 20 320 130" \
+        -font "$FONT" -fill "#00FF00" -pointsize 48 -annotate +40+95 "$RSRP" \
+        -fill white -pointsize 16 -annotate +215+95 "dB" \
+        -fill "#1a1a1a" -draw "rectangle 0 140 320 172" \
+        -fill "#CCCCCC" -pointsize 13 -annotate +15+161 "${QUOTE:-H29K Ready}" "$TMP_IMG" 2>/dev/null || echo "Render Error"
+    fi
     
-    fbv -f "$TMP_IMG"
+    # 4. 刷写屏幕（加容错，若临时文件未成功生成则不予刷写，避免屏幕黑屏闪烁）
+    [ -s "$TMP_IMG" ] && fbv -f "$TMP_IMG" 2>/dev/null
+
+    # 5. 精准控制刷新率，降低 CPU 开销
     sleep 25
 done
 EOF
