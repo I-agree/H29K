@@ -209,6 +209,16 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
+# 启用 cgroup v1/v2 兼容（Docker 要用）========================
+echo "cgroup /sys/fs/cgroup cgroup defaults 0 0" >> etc/fstab
+mkdir -p etc/modules.d
+echo "overlay" > etc/modules.d/overlay
+echo "bridge" > etc/modules.d/bridge
+echo "veth" > etc/modules.d/veth
+
+# 开机自启 dockerd
+/etc/init.d/dockerd enable
+
 printf '\n'
 # ======================== 【H29K 强制校验】 ========================
 echo "🔍 开始 H29K 构建前置 2 重校验..."
