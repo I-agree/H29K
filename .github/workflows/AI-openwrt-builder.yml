@@ -1,15 +1,3 @@
-#
-# https://github.com/P3TERX/Actions-OpenWrt
-#
-# File: .github/workflows/openwrt-bulder.yml
-# Description: Build OpenWrt using GitHub Actions
-#
-# Copyright (c) 2019-2024 P3TERX <https://p3terx.com>
-#
-# This is free software, licensed under the MIT License.
-# See /LICENSE for more information.
-#
-
 name: OpenWrt 构建器
 
 on:
@@ -27,6 +15,9 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
+  # 固定用 /mnt 大盘，不写死 sdb1
+  WORK_DIR: /mnt/workdir
+  CCACHE_DIR: /mnt/ccache
 
 jobs:
   build:
@@ -36,13 +27,13 @@ jobs:
     - name: 检出源码
       uses: actions/checkout@main
 
-    # ==================== ✅ 官方允许：挂载额外临时磁盘（100GB）====================
-    - name: 挂载额外工作磁盘 (官方允许)
+    - name: 准备大盘工作目录（关键：用 /mnt，不写死 sdb1）
       run: |
-        sudo mkdir -p /mnt/workdir
-        sudo mount /dev/sdb1 /mnt/workdir
-        sudo chown $(id -u):$(id -g) /mnt/workdir
+        sudo mkdir -p $WORK_DIR $CCACHE_DIR
+        sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR
         df -h
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
 
     - name: 初始化构建环境
       env:
@@ -56,13 +47,12 @@ jobs:
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
 
-    # ==================== ✅ 移动工作目录到大磁盘 ====================
-    - name: 克隆 OpenWrt 源码
-      working-directory: /mnt/workdir
+    - name: 克隆 OpenWrt 源码到大盘
+      working-directory: $WORK_DIR
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-        ln -sf /mnt/workdir/openwrt $GITHUB_WORKSPACE/openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: 加载自定义软件源
       run: |
@@ -85,13 +75,12 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    # ==================== ✅ 官方允许：ccache 缓存加速 ====================
-    - name: 启用 ccache 加速编译
+    - name: 启用 ccache 加速（大盘）
       run: |
         cd openwrt
         echo "CONFIG_CCACHE=y" >> .config
-        echo "CCACHE_DIR=/mnt/ccache" >> $GITHUB_ENV
-        mkdir -p /mnt/ccache
+        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+        mkdir -p $CCACHE_DIR
 
     - name: 下载依赖软件包
       id: package
