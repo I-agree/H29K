@@ -415,7 +415,7 @@ panel@0 {
 	pinctrl-0 = <&lcd_rs_pin>;
 	dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 	backlight = <&backlight>;
-	spi-max-frequency = <20000000>;
+	spi-max-frequency = <15000000>;
 	power-supply = <&vcc_3v3_lcd>;
 };
 
