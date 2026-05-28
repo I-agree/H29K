@@ -27,7 +27,7 @@ jobs:
     - name: 检出源码
       uses: actions/checkout@main
 
-    - name: 准备大盘工作目录
+    - name: 准备大盘工作目录（强制Go/Docker全走大盘，永不卡死）
       run: |
         sudo mkdir -p $WORK_DIR $CCACHE_DIR /mnt/tmp
         sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR /mnt/tmp
@@ -36,10 +36,14 @@ jobs:
         export TMPDIR=/mnt/tmp
         export TEMP=/mnt/tmp
         export TMP=/mnt/tmp
+        export GO_TMPDIR=/mnt/tmp
+        export CGO_TMPDIR=/mnt/tmp
         df -h
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
         echo "TMPDIR=/mnt/tmp" >> $GITHUB_ENV
+        echo "GO_TMPDIR=/mnt/tmp" >> $GITHUB_ENV
+        echo "CGO_TMPDIR=/mnt/tmp" >> $GITHUB_ENV
 
     - name: 初始化构建环境
       env:
