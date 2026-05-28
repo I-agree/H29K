@@ -417,6 +417,7 @@ panel@0 {
 	backlight = <&backlight>;
 	spi-max-frequency = <15000000>;
 	power-supply = <&vcc_3v3_lcd>;
+	reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
 };
 
 
