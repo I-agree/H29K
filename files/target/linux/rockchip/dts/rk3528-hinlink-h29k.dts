@@ -453,3 +453,33 @@ status = "okay";
 &usb_host0_ohci {
 status = "okay";
 };
+
+// === 新增 LCD 背光 PWM 控制支持 ===
+// 1. 在 &pinctrl 下添加 lcd_bl_pin（假设使用 gpio0 PA1，即原 vcc_3v3_lcd 的同引脚，但复用为 PWM5 输出）
+&pinctrl {
+    lcd {
+        lcd_bl_pin: lcd-bl-pin {
+            rockchip,pins =
+                <0 RK_PA1 RK_FUNC_PWM5 &pcfg_pull_none_drv_level_2>;
+        };
+    };
+};
+
+// 2. 确保 &pwm5 已正确引用该 pin（你原 DTS 中已有 pinctrl-0 = <&pwm5m1_pins>，此处需确认 pwm5m1_pins 是否对应 PA1）
+// 若原 pwm5m1_pins 不匹配，请替换为 lcd_bl_pin；否则保留原配置。为保险起见，显式覆盖：
+&pwm5 {
+    pinctrl-names = "default";
+    pinctrl-0 = <&lcd_bl_pin>; // ✅ 关键：绑定新定义的背光 pin
+    status = "okay";
+};
+
+// 3. 新增 backlight 设备节点（推荐放在 / 国际根节点下，或嵌套在 &spi1/panel@0 内）
+/backlight {
+    compatible = "pwm-backlight";
+    pwms = <&pwm5 0 5000000 0>; // channel=0, period=5ms (200Hz), polarity=normal
+    brightness-levels = <
+        0 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 255
+    >;
+    default-brightness-level = <15>; // 对应 240（约94%亮度），索引从0开始
+    enable-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>; // 可选：若背光有使能脚（如 vcc_3v3_lcd 的使能），此处复用
+};
