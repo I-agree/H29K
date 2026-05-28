@@ -46,8 +46,8 @@ mkdir -p "$(dirname "$DST_FONT")"
 
 if [ ! -f "$SRC_FONT" ]; then
   echo "❌ 错误：字体文件未找到！请确认："
-  echo "   • fonts/MiSans-Regular.ttf 已提交到 Git"
-  echo "   • 查找路径：$SRC_FONT"
+  echo "    • fonts/MiSans-Regular.ttf 已提交到 Git"
+  echo "    • 查找路径：$SRC_FONT"
   exit 1
 fi
 
@@ -154,7 +154,8 @@ while true; do
     RSRP=$(uqmi -d "$WDM_DEV" --get-signal-info 2>/dev/null | grep rsrp | awk '{print $2}' | head -n1)
     [ -z "$RSRP" ] && RSRP="Search"
 
-    QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | tr -d '\r\n' | cut -c 1-25)
+    # 🔥【修正 1】：去掉了末尾的 | cut -c 1-25。防止 BusyBox 按字节强行截断中文字符产生非法乱码，导致 GraphicsMagick 报错拒绝渲染
+    QUOTE=$(curl -s --connect-timeout 2 --max-time 3 "https://v1.hitokoto.cn/?encode=text" 2>/dev/null | tr -d '\r\n')
     if [ -z "$QUOTE" ]; then
       RAND_IDX=$(($(date +%s) % 3))
       case "$RAND_IDX" in
@@ -197,7 +198,7 @@ uci commit system
 # ✅ 禁用 ModemManager（避免与 uqmi/uqmic 冲突）
 /etc/init.d/modemmanager disable
 
-# ✅ 🔥 优化：改用标准 uci-defaults 方式安全激活按键守护进程，杜绝硬编码链接冲突
+# ✅ 🔥 优化：改用 standard uci-defaults 方式安全激活按键守护进程，杜绝硬编码链接冲突
 if [ -f "/etc/init.d/input-event-daemon" ]; then
     /etc/init.d/input-event-daemon enable
 fi
@@ -215,6 +216,11 @@ chmod +x files/etc/uci-defaults/99-h29k
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/98-docker-autostart <<'EOF'
 #!/bin/sh
+# 🔥【修正 2】：增加 cgroup 安全守卫。防止冷启动时底层挂载尚未就绪，导致 dockerd 服务由于找不到 cpu 树报错闪退
+if [ ! -d "/sys/fs/cgroup/cpu" ]; then
+    mount -t cgroup cgroup /sys/fs/cgroup 2>/dev/null
+fi
+
 # Docker 开机自启
 /etc/init.d/dockerd enable
 /etc/init.d/dockerd start
@@ -245,9 +251,8 @@ echo "@reboot root cd /etc/docker/mediamtx && docker-compose up -d" >> files/etc
 
 # 3. cgroup 配置
 mkdir -p files/etc/modules.d
-echo "overlay" > files/etc/modules.d/overlay
-echo "bridge"  > files/etc/modules.d/bridge
-echo "veth"   > files/etc/modules.d/veth
+# 🔥【修正 3】：遵循 OpenWrt 规范，将零散的驱动模块合并写入标准带优先级前缀的 30-docker 文件中，防止系统忽略零散文件导致无法加载
+echo -e "overlay\nbridge\nveth" > files/etc/modules.d/30-docker
 
 mkdir -p files/etc
 if ! grep -q "cgroup" files/etc/fstab 2>/dev/null; then
