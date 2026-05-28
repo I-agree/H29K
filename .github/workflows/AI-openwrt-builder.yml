@@ -48,8 +48,8 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
 
     - name: 克隆 OpenWrt 源码到大盘
-      working-directory: $WORK_DIR
       run: |
+        cd $WORK_DIR
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
