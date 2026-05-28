@@ -36,6 +36,14 @@ jobs:
     - name: 检出源码
       uses: actions/checkout@main
 
+    # ==================== ✅ 官方允许：挂载额外临时磁盘（100GB）====================
+    - name: 挂载额外工作磁盘 (官方允许)
+      run: |
+        sudo mkdir -p /mnt/workdir
+        sudo mount /dev/sdb1 /mnt/workdir
+        sudo chown $(id -u):$(id -g) /mnt/workdir
+        df -h
+
     - name: 初始化构建环境
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -47,15 +55,14 @@ jobs:
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-        sudo mkdir -p /workdir
-        sudo chown $USER:$GROUPS /workdir
 
+    # ==================== ✅ 移动工作目录到大磁盘 ====================
     - name: 克隆 OpenWrt 源码
-      working-directory: /workdir
+      working-directory: /mnt/workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+        ln -sf /mnt/workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: 加载自定义软件源
       run: |
@@ -77,6 +84,14 @@ jobs:
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    # ==================== ✅ 官方允许：ccache 缓存加速 ====================
+    - name: 启用 ccache 加速编译
+      run: |
+        cd openwrt
+        echo "CONFIG_CCACHE=y" >> .config
+        echo "CCACHE_DIR=/mnt/ccache" >> $GITHUB_ENV
+        mkdir -p /mnt/ccache
 
     - name: 下载依赖软件包
       id: package
