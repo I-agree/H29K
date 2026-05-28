@@ -414,8 +414,8 @@ panel@0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&lcd_rs_pin>;
 	dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
-	led-gpios = <&gpio0 RK_PA1 GPIO_ACTIVE_HIGH>;
-	spi-max-frequency = <15000000>;
+	backlight = <&backlight>;
+	spi-max-frequency = <20000000>;
 	power-supply = <&vcc_3v3_lcd>;
 };
 
