@@ -209,10 +209,21 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# ======================== Docker + MediaMTX 预装（完全正确版） ========================
-mkdir -p files/etc/docker/mediamtx
+# ======================== Docker + MediaMTX 预装 ========================
 
-# 写入 compose
+# 1. 创建 Docker 自启配置文件（独立、干净、可整段删除）
+mkdir -p files/etc/uci-defaults
+cat > files/etc/uci-defaults/98-docker-autostart <<'EOF'
+#!/bin/sh
+# Docker 开机自启
+/etc/init.d/dockerd enable
+/etc/init.d/dockerd start
+exit 0
+EOF
+chmod +x files/etc/uci-defaults/98-docker-autostart
+
+# 2. 配置 MediaMTX
+mkdir -p files/etc/docker/mediamtx
 cat > files/etc/docker/mediamtx/docker-compose.yml <<'EOF'
 version: "3"
 services:
@@ -225,32 +236,23 @@ services:
       - /etc/docker/mediamtx/mediamtx.yml:/mediamtx.yml
 EOF
 
-# 下载配置
 curl -fsSL --retry 3 \
   https://raw.githubusercontent.com/bluenviron/mediamtx/main/mediamtx.yml \
   -o files/etc/docker/mediamtx/mediamtx.yml
 
-# 开机启动
 mkdir -p files/etc/crontabs
 echo "@reboot root cd /etc/docker/mediamtx && docker-compose up -d" >> files/etc/crontabs/root
 
-# cgroup 配置
+# 3. cgroup 配置
 mkdir -p files/etc/modules.d
 echo "overlay" > files/etc/modules.d/overlay
-echo "bridge" > files/etc/modules.d/bridge
-echo "veth" > files/etc/modules.d/veth
+echo "bridge"  > files/etc/modules.d/bridge
+echo "veth"   > files/etc/modules.d/veth
 
-# fstab 挂载 cgroup
 mkdir -p files/etc
-echo "cgroup /sys/fs/cgroup cgroup defaults 0 0" >> files/etc/fstab
-
-# Docker 开机自启（统一在此板块，无需功能可整段删除）
-cat >> files/etc/uci-defaults/99-h29k <<'EOF'
-
-# Docker 开机自启
-/etc/init.d/dockerd enable
-/etc/init.d/dockerd start
-EOF
+if ! grep -q "cgroup" files/etc/fstab 2>/dev/null; then
+  echo "cgroup /sys/fs/cgroup cgroup defaults 0 0" >> files/etc/fstab
+fi
 
 printf '\n'
 # ======================== 【H29K 强制校验】 ========================
