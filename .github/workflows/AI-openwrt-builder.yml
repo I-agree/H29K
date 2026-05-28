@@ -27,13 +27,19 @@ jobs:
     - name: 检出源码
       uses: actions/checkout@main
 
-    - name: 准备大盘工作目录（关键：用 /mnt，不写死 sdb1）
+    - name: 准备大盘工作目录
       run: |
-        sudo mkdir -p $WORK_DIR $CCACHE_DIR
-        sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR
+        sudo mkdir -p $WORK_DIR $CCACHE_DIR /mnt/tmp
+        sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR /mnt/tmp
+        sudo mount --bind /mnt/tmp /tmp
+        sudo mount --bind /mnt/tmp /var/tmp
+        export TMPDIR=/mnt/tmp
+        export TEMP=/mnt/tmp
+        export TMP=/mnt/tmp
         df -h
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+        echo "TMPDIR=/mnt/tmp" >> $GITHUB_ENV
 
     - name: 初始化构建环境
       env:
