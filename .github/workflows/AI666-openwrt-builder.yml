@@ -112,15 +112,38 @@ jobs:
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
         mkdir -p $CCACHE_DIR
 
-    - name: 下载依赖软件包
+    - name: 下载依赖软件包与主线内核智能补全
       id: package
       run: |
         cd openwrt
         make defconfig
+        
+        # 💾【快照】在自动补全执行前，暂时将所有修改加入 Git 暂存区，以便精准剥离出“内核自动补全”的痕迹
+        git add target/linux/
+        
+        echo "🤖 启动内核符号冷启动补全，正在校准 Kconfig 技术栈..."
+        yes "" | make target/linux/refresh V=s
+        echo "✅ 内核依赖树重构完毕"
+        
+        # 📝【生成清单】对比前后差异，将内核自己补全、修改的参数全部抓取并写入根目录下的文件中
+        git diff target/linux/ > ../kernel_complements.txt || true
+        
+        # 友好提示：如果文件大小为0，说明内核配置很完美，没有任何需要补全的空白项
+        if [ ! -s ../kernel_complements.txt ]; then
+          echo "🎉 完美！当前内核配置极其标准，内核未追加任何额外补全项。" > ../kernel_complements.txt
+        fi
+
         # 🌟【优化】引入3次下载重试逻辑，防止因国外源码站单次网络波动导致流程断头卡死
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
+
+    - name: 上传内核自动补全对比清单
+      uses: actions/upload-artifact@main
+      if: always() # 🌟 强制执行：即使后面正式编译报错挂掉了，这个清单文件也一定会生成并供你下载
+      with:
+        name: H29K_内核自动补全明细表
+        path: kernel_complements.txt
 
     - name: 编译固件镜像
       id: compile
