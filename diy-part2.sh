@@ -210,49 +210,6 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
-# ======================== Docker + MediaMTX 预装 ========================
-
-# 1. 创建 Docker 自启配置文件（独立、干净、可整段删除）
-mkdir -p files/etc/uci-defaults
-cat > files/etc/uci-defaults/98-docker-autostart <<'EOF'
-#!/bin/sh
-# 🔥【修正 2】：增加 cgroup 安全守卫。防止冷启动时底层挂载尚未就绪，导致 dockerd 服务由于找不到 cpu 树报错闪退
-if [ ! -d "/sys/fs/cgroup/cpu" ]; then
-    mount -t cgroup cgroup /sys/fs/cgroup 2>/dev/null
-fi
-
-# Docker 开机自启
-/etc/init.d/dockerd enable
-/etc/init.d/dockerd start
-exit 0
-EOF
-chmod +x files/etc/uci-defaults/98-docker-autostart
-
-# 2. 配置 MediaMTX（🔥精准修正：改用原生 docker run，不再生成和依赖 docker-compose）
-mkdir -p files/etc/docker/mediamtx
-
-curl -fsSL --retry 3 \
-  https://raw.githubusercontent.com/bluenviron/mediamtx/main/mediamtx.yml \
-  -o files/etc/docker/mediamtx/mediamtx.yml
-
-mkdir -p files/etc/crontabs
-# 开机通过原生 docker run 启动，挂载网络与配置文件，效果与 compose 完全一致，且不再依赖 docker-compose 组件
-echo "@reboot root docker run -d --name mediamtx --restart always --network host -v /etc/docker/mediamtx/mediamtx.yml:/mediamtx.yml bluenviron/mediamtx:latest" >> files/etc/crontabs/root
-
-# 3. cgroup 配置
-mkdir -p files/etc/modules.d
-# 🔥【修正 3】：遵循 OpenWrt 规范，将零散的驱动模块合并写入标准带优先级前缀的 30-docker 文件中，防止系统忽略零散文件导致无法加载
-echo -e "overlay\nbridge\nveth" > files/etc/modules.d/30-docker
-
-mkdir -p files/etc
-if ! grep -q "cgroup" files/etc/fstab 2>/dev/null; then
-  echo "cgroup /sys/fs/cgroup cgroup defaults 0 0" >> files/etc/fstab
-fi
-
-# 🔥 强行解除 dockerman 面板对 docker-compose 的底层依赖，实现只编译面板不编译 compose
-sed -i 's/+docker-compose-v2//g' feeds/luci/applications/luci-app-dockerman/Makefile 2>/dev/null || true
-sed -i 's/+docker-compose//g' feeds/luci/applications/luci-app-dockerman/Makefile 2>/dev/null || true
-
 printf '\n'
 # ======================== 【H29K 强制校验】 ========================
 echo "🔍 开始 H29K 构建前置 2 重校验..."
