@@ -8,7 +8,7 @@ set -euo pipefail  # 严格报错模式：任一命令失败立即终止
 # ======================== 【1. 统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
-# 创建全局所需的所有目录架构
+# 创建全局所需的所有目录架构（🔥 已补齐 fonts 相关目录）
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/boot/uboot-rockchip/configs \
          package/boot/uboot-rockchip/dts \
@@ -17,6 +17,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/etc/config/screen \
          files/etc/docker/mediamtx \
          files/etc/init.d \
+         files/etc/fonts/conf.d \
          files/usr/bin
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main/files"
@@ -142,6 +143,7 @@ echo -e "# H29K OVERRIDE\n# CONFIG_TARGET_MULTI_ARCH is not set\nCONFIG_TARGET_r
 
 # ======================== 【4. 屏幕驱动与核心系统组件注入】 ========================
 # 按钮映射配置
+mkdir -p files/etc
 cat > files/etc/input-event-daemon.conf <<'EOF'
 /dev/input/event0
 412:1:/bin/button hotplug reset pressed
@@ -164,7 +166,8 @@ else
     echo "❌ 错误：未在本地 fonts/ 目录找到 MiSans-Regular.ttf" && exit 1
 fi
 
-# 系统默认中文字体指定
+# 系统默认中文字体指定（🔥 关键修复：确保父目录存在后再写入）
+mkdir -p files/etc/fonts/conf.d
 cat > files/etc/fonts/conf.d/99-misans-default.conf <<'EOF'
 <?xml version="1.0"?>
 <!DOCTYPE fontconfig SYSTEM "fonts.dtd">
@@ -177,6 +180,7 @@ cat > files/etc/fonts/conf.d/99-misans-default.conf <<'EOF'
 EOF
 
 # 屏幕守护服务化脚本
+mkdir -p files/etc/init.d
 cat > files/etc/init.d/h29k-screen <<'EOF'
 #!/bin/sh /etc/rc.common
 START=99
@@ -193,6 +197,7 @@ EOF
 chmod +x files/etc/init.d/h29k-screen
 
 # 屏幕主控渲染引擎
+mkdir -p files/usr/bin
 cat > files/usr/bin/h29k_screen.sh <<'EOF'
 #!/bin/sh
 FONT="/usr/share/fonts/truetype/MiSans-Regular.ttf"
@@ -232,6 +237,7 @@ EOF
 chmod +x files/usr/bin/h29k_screen.sh
 
 # ======================== 【5. 系统初始化与 UCI 策略】 ========================
+mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k <<'EOF'
 #!/bin/sh
 uci set luci.main.lang=zh_cn
@@ -247,6 +253,7 @@ EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
 # ======================== 【6. Docker 与 MediaMTX 容器流】 ========================
+mkdir -p files/etc/modules.d
 echo -e "overlay\nbridge\nveth" > files/etc/modules.d/30-docker
 
 cat > files/etc/init.d/mediamtx-init <<'EOF'
@@ -277,7 +284,8 @@ chmod +x files/etc/uci-defaults/98-docker-autostart
 sed -i 's/+docker-compose-v2//g; s/+docker-compose//g' feeds/luci/applications/luci-app-dockerman/Makefile 2>/dev/null || true
 
 # 网络栈核心高并发参数微调
-sed -i '/net.netfilter.nf_conntrack_max/d' package/base-files/files/etc/sysctl.conf
+mkdir -p package/base-files/files/etc
+sed -i '/net.netfilter.nf_conntrack_max/d' package/base-files/files/etc/sysctl.conf 2>/dev/null || true
 cat >> package/base-files/files/etc/sysctl.conf << 'EOF'
 net.netfilter.nf_conntrack_max=262144
 net.core.netdev_max_backlog=10000
