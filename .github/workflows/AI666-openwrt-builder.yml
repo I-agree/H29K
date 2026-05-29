@@ -125,12 +125,12 @@ jobs:
         yes "" | make target/linux/refresh V=s
         echo "✅ 内核依赖树重构完毕"
         
-        # 📝【生成清单】对比前后差异，将内核自己补全、修改的参数全部抓取并写入根目录下的文件中
-        git diff target/linux/ > ../kernel_complements.txt || true
+        # 📝【生成清单】🌟 核心修复：使用绝对路径变量，将文件死死扣在工作区根目录下
+        git diff target/linux/ > $GITHUB_WORKSPACE/kernel_complements.txt || true
         
         # 友好提示：如果文件大小为0，说明内核配置很完美，没有任何需要补全的空白项
-        if [ ! -s ../kernel_complements.txt ]; then
-          echo "🎉 完美！当前内核配置极其标准，内核未追加任何额外补全项。" > ../kernel_complements.txt
+        if [ ! -s $GITHUB_WORKSPACE/kernel_complements.txt ]; then
+          echo "🎉 完美！当前内核配置极其标准，内核未追加任何额外补全项。" > $GITHUB_WORKSPACE/kernel_complements.txt
         fi
 
         # 🌟【优化】引入3次下载重试逻辑，防止因国外源码站单次网络波动导致流程断头卡死
@@ -143,7 +143,8 @@ jobs:
       if: always() # 🌟 强制执行：即使后面正式编译报错挂掉了，这个清单文件也一定会生成并供你下载
       with:
         name: H29K_内核自动补全明细表
-        path: kernel_complements.txt
+        # 🎯 核心修复：明确指示上传组件，直奔工作区绝对路径获取该文件
+        path: ${{ github.workspace }}/kernel_complements.txt
 
     - name: 编译固件镜像
       id: compile
