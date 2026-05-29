@@ -264,6 +264,15 @@ chmod +x files/etc/uci-defaults/98-docker-autostart
 sed -i 's/+docker-compose-v2//g' feeds/luci/applications/luci-app-dockerman/Makefile 2>/dev/null || true
 sed -i 's/+docker-compose//g' feeds/luci/applications/luci-app-dockerman/Makefile 2>/dev/null || true
 
+# === 优化高 spec 硬件网络内核参数（针对 4G 内存与高并发 Docker 环境） ===
+sed -i '/net.netfilter.nf_conntrack_max/d' package/base-files/files/etc/sysctl.conf
+echo "net.netfilter.nf_conntrack_max=262144" >> package/base-files/files/etc/sysctl.conf
+
+# 顺手调大网络接收队列和缓冲区，防止千兆/5G 流量暴涌时 CPU 响应不及时导致丢包
+echo "net.core.netdev_max_backlog=10000" >> package/base-files/files/etc/sysctl.conf
+echo "net.core.rmem_max=16777216" >> package/base-files/files/etc/sysctl.conf
+echo "net.core.wmem_max=16777216" >> package/base-files/files/etc/sysctl.conf
+
 printf '\n'
 # ======================== 【H29K 强制校验】 ========================
 echo "🔍 开始 H29K 构建前置 2 重校验..."
