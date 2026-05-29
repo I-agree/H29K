@@ -23,20 +23,15 @@ sed -i '/define KernelPackage\/sound-core/,/^endef/{
 }' package/kernel/linux/modules/sound.mk
 
 # === 3. 清理 OpenWrt 原生多余/冲突的架构补丁（切断污染源） ===
-rm -rf target/linux/generic/hack-6.12
-rm -rf target/linux/bcm27xx/patches-6.12
-rm -f target/linux/generic/hack-6.18/920-device_tree_cmdline.patch
-rm -f target/linux/ipq806x/patches-6.12/901-02-ARM-decompressor-add-option-to-ignore-MEM-ATAGs.patch
-rm -f target/linux/mpc85xx/patches-6.12/102-powerpc-add-cmdline-override.patch
-rm -f package/boot/uboot-mediatek/patches/280-image-fdt-save-name-of-FIT-configuration-in-chosen-node.patch
-rm -f target/linux/generic/hack-6.12/920-device_tree_cmdline.patch
-rm -f target/linux/mpc85xx/patches-6.18/102-powerpc-add-cmdline-override.patch
-rm -f target/linux/mediatek/patches-6.18/901-arm-add-cmdline-override.patch
-rm -f target/linux/qualcommax/patches-6.12/0911-arm64-cmdline-replacement.patch
-rm -f target/linux/ipq806x/patches-6.12/902-ARM-decompressor-support-for-ATAGs-rootblock-parsing.patch
-rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch
-rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch
-rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch
+rm -f target/linux/generic/hack-6.12/920-device_tree_cmdline.patch || true
+rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch || true
+rm -f target/linux/ipq806x/patches-6.12/901-02-ARM-decompressor-add-option-to-ignore-MEM-ATAGs.patch || true
+rm -f target/linux/mpc85xx/patches-6.12/102-powerpc-add-cmdline-override.patch || true
+rm -f package/boot/uboot-mediatek/patches/280-image-fdt-save-name-of-FIT-configuration-in-chosen-node.patch || true
+rm -f target/linux/qualcommax/patches-6.12/0911-arm64-cmdline-replacement.patch || true
+rm -f target/linux/ipq806x/patches-6.12/902-ARM-decompressor-support-for-ATAGs-rootblock-parsing.patch || true
+rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch || true
+rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch || true
 rm -rf target/linux/airoha
 
 # === 4. 下载 H29K 专用核心设备树 (DTS) 与固件 Makefile 资源 ===
@@ -75,138 +70,60 @@ curl -L --retry 5 https://raw.githubusercontent.com/I-agree/H29K/main/files/targ
 wget -q --retry-connrefused --waitretry=2 -O package/boot/uboot-rockchip/Makefile https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-rockchip/Makefile
 wget -q --retry-connrefused --waitretry=2 -O package/boot/uboot-tools/Makefile https://raw.githubusercontent.com/I-agree/H29K/main/files/package/boot/uboot-tools/Makefile
 
-# === 5. 🎯 针对 H29K 进行内核配置（config-6.12）的强力清洗与合并注入 ===
+# === 5. 🎯 针对 H29K 进行主线内核配置（config-6.12）的强力清洗与合并注入 ===
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
-# A. 彻底抹除原文件中与 H29K 冲突或会导致覆盖失效的底层选项
+# A. 彻底抹除原文件中可能冲突的底层选项
 sed -i '/CONFIG_EMAC_ROCKCHIP/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ARC_EMAC_CORE/d' "$CONFIG_FILE"
 sed -i '/CONFIG_ARM64_PA_BITS/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ROCKCHIP_IOMMU/d' "$CONFIG_FILE"
 sed -i '/CONFIG_CMA_SIZE_MBYTES/d' "$CONFIG_FILE"
 sed -i '/CONFIG_CRYPTO_DEV_ROCKCHIP/d' "$CONFIG_FILE"
-sed -i '/CONFIG_UNMAP_KERNEL_AT_EL0/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ARM64_TAGGED_ADDR_ABI/d' "$CONFIG_FILE"
-sed -i '/CONFIG_COMPAT_32BIT_TIME/d' "$CONFIG_FILE"
-sed -i '/CONFIG_RODATA_FULL_DEFAULT_ENABLED/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ARM64_ERRATUM_1530923/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ARM64_ERRATUM_858921/d' "$CONFIG_FILE"
-sed -i '/CONFIG_ARM64_SVE/d' "$CONFIG_FILE"
 
-# 强力防御性验证
-if grep -qE "CONFIG_ARM64_TAGGED_ADDR_ABI=y|CONFIG_COMPAT_32BIT_TIME=y|CONFIG_UNMAP_KERNEL_AT_EL0=y|CONFIG_ROCKCHIP_IOMMU=y" "$CONFIG_FILE"; then
-    echo "❌ 错误：部分冲突配置项清洗失败，终止编译！"
-    exit 1
-fi
-
-# B. 一次性注入完全体 H29K 内核技术栈（含 SVE 禁用选项）
+# B. 一次性注入完全适配主线 Linux 6.12 的 H29K 内核技术栈
 cat >> "$CONFIG_FILE" << 'EOF'
 
-# === RK3528 核心与平台级别底座驱动 ===
-CONFIG_ROCKCHIP_RK3528=y
-CONFIG_SOC_RK3528=y
+# === RK3528 主线核心与平台级别底座驱动（对齐 Linux 6.12）===
+CONFIG_ARCH_ROCKCHIP=y
 CONFIG_ARM64_4K_PAGES=y
-CONFIG_ARM64_EPAN=y
-CONFIG_ARM64_PAN=y
-CONFIG_ARM64_VHE=y
-CONFIG_ARM64_PA_BITS_40=y
 CONFIG_ARM64_VA_BITS_48=y
-CONFIG_ARM64_ASIMD=y
-# CONFIG_ARM64_SVE is not set
-CONFIG_CLK_RK3528_PLL=y
-CONFIG_CLK_RK3528_ACLK_PERI=y
-CONFIG_CLK_RK3528_HCLK_PERI=y
-CONFIG_CLK_RK3528_PCLK_PERI=y
-CONFIG_CLK_RK3528_ACLK_CPU=y
-CONFIG_ROCKCHIP_RK3528_PMU=y
-CONFIG_ROCKCHIP_SECURE_BOOT=y
-CONFIG_ROCKCHIP_TRUSTED_FOUNDATION=y
-CONFIG_ROCKCHIP_USB3PHY=y
-CONFIG_ROCKCHIP_EMMC=y
-CONFIG_ROCKCHIP_CLK_RK3528=y
-
-# --- PWM 硬件控制器与 GPIO 设备树基础 ---
-CONFIG_PWM=y
-CONFIG_PWM_SYSFS=y
+CONFIG_COMMON_CLK_ROCKCHIP=y
+CONFIG_ROCKCHIP_PMDOMAINS=y
 CONFIG_PWM_ROCKCHIP=y
 CONFIG_OF_GPIO=y
 
-# --- DRM/KMS 专用背光管理（取代 fbdev emulation）---
-# CONFIG_DRM_FBDEV_EMULATION is not set
+# --- 主线标准显示架构与 ST7789V 屏幕驱动对齐 ---
+# 你的 DTS 声明的是 "sitronix,st7789v"，主线对应的 Kconfig 符号正是下面这个
+CONFIG_DRM=y
 CONFIG_DRM_KMS_HELPER=y
-CONFIG_DRM_KMS_CMA_HELPER=y
-CONFIG_DRM_SIMPLE_BRIDGE=y
-
-# --- 显示架构与 ST7789V 屏幕驱动 ---
-CONFIG_DRM_PANEL_SIMPLE=y
-CONFIG_DRM_PANEL_ST7789V_V2=y
-CONFIG_DRM_FBDEV_OVERALLOC=100
+CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 CONFIG_BACKLIGHT_PWM=y
 
-# --- 触控 FT6236 驱动支持 ---
-CONFIG_INPUT=y
-CONFIG_INPUT_MISC=y
-CONFIG_INPUT_POLLDEV=y
-CONFIG_TOUCHSCREEN_FT6236=y
-
-# --- 高速总线接口外设底层协议栈 ---
-CONFIG_SPI=y
-CONFIG_SPI_MASTER=y
-CONFIG_SPI_ROCKCHIP_SPI=y
-CONFIG_REGULATOR=y
+# --- 主线标准高速总线与存储协议栈（确保 eMMC/SD卡 正常 boot）---
+CONFIG_SPI_ROCKCHIP=y
 CONFIG_REGULATOR_FIXED_VOLTAGE=y
-CONFIG_USB_DWC3=y
-CONFIG_USB_DWC3_HOST=y
-CONFIG_USB_DWC3_GADGET=y
+CONFIG_MMC_SDHCI_OF_ROCKCHIP=y
 CONFIG_USB_DWC3_ROCKCHIP=y
-CONFIG_USB_DWC3_ROCKCHIP_PHY_V2=y
-CONFIG_MMC=y
-CONFIG_MMC_BLOCK=y
-CONFIG_MMC_SDHCI=y
-CONFIG_MMC_SDHCI_PLTFM=y
-CONFIG_MMC_SDHCI_ROCKCHIP=y
-CONFIG_MMC_SDHCI_OF_ROCKCHIP_V2=y
 
-# --- 硬件级加密引擎安全加速 (Crypto) ---
+# --- 主线标准硬件级加密引擎安全加速 ---
 CONFIG_CRYPTO_DEV_ROCKCHIP=y
-CONFIG_CRYPTO_DEV_ROCKCHIP_AES=y
-CONFIG_CRYPTO_DEV_ROCKCHIP_SHA=y
-CONFIG_CRYPTO_DEV_ROCKCHIP_TRNG=y
 
-# --- 视频硬解 VPU 核心媒体框架 ---
-CONFIG_MEDIA_SUPPORT=y
-CONFIG_MEDIA_CONTROLLER=y
-CONFIG_VIDEO_DEV=y
-CONFIG_VIDEO_ROCKCHIP_VPU=y
-CONFIG_VIDEO_ROCKCHIP_VPU_DEC=y
-CONFIG_VIDEO_ROCKCHIP_VPU_ENC=y
-
-# --- 开辟 320MB 连续物理内存（CMA），彻底喂饱硬解和高速屏幕刷新 ---
+# --- CMA 连续物理内存调优（推荐 128MB-256MB，平衡主线小屏幕显示与 Docker 运行空间） ---
 CONFIG_DMA_SHARED_BUFFER=y
-CONFIG_CMA_SIZE_MBYTES=320
+CONFIG_CMA_SIZE_MBYTES=128
 
 # --- 网络高并发 TCP BBR + FQ 底层内建 ---
 CONFIG_TCP_CONG_ADVANCED=y
 CONFIG_TCP_CONG_BBR=y
-CONFIG_TCP_CONG_CUBIC=y
 CONFIG_DEFAULT_TCP_CONG="bbr"
 CONFIG_NET_SCHED=y
 CONFIG_NET_SCH_FQ=y
-CONFIG_NET_SCH_FQ_CODEL=y
 CONFIG_DEFAULT_QDISC="fq"
 
-# --- 必须关闭的无用/冲突功能 ---
-# CONFIG_ROCKCHIP_RGA is not set
-# CONFIG_ROCKCHIP_IOMMU is not set
-# CONFIG_ROCKCHIP_DW_HDMI is not set
-# CONFIG_PCIE_ROCKCHIP_HOST is not set
+# --- 关闭主线无需或可能冲突的功能 ---
 # CONFIG_SND is not set
-# CONFIG_SND_SOC is not set
 # CONFIG_BT is not set
-
-# === END H29K CONFIGURATION ===
 EOF
-echo "✅ 已向 $CONFIG_FILE 安全注入 H29K 完全体内核配置技术栈"
+echo "✅ 已向 $CONFIG_FILE 安全注入适配主线 Linux 6.12 的 H29K 内核配置技术栈"
 
 # C. 对全局通用内核配置（generic/config-6.12）进行先清洗再修正，防止重复定义
 GENERIC_CONFIG="target/linux/generic/config-6.12"
