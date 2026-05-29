@@ -126,7 +126,7 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        ccache -M 5G
+        ccache -M 9G
         echo -e "$(nproc) thread compile"
         # 🌟【核心修复】优先全核编译。若失败，直接降级到双核（充分利用16G内存和4核）并打印详细日志（V=s）查错，决不单核憋死
         make -j$(nproc) || make -j2 V=s
