@@ -121,6 +121,10 @@ CONFIG_NET_SCHED=y
 CONFIG_NET_SCH_FQ=y
 CONFIG_DEFAULT_QDISC="fq"
 
+# --- 强制 CPU 调频策略为高性能模式（杜绝动态调频引发的小屏幕渲染卡顿与网络抖动） ---
+CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y
+# CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL is not set
+
 # --- 关闭主线无需或可能冲突的功能 ---
 # CONFIG_SND is not set
 # CONFIG_BT is not set
