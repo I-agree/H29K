@@ -34,8 +34,8 @@ mkdir -p files/etc
 # 生成 input-event-daemon 配置（原样写入，不解析任何字符，100%安全）
 cat > files/etc/input-event-daemon.conf <<'EOF'
 /dev/input/event0
-115:1:/bin/button hotplug reset pressed
-115:0:/bin/button hotplug reset released
+412:1:/bin/button hotplug reset pressed
+412:0:/bin/button hotplug reset released
 EOF
 
 # ======================== 【离线复制字体：MiSans-Regular.ttf】 ========================
