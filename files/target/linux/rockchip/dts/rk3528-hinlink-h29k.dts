@@ -429,7 +429,7 @@ pinctrl-0 = <&spi1_pins>, <&lcd_rs_pin>, <&lcd_rst_pin>;
 status = "okay";
 
 panel@0 {
-	compatible = "sitronix,st7789v-v2";
+	compatible = "sitronix,st7789v";
 	reg = <0>;
 	buswidth = <8>;
 	dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
