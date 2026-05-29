@@ -110,7 +110,7 @@ CONFIG_CRYPTO_DEV_ROCKCHIP=y
 
 # --- CMA 连续物理内存调优（推荐 128MB，平衡主线小屏幕显示与 Docker 运行空间） ---
 CONFIG_DMA_SHARED_BUFFER=y
-CONFIG_CMA_SIZE_MBYTES=512
+CONFIG_CMA_SIZE_MBYTES=256
 
 # --- 网络高并发 TCP BBR + FQ 底层内建（精准对齐 Linux 6.12 新版内核语法） ---
 CONFIG_TCP_CONG_ADVANCED=y
