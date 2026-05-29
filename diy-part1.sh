@@ -23,7 +23,6 @@ sed -i '/define KernelPackage\/sound-core/,/^endef/{
 }' package/kernel/linux/modules/sound.mk
 
 # === 3. 清理 OpenWrt 原生多余/冲突的架构补丁（切断污染源） ===
-rm -f target/linux/generic/hack-6.12/920-device_tree_cmdline.patch || true
 rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch || true
 rm -f target/linux/ipq806x/patches-6.12/901-02-ARM-decompressor-add-option-to-ignore-MEM-ATAGs.patch || true
 rm -f target/linux/mpc85xx/patches-6.12/102-powerpc-add-cmdline-override.patch || true
