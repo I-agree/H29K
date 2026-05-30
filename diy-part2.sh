@@ -8,7 +8,7 @@ set -euo pipefail  # 严格报错模式：任一命令失败立即终止
 # ======================== 【1. 统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
-# 创建全局所需的所有目录架构（🔥 已补齐 fonts 相关目录）
+# 创建全局所需的所有目录架构
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/boot/uboot-rockchip/configs \
          package/boot/uboot-rockchip/dts \
@@ -78,7 +78,8 @@ rm -rf target/linux/airoha
 # ======================== 【3. H29K 主线内核配置合并注入】 ========================
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
-sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_DEV_ROCKCHIP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d' "$CONFIG_FILE" 2>/dev/null || true
+# 🌟【核心修复】彻底剔除可能残存的硬件加密旧总开关、所有旧子驱动符号以及屏幕、调度器冲突项
+sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_DRM_PANEL_SITRONIX_ST7789V/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d' "$CONFIG_FILE" 2>/dev/null || true
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -180,7 +181,7 @@ else
     echo "❌ 错误：未在本地 fonts/ 目录找到 MiSans-Regular.ttf" && exit 1
 fi
 
-# 系统默认中文字体指定（🔥 关键修复：确保父目录存在后再写入）
+# 系统默认中文字体指定
 mkdir -p files/etc/fonts/conf.d
 cat > files/etc/fonts/conf.d/99-misans-default.conf <<'EOF'
 <?xml version="1.0"?>
@@ -242,7 +243,8 @@ while true; do
     fi
 
     if [ -f "$LOGO_DIR/LOGO3.jpg" ]; then
-        gm convert "$LOGO_DIR/LOGO3.jpg" -resize 320x172\! -fill "rgba(0,0,0,0.6)" -draw "rectangle 0 20 320 130" -font "$FONT" -fill "#00FF00" -pointsize 48 -annotate +40+95 "$RSRP" -fill white -pointsize 16 -annotate +215+95 "dB" -fill "#1a1a1a" -draw "rectangle 0 140 320 172" -fill "#CCCCCC" -pointsize 13 -annotate +15+161 "$QUOTE" "$TMP_IMG" 2>/dev/null || echo "Render Error"
+        # 🌟【优化】将强制改变长宽比的 ! 符号通过双引号包裹，使其在各种 shell 环境中均能完美解析
+        gm convert "$LOGO_DIR/LOGO3.jpg" -resize "320x172!" -fill "rgba(0,0,0,0.6)" -draw "rectangle 0 20 320 130" -font "$FONT" -fill "#00FF00" -pointsize 48 -annotate +40+95 "$RSRP" -fill white -pointsize 16 -annotate +215+95 "dB" -fill "#1a1a1a" -draw "rectangle 0 140 320 172" -fill "#CCCCCC" -pointsize 13 -annotate +15+161 "$QUOTE" "$TMP_IMG" 2>/dev/null || echo "Render Error"
     fi
     [ -s "$TMP_IMG" ] && fbv -f "$TMP_IMG" 2>/dev/null
     sleep 25
