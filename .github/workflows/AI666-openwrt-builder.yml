@@ -116,7 +116,7 @@ jobs:
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
         mkdir -p $CCACHE_DIR
 
-    - name: 下载依赖软件包与主线内核智能补全
+    - name: 主线内核智能补全与下载依赖软件包
       id: package
       run: |
         cd openwrt
@@ -126,15 +126,24 @@ jobs:
         git add target/linux/
         
         echo "🤖 启动内核符号冷启动补全，正在校准 Kconfig 技术栈..."
-        yes "" | make target/linux/refresh V=s
+        # 🌟【天网修复 1】将刷新过程的完整标准输出和错误全部捕获到独立日志，用于深层显微镜级扫描
+        yes "" | make target/linux/refresh V=s > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 || true
+        cat $GITHUB_WORKSPACE/kconfig_scan.log
         echo "✅ 内核依赖树重构完毕"
         
-        # 📝【生成清单】🌟 核心修复：使用绝对路径变量，将文件死死扣在工作区根目录下
+        # 📝【生成清单】使用绝对路径变量，将文件死死扣在工作区根目录下
         git diff target/linux/ > $GITHUB_WORKSPACE/kernel_complements.txt || true
         
-        # 友好提示：如果文件大小为0，说明内核配置很完美，没有任何需要补全的空白项
-        if [ ! -s $GITHUB_WORKSPACE/kernel_complements.txt ]; then
-          echo "🎉 完美！当前内核配置极其标准，内核未追加任何额外补全项。" > $GITHUB_WORKSPACE/kernel_complements.txt
+        # 🌟【天网修复 2】双重交叉验证：不仅看文件有无变动，更深度抠日志，只要含 (NEW) 交互弹窗，立刻揭穿虚假完美
+        if grep -q "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log; then
+          echo -e "\n❌【重大不完美警告】检测到未来新版内核引入了未决断的 (NEW) 交互选项！" > $GITHUB_WORKSPACE/kernel_complements.txt
+          echo "⚠️ 编译大概率会在后续阶段死锁或崩溃！" >> $GITHUB_WORKSPACE/kernel_complements.txt
+          echo "请检查下方被拦截的‘有罪选项’，并在 diy-part2.sh 中使用 CONFIG_XXX=y 补齐布尔开关：" >> $GITHUB_WORKSPACE/kernel_complements.txt
+          echo "------------------------------------------------------------------" >> $GITHUB_WORKSPACE/kernel_complements.txt
+          grep "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log >> $GITHUB_WORKSPACE/kernel_complements.txt
+        elif [ ! -s $GITHUB_WORKSPACE/kernel_complements.txt ]; then
+          # 两道防线全部通过，才是无懈可击的纯正完美
+          echo "🎉 真正完美！当前内核配置极其标准，既无结构变动，也未发现任何(NEW)隐形交互弹窗。" > $GITHUB_WORKSPACE/kernel_complements.txt
         fi
 
         # 🌟【优化】引入3次下载重试逻辑，防止因国外源码站单次网络波动导致流程断头卡死
