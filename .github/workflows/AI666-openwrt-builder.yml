@@ -116,7 +116,7 @@ jobs:
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
         mkdir -p $CCACHE_DIR
 
-    - name: 主线内核智能补全与下载依赖软件包
+    - name: 主线内核智能补全与下载依赖软件
       id: package
       run: |
         cd openwrt
@@ -126,7 +126,7 @@ jobs:
         git add target/linux/
         
         echo "🤖 启动内核符号冷启动补全，正在校准 Kconfig 技术栈..."
-        # 🌟【天网修复 1】将刷新过程的完整标准输出和错误全部捕获到独立日志，用于深层显微镜级扫描
+        # 将刷新过程的完整标准输出和错误全部捕获到独立日志，用于深层显微镜级扫描
         yes "" | make target/linux/refresh V=s > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 || true
         cat $GITHUB_WORKSPACE/kconfig_scan.log
         echo "✅ 内核依赖树重构完毕"
@@ -134,15 +134,11 @@ jobs:
         # 📝【生成清单】使用绝对路径变量，将文件死死扣在工作区根目录下
         git diff target/linux/ > $GITHUB_WORKSPACE/kernel_complements.txt || true
         
-        # 🌟【天网修复 2】双重交叉验证：不仅看文件有无变动，更深度抠日志，只要含 (NEW) 交互弹窗，立刻揭穿虚假完美
+        # 双重交叉验证：不仅看文件有无变动，更深度抠日志，只要含 (NEW) 交互弹窗，排查潜在隐患
         if grep -q "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log; then
           echo -e "\n❌【重大不完美警告】检测到未来新版内核引入了未决断的 (NEW) 交互选项！" > $GITHUB_WORKSPACE/kernel_complements.txt
-          echo "⚠️ 编译大概率会在后续阶段死锁或崩溃！" >> $GITHUB_WORKSPACE/kernel_complements.txt
-          echo "请检查下方被拦截的‘有罪选项’，并在 diy-part2.sh 中使用 CONFIG_XXX=y 补齐布尔开关：" >> $GITHUB_WORKSPACE/kernel_complements.txt
-          echo "------------------------------------------------------------------" >> $GITHUB_WORKSPACE/kernel_complements.txt
           grep "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log >> $GITHUB_WORKSPACE/kernel_complements.txt
         elif [ ! -s $GITHUB_WORKSPACE/kernel_complements.txt ]; then
-          # 两道防线全部通过，才是无懈可击的纯正完美
           echo "🎉 真正完美！当前内核配置极其标准，既无结构变动，也未发现任何(NEW)隐形交互弹窗。" > $GITHUB_WORKSPACE/kernel_complements.txt
         fi
 
@@ -156,7 +152,6 @@ jobs:
       if: always() # 🌟 强制执行：即使后面正式编译报错挂掉了，这个清单文件也一定会生成并供你下载
       with:
         name: H29K_内核自动补全明细表
-        # 🎯 核心修复：明确指示上传组件，直奔工作区绝对路径获取该文件
         path: ${{ github.workspace }}/kernel_complements.txt
 
     - name: 编译固件镜像
@@ -165,7 +160,23 @@ jobs:
         cd openwrt
         ccache -M 9G
         echo -e "$(nproc) thread compile"
-        # 🌟【核心修复】优先全核编译。若失败，直接降级到双核（充分利用16G内存和4核）并打印详细日志（V=s）查错，决不单核憋死
+        
+        # 🛡️【天网深层防御线】强行提前释放内核源码与最终合并配置，死死按住 kmod 引入的二次语义冲突弹窗
+        echo "🔄 [天网拦截] 正在提前释放并生成内核最终合并配置..."
+        make target/linux/prepare V=s
+        
+        echo "⚙️ [天网拦截] 正在对最终生成的内核 `.config` 执行 olddefconfig 净化..."
+        # 动态精准搜寻真正的内核解压源码目录，不管它版本号是 6.12.91 还是未来的新版
+        LINUX_DIR=$(ls -d build_dir/target-*/linux-*/* 2>/dev/null | grep -E 'linux-[0-9]' | head -n 1)
+        if [ -d "$LINUX_DIR" ]; then
+          echo "🎯 成功锁定内核合并目录: $LINUX_DIR，正在强行注入默认缺省值..."
+          make -C "$LINUX_DIR" olddefconfig
+          echo "✅ 内核语义冲突隐患已被强制解除！"
+        else
+          echo "⚠️ 未能锁定内核源码目录，跳过截击净化流程。"
+        fi
+        
+        # 🌟【核心修复】优先全核编译。若失败，直接降级到双核（充分利用16G内存和4核）并打印详细日志（V=s）查错
         make -j$(nproc) || make -j2 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
