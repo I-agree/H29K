@@ -42,6 +42,8 @@ jobs:
         
         # 限制 Go 编译器内部最大线程并发，防止其霸占 4 核导致虚拟机 I/O 锁死
         echo "GOMAXPROCS=2" >> $GITHUB_ENV
+        # 🌟【终极补刀】强制 Go 编译器将内存垃圾回收频率提高一倍，内存占用直接砍半，断绝 Docker 编译卡死
+        echo "GOGC=50" >> $GITHUB_ENV
         
         export TMPDIR=/mnt/tmp
         export TEMP=/mnt/tmp
@@ -74,6 +76,15 @@ jobs:
         key: ${{ runner.os }}-openwrt-ccache-${{ env.REPO_BRANCH }}-${{ hashFiles('**/*.config', '**/diy-part2.sh') }}
         restore-keys: |
           ${{ runner.os }}-openwrt-ccache-${{ env.REPO_BRANCH }}-
+
+    - name: 查看编译环境硬件规格 (CPU/内存)
+      run: |
+        echo "==================== CPU 核心数 ===================="
+        echo "逻辑核心数: $(nproc)"
+        cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+        
+        echo -e "\n==================== 内存大小 ===================="
+        free -h
 
     - name: 克隆 OpenWrt 源码到大盘
       run: |
@@ -158,7 +169,6 @@ jobs:
         make toolchain/compile -j$(nproc)
         
         echo "🤖 [步骤 2/3] 工具链已就位！切换单线程并注入无限回车，瞬间踏平一切内核配置弹窗..."
-        # 🌟【关键修复】单线程下 GNU Make 绝对不会拦截 stdin 管道，yes "" 强力压制一切内核配置异动问答
         yes "" | make target/linux/configure -j1 V=s
         
         echo "🚀 [步骤 3/3] 内核配置隐患已被物理超度！重新拉满全核，总攻编译剩余全家桶..."
