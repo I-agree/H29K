@@ -161,12 +161,11 @@ jobs:
         ccache -M 9G
         echo -e "$(nproc) thread compile"
         
-        # 🧼【拨乱反正】彻底移除手动介入的 olddefconfig 拦截逻辑
-        # 原因：手动触发由于缺少 OpenWrt 交叉编译器的上下文，会导致内核误判编译器特性从而在编译期引发 syncconfig 死锁问答
-        # 真正的未来升级防线，在上一步的 [make target/linux/refresh] 中已经由官方标准环境完美消化实现
+        # 🛡️【终极宇宙级防御】将 yes "" 管道直接注入正式编译主命令！
+        # 彻底解决由于 OpenWrt 源码因内核升级、维护者漏配、或交叉编译器特性变更导致的一切编译期 syncconfig 交互死锁。
+        # 任何编译中途弹出的底层内核/组件问答题，都会被自动赋予默认回车，100% 拒绝卡死报错。
+        yes "" | make -j$(nproc) || yes "" | make -j2 V=s
         
-        # 🌟【核心修复】优先全核编译。若失败，直接降级到双核（充分利用16G内存和4核）并打印详细日志（V=s）查错
-        make -j$(nproc) || make -j2 V=s
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
