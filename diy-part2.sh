@@ -78,8 +78,8 @@ rm -rf target/linux/airoha
 # ======================== 【3. H29K 主线内核配置合并注入】 ========================
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
-# 🌟【核心修复】彻底剔除可能残存的硬件加密旧总开关、所有旧子驱动符号以及屏幕、调度器冲突项
-sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_DRM_PANEL_SITRONIX_ST7789V/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d' "$CONFIG_FILE" 2>/dev/null || true
+# 🌟【核心修复】彻底剔除可能残存的硬件加密旧总开关、所有旧子驱动符号（含非对称加密组件）以及屏幕、调度器冲突项
+sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_DRM_PANEL_SITRONIX_ST7789V/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d' "$CONFIG_FILE" 2>/dev/null || true
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
