@@ -169,7 +169,7 @@ jobs:
         make toolchain/compile -j$(nproc)
         
         echo "🤖 [步骤 2/3] 工具链已就位！切换单线程并注入无限回车，瞬间踏平一切内核配置弹窗..."
-        yes "" | make target/linux/configure -j1 V=s
+        yes "" | make target/linux/prepare -j1 V=s
         
         echo "🚀 [步骤 3/3] 内核配置隐患已被物理超度！重新拉满全核，总攻编译剩余全家桶..."
         make -j$(nproc) || make -j2 V=s
