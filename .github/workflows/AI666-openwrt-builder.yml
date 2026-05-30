@@ -15,7 +15,6 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
-  # 固定用 /mnt 大盘，不写死 sdb1
   WORK_DIR: /mnt/workdir
   CCACHE_DIR: /mnt/ccache
 
@@ -72,7 +71,8 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ${{ env.CCACHE_DIR }}
-        key: ${{ runner.os }}-openwrt-ccache-${{ env.REPO_BRANCH }}-${{ github.sha }}
+        # 🌟【优化】去掉具体的 commit SHA，改用配置文件哈希，防止每次编译都无谓地向 GitHub 存储塞好几G的重复垃圾缓存包
+        key: ${{ runner.os }}-openwrt-ccache-${{ env.REPO_BRANCH }}-${{ hashFiles('**/*.config', '**/diy-part2.sh') }}
         restore-keys: |
           ${{ runner.os }}-openwrt-ccache-${{ env.REPO_BRANCH }}-
 
@@ -99,8 +99,12 @@ jobs:
 
     - name: 加载自定义配置文件
       run: |
-        [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        # 🌟【核心修复】采用合并复制而非盲目 mv，防止多轮复用或增量编译时文件被错误地套娃成 openwrt/files/files
+        if [ -d files ]; then
+          mkdir -p openwrt/files
+          cp -r files/* openwrt/files/
+        fi
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
