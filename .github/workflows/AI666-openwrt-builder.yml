@@ -33,7 +33,7 @@ jobs:
         sudo mount --bind /mnt/tmp /tmp
         sudo mount --bind /mnt/tmp /var/tmp
         
-        # 🌟【核心修复】强制恢复系统标准临时目录权限，防止底层安全组件权限不足导致构建死锁
+        # 🌟【核心修复】强制恢复 system 标准临时目录权限，防止底层安全组件权限不足导致构建死锁
         sudo chmod 1777 /tmp
         sudo chmod 1777 /var/tmp
         
@@ -125,8 +125,8 @@ jobs:
         # 💾【快照】在自动补全执行前，暂时将所有修改加入 Git 暂存区，以便精准剥离出“内核自动补全”的痕迹
         git add target/linux/
         
+        # 🌟【前置防御】利用 yes "" 无限回车结合 OpenWrt 原生交叉编译环境，阻击任何潜在的 (NEW) 选项
         echo "🤖 启动内核符号冷启动补全，正在校准 Kconfig 技术栈..."
-        # 将刷新过程的完整标准输出和错误全部捕获到独立日志，用于深层显微镜级扫描
         yes "" | make target/linux/refresh V=s > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 || true
         cat $GITHUB_WORKSPACE/kconfig_scan.log
         echo "✅ 内核依赖树重构完毕"
@@ -161,16 +161,17 @@ jobs:
         ccache -M 9G
         echo -e "$(nproc) thread compile"
         
-        # 🛡️【天网深层防御线】强行提前释放内核源码与最终合并配置，死死按住 kmod 引入的二次语义冲突弹窗
+        # 🛡️【天网深层防御线·完全体】提前释放内核，并赋予正确的架构阻击变量，彻底解决升级弹窗
         echo "🔄 [天网拦截] 正在提前释放并生成内核最终合并配置..."
         make target/linux/prepare V=s
         
-        echo "⚙️ [天网拦截] 正在对最终生成的内核 `.config` 执行 olddefconfig 净化..."
+        echo "⚙️ [天网拦截] 正在对最终生成的内核 config 执行 olddefconfig 净化..."
         # 动态精准搜寻真正的内核解压源码目录，不管它版本号是 6.12.91 还是未来的新版
         LINUX_DIR=$(ls -d build_dir/target-*/linux-*/* 2>/dev/null | grep -E 'linux-[0-9]' | head -n 1)
         if [ -d "$LINUX_DIR" ]; then
           echo "🎯 成功锁定内核合并目录: $LINUX_DIR，正在强行注入默认缺省值..."
-          make -C "$LINUX_DIR" olddefconfig
+          # 🌟【核心修复】显式指明 ARCH=arm64 交叉编译架构，绝不再误抄宿主机 Azure 机器的 X86 配置
+          make -C "$LINUX_DIR" ARCH=arm64 olddefconfig
           echo "✅ 内核语义冲突隐患已被强制解除！"
         else
           echo "⚠️ 未能锁定内核源码目录，跳过截击净化流程。"
