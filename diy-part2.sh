@@ -64,7 +64,7 @@ echo "❄️ [嗅探成功] 当前 Alpine 最新稳定版本锁定为: $ALPINE_V
 # ======================== 【1. 统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
-# 创建全局所需的所有目录架构
+# 创建全局所需的所有目录架构 (新增 files/www 网页容器支撑)
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/boot/uboot-rockchip/configs \
          package/boot/uboot-rockchip/dts \
@@ -75,6 +75,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/etc/init.d \
          files/etc/fonts/conf.d \
          files/usr/bin \
+         files/www \
          files/usr/share/docker-images
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main/files"
@@ -92,7 +93,7 @@ download_and_check() {
     fi
 }
 
-# --- 批量下载 10 个核心底座组件 ---
+# --- 批量下载核心底座组件 ---
 download_and_check "${BASE_URL}/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts" "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig" "package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
@@ -112,11 +113,10 @@ if ! grep -q "智能识别 Binman 合体固件或传统拆分固件" "target/lin
     echo "❌ 错误: Makefile 核心打包规则不匹配" && exit 1
 fi
 
-# --- 统一拉取应用层开机 LOGO 组与 MediaMTX 配置 ---
+# --- 统一拉取应用层开机 LOGO 组 (不拉取原厂 mediamtx.yml，我们后面做就地注入) ---
 for i in 1 2 3; do
     download_and_check "${LOGO_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg"
 done
-download_and_check "https://raw.githubusercontent.com/I-agree/H29K/main/files/etc/docker/mediamtx/mediamtx.yml" "files/etc/docker/mediamtx/mediamtx.yml"
 
 echo "✅ 所有外部资源下载并校验通过！"
 
@@ -237,7 +237,7 @@ cat > files/etc/fonts/conf.d/99-misans-default.conf <<'EOF'
 </fontconfig>
 EOF
 
-# 屏幕守护服务化脚本
+# 屏幕守护 service 脚本
 mkdir -p files/etc/init.d
 cat > files/etc/init.d/h29k-screen <<'EOF'
 #!/bin/sh /etc/rc.common
@@ -338,17 +338,54 @@ EOF
 # ==============================================================================
 # 📹 【完全体边缘导播】动态插拔、HDMI同步、网络RTSP、网页端一键RTMP直播推流系统
 # ==============================================================================
-echo "🚀 正在注入 H29K 专属微型直播导播守护系统模板..."
+echo "🚀 正在注入 H29K 专属微型直播导播守护系统核心..."
 
-# 1. 生成 MediaMTX 核心配置文件（升级为 H.264 零功耗采集）
+# 1. 生成 MediaMTX 全量高性能配置文件（🌟 专为西瓜播放器高并发跨域调优）
 cat > files/etc/docker/mediamtx/mediamtx.yml << 'EOF'
+logLevel: warn
+logDestinations: [stdout]
+writeQueueSize: 256
+
+rtsp: true
+rtspTransports: [udp, tcp]
+rtspAddress: :8554
+rtpAddress: :8000
+rtcpAddress: :8001
+
+rtmp: true
+rtmpAddress: :1935
+
+# 🌟 HLS / LL-HLS 核心服务器调优（对齐 xgplayer 前端秒开）
+hls: true
+hlsAddress: :8888
+hlsAllowOrigins: ["*"]          # 允许跨域，防止从网页后台(80端口)加载时触发跨域浏览器拦截
+hlsAlwaysRemux: true            # 切片常驻！摄像头接入后台即自动保持切片，实现网页端真正「秒开」
+hlsVariant: lowLatency          # 苹果主推的低延迟 HLS (LL-HLS) 变体，将画面的网络延迟压到最低
+hlsSegmentCount: 5              # 减少保留的切片数量，极致节省 H29K 的物理内存
+hlsSegmentDuration: 1s          # 1秒一个微切片，配合西瓜播放器达成流畅低延迟
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 20M
+hlsDirectory: ""                # 保持空字符串，代表存放在内存(RAM)中，绝不伤软路由 Flash 闪存寿命
+
+webrtc: true
+webrtcAddress: :8889
+webrtcAllowOrigins: ["*"]
+webrtcLocalUDPAddress: :8189
+webrtcIPsFromInterfaces: true
+srt: false
+
+pathDefaults:
+  source: publisher
+  overridePublisher: true
+
 paths:
   cam:
-    # 🌟 采用 H264 硬件直出，-c:v copy 彻底解放 CPU，麦克风打包进 RTSP
+    # 🌟 采用 H264 硬件直出，-c:v copy 彻底解放 CPU，麦克风打包进全协议流
     runOnInit: ffmpeg -f v4l2 -input_format h264 -i /dev/video0 -f alsa -i hw:1,0 -c:v copy -c:a aac -b:a 128k -f rtsp rtsp://127.0.0.1:8554/cam
+    runOnInitRestart: true      # 摄像头断开或供电不稳时，自动无感重启流守护进程
 EOF
 
-# 2. 编写【直播推流控制脚本】（🌟使用 __ALPINE_VER__ 占位符以便后续动态熔铸）
+# 2. 编写【直播推流控制脚本】
 cat > files/usr/bin/live-push.sh << 'EOF'
 #!/bin/sh
 
@@ -412,7 +449,7 @@ EOF
 
 chmod +x files/usr/bin/live-push.sh
 
-# 3. 编写核心动态监测与控制引擎脚本（🌟引入动态版本解耦模板）
+# 3. 编写核心动态监测与控制引擎脚本
 cat > files/usr/bin/cam-monitor.sh << 'EOF'
 #!/bin/sh
 
@@ -503,10 +540,96 @@ EOF
 chmod +x files/etc/init.d/cam-monitor
 echo "✅ 完全体智能导播直播系统架构准备完毕！"
 
+
+# ==============================================================================
+# 🖼️ 【xgplayer 内嵌】生成专属的网页端超低延迟监控大屏面板
+# ==============================================================================
+echo "🖼️ 正在生成 H29K 专属网页直播监视器页面 (西瓜播放器内核)..."
+
+cat > files/www/cam.html << 'EOF'
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H29K 完全体边缘导播 - 网页实时预览</title>
+    <style>
+        body {
+            margin: 0; padding: 0;
+            background-color: #141414; color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh;
+        }
+        .container {
+            width: 90%; max-width: 800px;
+            background: #1e1e1e; border-radius: 12px; padding: 20px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5); border: 1px solid #333;
+        }
+        h2 {
+            margin-top: 0; font-weight: 500; font-size: 1.4rem; color: #4fc3f7;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .status-badge {
+            background: #2e7d32; color: #fff; font-size: 0.75rem;
+            padding: 4px 8px; border-radius: 4px; font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.6; } 50% { opacity: 1; } 100% { opacity: 0.6; }
+        }
+        #h29k-player {
+            width: 100%; height: 450px; background: #000; border-radius: 8px; overflow: hidden;
+        }
+        .info-panel {
+            margin-top: 15px; font-size: 0.9rem; color: #aaaaaa; line-height: 1.6;
+            background: #252525; padding: 12px; border-radius: 6px; border-left: 4px solid #4fc3f7;
+        }
+    </style>
+    <script src="https://unpkg.com/xgplayer@3.0.1/browser/index.js" type="text/javascript"></script>
+    <script src="https://unpkg.com/xgplayer-hls@3.0.1/browser/index.js" type="text/javascript"></script>
+</head>
+<body>
+    <div class="container">
+        <h2>📹 H29K 边缘导播网页实时预览 <span class="status-badge">LIVE 连线中</span></h2>
+        <div id="h29k-player"></div>
+        <div class="info-panel">
+            <strong>💡 导播台微调说明：</strong><br>
+            1. 当前视频流基于 <strong>MediaMTX LL-HLS</strong> 协议，首开极速，端到端延迟低至 1s 内。<br>
+            2. 视频采用 H.264 硬件直通流拷贝技术，不占用 H29K 软路由的 CPU，客户端承担解码渲染。<br>
+            3. 如果画面未正常播放，请点击播放器正中心的播放按钮。手机端支持原生内联控制和全屏手势。
+        </div>
+    </div>
+
+    <script>
+        // 动态获取当前软路由的 LAN 口访问 IP
+        const boxIp = window.location.hostname || '192.168.1.1';
+        
+        // 熔铸初始化西瓜播放器 HLS 实例
+        const player = new window.XgplayerHls({
+            id: 'h29k-player',
+            url: `http://${boxIp}:8888/cam/index.m3u8`, // 完美对接底层的 MediaMTX 低延迟切片流
+            isLive: true,
+            autoplay: true,
+            muted: true,
+            playsinline: true,
+            width: '100%',
+            height: '100%',
+            fluid: true,
+            cors: true
+        });
+    </script>
+</body>
+</html>
+EOF
+
+echo "✅ 西瓜播放器离线监控面板全套资源已封装注入完成！"
+
+
 # ==============================================================================
 # 🎛️ 【LuCI 预装】将直播控制按钮直接固化进入 OpenWrt 网页后台
 # ==============================================================================
-echo "🎨 正在向固件中预装『自定义命令』直播控制按钮..."
+echo "🎨 正在向固件中预装『自定义命令』直播控制按钮与西瓜播放器大屏入口..."
 
 mkdir -p files/etc/config
 cat > files/etc/config/luci_commands << 'EOF'
@@ -522,30 +645,14 @@ config command
 config command
 	option name '📊 查看当前直播状态'
 	option command '/usr/bin/live-push.sh status'
+
+config command
+	option name '🌐 智能获取网页端实时监视大屏链接'
+	option command 'echo "=================================================" && echo "👉 请拷贝并在浏览器新标签页中访问以下地址查看实时画面：" && echo "👉 http://$(uci get network.lan.ipaddr)/cam.html" && echo "================================================="'
 EOF
 
-echo "💖 网页端快捷按钮已成功打包进固件源码树！"
+echo "💖 网页端快捷按钮与大屏交互逻辑已成功打包进固件源码树！"
 
-<script src="https://unpkg.com/xgplayer@3.0.1/browser/index.js" type="text/javascript"></script>
-<script src="https://unpkg.com/xgplayer-flv@3.0.1/browser/index.js" type="text/javascript"></script>
-
-<div id="h29k-player" style="width: 100%; max-width: 640px; height: 360px;"></div>
-
-<script>
-  // 动态获取当前盒子的 IP 地址
-  const boxIp = window.location.hostname; 
-  
-  const player = new window.XgplayerFlv({
-    id: 'h29k-player',
-    url: `http://${boxIp}:8888/cam/index.m3u8`, // 或者是 MediaMTX 对应的 HTTP-FLV 地址
-    isLive: true,            // 锁定为直播模式
-    autoplay: true,          // 自动播放
-    muted: true,             // 默认静音避免浏览器拦截自动播放
-    playsinline: true,       // 允许 H5 手机端内联播放，不强制弹窗全屏
-    height: '100%',
-    width: '100%'
-  });
-</script>
 
 # ==============================================================================
 # 🐳 【🌟 动态熔铸核心】将刚才嗅探到的最新版本号，强行注入脚本并封印为离线包
