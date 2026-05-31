@@ -42,7 +42,7 @@ jobs:
         
         # 限制 Go 编译器内部最大线程并发，防止其霸占 4 核导致虚拟机 I/O 锁死
         echo "GOMAXPROCS=2" >> $GITHUB_ENV
-        # 🌟【终极补刀】强制 Go 编译器将内存垃圾回收频率提高一倍，内存占用直接砍半，断绝 Docker 编译卡死
+        # 强制 Go 编译器将内存垃圾回收频率提高一倍，内存占用直接砍半，断绝 Docker 编译卡死
         echo "GOGC=50" >> $GITHUB_ENV
         
         export TMPDIR=/mnt/tmp
@@ -159,6 +159,7 @@ jobs:
 
     - name: 编译固件镜像
       id: compile
+      timeout-minutes: 60  # 🌟 设定 60 分钟超时，防止无限挂起白白浪费 Actions 额度
       run: |
         cd openwrt
         ccache -M 9G
@@ -172,7 +173,14 @@ jobs:
         yes "" | make target/linux/refresh V=s
         
         echo "🚀 [步骤 3/3] 内核配置隐患已被物理超度！重新拉满全核，总攻编译剩余全家桶..."
-        make -j$(nproc) || make -j2 V=s
+        # 🌟 在局部上下文强行导出变量，确保直达底层的 Docker / Go 编译器
+        export GOMAXPROCS=2
+        export GOGC=50
+        export GIT_TERMINAL_PROMPT=0
+        export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=no"
+        
+        # 执行编译，并将控制变量直接压入 make 命令行，双重保险防擦除
+        make -j$(nproc) GOMAXPROCS=2 GOGC=50
         
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
