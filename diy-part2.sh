@@ -296,4 +296,185 @@ net.core.rmem_max=16777216
 net.core.wmem_max=16777216
 EOF
 
+# ==============================================================================
+# 📹 【完全体边缘导播】动态插拔、HDMI同步、网络RTSP、网页端一键RTMP直播推流系统
+# ==============================================================================
+echo "🚀 正在注入 H29K 专属微型直播导播守护系统..."
+
+# 1. 创建配置与脚本存放目录
+mkdir -p files/usr/bin
+mkdir -p files/etc/init.d
+mkdir -p files/etc/docker/mediamtx
+
+# 2. 生成 MediaMTX 核心配置文件（升级为 H.264 零功耗采集）
+cat > files/etc/docker/mediamtx/mediamtx.yml << 'EOF'
+paths:
+  cam:
+    # 🌟 切换为 -input_format h264 硬件直出，-c:v copy 彻底解放 CPU
+    # 麦克风音频同样打包进 RTSP 流中（rtsp://127.0.0.1:8554/cam）
+    runOnInit: ffmpeg -f v4l2 -input_format h264 -i /dev/video0 -f alsa -i hw:1,0 -c:v copy -c:a aac -b:a 128k -f rtsp rtsp://127.0.0.1:8554/cam
+EOF
+
+# 3. 编写【直播推流控制脚本】（供网页端调用）
+cat > files/usr/bin/live-push.sh << 'EOF'
+#!/bin/sh
+
+ACTION=$1
+RTMP_URL=$2
+
+is_container_running() {
+    docker ps --format '{{.Names}}' | grep -q "^$1$"
+}
+
+case "$ACTION" in
+    start)
+        if [ -z "$RTMP_URL" ]; then
+            echo "❌ 错误：未检测到推流地址！请在后面加上你的直播间 RTMP 地址和密钥。"
+            exit 1
+        fi
+        if ! [ -e /dev/video0 ]; then
+            echo "❌ 错误：当前未连接摄像头，拒绝发起直播！"
+            exit 1
+        fi
+        
+        # 如果已有旧推流，先物理超度
+        docker rm -f live-pusher >/dev/null 2>&1
+        
+        echo "📡 正在启动网络直播推流模块..."
+        # 🌟 从本地零延迟的 RTSP 源摘取音视频，原封不动地 (-c copy) 丢给 B站/抖音等直播平台，CPU 完全不发热！
+        docker run -d --name live-pusher --restart always --network host \
+            alpine:3.19 sh -c "apk add --no-cache ffmpeg && ffmpeg -i rtsp://127.0.0.1:8554/cam -c:v copy -c:a copy -f flv '$RTMP_URL'"
+        
+        if [ $? -eq 0 ]; then
+            echo "✅ 直播推流已成功发起！"
+            echo "🔗 目标平台: $RTMP_URL"
+        else
+            echo "❌ 直播推流容器启动失败，请检查网络或地址。"
+        fi
+        ;;
+        
+    stop)
+        if is_container_running "live-pusher"; then
+            echo "🛑 正在停止直播推流..."
+            docker rm -f live-pusher >/dev/null 2>&1
+            echo "✅ 直播已安全关闭，断开与平台的连接。"
+        else
+            echo "ℹ️ 当前没有正在进行的直播推流。"
+        fi
+        ;;
+        
+    status)
+        if is_container_running "live-pusher"; then
+            echo "🟢 状态：正在激情直播中..."
+            docker logs --tail 2 live-pusher
+        else
+            echo "⚪ 状态：闲置中，未开启直播。"
+        fi
+        ;;
+    *)
+        echo "使用方法: $0 {start \"你的RTMP推流地址\"|stop|status}"
+        ;;
+esac
+EOF
+
+chmod +x files/usr/bin/live-push.sh
+
+# 4. 编写核心动态监测与控制引擎脚本（加入直播断开保护机制）
+cat > files/usr/bin/cam-monitor.sh << 'EOF'
+#!/bin/sh
+
+is_container_running() {
+    docker ps --format '{{.Names}}' | grep -q "^$1$"
+}
+
+echo "👀 H29K 智能直播机监测守护进程已启动..."
+
+while true; do
+    # 核心判断：只有当检测到摄像头硬件存在时才工作
+    if [ -e /dev/video0 ] && [ -e /dev/snd ]; then
+        
+        # A. 激活【网络串流核心服务】
+        if ! is_container_running "mediamtx"; then
+            echo "🎵 检测到摄像头接入，正在唤醒基础音视频引擎..."
+            docker run -d --name mediamtx --restart always --network host \
+                --privileged \
+                --device /dev/video0:/dev/video0 \
+                --device /dev/snd:/dev/snd \
+                -v /etc/docker/mediamtx/mediamtx.yml:/mediamtx.yml \
+                bluenviron/mediamtx:latest
+        fi
+
+        # B. 激活【HDMI本地大屏音画同步播放器】
+        if ! is_container_running "cam-hdmi-player"; then
+            echo "📺 正在向 HDMI 外接大屏输出实时音画面..."
+            docker run -d --name cam-hdmi-player --restart always --network host \
+                --privileged \
+                --device /dev/fb0:/dev/fb0 \
+                --device /dev/snd:/dev/snd \
+                alpine:3.19 sh -c "apk add --no-cache ffmpeg && ffmpeg -re -i rtsp://127.0.0.1:8554/cam -f fbdev /dev/fb0 -f alsa hw:0,0"
+        fi
+
+    else
+        # 💥 物理断电保护：如果拔掉摄像头，连同【直播推流】在内的所有容器瞬间强杀，防止后台死循环报错崩溃
+        if echo "$(docker ps --format '{{.Names}}')" | grep -qE "cam-hdmi-player|mediamtx|live-pusher"; then
+            echo "⚠️ 摄像头被物理拔出，正在紧急熔断直播、大屏输出及基础服务..."
+            docker rm -f cam-hdmi-player mediamtx live-pusher >/dev/null 2>&1
+            # 清屏，恢复整洁的 HDMI 显示端
+            cat /dev/zero > /dev/fb0 >/dev/null 2>&1
+        fi
+    fi
+    
+    sleep 3
+done
+EOF
+
+chmod +x files/usr/bin/cam-monitor.sh
+
+# 5. 建立系统自启服务
+cat > files/etc/init.d/cam-monitor << 'EOF'
+#!/bin/sh /etc/rc.common
+
+START=99
+USE_PROCD=1
+
+start_service() {
+    procd_open_instance
+    procd_set_param command /bin/sh /usr/bin/cam-monitor.sh
+    procd_set_param stdout 1
+    procd_set_param stderr 1
+    procd_set_param respawn
+    procd_close_instance
+}
+EOF
+
+chmod +x files/etc/init.d/cam-monitor
+echo "✅ 完全体智能导播直播系统部署完成！"
+
+# ==============================================================================
+# 🎛️ 【LuCI 预装】将直播控制按钮直接固化进入 OpenWrt 网页后台
+# ==============================================================================
+echo "🎨 正在向固件中预装『自定义命令』直播控制按钮..."
+
+# 1. 确保 UCI 配置目录存在
+mkdir -p files/etc/config
+
+# 2. 写入预设的 luci_commands 配置文件
+# 预设了三个按钮：开启（带默认提示占位符）、关闭、查看状态
+cat > files/etc/config/luci_commands << 'EOF'
+
+config command
+	option name '🚀 一键开启网络直播'
+	option command '/usr/bin/live-push.sh start "请在这里替换为你的RTMP推流地址和密钥"'
+
+config command
+	option name '🛑 一键关闭网络直播'
+	option command '/usr/bin/live-push.sh stop'
+
+config command
+	option name '📊 查看当前直播状态'
+	option command '/usr/bin/live-push.sh status'
+EOF
+
+echo "💖 网页端快捷按钮已成功打包进固件源码树！"
+
 echo "🚀 H29K 所有轻量化改造与下载链整合已全部就位！"
