@@ -7,8 +7,8 @@
 # 添加 QModem 软件源
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 # 无线网卡驱动
-git clone https://github.com/mofan236/openwrt-aic8800.git package/aic8800
+git clone https://github.com/radxa-pkg/aic8800.git package/aic8800
 # 安装 argon 主题
-git clone https://github.com/jerrykuku/luci-theme-argon package/luci-theme-argon
+git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
 echo "🚀 [diy-part1.sh] 软件源预处理圆满完成！"
