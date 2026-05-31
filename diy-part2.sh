@@ -139,7 +139,7 @@ rm -rf target/linux/airoha
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
 # 🌟 移除了对 CONFIG_SND 的清理和禁用，确保 ALSA 声音核心框架能顺利编译
-sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_DRM_PANEL_SITRunning_ST7789V/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d; /CONFIG_SND/d' "$CONFIG_FILE" 2>/dev/null || true
+sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d; /CONFIG_SND/d' "$CONFIG_FILE" 2>/dev/null || true
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -663,4 +663,15 @@ docker save bluenviron/mediamtx:${MEDIAMTX_VER} -o files/usr/share/docker-images
 docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
+
+
+# === 修复官方 OpenWrt 编译 aic8800 缺少 mac80211-backport 头文件导致的报错 ===
+if [ -f package/aic8800/Makefile ]; then
+    echo "⚡ 正在针对官方 OpenWrt 环境净化 aic8800 的 Makefile..."
+    # 彻底抹除找不到的 mac80211-backport 路径
+    sed -i '/mac80211-backport/d' package/aic8800/Makefile
+    # 彻底抹除找不到的 backport 头文件包含
+    sed -i '/backport\//d' package/aic8800/Makefile
+fi
+
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
