@@ -526,6 +526,26 @@ EOF
 
 echo "💖 网页端快捷按钮已成功打包进固件源码树！"
 
+<script src="https://unpkg.com/xgplayer@3.0.1/browser/index.js" type="text/javascript"></script>
+<script src="https://unpkg.com/xgplayer-flv@3.0.1/browser/index.js" type="text/javascript"></script>
+
+<div id="h29k-player" style="width: 100%; max-width: 640px; height: 360px;"></div>
+
+<script>
+  // 动态获取当前盒子的 IP 地址
+  const boxIp = window.location.hostname; 
+  
+  const player = new window.XgplayerFlv({
+    id: 'h29k-player',
+    url: `http://${boxIp}:8888/cam/index.m3u8`, // 或者是 MediaMTX 对应的 HTTP-FLV 地址
+    isLive: true,            // 锁定为直播模式
+    autoplay: true,          // 自动播放
+    muted: true,             // 默认静音避免浏览器拦截自动播放
+    playsinline: true,       // 允许 H5 手机端内联播放，不强制弹窗全屏
+    height: '100%',
+    width: '100%'
+  });
+</script>
 
 # ==============================================================================
 # 🐳 【🌟 动态熔铸核心】将刚才嗅探到的最新版本号，强行注入脚本并封印为离线包
