@@ -26,7 +26,7 @@ jobs:
     - name: 检出源码
       uses: actions/checkout@v4
 
-    - name: 准备大盘工作目录（强制Go/Docker全走大盘，永不卡死）
+    - name: 准备大盘工作目录（强制Go/Docker全走大盘，重构物理Swap永不卡死）
       run: |
         sudo mkdir -p $WORK_DIR $CCACHE_DIR /mnt/tmp
         sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR /mnt/tmp
@@ -36,6 +36,20 @@ jobs:
         # 强制恢复 system 标准临时目录权限，防止底层安全组件权限不足导致构建死锁
         sudo chmod 1777 /tmp
         sudo chmod 1777 /var/tmp
+        
+        # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
+        echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
+        # 1. 停用系统可能存在的零碎、低效旧交换分区
+        sudo swapoff -a || true
+        # 2. 直接在独立大盘 /mnt 上划出 8GB 专属全量 Swap 空间，为极端多包并发提供绝对容错兜底
+        sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=8192
+        sudo chmod 600 /mnt/swapfile
+        sudo mkswap /mnt/swapfile
+        sudo swapon /mnt/swapfile
+        # 3. 强行修改内核虚拟内存激进系数（从默认 60 压榨到 10）
+        # 迫使 CPU 优先榨干物理内存，不到最后一刻绝不读写硬盘，从底层物理掐断 Swap 造成的 I/O 假死
+        sudo sysctl vm.swappiness=10
+        echo "✅ Swap 扩容 8GB 且 swappiness=10 校准完毕！"
         
         # 关闭 Git 密码终端交互，如果遇到坏包凭证错误立刻弹回报错，绝不后台死等
         echo "GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
