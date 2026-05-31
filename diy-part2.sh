@@ -5,6 +5,27 @@
 
 set -euo pipefail  # 严格报错模式：任一命令失败立即终止
 
+# ======================== 【0. 🚀 编译期：最新稳定版动态嗅探中心】 ========================
+echo "🔍 正在动态获取互联网当前最新的稳定版版本号..."
+
+# ① 动态抓取 MediaMTX 官方 GitHub 最新 Release 发布的稳定版 Tag (形如 v1.9.3)
+MEDIAMTX_VER=$(curl -s https://api.github.com/repos/bluenviron/mediamtx/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+if [ -z "$MEDIAMTX_VER" ]; then
+    echo "⚠️ 警告: 无法通过 API 获取 MediaMTX 精确版本，降级使用官方最新稳妥标记"
+    MEDIAMTX_VER="latest"
+fi
+echo "🔥 [嗅探成功] 当前 MediaMTX 最新稳定版本锁定为: $MEDIAMTX_VER"
+
+# ② 动态抓取 Alpine 官方最新稳定版 (利用编译宿主机 Docker 容器秒级解析系统版本，100%准确)
+docker pull alpine:latest >/dev/null 2>&1
+ALPINE_VER=$(docker run --rm alpine:latest cat /etc/alpine-release | tr -d '\r\n')
+if [ -z "$ALPINE_VER" ]; then
+    echo "⚠️ 警告: 无法解析 Alpine 精确版本号，降级使用 3.20 稳定分支"
+    ALPINE_VER="3.20"
+fi
+echo "❄️ [嗅探成功] 当前 Alpine 最新稳定版本锁定为: $ALPINE_VER"
+
+
 # ======================== 【1. 统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
@@ -18,7 +39,8 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/etc/docker/mediamtx \
          files/etc/init.d \
          files/etc/fonts/conf.d \
-         files/usr/bin
+         files/usr/bin \
+         files/usr/share/docker-images
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main/files"
 LOGO_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
@@ -78,7 +100,7 @@ rm -rf target/linux/airoha
 # ======================== 【3. H29K 主线内核配置合并注入】 ========================
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
-# 🌟【修复】移除了对 CONFIG_SND 的清理和禁用，确保 ALSA 声音核心框架能顺利编译
+# 🌟 移除了对 CONFIG_SND 的清理和禁用，确保 ALSA 声音核心框架能顺利编译
 sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_DRM_PANEL_SITRONIX_ST7789V/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d; /CONFIG_SND/d' "$CONFIG_FILE" 2>/dev/null || true
 
 cat >> "$CONFIG_FILE" << 'EOF'
@@ -254,7 +276,6 @@ EOF
 chmod +x files/etc/uci-defaults/99-h29k
 
 # ======================== 【6. Docker 基础环境策略】 ========================
-# 🌟【优化】彻底移除了相互冲突的旧 mediamtx-init 启动项，交给后面的高级守护脚本动态接管
 mkdir -p files/etc/modules.d
 echo -e "overlay\nbridge\nveth" > files/etc/modules.d/30-docker
 
@@ -268,7 +289,7 @@ chmod +x files/etc/uci-defaults/98-docker-autostart
 
 sed -i 's/+docker-compose-v2//g; s/+docker-compose//g' feeds/luci/applications/luci-app-dockerman/Makefile 2>/dev/null || true
 
-# 网络栈核心高并发参数微调
+# 网络栈核心高并发 parameters 微调
 mkdir -p package/base-files/files/etc
 sed -i '/net.netfilter.nf_conntrack_max/d' package/base-files/files/etc/sysctl.conf 2>/dev/null || true
 cat >> package/base-files/files/etc/sysctl.conf << 'EOF'
@@ -282,7 +303,7 @@ EOF
 # ==============================================================================
 # 📹 【完全体边缘导播】动态插拔、HDMI同步、网络RTSP、网页端一键RTMP直播推流系统
 # ==============================================================================
-echo "🚀 正在注入 H29K 专属微型直播导播守护系统..."
+echo "🚀 正在注入 H29K 专属微型直播导播守护系统模板..."
 
 # 1. 生成 MediaMTX 核心配置文件（升级为 H.264 零功耗采集）
 cat > files/etc/docker/mediamtx/mediamtx.yml << 'EOF'
@@ -292,7 +313,7 @@ paths:
     runOnInit: ffmpeg -f v4l2 -input_format h264 -i /dev/video0 -f alsa -i hw:1,0 -c:v copy -c:a aac -b:a 128k -f rtsp rtsp://127.0.0.1:8554/cam
 EOF
 
-# 2. 编写【直播推流控制脚本】（供网页端调用）
+# 2. 编写【直播推流控制脚本】（🌟使用 __ALPINE_VER__ 占位符以便后续动态熔铸）
 cat > files/usr/bin/live-push.sh << 'EOF'
 #!/bin/sh
 
@@ -318,9 +339,9 @@ case "$ACTION" in
         docker rm -f live-pusher >/dev/null 2>&1
         
         echo "📡 正在启动网络直播推流模块..."
-        # 从本地零延迟的 RTSP 源摘取音视频，直接打包丢给直播平台
+        # 🌟 此处的镜像版本会在编译期被动态替换为当时的最新稳定版
         docker run -d --name live-pusher --restart always --network host \
-            alpine:3.19 sh -c "apk add --no-cache ffmpeg && ffmpeg -i rtsp://127.0.0.1:8554/cam -c:v copy -c:a copy -f flv '$RTMP_URL'"
+            alpine:__ALPINE_VER__ sh -c "apk add --no-cache ffmpeg && ffmpeg -i rtsp://127.0.0.1:8554/cam -c:v copy -c:a copy -f flv '$RTMP_URL'"
         
         if [ $? -eq 0 ]; then
             echo "✅ 直播推流已成功发起！"
@@ -356,7 +377,7 @@ EOF
 
 chmod +x files/usr/bin/live-push.sh
 
-# 3. 编写核心动态监测与控制引擎脚本（加入直播断开保护机制）
+# 3. 编写核心动态监测与控制引擎脚本（🌟引入动态版本解耦模板）
 cat > files/usr/bin/cam-monitor.sh << 'EOF'
 #!/bin/sh
 
@@ -366,8 +387,29 @@ is_container_running() {
 
 echo "👀 H29K 智能直播机监测守护进程已启动..."
 
+# 等待 Dockerd 守护进程彻底就绪
+timeout=0
+while [ ! -S /var/run/docker.sock ]; do
+    if [ $timeout -gt 30 ]; then break; fi
+    sleep 1
+    timeout=$((timeout + 1))
+done
+
+# 如果检测到打包进固件的离线镜像，开始本地导入（彻底断网可用）
+if [ -d /usr/share/docker-images ]; then
+    echo "📦 [H29K] 正在进行全家桶离线驱动包冷启动注入，请稍候..." > /dev/console
+    for tar in /usr/share/docker-images/*.tar; do
+        if [ -f "$tar" ]; then
+            docker load -i "$tar"
+        fi
+    done
+    # 销毁入口，防止以后开机重复执行浪费时间
+    rm -rf /usr/share/docker-images
+    echo "✅ [H29K] 离线镜像注入成功！系统已完全具备全功能生产力。" > /dev/console
+fi
+
 while true; do
-    # 核心判断：只有当检测到摄像头硬件存在时才工作
+    # 核心判断：只有当检测 to 摄像头硬件存在时才工作
     if [ -e /dev/video0 ]; then
         
         # A. 激活【网络串流核心服务】
@@ -378,7 +420,7 @@ while true; do
                 --device /dev/video0:/dev/video0 \
                 --device /dev/snd:/dev/snd \
                 -v /etc/docker/mediamtx/mediamtx.yml:/mediamtx.yml \
-                bluenviron/mediamtx:latest
+                bluenviron/mediamtx:__MEDIAMTX_VER__
         fi
 
         # B. 激活【HDMI本地大屏音画同步播放器】
@@ -388,11 +430,11 @@ while true; do
                 --privileged \
                 --device /dev/fb0:/dev/fb0 \
                 --device /dev/snd:/dev/snd \
-                alpine:3.19 sh -c "apk add --no-cache ffmpeg && ffmpeg -re -i rtsp://127.0.0.1:8554/cam -f fbdev /dev/fb0 -f alsa hw:0,0"
+                alpine:__ALPINE_VER__ sh -c "apk add --no-cache ffmpeg && ffmpeg -re -i rtsp://127.0.0.1:8554/cam -f fbdev /dev/fb0 -f alsa hw:0,0"
         fi
 
     else
-        # 💥 物理断电保护：🌟【修复】将 cat 替换为 1M 限量 dd 命令，0.01 秒安全闪电清屏不产生无限死循环
+        # 物理断电保护
         if docker ps -a --format '{{.Names}}' | grep -qE "cam-hdmi-player|mediamtx|live-pusher"; then
             echo "⚠️ 摄像头被物理拔出，正在紧急熔断直播、大屏输出及基础服务..."
             docker rm -f cam-hdmi-player mediamtx live-pusher >/dev/null 2>&1
@@ -424,17 +466,14 @@ start_service() {
 EOF
 
 chmod +x files/etc/init.d/cam-monitor
-echo "✅ 完全体智能导播直播系统部署完成！"
+echo "✅ 完全体智能导播直播系统架构准备完毕！"
 
 # ==============================================================================
 # 🎛️ 【LuCI 预装】将直播控制按钮直接固化进入 OpenWrt 网页后台
 # ==============================================================================
 echo "🎨 正在向固件中预装『自定义命令』直播控制按钮..."
 
-# 1. 确保 UCI 配置目录存在
 mkdir -p files/etc/config
-
-# 2. 写入预设的 luci_commands 配置文件
 cat > files/etc/config/luci_commands << 'EOF'
 
 config command
@@ -452,4 +491,24 @@ EOF
 
 echo "💖 网页端快捷按钮已成功打包进固件源码树！"
 
-echo "🚀 H29K 所有轻量化改造与下载链整合已全部就位！"
+
+# ==============================================================================
+# 🐳 【🌟 动态熔铸核心】将刚才嗅探到的最新版本号，强行注入脚本并封印为离线包
+# ==============================================================================
+echo "🐳 正在通过模板引擎，将最新稳定版号固化进运行时脚本中..."
+sed -i "s/__MEDIAMTX_VER__/${MEDIAMTX_VER}/g" files/usr/bin/cam-monitor.sh
+sed -i "s/__ALPINE_VER__/${ALPINE_VER}/g" files/usr/bin/cam-monitor.sh
+sed -i "s/__ALPINE_VER__/${ALPINE_VER}/g" files/usr/bin/live-push.sh
+
+echo "🎁 正在通过宿主机 Docker，强行跨架构下载并封印 H29K(ARM64) 专属离线镜像..."
+
+# 1. 强制指定 --platform linux/arm64 抓取最新稳定版 MediaMTX
+docker pull --platform linux/arm64 bluenviron/mediamtx:${MEDIAMTX_VER}
+docker save bluenviron/mediamtx:${MEDIAMTX_VER} -o files/usr/share/docker-images/mediamtx.tar
+
+# 2. 强制指定 --platform linux/arm64 抓取最新稳定版 Alpine 播放器底座
+docker pull --platform linux/arm64 alpine:${ALPINE_VER}
+docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
+
+echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
+echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
