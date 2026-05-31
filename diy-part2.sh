@@ -116,7 +116,7 @@ fi
 for i in 1 2 3; do
     download_and_check "${LOGO_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg"
 done
-download_and_check "https://raw.githubusercontent.com/bluenviron/mediamtx/main/mediamtx.yml" "files/etc/docker/mediamtx/mediamtx.yml"
+download_and_check "https://raw.githubusercontent.com/I-agree/H29K/main/files/etc/docker/mediamtx/mediamtx.yml" "files/etc/docker/mediamtx/mediamtx.yml"
 
 echo "✅ 所有外部资源下载并校验通过！"
 
