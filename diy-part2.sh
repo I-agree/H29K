@@ -88,9 +88,12 @@ download_and_check() {
     local url="$1"
     local dest="$2"
     echo "正在下载: $dest ..."
-    curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$url" -o "$dest"
+    if ! curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$url" -o "$dest"; then
+        echo "❌ 错误: $url 网络请求或连接失败！"
+        exit 1
+    fi
     if [ ! -s "$dest" ]; then
-        echo "❌ 错误: $dest 下载失败或文件为空！"
+        echo "❌ 错误: $dest 下载成功但文件为空！"
         exit 1
     fi
 }
@@ -198,9 +201,8 @@ echo "✅ 已向 $CONFIG_FILE 注入目标内核参数"
 
 # 全局通用内核参数防御修正
 GENERIC_CONFIG="target/linux/generic/config-6.12"
-if [ -f "$G_CONF" ] || [ -f "$GENERIC_CONFIG" ]; then
-    # 针对通用配置做同步清理，双重保险
-    sed -i '/CONFIG_ARM64_SVE/d; /CONFIG_ARM64_ASIMD/d' "${GENERIC_CONFIG:-/dev/null}" 2>/dev/null || true
+if [ -f "$GENERIC_CONFIG" ]; then
+    sed -i '/CONFIG_ARM64_SVE/d; /CONFIG_ARM64_ASIMD/d' "$GENERIC_CONFIG" 2>/dev/null || true
     echo "# CONFIG_ARM64_SVE is not set" >> "$GENERIC_CONFIG"
     echo "CONFIG_ARM64_ASIMD=y" >> "$GENERIC_CONFIG"
 fi
