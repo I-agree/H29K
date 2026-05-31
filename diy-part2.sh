@@ -3,25 +3,60 @@
 # File name: diy-part2.sh
 # Description: OpenWrt DIY script part 2 (After Update feeds)
 
-set -euo pipefail  # 严格报错模式：任一命令失败立即终止
+set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终止
 
-# ======================== 【0. 🚀 编译期：最新稳定版动态嗅探中心】 ========================
+# ======================== 【0. 🚀 编译期：最新稳定版动态嗅探与自愈中心】 ========================
 echo "🔍 正在动态获取互联网当前最新的稳定版版本号..."
 
-# ① 动态抓取 MediaMTX 官方 GitHub 最新 Release 发布的稳定版 Tag (形如 v1.9.3)
-MEDIAMTX_VER=$(curl -s https://api.github.com/repos/bluenviron/mediamtx/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-if [ -z "$MEDIAMTX_VER" ]; then
-    echo "⚠️ 警告: 无法通过 API 获取 MediaMTX 精确版本，降级使用官方最新稳妥标记"
-    MEDIAMTX_VER="latest"
-fi
-echo "🔥 [嗅探成功] 当前 MediaMTX 最新稳定版本锁定为: $MEDIAMTX_VER"
+# 获取 MediaMTX 最近发布的 3 个正式稳定版 Tag 列表，用于防时差容错
+MEDIAMTX_RELEASES=$(curl -s https://api.github.com/repos/bluenviron/mediamtx/releases | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/' | head -n 3)
 
-# ② 动态抓取 Alpine 官方最新稳定版 (利用编译宿主机 Docker 容器秒级解析系统版本，100%准确)
+MEDIAMTX_VER=""
+echo "🎁 开始智能检索并跨架构预拉取 H29K(ARM64) 专属 MediaMTX 镜像..."
+
+# 遍历最近的 3 个版本，哪个在 Docker Hub 上有货就用哪个，完美解决官方推流时差问题
+for VER in $MEDIAMTX_RELEASES; do
+    echo "⏳ 尝试拉取版本: bluenviron/mediamtx:$VER (linux/arm64) ..."
+    if docker pull --platform linux/arm64 bluenviron/mediamtx:${VER} >/dev/null 2>&1; then
+        MEDIAMTX_VER=$VER
+        echo "🔥 [匹配成功] 已成功锁定并下载 MediaMTX 官方镜像标签: $MEDIAMTX_VER"
+        break
+    fi
+    
+    # 容错：去掉 'v' 前缀再次尝试（防止 Docker Hub 标签不带 v）
+    VER_NO_V="${VER#v}"
+    echo "⏳ 带 'v' 标签未找到，尝试拉取无 'v' 版本: bluenviron/mediamtx:$VER_NO_V ..."
+    if docker pull --platform linux/arm64 bluenviron/mediamtx:${VER_NO_V} >/dev/null 2>&1; then
+        MEDIAMTX_VER=$VER_NO_V
+        echo "🔥 [匹配成功] 已成功锁定并下载 MediaMTX 官方镜像标签: $MEDIAMTX_VER"
+        break
+    fi
+done
+
+# 终极兜底：如果最近 3 个特定版本由于各种不可抗力都拉取失败，直接拉取 latest 并封装为本地永久不变标签 frozen
+if [ -z "$MEDIAMTX_VER" ]; then
+    echo "⚠️ 警告: 无法在 Docker Hub 找到精确的 Release 镜像，触发终极智能自愈兜底..."
+    echo "⏳ 正在拉取 bluenviron/mediamtx:latest (linux/arm64) ..."
+    docker pull --platform linux/arm64 bluenviron/mediamtx:latest
+    docker tag bluenviron/mediamtx:latest bluenviron/mediamtx:frozen
+    MEDIAMTX_VER="frozen"
+    echo "❄️ [兜底成功] 已将最新镜像本地封印为永久冷启动标签: frozen"
+fi
+
+# ② 动态抓取 Alpine 官方最新稳定版
 docker pull alpine:latest >/dev/null 2>&1
 ALPINE_VER=$(docker run --rm alpine:latest cat /etc/alpine-release | tr -d '\r\n')
 if [ -z "$ALPINE_VER" ]; then
     echo "⚠️ 警告: 无法解析 Alpine 精确版本号，降级使用 3.20 稳定分支"
     ALPINE_VER="3.20"
+fi
+
+echo "⏳ 正在预下载 Alpine 播放器底座镜像 (linux/arm64) ..."
+if ! docker pull --platform linux/arm64 alpine:${ALPINE_VER} >/dev/null 2>&1; then
+    echo "⚠️ 警告: alpine:${ALPINE_VER} 拉取失败，将降级使用 alpine:latest 并固化"
+    docker pull --platform linux/arm64 alpine:latest
+    docker tag alpine:latest alpine:frozen
+    ALPINE_VER="frozen"
 fi
 echo "❄️ [嗅探成功] 当前 Alpine 最新稳定版本锁定为: $ALPINE_VER"
 
@@ -503,11 +538,9 @@ sed -i "s/__ALPINE_VER__/${ALPINE_VER}/g" files/usr/bin/live-push.sh
 echo "🎁 正在通过宿主机 Docker，强行跨架构下载并封印 H29K(ARM64) 专属离线镜像..."
 
 # 1. 强制指定 --platform linux/arm64 抓取最新稳定版 MediaMTX
-docker pull --platform linux/arm64 bluenviron/mediamtx:${MEDIAMTX_VER}
 docker save bluenviron/mediamtx:${MEDIAMTX_VER} -o files/usr/share/docker-images/mediamtx.tar
 
 # 2. 强制指定 --platform linux/arm64 抓取最新稳定版 Alpine 播放器底座
-docker pull --platform linux/arm64 alpine:${ALPINE_VER}
 docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
