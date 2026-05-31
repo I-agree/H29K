@@ -24,7 +24,7 @@ jobs:
 
     steps:
     - name: 检出源码
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
 
     - name: 准备大盘工作目录（强制Go/Docker全走大盘，永不卡死）
       run: |
@@ -82,7 +82,6 @@ jobs:
         echo "==================== CPU 核心数 ===================="
         echo "逻辑核心数: $(nproc)"
         cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
-        
         echo -e "\n==================== 内存大小 ===================="
         free -h
 
@@ -95,31 +94,31 @@ jobs:
 
     - name: 加载自定义软件源
       run: |
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
-        cd openwrt
+        cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: 更新软件源索引
-      run: cd openwrt && ./scripts/feeds update -a
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
 
     - name: 安装软件源组件
-      run: cd openwrt && ./scripts/feeds install -a
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
 
     - name: 加载自定义配置文件
       run: |
         if [ -d files ]; then
-          mkdir -p openwrt/files
-          cp -r files/* openwrt/files/
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+          cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
         fi
-        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE openwrt/.config
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
         chmod +x $DIY_P2_SH
-        cd openwrt
+        cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: 启用 ccache 加速（大盘）
       run: |
-        cd openwrt
+        cd ${{ env.WORK_DIR }}/openwrt
         echo "CONFIG_CCACHE=y" >> .config
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
         mkdir -p $CCACHE_DIR
@@ -127,7 +126,7 @@ jobs:
     - name: 主线内核智能补全与下载依赖软件
       id: package
       run: |
-        cd openwrt
+        cd ${{ env.WORK_DIR }}/openwrt
         make defconfig
         
         git add target/linux/
@@ -151,7 +150,7 @@ jobs:
         find dl -size -1024c -exec rm -f {} \;
 
     - name: 上传内核自动补全对比清单
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v4
       if: always()
       with:
         name: H29K_内核自动补全明细表
@@ -159,9 +158,8 @@ jobs:
 
     - name: 编译固件镜像
       id: compile
-      timeout-minutes: 60  # 🌟 设定 60 分钟超时，防止无限挂起白白浪费 Actions 额度
       run: |
-        cd openwrt
+        cd ${{ env.WORK_DIR }}/openwrt
         ccache -M 9G
         echo -e "$(nproc) thread compile"
         
@@ -173,7 +171,6 @@ jobs:
         yes "" | make target/linux/refresh V=s
         
         echo "🚀 [步骤 3/3] 内核配置隐患已被物理超度！重新拉满全核，总攻编译剩余全家桶..."
-        # 🌟 在局部上下文强行导出变量，确保直达底层的 Docker / Go 编译器
         export GOMAXPROCS=2
         export GOGC=50
         export GIT_TERMINAL_PROMPT=0
@@ -191,24 +188,24 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
-    - name: 上传 bin 目录（含全部构建产物）
-      uses: actions/upload-artifact@main
+    - name: 上传 bin 目录（使用绝对路径，防止软连接失效导致空包）
+      uses: actions/upload-artifact@v4
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: openwrt/bin
+        path: ${{ env.WORK_DIR }}/openwrt/bin
 
     - name: 整理固件输出目录
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        cd openwrt/bin/targets/*/*
+        cd ${{ env.WORK_DIR }}/openwrt/bin/targets/*/*
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: 上传固件输出目录
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
