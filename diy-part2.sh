@@ -63,7 +63,6 @@ if ! docker pull --platform linux/arm64 alpine:${ALPINE_VER} >/dev/null 2>&1; th
 fi
 echo "❄️ [嗅探成功] 当前 Alpine 最新稳定版本锁定为: $ALPINE_VER"
 
-
 # ======================== 【1. 统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
@@ -138,8 +137,10 @@ rm -rf target/linux/airoha
 # ======================== 【3. H29K 主线内核配置合并注入】 ========================
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
-# 🌟 移除了对 CONFIG_SND 的清理和禁用，确保 ALSA 声音核心框架能顺利编译
-sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d; /CONFIG_SND/d' "$CONFIG_FILE" 2>/dev/null || true
+echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
+
+# 🌟 核心清理：在原基础上，增加了对 CONFIG_ARM64_SVE 的定点清理，防止其覆盖通用配置
+sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d; /CONFIG_SND/d; /CONFIG_ARM64_SVE/d' "$CONFIG_FILE" 2>/dev/null || true
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -153,6 +154,10 @@ CONFIG_COMMON_CLK_ROCKCHIP=y
 CONFIG_ROCKCHIP_PMDOMAINS=y
 CONFIG_PWM_ROCKCHIP=y
 CONFIG_OF_GPIO=y
+
+# --- 针对 A53 架构彻底关闭不支持的 SVE 扩展，全力确保 ASIMD(NEON) 跑满 ---
+# CONFIG_ARM64_SVE is not set
+CONFIG_ARM64_ASIMD=y
 
 # --- 禁用低效且冲突的板载硬件加密，全力释放更强的 ARMv8 CPU 内置加密扩展性能 ---
 CONFIG_CRYPTO_HW=y
@@ -193,8 +198,9 @@ echo "✅ 已向 $CONFIG_FILE 注入目标内核参数"
 
 # 全局通用内核参数防御修正
 GENERIC_CONFIG="target/linux/generic/config-6.12"
-if [ -f "$GENERIC_CONFIG" ]; then
-    sed -i '/CONFIG_ARM64_SVE/d; /CONFIG_ARM64_ASIMD/d' "$GENERIC_CONFIG"
+if [ -f "$G_CONF" ] || [ -f "$GENERIC_CONFIG" ]; then
+    # 针对通用配置做同步清理，双重保险
+    sed -i '/CONFIG_ARM64_SVE/d; /CONFIG_ARM64_ASIMD/d' "${GENERIC_CONFIG:-/dev/null}" 2>/dev/null || true
     echo "# CONFIG_ARM64_SVE is not set" >> "$GENERIC_CONFIG"
     echo "CONFIG_ARM64_ASIMD=y" >> "$GENERIC_CONFIG"
 fi
@@ -336,7 +342,6 @@ net.core.netdev_max_backlog=10000
 net.core.rmem_max=16777216
 net.core.wmem_max=16777216
 EOF
-
 
 # ==============================================================================
 # 📹 【完全体边缘导播】动态插拔、HDMI同步、网络RTSP、网页端一键RTMP直播推流系统
@@ -535,7 +540,6 @@ EOF
 chmod +x files/etc/init.d/cam-monitor
 echo "✅ 完全体智能导播直播系统架构准备完毕！"
 
-
 # ==============================================================================
 # 🖼️ 【xgplayer 内嵌】生成专属的网页端超低延迟监控大屏面板
 # ==============================================================================
@@ -617,7 +621,6 @@ EOF
 
 echo "✅ 西瓜播放器离线监控面板全套资源已封装注入完成！"
 
-
 # ==============================================================================
 # 🎛️ 【LuCI 预装】将直播控制按钮直接固化进入 OpenWrt 网页后台
 # ==============================================================================
@@ -645,7 +648,6 @@ EOF
 
 echo "💖 网页端快捷按钮与大屏交互逻辑已成功打包进固件源码树！"
 
-
 # ==============================================================================
 # 🐳 【🌟 动态熔铸核心】将刚才嗅探到的最新版本号，强行注入脚本并封印为离线包
 # ==============================================================================
@@ -663,7 +665,6 @@ docker save bluenviron/mediamtx:${MEDIAMTX_VER} -o files/usr/share/docker-images
 docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
-
 
 # === 修复官方 OpenWrt 编译 aic8800 缺少 mac80211-backport 头文件导致的报错 ===
 if [ -f package/aic8800/Makefile ]; then
