@@ -1,0 +1,82 @@
+###############################################
+# H29K 智能直播导播机 - MediaMTX 核心优化配置
+###############################################
+
+# 日志与基础性能调优
+logLevel: warn                  # 生产环境降级为 warn，减少频繁写入 OpenWrt 日志导致的 CPU 损耗
+logDestinations: [stdout]
+logStructured: false
+
+readTimeout: 10s
+writeTimeout: 10s
+writeQueueSize: 256             # 针对 4核嵌入式芯片调优，减小队列，极致节省内存占用
+udpMaxPayloadSize: 1452
+
+###############################################
+# 安全与认证（默认在局域网内放开，方便流媒体交互）
+authMethod: internal
+authInternalUsers:
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: publish
+        path:
+      - action: read
+        path:
+      - action: playback
+        path:
+
+###############################################
+# 各大流媒体协议服务器开关
+rtsp: true
+rtspTransports: [udp, tcp]     # 移除多播(multicast)，在软路由环境毫无必要，精简网络栈
+rtspAddress: :8554
+rtpAddress: :8000
+rtcpAddress: :8001
+
+rtmp: true
+rtmpAddress: :1935              # 保持 RTMP 开启，留给 live-push.sh 作为后备推流通道
+
+###############################################
+# HLS 服务器核心调优（🌟 专为西瓜播放器 xgplayer 优化）
+hls: true
+hlsAddress: :8888
+hlsAllowOrigins: ["*"]          # 允许跨域，防止 LuCI 网页后台加载播放器时触发跨域拦截
+
+hlsAlwaysRemux: true            # 🔥【硬核修改】切片常驻！摄像头一旦接入，后台保持自动切片。
+                                # 这样西瓜播放器一打开就是“现成”的流，实现真正网页端「秒开」！
+
+hlsVariant: lowLatency          # 采用 Apple 主推的低延迟 HLS (LL-HLS) 协议，延迟压到 1s 左右
+hlsSegmentCount: 5              # 减少保留的切片数量（默认7），进一步榨干并节省 RAM
+hlsSegmentDuration: 1s          # 1秒一个切片，配合西瓜播放器达成极致低延迟
+hlsPartDuration: 200ms          # 微切片脉冲，保证 LL-HLS 高速同步
+hlsSegmentMaxSize: 20M
+
+# 注意：MediaMTX 默认将 HLS 切片保存在内存中（空字符串表示内存模式）
+# 这在 OpenWrt 上极其完美，完全不伤 eMMC 闪存或 TF 刷机卡！
+hlsDirectory: "" 
+
+###############################################
+# WebRTC 超低延迟服务器（备用，xgplayer 亦可拓展对接 WHEP）
+webrtc: true
+webrtcAddress: :8889
+webrtcAllowOrigins: ["*"]
+webrtcLocalUDPAddress: :8189
+webrtcIPsFromInterfaces: true
+
+srt: false                      # H29K 场景用不到 SRT 协议，果断关闭，释放 CPU 监听开销
+
+###############################################
+# 默认路径缺省配置
+pathDefaults:
+  source: publisher
+  overridePublisher: true
+
+###############################################
+# 🌟 动态监控核心：H29K 物理摄像头硬件直通路径
+paths:
+  cam:
+    # 使用占位符，编译期会被自动熔铸，开机自动通过 H.264 硬件直出并打包麦克风
+    runOnInit: ffmpeg -f v4l2 -input_format h264 -i /dev/video0 -f alsa -i hw:1,0 -c:v copy -c:a aac -b:a 128k -f rtsp rtsp://127.0.0.1:8554/cam
+    runOnInitRestart: true      # 🔥 如果摄像头因为电压不稳、松动导致短暂断开，MediaMTX 会自动重启 FFmpeg 守护，实现无人值守自愈！
