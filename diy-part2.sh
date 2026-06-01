@@ -676,6 +676,8 @@ fi
 # === 针对 Linux 6.12.91 内核精准修正 aic8800 补丁 ===
 python3 -c '
 import os
+import re
+
 patch_file = None
 for root, dirs, files in os.walk("."):
     if "020-wireless-6.16.patch" in files:
@@ -683,27 +685,23 @@ for root, dirs, files in os.walk("."):
         break
 
 if patch_file:
-    print(f"🛠️ 正在为 Linux 6.12.91 剥离核心内核宏污染...")
+    print("🛠️ 正在为 Linux 6.12.91 开启全局正则宏污染剥离手术...")
     with open(patch_file, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
     
-    # 1. 修复 6.15+ 定时器冲突，让其在 6.12.91 上正确回退到 del_timer
-    content = content.replace("KERNEL_VERSION(6, 15, 0)) || defined(BUILD_OPENWRT)", "KERNEL_VERSION(6, 15, 0))")
-    content = content.replace("KERNEL_VERSION(6, 16, 0)) || defined(BUILD_OPENWRT)", "KERNEL_VERSION(6, 16, 0))")
+    # 1. 彻底清除 || defined(BUILD_OPENWRT) 及其换行变种（如 ||\n+defined...）
+    # 这样会使 #if (VERSION >= 6,13,0) || defined(BUILD_OPENWRT) 纯净退化为 #if (VERSION >= 6,13,0)
+    content = re.sub(r"\|\|\s*(?:\+\s*)?defined\s*\(\s*BUILD_OPENWRT\s*\)", "", content)
     
-    # 2. 修复 6.13+ VFS 命名空间与双引号语法冲突，让其在 6.12.91 上回退到无引号的符号导入
-    content = content.replace(
-        "+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)) || defined(BUILD_OPENWRT)\n MODULE_IMPORT_NS(\"VFS_internal",
-        "+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))\n MODULE_IMPORT_NS(\"VFS_internal"
-    )
-    content = content.replace(
-        "+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)) ||\n defined(BUILD_OPENWRT)\n+MODULE_IMPORT_NS(\"VFS_internal",
-        "+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))\n+MODULE_IMPORT_NS(\"VFS_internal"
-    )
+    # 2. 彻底清除 && !defined(BUILD_OPENWRT) 及其换行变种
+    # 这样会使 #if (VERSION < 6,17,0) && !defined(BUILD_OPENWRT) 纯净退化为 #if (VERSION < 6,17,0)
+    content = re.sub(r"&&\s*(?:\+\s*)?!\s*defined\s*\(\s*BUILD_OPENWRT\s*\)", "", content)
     
     with open(patch_file, "w", encoding="utf-8") as f:
         f.write(content)
-    print("✅ 针对 6.12.91 内核的补丁手术成功！")
+    print("✅ 针对 6.12.91 内核的全局补丁去污染手术大功告成！")
+else:
+    print("⚠️ 未找到 020-wireless-6.16.patch 补丁文件，跳过手术。")
 '
 
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
