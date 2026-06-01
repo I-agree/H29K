@@ -669,20 +669,21 @@ docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
 
 # =================================================================
-# 🚨 动态拦截并修复 aic8800 的下载与编译双重硬伤
-# =================================================================
-# 🚨 针对 aic8800 本地 Makefile 的精准外科手术 (在 make download 之前拦截)
+# 🚨 针对 aic8800 本地 Makefile 的终极外科手术 (通关下载 + 依赖 + 编译阻拦)
 # =================================================================
 if [ -f "package/aic8800/Makefile" ]; then
-    echo "🛠️ 正在手术修正 package/aic8800/Makefile..."
+    echo "🛠️ 正在进行 aic8800 Makefile 深度闭环手术..."
     
-    # 1. 彻底删除哈希校验行 (防止新版 OpenWrt 严苛校验导致 download 阶段挂掉)
+    # 1. 彻底删除哈希校验行 (防止新版下载校验挂掉)
     sed -i '/PKG_MIRROR_HASH/d' package/aic8800/Makefile
     
-    # 2. 补全无线底层依赖链 (确保后续第 7 步编译时不抢跑、不报错)
+    # 2. 补全无线底层依赖链 (确保与 mac80211 对齐不抢跑)
     sed -i 's/DEPENDS:=+kmod-cfg80211/DEPENDS:=+kmod-mac80211 +kmod-cfg80211/g' package/aic8800/Makefile
     
-    echo "✅ aic8800 Makefile 拦截修正完成！"
+    # 3. 强行屏蔽新版 Linux 6.x 内核严苛的缺少原型报错 (降服 cc1 强迫症)
+    sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes/g' package/aic8800/Makefile
+    
+    echo "✅ aic8800 三合一终极修补完成！"
 else
     echo "⚠️ 未找到 package/aic8800/Makefile，请检查路径！"
 fi
