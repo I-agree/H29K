@@ -1,7 +1,7 @@
 name: 🚨 Aic8800 专属 Debug 强行逼供脚本
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # 手动触发
 
 env:
   REPO_URL: https://github.com/openwrt/openwrt
@@ -21,7 +21,7 @@ jobs:
     - name: 1. 检出本地配置
       uses: actions/checkout@v4
 
-    - name: 2. 初始化高容错大盘环境
+    - name: 2. 初始化高容错大盘环境 (带 Swap 固若金汤)
       run: |
         sudo mkdir -p $WORK_DIR $CCACHE_DIR /mnt/tmp
         sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR /mnt/tmp
@@ -58,13 +58,12 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: 6. 载入芯片配置文件 (完全对齐主 YML，拒绝污染)
+    - name: 6. 载入芯片配置文件 (标准 defconfig，拒绝任何污染)
       run: |
         [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
         chmod +x $DIY_P2_SH
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        # 只做标准配置结构化，绝不运行任何带有 refresh 的异端命令
         make defconfig
 
     - name: 7. 【全速轰炸】编译通用底层工具链 (tools & toolchain)
@@ -73,16 +72,22 @@ jobs:
         make tools/compile -j$(nproc)
         make toolchain/compile -j$(nproc)
 
-    - name: 🛡️ 8. 【全速轰炸】编译 Linux 内核大盘 (完全对齐主 YML 核心步骤)
+    - name: 🛡️ 8. 【全速轰炸】编译 Linux 内核大盘 (前提条件一)
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        echo "🚀 正在全速编译完整的 Linux 内核与核心依赖..."
+        echo "🚀 正在全速编译完整的 Linux 内核基础..."
         make target/linux/compile -j$(nproc)
 
-    - name: 🚨 9. 【单线程强行逼供】单独全显编译 aic8800
+    - name: 📡 9. 【全速轰炸】编译无线底层驱动堆栈 (前提条件二)
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo "🚀 正在编译 aic8800 绝对依赖的 mac80211 内核无线模块..."
+        make package/kernel/mac80211/compile -j$(nproc)
+
+    - name: 🚨 10. 【单线程强行逼供】单独全显编译 aic8800
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         echo "=================================================================="
-        echo "🚨 内核大盘已安全通过！现在进入纯净单线程单独轰炸 aic8800！"
+        echo "🚨 所有前置大山已全部铲平！现在进入纯净单线程单独硬刚 aic8800！"
         echo "=================================================================="
         make package/aic8800/compile V=s -j1
