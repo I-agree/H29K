@@ -669,7 +669,7 @@ docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
 
 # =================================================================
-# 🚨 针对 aic8800 本地 Makefile 的终极外科手术 (通关下载 + 依赖 + 编译阻拦)
+# 🚨 针对 aic8800 本地 Makefile 的终极补丁 (通关下载 + 依赖 + GCC14 编译阻拦)
 # =================================================================
 if [ -f "package/aic8800/Makefile" ]; then
     echo "🛠️ 正在进行 aic8800 Makefile 深度闭环手术..."
@@ -680,10 +680,12 @@ if [ -f "package/aic8800/Makefile" ]; then
     # 2. 补全无线底层依赖链 (确保与 mac80211 对齐不抢跑)
     sed -i 's/DEPENDS:=+kmod-cfg80211/DEPENDS:=+kmod-mac80211 +kmod-cfg80211/g' package/aic8800/Makefile
     
-    # 3. 强行屏蔽新版 Linux 6.x 内核严苛的缺少原型报错 (降服 cc1 强迫症)
-    sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes/g' package/aic8800/Makefile
+    # 3. 强行屏蔽新版 Linux 6.x 内核 / GCC 14 严苛的语法报错
+    # -Wno-missing-prototypes: 忽略缺失函数原型的警告
+    # -Wno-expansion-to-defined: 忽略宏展开中包含 defined 的不规范警告
+    sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined/g' package/aic8800/Makefile
     
-    echo "✅ aic8800 三合一终极修补完成！"
+    echo "✅ aic8800 五合一终极修补完成！"
 else
     echo "⚠️ 未找到 package/aic8800/Makefile，请检查路径！"
 fi
