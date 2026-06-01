@@ -15,6 +15,13 @@ cd ../..
 cp -r package/immortalwrt_temp/package/kernel/aic8800 package/aic8800
 rm -rf package/immortalwrt_temp
 
+# =================================================================
+# 🚨 强行物理修复 aic8800 缺少 mac80211 前置依赖的底层硬伤
+# =================================================================
+echo "🛠️ 正在修复 aic8800 依赖关系，强行注入 +kmod-mac80211..."
+find package/ -name "Makefile" -path "*/aic8800/*" -exec sed -i 's/DEPENDS:=+kmod-cfg80211/DEPENDS:=+kmod-mac80211 +kmod-cfg80211/g' {} +
+echo "✅ aic8800 依赖链物理修补完成！"
+
 # === 3. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
