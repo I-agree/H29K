@@ -1,7 +1,7 @@
 name: 🚨 Aic8800 专属 Debug 强行逼供脚本
 
 on:
-  workflow_dispatch: # 纯手动触发，方便你随时点击测试
+  workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/openwrt/openwrt
@@ -21,20 +21,17 @@ jobs:
     - name: 1. 检出本地配置
       uses: actions/checkout@v4
 
-    - name: 2. 初始化高容错大盘环境 (防止假死)
+    - name: 2. 初始化高容错大盘环境
       run: |
         sudo mkdir -p $WORK_DIR $CCACHE_DIR /mnt/tmp
         sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR /mnt/tmp
         sudo mount --bind /mnt/tmp /tmp
-        
-        # 简单粗暴划出 8GB Swap，防止 4 核物理内存意外挤爆
         sudo swapoff -a || true
         sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=8192
         sudo chmod 600 /mnt/swapfile
         sudo mkswap /mnt/swapfile
         sudo swapon /mnt/swapfile
         sudo sysctl vm.swappiness=10
-        
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
         echo "TMPDIR=/mnt/tmp" >> $GITHUB_ENV
@@ -61,37 +58,31 @@ jobs:
         ./scripts/feeds update -a
         ./scripts/feeds install -a
 
-    - name: 6. 载入芯片配置文件并物理超度内核弹窗
+    - name: 6. 载入芯片配置文件 (完全对齐主 YML，拒绝污染)
       run: |
         [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
         chmod +x $DIY_P2_SH
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        
-        # 强制用默认回车灌入缺少的内核新符号，彻底按死任何交互弹窗
+        # 只做标准配置结构化，绝不运行任何带有 refresh 的异端命令
         make defconfig
-        yes "" | make target/linux/refresh V=s
 
     - name: 7. 【全速轰炸】编译通用底层工具链 (tools & toolchain)
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        echo "🚀 正在使用全核心加速编译依赖工具链..."
         make tools/compile -j$(nproc)
         make toolchain/compile -j$(nproc)
 
-    - name: 8. 【全速轰炸】编译内核无线基础堆栈 (mac80211)
+    - name: 🛡️ 8. 【全速轰炸】编译 Linux 内核大盘 (完全对齐主 YML 核心步骤)
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        echo "🚀 正在编译 aic8800 绝对依赖的无线底层..."
-        make package/kernel/mac80211/compile -j$(nproc)
+        echo "🚀 正在全速编译完整的 Linux 内核与核心依赖..."
+        make target/linux/compile -j$(nproc)
 
     - name: 🚨 9. 【单线程强行逼供】单独全显编译 aic8800
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         echo "=================================================================="
-        echo "🚨 警告：下方将进入纯净的单线程单包编译。如果没有混淆日志，"
-        echo "🚨 那么挂掉的地方，上方 2-5 行就是 100% 真实的驱动源码报错！"
+        echo "🚨 内核大盘已安全通过！现在进入纯净单线程单独轰炸 aic8800！"
         echo "=================================================================="
-        
-        # 使用 -j1（单线程）和 V=s（详细输出）无干扰硬刚 aic8800
         make package/aic8800/compile V=s -j1
