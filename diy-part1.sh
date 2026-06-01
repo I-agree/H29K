@@ -7,9 +7,8 @@
 # 添加 QModem 软件源
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 
-# === 2. 提取无线网卡驱动 ===
-# 使用 Git 稀疏克隆，精准切出 ImmortalWrt 官方带有标准 OpenWrt Makefile 的 aic8800 驱动包
-git clone --depth 1 --filter=blob:none --sparse https://github.com/immortalwrt/immortalwrt.git package/immortalwrt_temp
+# === 2. 提取无线网卡驱动（精准对齐 25.12 分支时代） ===
+git clone --depth 1 -b openwrt-25.12 --filter=blob:none --sparse https://github.com/immortalwrt/immortalwrt.git package/immortalwrt_temp
 cd package/immortalwrt_temp
 git sparse-checkout set package/kernel/aic8800
 cd ../..
