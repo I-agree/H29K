@@ -668,40 +668,24 @@ docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
 
-# 精准净化 aic8800 驱动的 Makefile，物理超度所有非官方主线的 backport 预载依赖
-if [ -f package/aic8800/Makefile ]; then
-    sed -i '/backport/d' package/aic8800/Makefile
-fi
+# =========================================================================
+# 完美适配 OpenWrt 25.12 (Linux 6.12.91) 的 aic8800 驱动全自动清洗脚本
+# =========================================================================
+# 策略：自动定位所有 aic8800 组件目录，对所有 Makefile、Kbuild 和 .patch 进行等线清洗
+# 优点：只抹除/替换核心毒瘤字段，不改变行数，完美保留 Makefile 连字符 (\) 和补丁结构
 
-# === 针对 Linux 6.12.91 内核精准修正 aic8800 补丁 ===
-python3 -c '
-import os
-import re
-
-patch_file = None
-for root, dirs, files in os.walk("."):
-    if "020-wireless-6.16.patch" in files:
-        patch_file = os.path.join(root, "020-wireless-6.16.patch")
-        break
-
-if patch_file:
-    print("🛠️ 正在为 Linux 6.12.91 开启全局正则宏污染剥离手术...")
-    with open(patch_file, "r", encoding="utf-8", errors="ignore") as f:
-        content = f.read()
+find package/ feeds/ -type d -name "*aic8800*" 2>/dev/null | while read -r dir; do
+    echo "正在全自动清洗 aic8800 组件目录: $dir"
     
-    # 1. 彻底清除 || defined(BUILD_OPENWRT) 及其换行变种（如 ||\n+defined...）
-    # 这样会使 #if (VERSION >= 6,13,0) || defined(BUILD_OPENWRT) 纯净退化为 #if (VERSION >= 6,13,0)
-    content = re.sub(r"\|\|\s*(?:\+\s*)?defined\s*\(\s*BUILD_OPENWRT\s*\)", "", content)
-    
-    # 2. 彻底清除 && !defined(BUILD_OPENWRT) 及其换行变种
-    # 这样会使 #if (VERSION < 6,17,0) && !defined(BUILD_OPENWRT) 纯净退化为 #if (VERSION < 6,17,0)
-    content = re.sub(r"&&\s*(?:\+\s*)?!\s*defined\s*\(\s*BUILD_OPENWRT\s*\)", "", content)
-    
-    with open(patch_file, "w", encoding="utf-8") as f:
-        f.write(content)
-    print("✅ 针对 6.12.91 内核的全局补丁去污染手术大功告成！")
-else:
-    print("⚠️ 未找到 020-wireless-6.16.patch 补丁文件，跳过手术。")
-'
+    # 统一穿透清洗该目录下所有的 Makefile、Kbuild、.mk 和 .patch 补丁文件
+    find "$dir" -type f \( -name "Makefile" -o -name "Kbuild" -o -name "*.patch" -o -name "*.mk" \) | xargs -r sed -i \
+        -e 's/NOSTDINC_FLAGS :=/ccflags-y +=/g' \
+        -e 's/NOSTDINC_FLAGS +=/ccflags-y +=/g' \
+        -e 's|mac80211-backport|mac80211|g' \
+        -e 's|-include backport/autoconf.h||g' \
+        -e 's|-include backport/backport.h||g' \
+        -e 's/\$(KERNEL_NOSTDINC_FLAGS)//g' \
+        -e 's/NOSTDINC_FLAGS="\$(NOSTDINC_FLAGS)"//g'
+done
 
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
