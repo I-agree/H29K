@@ -669,23 +669,49 @@ docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
 
 # =========================================================================
-# 完美适配 OpenWrt 25.12 (Linux 6.12.91) 的 aic8800 驱动全自动清洗脚本
+# 针对 aic8800 截图目录结构定制的 diy-part2.sh 动态补丁注入脚本
 # =========================================================================
-# 策略：自动定位所有 aic8800 组件目录，对所有 Makefile、Kbuild 和 .patch 进行等线清洗
-# 优点：只抹除/替换核心毒瘤字段，不改变行数，完美保留 Makefile 连字符 (\) 和补丁结构
+# 适用环境：OpenWrt 25.12 (mac80211 6.18.26)
+# 核心原理：diy-part2.sh 执行时无源码，通过直接在 patches 目录下增殖一个 090 补丁，
+# 让 OpenWrt 编译系统在后续解压源码后，自动通过补丁机制将内核 Kbuild 彻底洗净。
 
-find package/ feeds/ -type d -name "*aic8800*" 2>/dev/null | while read -r dir; do
-    echo "正在全自动清洗 aic8800 组件目录: $dir"
+echo "开始为 aic8800 注入 25.12 专属内核适配补丁..."
+
+# 1. 寻找 aic8800 包所在的绝对路径
+AIC_DIR=$(find package/ feeds/ -type d -name "aic8800" 2>/dev/null | head -n 1)
+
+if [ -n "$AIC_DIR" ] && [ -d "$AIC_DIR/patches" ]; then
+    echo "成功定位组件补丁目录: $AIC_DIR/patches"
     
-    # 统一穿透清洗该目录下所有的 Makefile、Kbuild、.mk 和 .patch 补丁文件
-    find "$dir" -type f \( -name "Makefile" -o -name "Kbuild" -o -name "*.patch" -o -name "*.mk" \) | xargs -r sed -i \
-        -e 's/NOSTDINC_FLAGS :=/ccflags-y +=/g' \
-        -e 's/NOSTDINC_FLAGS +=/ccflags-y +=/g' \
-        -e 's|mac80211-backport|mac80211|g' \
-        -e 's|-include backport/autoconf.h||g' \
-        -e 's|-include backport/backport.h||g' \
-        -e 's/\$(KERNEL_NOSTDINC_FLAGS)//g' \
-        -e 's/NOSTDINC_FLAGS="\$(NOSTDINC_FLAGS)"//g'
-done
+    # 2. 凭空生成 090-fix-kernel-6.18-compat.patch 补丁文件
+    # 该补丁会在编译解压阶段，直接命中并斩断 aic8800_fdrv/Kbuild 内的所有旧兼容层依赖
+    cat << 'EOF' > "$AIC_DIR/patches/090-fix-kernel-6.18-compat.patch"
+--- a/aic8800_fdrv/Kbuild
++++ b/aic8800_fdrv/Kbuild
+@@ -1,13 +1,5 @@
+-NOSTDINC_FLAGS :=
+-NOSTDINC_FLAGS += -I$(src)/..
+-NOSTDINC_FLAGS += -I$(src)/.
+-NOSTDINC_FLAGS += -I$(src)/rwnx
+-NOSTDINC_FLAGS += -I$(src)/../mac80211-backport/backport-include
+-NOSTDINC_FLAGS += -I$(src)/../mac80211-backport/backport-include/uapi
+-NOSTDINC_FLAGS += -I$(src)/../mac80211-backport/include
+-NOSTDINC_FLAGS += -I$(src)/../mac80211-backport/include/uapi
+-NOSTDINC_FLAGS += -include backport/autoconf.h
+-NOSTDINC_FLAGS += -include backport/backport.h
++ccflags-y += -I$(src)/.. -I$(src)/. -I$(src)/rwnx
++ccflags-y += -I$(STAGING_DIR)/usr/include/mac80211
+ 
+-export rwnx_dir := $(src)
+-export rwnx_backport := 1
++ccflags-y += -DCONFIG_RWNX_FULLMAC
++ccflags-y += -DCONFIG_AIC8800_WLAN
+EOF
+
+    echo "成功在 patches 目录中创建 090-fix-kernel-6.18-compat.patch！"
+    echo "aic8800 适配 6.18+ 内核前置拦截成功。"
+else
+    echo "错误: 未找到 aic8800 目录或 patches 结构不符，请检查 diy-part1.sh 下载状态。"
+fi
 
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
