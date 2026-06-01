@@ -194,6 +194,10 @@ jobs:
         # 1. 首先启动全核高并发轰炸编译，如果成功则直接跳过精确 Debug 阶段
         if ! make -j$(nproc) GOMAXPROCS=2 GOGC=50; then
             echo -e "\n\n❌ [WARNING] 全核并发编译在某个特定包发生碰撞熔断！"
+            
+            echo "🛡️ [预检] 正在强制全速编译内核无线堆栈 mac80211，防止依赖缺失..."
+            yes "" | make package/kernel/mac80211/compile -j$(nproc)
+            
             echo "⚠️ 正在精准降级到 package/aic8800 单包单线程编译，瞬间抓取核心报错..."
             echo "====================== aic8800 底层详细错误日志输出 ======================"
             
