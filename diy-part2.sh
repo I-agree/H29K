@@ -668,13 +668,42 @@ docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
 
-# === 修复官方 OpenWrt 编译 aic8800 缺少 mac80211-backport 头文件导致的报错 ===
+# 精准净化 aic8800 驱动的 Makefile，物理超度所有非官方主线的 backport 预载依赖
 if [ -f package/aic8800/Makefile ]; then
-    echo "⚡ 正在针对官方 OpenWrt 环境净化 aic8800 的 Makefile..."
-    # 彻底抹除找不到的 mac80211-backport 路径
-    sed -i '/mac80211-backport/d' package/aic8800/Makefile
-    # 彻底抹除找不到的 backport 头文件包含
-    sed -i '/backport\//d' package/aic8800/Makefile
+    sed -i '/backport/d' package/aic8800/Makefile
 fi
+
+# === 针对 Linux 6.12.91 内核精准修正 aic8800 补丁 ===
+python3 -c '
+import os
+patch_file = None
+for root, dirs, files in os.walk("."):
+    if "020-wireless-6.16.patch" in files:
+        patch_file = os.path.join(root, "020-wireless-6.16.patch")
+        break
+
+if patch_file:
+    print(f"🛠️ 正在为 Linux 6.12.91 剥离核心内核宏污染...")
+    with open(patch_file, "r", encoding="utf-8", errors="ignore") as f:
+        content = f.read()
+    
+    # 1. 修复 6.15+ 定时器冲突，让其在 6.12.91 上正确回退到 del_timer
+    content = content.replace("KERNEL_VERSION(6, 15, 0)) || defined(BUILD_OPENWRT)", "KERNEL_VERSION(6, 15, 0))")
+    content = content.replace("KERNEL_VERSION(6, 16, 0)) || defined(BUILD_OPENWRT)", "KERNEL_VERSION(6, 16, 0))")
+    
+    # 2. 修复 6.13+ VFS 命名空间与双引号语法冲突，让其在 6.12.91 上回退到无引号的符号导入
+    content = content.replace(
+        "+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)) || defined(BUILD_OPENWRT)\n MODULE_IMPORT_NS(\"VFS_internal",
+        "+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))\n MODULE_IMPORT_NS(\"VFS_internal"
+    )
+    content = content.replace(
+        "+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0)) ||\n defined(BUILD_OPENWRT)\n+MODULE_IMPORT_NS(\"VFS_internal",
+        "+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))\n+MODULE_IMPORT_NS(\"VFS_internal"
+    )
+    
+    with open(patch_file, "w", encoding="utf-8") as f:
+        f.write(content)
+    print("✅ 针对 6.12.91 内核的补丁手术成功！")
+'
 
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
