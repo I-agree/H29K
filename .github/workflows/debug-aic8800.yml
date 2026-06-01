@@ -1,0 +1,97 @@
+name: 🚨 Aic8800 专属 Debug 强行逼供脚本
+
+on:
+  workflow_dispatch: # 纯手动触发，方便你随时点击测试
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: openwrt-25.12
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  WORK_DIR: /mnt/workdir
+  CCACHE_DIR: /mnt/ccache
+
+jobs:
+  debug_build:
+    runs-on: ubuntu-22.04
+
+    steps:
+    - name: 1. 检出本地配置
+      uses: actions/checkout@v4
+
+    - name: 2. 初始化高容错大盘环境 (防止假死)
+      run: |
+        sudo mkdir -p $WORK_DIR $CCACHE_DIR /mnt/tmp
+        sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR /mnt/tmp
+        sudo mount --bind /mnt/tmp /tmp
+        
+        # 简单粗暴划出 8GB Swap，防止 4 核物理内存意外挤爆
+        sudo swapoff -a || true
+        sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=8192
+        sudo chmod 600 /mnt/swapfile
+        sudo mkswap /mnt/swapfile
+        sudo swapon /mnt/swapfile
+        sudo sysctl vm.swappiness=10
+        
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
+        echo "TMPDIR=/mnt/tmp" >> $GITHUB_ENV
+
+    - name: 3. 安装 Ubuntu 编译依赖基础包
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+
+    - name: 4. 克隆 OpenWrt 主线源码
+      run: |
+        cd $WORK_DIR
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 5. 注入自定义 Feeds 软件源
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: 6. 载入芯片配置文件并物理超度内核弹窗
+      run: |
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+        
+        # 强制用默认回车灌入缺少的内核新符号，彻底按死任何交互弹窗
+        make defconfig
+        yes "" | make target/linux/refresh V=s
+
+    - name: 7. 【全速轰炸】编译通用底层工具链 (tools & toolchain)
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo "🚀 正在使用全核心加速编译依赖工具链..."
+        make tools/compile -j$(nproc)
+        make toolchain/compile -j$(nproc)
+
+    - name: 8. 【全速轰炸】编译内核无线基础堆栈 (mac80211)
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo "🚀 正在编译 aic8800 绝对依赖的无线底层..."
+        make package/kernel/mac80211/compile -j$(nproc)
+
+    - name: 🚨 9. 【单线程强行逼供】单独全显编译 aic8800
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo "=================================================================="
+        echo "🚨 警告：下方将进入纯净的单线程单包编译。如果没有混淆日志，"
+        echo "🚨 那么挂掉的地方，上方 2-5 行就是 100% 真实的驱动源码报错！"
+        echo "=================================================================="
+        
+        # 使用 -j1（单线程）和 V=s（详细输出）无干扰硬刚 aic8800
+        make package/aic8800/compile V=s -j1
