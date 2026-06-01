@@ -669,49 +669,36 @@ docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
 
 # =========================================================================
-# 针对 aic8800 截图目录结构定制的 diy-part2.sh 动态补丁注入脚本
+# 完全基于截图和真实文件、不新增任何文件的 aic8800 精准安全清洗脚本
 # =========================================================================
 # 适用环境：OpenWrt 25.12 (mac80211 6.18.26)
-# 核心原理：diy-part2.sh 执行时无源码，通过直接在 patches 目录下增殖一个 090 补丁，
-# 让 OpenWrt 编译系统在后续解压源码后，自动通过补丁机制将内核 Kbuild 彻底洗净。
+# 原理：绝不凭空创建新文件，防止触发 OpenWrt 的补丁校验/列表报错。
+# 直接在原有 patches 目录内的 010~080 补丁中，通过 sed 将那些试图引入
+# backport 污染的上下文及指令，替换为适配 Linux 6.18+ 的现代 ccflags-y。
 
-echo "开始为 aic8800 注入 25.12 专属内核适配补丁..."
+echo "正在对 aic8800 已有补丁执行无痕安全清洗..."
 
-# 1. 寻找 aic8800 包所在的绝对路径
+# 1. 自动寻找 aic8800 文件夹路径
 AIC_DIR=$(find package/ feeds/ -type d -name "aic8800" 2>/dev/null | head -n 1)
 
 if [ -n "$AIC_DIR" ] && [ -d "$AIC_DIR/patches" ]; then
-    echo "成功定位组件补丁目录: $AIC_DIR/patches"
+    echo "定位成功: $AIC_DIR/patches"
     
-    # 2. 凭空生成 090-fix-kernel-6.18-compat.patch 补丁文件
-    # 该补丁会在编译解压阶段，直接命中并斩断 aic8800_fdrv/Kbuild 内的所有旧兼容层依赖
-    cat << 'EOF' > "$AIC_DIR/patches/090-fix-kernel-6.18-compat.patch"
---- a/aic8800_fdrv/Kbuild
-+++ b/aic8800_fdrv/Kbuild
-@@ -1,13 +1,5 @@
--NOSTDINC_FLAGS :=
--NOSTDINC_FLAGS += -I$(src)/..
--NOSTDINC_FLAGS += -I$(src)/.
--NOSTDINC_FLAGS += -I$(src)/rwnx
--NOSTDINC_FLAGS += -I$(src)/../mac80211-backport/backport-include
--NOSTDINC_FLAGS += -I$(src)/../mac80211-backport/backport-include/uapi
--NOSTDINC_FLAGS += -I$(src)/../mac80211-backport/include
--NOSTDINC_FLAGS += -I$(src)/../mac80211-backport/include/uapi
--NOSTDINC_FLAGS += -include backport/autoconf.h
--NOSTDINC_FLAGS += -include backport/backport.h
-+ccflags-y += -I$(src)/.. -I$(src)/. -I$(src)/rwnx
-+ccflags-y += -I$(STAGING_DIR)/usr/include/mac80211
- 
--export rwnx_dir := $(src)
--export rwnx_backport := 1
-+ccflags-y += -DCONFIG_RWNX_FULLMAC
-+ccflags-y += -DCONFIG_AIC8800_WLAN
-EOF
+    # 2. 深度无痕清洗现有的补丁文件和外层 Makefile
+    # 这一步直接把补丁里企图添加的 backport 头文件包含、宏定义、旧编译旗帜一网打尽
+    find "$AIC_DIR" -type f \( -name "*.patch" -o -name "Makefile" \) | xargs -r sed -i \
+        -e 's/NOSTDINC_FLAGS :=/ccflags-y +=/g' \
+        -e 's/NOSTDINC_FLAGS +=/ccflags-y +=/g' \
+        -e 's|mac80211-backport|mac80211|g' \
+        -e 's|-include backport/autoconf.h||g' \
+        -e 's|-include backport/backport.h||g' \
+        -e 's/\$(KERNEL_NOSTDINC_FLAGS)//g' \
+        -e 's/NOSTDINC_FLAGS="\$(NOSTDINC_FLAGS)"//g' \
+        -e 's/export rwnx_backport := 1/export rwnx_backport := 0/g'
 
-    echo "成功在 patches 目录中创建 090-fix-kernel-6.18-compat.patch！"
-    echo "aic8800 适配 6.18+ 内核前置拦截成功。"
+    echo "aic8800 原有补丁清洗完毕，未增加任何新文件，结构保持绝对纯净！"
 else
-    echo "错误: 未找到 aic8800 目录或 patches 结构不符，请检查 diy-part1.sh 下载状态。"
+    echo "警告: 未找到 aic8800 目录，请确认 diy-part1.sh 下载路径是否正确。"
 fi
 
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
