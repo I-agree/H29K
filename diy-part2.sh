@@ -668,36 +668,4 @@ docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
 
-# ==============================================================================
-# AIC8800 修复 for RK3528 H29K + OpenWrt 25.12 Kernel 6.12
-# 严格按你截图目录 & YML 流程编写
-# ==============================================================================
-
-AIC_DIR="package/kernel/aic8800"
-
-if [ -d "$AIC_DIR" ]; then
-  echo "🔧 开始修复 RK3528 H29K 专用 AIC8800 驱动..."
-  cd "$AIC_DIR" || exit 1
-
-  # 1. 修复 implicit-fallthrough 编译错误
-  find . -name "*.c" -type f | xargs sed -i 's|// no break|fallthrough;|g'
-
-  # 2. 修复内核版本判断（去掉错误的 BUILD_OPENWRT 宏）
-  find . -name "*.[ch]" | xargs sed -i \
-    -e 's|KERNEL_VERSION(6,13,0)) || defined(BUILD_OPENWRT)|KERNEL_VERSION(6,13,0))|g' \
-    -e 's|KERNEL_VERSION(6,15,0)) || defined(BUILD_OPENWRT)|KERNEL_VERSION(6,15,0))|g' \
-    -e 's|KERNEL_VERSION(6,17,0)) || defined(BUILD_OPENWRT)|KERNEL_VERSION(6,17,0))|g'
-
-  # 3. 修复 ARM64 / RK3528 下 PC 宏冲突
-  find . -name "*.[ch]" | xargs sed -i 's|uint32_t PC;|uint32_t pc;|g'
-
-  # 4. 修复 6.12 定时器：timer_delete → del_timer
-  find . -name "*.c" | xargs sed -i 's|timer_delete|del_timer|g'
-
-  echo "✅ AIC8800 驱动修复完成（RK3528 H29K 专用）"
-  cd - >/dev/null
-else
-  echo "⚠️ 未找到 aic8800，跳过修复"
-fi
-
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
