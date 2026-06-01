@@ -190,8 +190,19 @@ jobs:
         export GIT_TERMINAL_PROMPT=0
         export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=no"
         
-        # 执行编译，并将控制变量直接压入 make 命令行，双重保险防擦除
-        make -j$(nproc) GOMAXPROCS=2 GOGC=50
+        # 【双轨智能自动降级熔断纠错技术】
+        # 1. 首先启动全核高并发轰炸编译，如果成功则直接跳过 Debug 阶段
+        if ! make -j$(nproc) GOMAXPROCS=2 GOGC=50; then
+            echo -e "\n\n❌ [WARNING] 全核并发编译在某个特定包发生碰撞熔断！"
+            echo "⚠️ 正在启动自动化[单线程降级容错拦截机制]，强行切换至 -j1 V=s 捕捉核心死因..."
+            echo "====================== 核心底层详细错误日志输出 ======================"
+            
+            # 2. 降级为单线程编译，辅以 V=s 输出，彻底杜绝日志被冲刷，第一报错现场一定会停留在屏幕最底部
+            make -j1 V=s GOMAXPROCS=2 GOGC=50
+            
+            # 如果单线程深挖重试依然报错，则断言终止工作流
+            exit 1
+        fi
         
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
