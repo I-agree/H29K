@@ -668,45 +668,4 @@ docker save alpine:${ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPINE_VER）已完美结晶并存入固件内部！"
 
-# =========================================================================
-# 真正基于截图事实、逻辑闭环的 aic8800 完美编译适配脚本
-# =========================================================================
-# 适用环境：OpenWrt 25.12 (mac80211 6.18.26)
-# 原理：1. 不新增任何新文件，防止触发 OpenWrt 的静态补丁列表和签名校验报错。
-#       2. 利用 080 补丁或外层 Makefile 作为载体，注入强行清洗内层未来源码的指令。
-
-echo "启动 aic8800 源码架构安全注入..."
-
-# 自动定位 aic8800 目录
-AIC_DIR=$(find package/ feeds/ -type d -name "aic8800" 2>/dev/null | head -n 1)
-
-if [ -n "$AIC_DIR" ] && [ -f "$AIC_DIR/Makefile" ]; then
-    echo "成功锁定目标目录: $AIC_DIR"
-
-    # 方案 A：直接修改外层的 OpenWrt Makefile，注入编译前的深度清洗动作
-    # 在 PKG_BUILD_DIR 准备完毕（即源码拉取解压并打完 010-080 补丁）的当场，强制用 sed 清洗内层 Kbuild
-    echo "正在向外层构建脚本注入[时空穿透]清洗命令..."
-    
-    # 寻找外层 Makefile 中准备构建的核心位置，在 eval 实例化之前，动态篡改并插入我们的 Hook 动作
-    # 这样无论源码什么时候解压，只要一进入编译流程，这一段清洗指令就会在内存中被准时触发
-    sed -i '/include \$(INCLUDE_DIR)\/package.mk/a \
-define Build/Prepare\n\t\$(call Build/Prepare/Default)\n\t@echo "=== 正在执行 aic8800 内层内核适配清洗 ==="\n\tfind \$(PKG_BUILD_DIR) -type f -name "Kbuild" | xargs -r sed -i -e "s/NOSTDINC_FLAGS :=/ccflags-y +=/g" -e "s/NOSTDINC_FLAGS +=/ccflags-y +=/g" -e "s|mac80211-backport|mac80211|g" -e "s|-include backport/.*||g" -e "s/\\\$(KERNEL_NOSTDINC_FLAGS)//g"\nendef' "$AIC_DIR/Makefile"
-
-    # 方案 B：双重保险，同时清洗 010-080 补丁中本身可能存在的过时内核宏定义上下文
-    if [ -d "$AIC_DIR/patches" ]; then
-        echo "正在同步清洗 010-080 补丁内部上下文..."
-        find "$AIC_DIR/patches" -type f -name "*.patch" | xargs -r sed -i \
-            -e 's/NOSTDINC_FLAGS :=/ccflags-y +=/g' \
-            -e 's/NOSTDINC_FLAGS +=/ccflags-y +=/g' \
-            -e 's|mac80211-backport|mac80211|g' \
-            -e 's|-include backport/autoconf.h||g' \
-            -e 's|-include backport/backport.h||g' \
-            -e 's/\$(KERNEL_NOSTDINC_FLAGS)//g'
-    fi
-
-    echo "aic8800 逻辑闭环处理完成！未产生任何多余碎片文件。"
-else
-    echo "错误: 未找到 aic8800 目录，请检查 diy-part1.sh 下载路径。"
-fi
-
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
