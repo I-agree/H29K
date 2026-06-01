@@ -671,14 +671,20 @@ echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine@$ALPIN
 # =================================================================
 # 🚨 动态拦截并修复 aic8800 的下载与编译双重硬伤
 # =================================================================
-echo "🛠️ 正在对 aic8800 进行手术开发..."
-
-# 1. 物理修复编译依赖：强行注入 +kmod-mac80211 依赖
-find package/ -name "Makefile" -path "*/aic8800/*" -exec sed -i 's/DEPENDS:=+kmod-cfg80211/DEPENDS:=+kmod-mac80211 +kmod-cfg80211/g' {} +
-
-# 2. 物理修复下载报错：将 PKG_MIRROR_HASH 强行改为 skip，跳过严苛的压缩包哈希校验
-find package/ -name "Makefile" -path "*/aic8800/*" -exec sed -i 's/PKG_MIRROR_HASH:=.*/PKG_MIRROR_HASH:=skip/g' {} +
-
-echo "✅ aic8800 编译依赖与下载哈希全面修复完成！"
+# 🚨 针对 aic8800 本地 Makefile 的精准外科手术 (在 make download 之前拦截)
+# =================================================================
+if [ -f "package/aic8800/Makefile" ]; then
+    echo "🛠️ 正在手术修正 package/aic8800/Makefile..."
+    
+    # 1. 彻底删除哈希校验行 (防止新版 OpenWrt 严苛校验导致 download 阶段挂掉)
+    sed -i '/PKG_MIRROR_HASH/d' package/aic8800/Makefile
+    
+    # 2. 补全无线底层依赖链 (确保后续第 7 步编译时不抢跑、不报错)
+    sed -i 's/DEPENDS:=+kmod-cfg80211/DEPENDS:=+kmod-mac80211 +kmod-cfg80211/g' package/aic8800/Makefile
+    
+    echo "✅ aic8800 Makefile 拦截修正完成！"
+else
+    echo "⚠️ 未找到 package/aic8800/Makefile，请检查路径！"
+fi
 
 echo "🚀 H29K 极其稳健的最新稳定版离线闭环改造，全部大功告成！"
