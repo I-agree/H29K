@@ -684,9 +684,10 @@ if [ -f "package/aic8800/Makefile" ]; then
     # -Wno-missing-prototypes: 忽略缺失函数原型的警告
     # -Wno-expansion-to-defined: 忽略宏展开中包含 defined 的规范警告
     # -Wno-attribute-warning: 忽略 Fortify String 等触发的内核编译期越界属性警告
-    sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning/g' package/aic8800/Makefile
+    # -Wno-unused-function: 忽略定义了但未使用的 static 函数警告 (解决电源管理挂起/恢复函数报错)
+    sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning -Wno-unused-function -Wno-error=unused-function/g' package/aic8800/Makefile
     
-    echo "✅ aic8800 七合一终极修补完成！"
+    echo "✅ aic8800 九合一终极修补完成！"
 else
     echo "⚠️ 未找到 package/aic8800/Makefile，请检查路径！"
 fi
