@@ -180,17 +180,25 @@ jobs:
         make tools/compile -j$(nproc)
         make toolchain/compile -j$(nproc)
         
-        echo "🤖 [步骤 2/3] 工具链已就位！使用真实交叉编译器精准校准内核，瞬间踏平一切内核配置弹窗..."
+        echo "🤖 [步骤 2/3] 工具链已就位！使用真实交叉编译器精准校准内核..."
         yes "" | make target/linux/refresh V=s
         
-        echo "🚀 [步骤 3/3] 内核配置隐患已被物理超度！硬件性能全量释放！开始 4 核满血总攻编译..."
+        echo "🚀 [步骤 3/3] 开启专项狙击！让 Go 语言双子星排队单挑，斩断内存踩踏..."
+        
+        echo "📦 [专项狙击 1/2] 单独全速编译 dockerd 守护进程核心..."
+        # 4核全神贯注编译这一个包，即使失败也触发你的智能熔断降级
+        make package/feeds/packages/dockerd/compile -j$(nproc) || make package/feeds/packages/dockerd/compile -j1 V=s
+        
+        echo "📦 [专项狙击 2/2] 紧接着单独全速编译 docker 客户端核心..."
+        make package/feeds/packages/docker/compile -j$(nproc) || make package/feeds/packages/docker/compile -j1 V=s
+        
+        echo "🔥 [终极总攻] 双子星已被物理超度！开始全包 4 核满血总攻编译..."
         export GIT_TERMINAL_PROMPT=0
         export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=no"
         
         # =================================================================
         # 🛡️ 【通用型：全自动断点智能熔断技术】
         # =================================================================
-        # 1. 4核全速编译
         if ! make -j$(nproc); then
             echo -e "\n\n❌ [自动熔断] 全核并发编译在某个位置发生碰撞擦枪走火！"
             echo "🔍 正在自动降级至顶层单线程详细模式 (-j1 V=s)，精准捕捉当前破损包的核心报错..."
@@ -198,16 +206,11 @@ jobs:
             echo "========= 🔥 OPENWRT CORE ERROR LOG AUTOMATIC CAPTURE ==========="
             echo "================================================================="
             
-            # 2. 通用 Debug 核心：
-            # 绝对不要加 yes "" 管道！让编译器自然死亡并释放错误信号。
-            # OpenWrt 会瞬间跳过已完成的包，直接卡在真正死掉的那个包上，拉出完整无错位日志。
             make -j1 V=s
             
             echo "================================================================="
             echo "========= 🛑 ERROR LOG CAPTURE END. BUILD TERMINATED ==========="
             echo "================================================================="
-            
-            # 明确向 GitHub Actions 宣告失败，及时释放算力，防止无效挂机
             exit 1
         fi
         
