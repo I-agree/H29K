@@ -54,11 +54,6 @@ jobs:
         # 关闭 Git 密码终端交互，如果遇到坏包凭证错误立刻弹回报错，绝不后台死等
         echo "GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
         
-        # 限制 Go 编译器内部最大线程并发，防止其霸占 4 核导致虚拟机 I/O 锁死
-        echo "GOMAXPROCS=2" >> $GITHUB_ENV
-        # 强制 Go 编译器将内存垃圾回收频率提高一倍，内存占用直接砍半，断绝 Docker 编译卡死
-        echo "GOGC=50" >> $GITHUB_ENV
-        
         export TMPDIR=/mnt/tmp
         export TEMP=/mnt/tmp
         export TMP=/mnt/tmp
