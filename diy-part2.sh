@@ -639,13 +639,24 @@ docker save h29k-alpine-ffmpeg:${補_ALPINE_VER} -o files/usr/share/docker-image
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine-FFmpeg@$補_ALPINE_VER）已实现100%纯本地闭环！"
 
 # =================================================================
-# 🚨 针对 aic8800 本地 Makefile 的终极补丁
+# 🚨 针对 aic8800 本地 Makefile 的终极补丁 (通关下载 + 依赖 + 屏蔽 GCC14 所有强迫症报错)
 # =================================================================
 if [ -f "package/aic8800/Makefile" ]; then
     echo "🛠️ 正在进行 aic8800 Makefile 终极闭环手术..."
+    
+    # 1. 彻底删除哈希校验行 (防止新版下载校验挂掉)
     sed -i '/PKG_MIRROR_HASH/d' package/aic8800/Makefile
+    
+    # 2. 补全无线底层依赖链 (确保与 mac80211 对齐不抢跑)
     sed -i 's/DEPENDS:=+kmod-cfg80211/DEPENDS:=+kmod-mac80211 +kmod-cfg80211/g' package/aic8800/Makefile
+    
+    # 3. 强行屏蔽新版 Linux 6.x 内核 / GCC 14 的各类严苛语法与安全阻拦
+    # -Wno-missing-prototypes: 忽略缺失函数原型的警告
+    # -Wno-expansion-to-defined: 忽略宏展开中包含 defined 的规范警告
+    # -Wno-attribute-warning: 忽略 Fortify String 等触发的内核编译期越界属性警告
+    # -Wno-unused-function: 忽略定义了但未使用的 static 函数警告 (解决电源管理挂起/恢复函数报错)
     sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning -Wno-unused-function -Wno-error=unused-function/g' package/aic8800/Makefile
+    
     echo "✅ aic8800 九合一终极修补完成！"
 else
     echo "⚠️ 未找到 package/aic8800/Makefile，请检查路径！"
