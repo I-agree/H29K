@@ -196,62 +196,68 @@ CONFIG_DEFAULT_QDISC="fq"
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
 
 # ==============================================================================
-# 📡 H29K 专属蓝牙子系统全量闭环配置（拒绝弹窗提问）
+# 📡 基于下面网页对齐的蓝牙全量闭环配置（拒绝任何弹窗）
+# https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/bluetooth/Kconfig?h=linux-6.12.y
+# https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/net/bluetooth/Kconfig?h=linux-6.12.y
 # ==============================================================================
-# --- 核心协议栈与基础框架层 ---
+
+# --- 1. 核心协议栈框架层 (对照 net/bluetooth/Kconfig) ---
 CONFIG_BT=y
 CONFIG_BT_BREDR=y
 CONFIG_BT_LE=y
-# CONFIG_BT_RFCOMM is not set
-# CONFIG_BT_BNEP is not set
-# CONFIG_BT_HIDP is not set
-# CONFIG_BT_HS is not set
 # CONFIG_BT_LE_L2CAP_ECRED is not set
+# CONFIG_BT_6LOWPAN is not set
+# CONFIG_BT_LEDS is not set
 # CONFIG_BT_MSFTEXT is not set
 # CONFIG_BT_AOSPEXT is not set
 # CONFIG_BT_DEBUGFS is not set
-# CONFIG_BT_SELFTESTS is not set
+# CONFIG_BT_SELFTEST is not set
+# CONFIG_BT_FEATURE_DEBUG is not set
 
-# --- 核心目标驱动：UART H4（AIC8800等网卡必备） ---
+# --- 2. 阻断外部 source 嵌套树 (对照 net/bluetooth/ 核心协议子框架) ---
+# CONFIG_BT_RFCOMM is not set
+# CONFIG_BT_BNEP is not set
+# CONFIG_BT_CMTP is not set
+# CONFIG_BT_HIDP is not set
+
+# --- 3. 核心目标：仅放行 UART H4 总线 (对照 drivers/bluetooth/Kconfig) ---
 CONFIG_BT_HCIUART=y
 CONFIG_BT_HCIUART_H4=y
 
-# --- 显式关闭所有冲突的 UART 子协议（防止 H4 之后的菜单弹窗） ---
-# CONFIG_BT_HCIUART_BCM is not set
-# CONFIG_BT_HCIUART_CYPRESS is not set
-# CONFIG_BT_HCIUART_RTL is not set
-# CONFIG_BT_HCIUART_LL is not set
+# --- 4. 彻底封死所有其他冲突的 UART 子协议 (100% 对照清单) ---
+# CONFIG_BT_HCIUART_NOKIA is not set
+# CONFIG_BT_HCIUART_BCSP is not set
 # CONFIG_BT_HCIUART_ATH3K is not set
+# CONFIG_BT_HCIUART_LL is not set
 # CONFIG_BT_HCIUART_3WIRE is not set
 # CONFIG_BT_HCIUART_INTEL is not set
+# CONFIG_BT_HCIUART_BCM is not set
+# CONFIG_BT_HCIUART_RTL is not set
 # CONFIG_BT_HCIUART_QCA is not set
 # CONFIG_BT_HCIUART_AG6XX is not set
 # CONFIG_BT_HCIUART_MRVL is not set
-# CONFIG_BT_HCIUART_BCMTRM is not set
-# CONFIG_BT_HCIUART_NXPUART is not set
+# CONFIG_BT_HCIUART_AML is not set
 
-# --- 显式关闭所有非 UART 接口的总线底层驱动 ---
+# --- 5. 彻底封死所有非 UART 总线的独立驱动 (100% 对照清单) ---
 # CONFIG_BT_HCIBTUSB is not set
 # CONFIG_BT_HCIBTSDIO is not set
 # CONFIG_BT_HCIBCM203X is not set
+# CONFIG_BT_HCIBCM4377 is not set
 # CONFIG_BT_HCIBPA10X is not set
 # CONFIG_BT_HCIBFUSB is not set
 # CONFIG_BT_HCIDTL1 is not set
-# CONFIG_BT_HCIB303 is not set
-# CONFIG_BT_HCIH4P is not set
-# CONFIG_BT_HCIPCIVM is not set
-# CONFIG_BT_HCIVIRT is not set
+# CONFIG_BT_HCIBT3C is not set
+# CONFIG_BT_HCIBLUECARD is not set
 # CONFIG_BT_HCIVHCI is not set
-
-# --- 显式关闭 6.12 内核中新增/并列的其他厂商独立无线模块 ---
 # CONFIG_BT_MRVL is not set
-# CONFIG_BT_MTK is not set
-# CONFIG_BT_QCOM is not set
-# CONFIG_BT_RTL is not set
-# CONFIG_BT_BCM is not set
-# CONFIG_BT_INTEL is not set
-# CONFIG_BT_HCIRSXX is not set
-# CONFIG_BT_VIRTUAL is not set
+# CONFIG_BT_MRVL_SDIO is not set
+# CONFIG_BT_ATH3K is not set
+# CONFIG_BT_MTKSDIO is not set
+# CONFIG_BT_MTKUART is not set
+# CONFIG_BT_QCOMSMD is not set
+# CONFIG_BT_VIRTIO is not set
+# CONFIG_BT_NXPUART is not set
+# CONFIG_BT_INTEL_PCIE is not set
 # ==============================================================================
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数（含蓝牙母开关）"
