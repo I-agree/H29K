@@ -61,6 +61,14 @@ cat > Dockerfile.alpine << EOF
 FROM --platform=linux/arm64 alpine:${FALLBACK_ALPINE_VER}
 RUN apk add --no-cache ffmpeg
 EOF
+
+# =================================================================
+# ⚙️ 跨架构核心补丁：为 x86_64 宿主机注入 ARM64 动态内核模拟器
+# =================================================================
+echo "🔧 检测到 H29K 专属 ARM64 镜像熔铸需求，正在为宿主机注入 QEMU 模拟器..."
+sudo docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+# --- 下面是 Docker 编译命令 ---
 docker buildx build --platform linux/arm64 -f Dockerfile.alpine -t h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} --load .
 
 # ======================== 【1. 统一下载与文件校验中心】 ========================
