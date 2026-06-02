@@ -195,16 +195,36 @@ CONFIG_DEFAULT_QDISC="fq"
 # --- 采用现代 Schedutil 智能调度模式 ---
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
 
-# 🌟【核心修复】彻底开启内核蓝牙协议栈总开关，确保 kmod-bluetooth 依赖能够顺利通过编译
+# ==============================================================================
+# 📡 H29K 专属无线/蓝牙基座硬锁（纯配置文件精准闭环，无全局免疫补丁）
+# ==============================================================================
+# --- 核心协议栈正向开启 ---
 CONFIG_BT=y
 CONFIG_BT_BREDR=y
 CONFIG_BT_LE=y
 CONFIG_BT_HCIUART=y
 CONFIG_BT_HCIUART_H4=y
 
-# --- 显式关闭所有不需要且会导致弹窗的蓝牙子驱动 ---
+# --- 显式关闭所有不需要的底层总线驱动 ---
 # CONFIG_BT_HCIBTUSB is not set
 # CONFIG_BT_HCIBTSDIO is not set
+# CONFIG_BT_HCIBCM203X is not set
+# CONFIG_BT_HCIBPA10X is not set
+# CONFIG_BT_HCIBFUSB is not set
+# CONFIG_BT_HCIDTL1 is not set
+# CONFIG_BT_HCIB303 is not set
+# CONFIG_BT_HCIH4P is not set
+# CONFIG_BT_HCIPCIVM is not set
+# CONFIG_BT_HCIVIRT is not set
+# CONFIG_BT_HCIVHCI is not set
+# CONFIG_BT_MRVL is not set
+# CONFIG_BT_MRVL_SDIO is not set
+# CONFIG_BT_MTKSDIO is not set
+# CONFIG_BT_MTKUART is not set
+# CONFIG_BT_QCOM is not set
+# CONFIG_BT_HCIRSXX is not set
+
+# --- 显式关闭所有冲突/多余的 UART 子协议（AIC8800蓝牙仅依赖 H4） ---
 # CONFIG_BT_HCIUART_BCM is not set
 # CONFIG_BT_HCIUART_CYPRESS is not set
 # CONFIG_BT_HCIUART_RTL is not set
@@ -215,19 +235,10 @@ CONFIG_BT_HCIUART_H4=y
 # CONFIG_BT_HCIUART_INTEL is not set
 # CONFIG_BT_HCIUART_BCMTRM is not set
 # CONFIG_BT_HCIUART_NXPUART is not set
-# CONFIG_BT_HCIBCM is not set
-# CONFIG_BT_HCIBFUSB is not set
-# CONFIG_BT_HCIDTL1 is not set
-# CONFIG_BT_HCIB303 is not set
-# CONFIG_BT_HCIH4P is not set
-# CONFIG_BT_HCIPCIVM is not set
-# CONFIG_BT_HCIVIRT is not set
-# CONFIG_BT_MRVL is not set
-# CONFIG_BT_MTKSDIO is not set
-# CONFIG_BT_MTKUART is not set
-# CONFIG_BT_QCOM is not set
-# CONFIG_BT_HCIRSXX is not set
-# CONFIG_BT_NXPUART is not set
+# CONFIG_BT_HCIUART_LL is not set
+# CONFIG_BT_HCIUART_ATH3K is not set
+# CONFIG_BT_HCIUART_MRVL_AUTODS is not set
+# ==============================================================================
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数（含蓝牙母开关）"
 
