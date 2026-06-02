@@ -387,8 +387,6 @@ exit 0
 EOF
 chmod +x files/etc/uci-defaults/98-docker-autostart
 
-sed -i 's/+docker-compose-v2//g; s/+docker-compose//g' feeds/luci/applications/luci-app-dockerman/Makefile 2>/dev/null || true
-
 mkdir -p package/base-files/files/etc
 sed -i '/net.netfilter.nf_conntrack_max/d' package/base-files/files/etc/sysctl.conf 2>/dev/null || true
 cat >> package/base-files/files/etc/sysctl.conf << 'EOF'
