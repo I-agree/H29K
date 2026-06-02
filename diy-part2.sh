@@ -196,16 +196,41 @@ CONFIG_DEFAULT_QDISC="fq"
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
 
 # ==============================================================================
-# 📡 H29K 专属无线/蓝牙基座硬锁（纯配置文件精准闭环，无全局免疫补丁）
+# 📡 H29K 专属蓝牙子系统全量闭环配置（拒绝弹窗提问）
 # ==============================================================================
-# --- 核心协议栈正向开启 ---
+# --- 核心协议栈与基础框架层 ---
 CONFIG_BT=y
 CONFIG_BT_BREDR=y
 CONFIG_BT_LE=y
+# CONFIG_BT_RFCOMM is not set
+# CONFIG_BT_BNEP is not set
+# CONFIG_BT_HIDP is not set
+# CONFIG_BT_HS is not set
+# CONFIG_BT_LE_L2CAP_ECRED is not set
+# CONFIG_BT_MSFTEXT is not set
+# CONFIG_BT_AOSPEXT is not set
+# CONFIG_BT_DEBUGFS is not set
+# CONFIG_BT_SELFTESTS is not set
+
+# --- 核心目标驱动：UART H4（AIC8800等网卡必备） ---
 CONFIG_BT_HCIUART=y
 CONFIG_BT_HCIUART_H4=y
 
-# --- 显式关闭所有不需要的底层总线驱动 ---
+# --- 显式关闭所有冲突的 UART 子协议（防止 H4 之后的菜单弹窗） ---
+# CONFIG_BT_HCIUART_BCM is not set
+# CONFIG_BT_HCIUART_CYPRESS is not set
+# CONFIG_BT_HCIUART_RTL is not set
+# CONFIG_BT_HCIUART_LL is not set
+# CONFIG_BT_HCIUART_ATH3K is not set
+# CONFIG_BT_HCIUART_3WIRE is not set
+# CONFIG_BT_HCIUART_INTEL is not set
+# CONFIG_BT_HCIUART_QCA is not set
+# CONFIG_BT_HCIUART_AG6XX is not set
+# CONFIG_BT_HCIUART_MRVL is not set
+# CONFIG_BT_HCIUART_BCMTRM is not set
+# CONFIG_BT_HCIUART_NXPUART is not set
+
+# --- 显式关闭所有非 UART 接口的总线底层驱动 ---
 # CONFIG_BT_HCIBTUSB is not set
 # CONFIG_BT_HCIBTSDIO is not set
 # CONFIG_BT_HCIBCM203X is not set
@@ -217,27 +242,16 @@ CONFIG_BT_HCIUART_H4=y
 # CONFIG_BT_HCIPCIVM is not set
 # CONFIG_BT_HCIVIRT is not set
 # CONFIG_BT_HCIVHCI is not set
-# CONFIG_BT_MRVL is not set
-# CONFIG_BT_MRVL_SDIO is not set
-# CONFIG_BT_MTKSDIO is not set
-# CONFIG_BT_MTKUART is not set
-# CONFIG_BT_QCOM is not set
-# CONFIG_BT_HCIRSXX is not set
 
-# --- 显式关闭所有冲突/多余的 UART 子协议（AIC8800蓝牙仅依赖 H4） ---
-# CONFIG_BT_HCIUART_BCM is not set
-# CONFIG_BT_HCIUART_CYPRESS is not set
-# CONFIG_BT_HCIUART_RTL is not set
-# CONFIG_BT_HCIUART_QCA is not set
-# CONFIG_BT_HCIUART_AG6XX is not set
-# CONFIG_BT_HCIUART_MRVL is not set
-# CONFIG_BT_HCIUART_3WIRE is not set
-# CONFIG_BT_HCIUART_INTEL is not set
-# CONFIG_BT_HCIUART_BCMTRM is not set
-# CONFIG_BT_HCIUART_NXPUART is not set
-# CONFIG_BT_HCIUART_LL is not set
-# CONFIG_BT_HCIUART_ATH3K is not set
-# CONFIG_BT_HCIUART_MRVL_AUTODS is not set
+# --- 显式关闭 6.12 内核中新增/并列的其他厂商独立无线模块 ---
+# CONFIG_BT_MRVL is not set
+# CONFIG_BT_MTK is not set
+# CONFIG_BT_QCOM is not set
+# CONFIG_BT_RTL is not set
+# CONFIG_BT_BCM is not set
+# CONFIG_BT_INTEL is not set
+# CONFIG_BT_HCIRSXX is not set
+# CONFIG_BT_VIRTUAL is not set
 # ==============================================================================
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数（含蓝牙母开关）"
