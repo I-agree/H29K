@@ -21,6 +21,10 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    # 🔥 【强力注入】显式声明工作流 Token 核心权限，踏平所有 403 权限暗礁
+    permissions:
+      contents: write   # 允许创建、修改、删除 GitHub Release 固件
+      actions: write    # 允许清理和删除历史工作流运行记录
 
     steps:
     - name: 检出源码
