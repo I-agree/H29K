@@ -201,6 +201,33 @@ CONFIG_BT_BREDR=y
 CONFIG_BT_LE=y
 CONFIG_BT_HCIUART=y
 CONFIG_BT_HCIUART_H4=y
+
+# --- 显式关闭所有不需要且会导致弹窗的蓝牙子驱动 ---
+# CONFIG_BT_HCIBTUSB is not set
+# CONFIG_BT_HCIBTSDIO is not set
+# CONFIG_BT_HCIUART_BCM is not set
+# CONFIG_BT_HCIUART_CYPRESS is not set
+# CONFIG_BT_HCIUART_RTL is not set
+# CONFIG_BT_HCIUART_QCA is not set
+# CONFIG_BT_HCIUART_AG6XX is not set
+# CONFIG_BT_HCIUART_MRVL is not set
+# CONFIG_BT_HCIUART_3WIRE is not set
+# CONFIG_BT_HCIUART_INTEL is not set
+# CONFIG_BT_HCIUART_BCMTRM is not set
+# CONFIG_BT_HCIUART_NXPUART is not set
+# CONFIG_BT_HCIBCM is not set
+# CONFIG_BT_HCIBFUSB is not set
+# CONFIG_BT_HCIDTL1 is not set
+# CONFIG_BT_HCIB303 is not set
+# CONFIG_BT_HCIH4P is not set
+# CONFIG_BT_HCIPCIVM is not set
+# CONFIG_BT_HCIVIRT is not set
+# CONFIG_BT_MRVL is not set
+# CONFIG_BT_MTKSDIO is not set
+# CONFIG_BT_MTKUART is not set
+# CONFIG_BT_QCOM is not set
+# CONFIG_BT_HCIRSXX is not set
+# CONFIG_BT_NXPUART is not set
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数（含蓝牙母开关）"
 
