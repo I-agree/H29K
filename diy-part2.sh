@@ -50,18 +50,18 @@ docker pull alpine:latest >/dev/null 2>&1 || true
 ALPINE_VER=$(docker run --rm alpine:latest cat /etc/alpine-release 2>/dev/null | tr -d '\r\n' || true)
 if [ -z "$ALPINE_VER" ]; then
     echo "⚠️ 警告: 无法解析 Alpine 精确版本号，降级使用 3.20 稳定分支"
-    補_ALPINE_VER="3.20"
+    FALLBACK_ALPINE_VER="3.20"
 else
-    補_ALPINE_VER="$ALPINE_VER"
+    FALLBACK_ALPINE_VER="$ALPINE_VER"
 fi
 
 echo "⏳ [宿主机环境预编译] 正在通过 Buildx 熔铸高并发纯本地化 ARM64 Alpine-FFmpeg 生产力镜像..."
 # 🌟【自愈核心】在编译期利用 GitHub Actions 的强网环境，把 ffmpeg 灌入 Alpine 基础镜像中，彻底干掉运行期的 apk add 
 cat > Dockerfile.alpine << EOF
-FROM --platform=linux/arm64 alpine:${補_ALPINE_VER}
+FROM --platform=linux/arm64 alpine:${FALLBACK_ALPINE_VER}
 RUN apk add --no-cache ffmpeg
 EOF
-docker buildx build --platform linux/arm64 -f Dockerfile.alpine -t h29k-alpine-ffmpeg:${補_ALPINE_VER} --load .
+docker buildx build --platform linux/arm64 -f Dockerfile.alpine -t h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} --load .
 
 # ======================== 【1. 统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
@@ -626,17 +626,17 @@ EOF
 # ==============================================================================
 echo "🐳 正在通过模板引擎，将最新稳定版号固化进运行时脚本中..."
 sed -i "s/__MEDIAMTX_VER__/${MEDIAMTX_VER}/g" files/usr/bin/cam-monitor.sh
-sed -i "s/__ALPINE_VER__/${補_ALPINE_VER}/g" files/usr/bin/cam-monitor.sh
-sed -i "s/__ALPINE_VER__/${補_ALPINE_VER}/g" files/usr/bin/live-push.sh
+sed -i "s/__ALPINE_VER__/${FALLBACK_ALPINE_VER}/g" files/usr/bin/cam-monitor.sh
+sed -i "s/__ALPINE_VER__/${FALLBACK_ALPINE_VER}/g" files/usr/bin/live-push.sh
 
 echo "🎁 正在通过宿主机 Docker，强行跨架构下发并封印 H29K(ARM64) 专属闭环离线包..."
 # 1. 封印完全体音视频 MediaMTX 镜像
 docker save bluenviron/mediamtx:${MEDIAMTX_VER} -o files/usr/share/docker-images/mediamtx.tar
 
 # 2. 封印本地编译期直接内建好 FFmpeg 的专属高精 Alpine 镜像
-docker save h29k-alpine-ffmpeg:${補_ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
+docker save h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
-echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine-FFmpeg@$補_ALPINE_VER）已实现100%纯本地闭环！"
+echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine-FFmpeg@$FALLBACK_ALPINE_VER）已实现100%纯本地闭环！"
 
 # =================================================================
 # 🚨 针对 aic8800 本地 Makefile 的终极补丁 (通关下载 + 依赖 + 屏蔽 GCC14 所有强迫症报错)
