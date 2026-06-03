@@ -184,6 +184,27 @@ CONFIG_BACKLIGHT_PWM=y
 CONFIG_ROCKCHIP_IOMMU=y
 CONFIG_DRM_DW_HDMI=y
 
+# =================================================================
+# 🛡️ 必须补充的“防弹窗/防卡死”屏蔽词（Linux 6.12 新增的无用符号）
+# =================================================================
+# CONFIG_DRM_DEBUG_MM is not set
+# CONFIG_DRM_PANIC is not set
+# CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS is not set
+# CONFIG_DRM_DEBUG_MODESET_LOCK is not set
+# CONFIG_DRM_FBDEV_EMULATION is not set
+# CONFIG_DRM_LOAD_EDID_FIRMWARE is not set
+# CONFIG_DRM_DISPLAY_DP_AUX_CEC is not set
+# CONFIG_DRM_DISPLAY_DP_AUX_CHARDEV is not set
+
+# 物理屏蔽 X86/桌面级 显卡驱动，防止交叉编译时内核反复盘问
+# CONFIG_DRM_RADEON is not set
+# CONFIG_DRM_AMDGPU is not set
+# CONFIG_DRM_NOUVEAU is not set
+# CONFIG_DRM_XE is not set
+# CONFIG_DRM_VGEM is not set
+# CONFIG_DRM_VKMS is not set
+# =================================================================
+
 # --- 主线标准高速总线与存储协议栈 ---
 CONFIG_SPI_ROCKCHIP=y
 CONFIG_REGULATOR_FIXED_VOLTAGE=y
