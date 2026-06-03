@@ -189,10 +189,10 @@ jobs:
         echo "🚀 [步骤 3/3] 开启满血专项狙击！让六大高负载包排队单挑，绝不给 CPU 和内存死锁留任何机会..."
         
         echo "📦 [专项狙击 1/6] 单独全速编译无线核心架构 mac80211（断开内核符号抢夺）..."
-        make package/kernel/mac80211/compile -j$(nproc) || make package/kernel/mac80211/compile -j1 V=s
+        make package/kernel/mac80211/compile -j$(nproc) || make package/kernel/mac80211/compile -j1 V=w
         
         echo "📦 [专项狙击 2/6] 单独全速编译第三方无线驱动 aic8800（避免与主线网卡冲突）..."
-        make package/aic8800/compile -j$(nproc) || make package/aic8800/compile -j1 V=s
+        make package/aic8800/compile -j$(nproc) || make package/aic8800/compile -j1 V=w
         
         echo "📦 [专项狙击 3/6] 单独全速编译 dockerd 守护进程核心..."
         make package/feeds/packages/dockerd/compile -j$(nproc) || make package/feeds/packages/dockerd/compile -j1 V=s
