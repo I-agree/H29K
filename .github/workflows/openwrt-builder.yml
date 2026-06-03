@@ -183,7 +183,7 @@ jobs:
         echo "🤖 [步骤 2/3] 工具链已就位！使用真实交叉编译器精准校准内核..."
         make target/linux/refresh V=w
         
-        echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞...没有问题不要用make target/linux/compile -j1 V=s，平常make target/linux/compile -j$(nproc)"
+        echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞...没有问题不要用make target/linux/compile -j1 V=s"
         make target/linux/compile -j$(nproc)
         
         echo "🚀 [步骤 3/3] 开启满血专项狙击！让六大高负载包排队单挑，绝不给 CPU 和内存死锁留任何机会..."
