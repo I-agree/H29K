@@ -145,16 +145,15 @@ jobs:
         git add target/linux/
         
         echo "🤖 启动内核符号冷启动补全，正在校准 Kconfig 技术栈..."
-        make target/linux/refresh V=s KCONFIG_NOTIMEOUT=1 > $GITHUB_WORKSPACE/oldconfig_scan.log 2>&1 || true
-        make target/linux/oldconfig V=s KCONFIG_NOTIMEOUT=1 >> $GITHUB_WORKSPACE/oldconfig_scan.log 2>&1 || true
-        cat $GITHUB_WORKSPACE/oldconfig_scan.log
+        make target/linux/refresh V=s KCONFIG_NOTIMEOUT=1 > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 || true
+        cat $GITHUB_WORKSPACE/kconfig_scan.log
         echo "✅ 内核依赖树重构完毕"
         
         git diff target/linux/ > $GITHUB_WORKSPACE/kernel_complements.txt || true
         
-        if grep -q "(NEW)" $GITHUB_WORKSPACE/oldconfig_scan.log; then
+        if grep -q "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log; then
           echo -e "\n❌【重大不完美警告】检测到未来新版内核引入了未决断的 (NEW) 交互选项！" > $GITHUB_WORKSPACE/kernel_complements.txt
-          grep "(NEW)" $GITHUB_WORKSPACE/oldconfig_scan.log >> $GITHUB_WORKSPACE/kernel_complements.txt
+          grep "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log >> $GITHUB_WORKSPACE/kernel_complements.txt
         elif [ ! -s $GITHUB_WORKSPACE/kernel_complements.txt ]; then
           echo "🎉 真正完美！当前内核配置极其标准，既无结构变动，也未发现任何(NEW)隐形交互弹窗。" > $GITHUB_WORKSPACE/kernel_complements.txt
         fi
