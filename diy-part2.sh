@@ -181,6 +181,9 @@ CONFIG_ROCKCHIP_DW_HDMI=y
 CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 CONFIG_BACKLIGHT_PWM=y
 
+CONFIG_ROCKCHIP_IOMMU=y
+CONFIG_DRM_DW_HDMI=y
+
 # --- 主线标准高速总线与存储协议栈 ---
 CONFIG_SPI_ROCKCHIP=y
 CONFIG_REGULATOR_FIXED_VOLTAGE=y
@@ -202,11 +205,6 @@ CONFIG_DEFAULT_QDISC="fq"
 
 # --- 采用现代 Schedutil 智能调度模式 ---
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
-
-# 顶层总前置（DRM_ROCKCHIP硬性依赖）
-CONFIG_DRM=y
-CONFIG_ROCKCHIP_IOMMU=y
-CONFIG_DRM_DW_HDMI=y
 
 # ==============================================================================
 # 📡 基于下面网页对齐的蓝牙全量闭环配置（拒绝任何弹窗）
