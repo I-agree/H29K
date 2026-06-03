@@ -181,7 +181,7 @@ jobs:
         make toolchain/compile -j$(nproc)
         
         echo "🤖 [步骤 2/3] 工具链已就位！使用真实交叉编译器精准校准内核..."
-        yes "" 2>/dev/null | make target/linux/refresh V=s
+        yes "" 2>/dev/null | make target/linux/refresh V=w
         
         echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
         make target/linux/compile -j$(nproc)
@@ -189,10 +189,10 @@ jobs:
         echo "🚀 [步骤 3/3] 开启满血专项狙击！拒绝高并发死锁，核心无线驱动单线强刷..."
         
         echo "📦 [专项狙击 1/6] 单线稳健编译无线核心架构 mac80211（断开多线程符号抢夺）..."
-        make package/kernel/mac80211/compile -j1 V=s
+        make package/kernel/mac80211/compile -j1 V=w
         
         echo "📦 [专项狙击 2/6] 单线稳健编译第三方无线驱动 aic8800（彻底规避 Jobserver 令牌死锁）..."
-        make package/aic8800/compile -j1 V=s
+        make package/aic8800/compile -j1 V=w
         
         echo "📦 [专项狙击 3/6] 单独全速编译 dockerd 守护进程核心..."
         make package/feeds/packages/dockerd/compile -j$(nproc) || make package/feeds/packages/dockerd/compile -j1 V=s
