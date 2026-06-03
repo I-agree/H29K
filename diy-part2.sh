@@ -203,6 +203,11 @@ CONFIG_DEFAULT_QDISC="fq"
 # --- 采用现代 Schedutil 智能调度模式 ---
 CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y
 
+# 顶层总前置（DRM_ROCKCHIP硬性依赖）
+CONFIG_DRM=y
+CONFIG_ROCKCHIP_IOMMU=y
+CONFIG_DRM_DW_HDMI=y
+
 # ==============================================================================
 # 📡 基于下面网页对齐的蓝牙全量闭环配置（拒绝任何弹窗）
 # https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/bluetooth/Kconfig?h=linux-6.12.y
