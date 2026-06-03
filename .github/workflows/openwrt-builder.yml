@@ -145,7 +145,7 @@ jobs:
         git add target/linux/
         
         echo "🤖 启动内核符号冷启动补全，正在校准 Kconfig 技术栈..."
-        trap - SIGPIPE && yes "" | make target/linux/refresh V=s > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 || true
+        (yes "" 2>/dev/null) | make target/linux/refresh V=s > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 || true
         cat $GITHUB_WORKSPACE/kconfig_scan.log
         echo "✅ 内核依赖树重构完毕"
         
@@ -181,7 +181,7 @@ jobs:
         make toolchain/compile -j$(nproc)
         
         echo "🤖 [步骤 2/3] 工具链已就位！使用真实交叉编译器精准校准内核..."
-        trap - SIGPIPE && yes "" | make target/linux/refresh V=w
+        (yes "" 2>/dev/null) | make target/linux/refresh V=w
         
         echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
         make target/linux/compile -j$(nproc)
