@@ -73,6 +73,7 @@ docker buildx build --platform linux/arm64 -f Dockerfile.alpine -t h29k-alpine-f
 # ======================== 【1. 统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
+# 创建全局所需的所有目录架构 (新增 files/www 网页容器支撑)
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/boot/uboot-rockchip/configs \
          package/boot/uboot-rockchip/dts \
@@ -89,18 +90,22 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main/files"
 LOGO_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 
+# [工具函数] 统一的下载与基础大小校验
 download_and_check() {
     local url="$1"
     local dest="$2"
     echo "正在下载: $dest ..."
     if ! curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$url" -o "$dest"; then
-        echo "❌ 错误: $url 网络请求或连接失败！" && exit 1
+        echo "❌ 错误: $url 网络请求或连接失败！"
+        exit 1
     fi
     if [ ! -s "$dest" ]; then
-        echo "❌ 错误: $dest 下载成功但文件为空！" && exit 1
+        echo "❌ 错误: $dest 下载成功但文件为空！"
+        exit 1
     fi
 }
 
+# --- 批量下载核心底座组件 ---
 download_and_check "${BASE_URL}/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts" "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig" "package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
@@ -112,6 +117,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/image/mmc.bootscript" "tar
 download_and_check "${BASE_URL}/scripts/gen_image_generic.sh" "scripts/gen_image_generic.sh"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
 
+# --- 深度内容专项校验 ---
 if grep -q "hinlink_h28k" "target/linux/rockchip/image/armv8.mk"; then
     echo "❌ 错误: armv8.mk 包含非法内容 (h28k)" && exit 1
 fi
@@ -119,6 +125,7 @@ if ! grep -q "智能识别 Binman 合体固件或传统拆分固件" "target/lin
     echo "❌ 错误: Makefile 核心打包规则不匹配" && exit 1
 fi
 
+# --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
     download_and_check "${LOGO_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg"
 done
