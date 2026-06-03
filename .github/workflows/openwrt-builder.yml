@@ -182,7 +182,7 @@ jobs:
         
         echo "🤖 [步骤 2/3] 工具链已就位！使用真实交叉编译器精准校准内核..."
         yes "" | make target/linux/refresh V=s
-
+        
         echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
         # refresh 已经把完美的配置写入了 target/linux/ 中。
         # 现在我们用这条命令，强迫 Buildroot 读取新配置，并在 build_dir 中物理生成 .config 和 modules.builtin
