@@ -145,7 +145,7 @@ jobs:
         git add target/linux/
         
         echo "🤖 启动内核符号冷启动补全，正在校准 Kconfig 技术栈..."
-        make target/linux/refresh V=s KCONFIG_NOTIMEOUT=1 --no-print-directory > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 || true
+        make target/linux/refresh V=s KCONFIG_NOTIMEOUT=1 --no-print-directory > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 < /dev/null || true
         cat $GITHUB_WORKSPACE/kconfig_scan.log
         echo "✅ 内核依赖树重构完毕"
         
