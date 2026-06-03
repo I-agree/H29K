@@ -186,13 +186,13 @@ jobs:
         echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
         make target/linux/compile -j$(nproc)
         
-        echo "🚀 [步骤 3/3] 开启满血专项狙击！让六大高负载包排队单挑，绝不给 CPU 和内存死锁留任何机会..."
+        echo "🚀 [步骤 3/3] 开启满血专项狙击！拒绝高并发死锁，核心无线驱动单线强刷..."
         
-        echo "📦 [专项狙击 1/6] 单独全速编译无线核心架构 mac80211（断开内核符号抢夺）..."
-        make package/kernel/mac80211/compile -j$(nproc) || make package/kernel/mac80211/compile -j1 V=s
+        echo "📦 [专项狙击 1/6] 单线稳健编译无线核心架构 mac80211（断开多线程符号抢夺）..."
+        make package/kernel/mac80211/compile -j1 V=s
         
-        echo "📦 [专项狙击 2/6] 单独全速编译第三方无线驱动 aic8800（避免与主线网卡冲突）..."
-        make package/aic8800/compile -j$(nproc) || make package/aic8800/compile -j1 V=s
+        echo "📦 [专项狙击 2/6] 单线稳健编译第三方无线驱动 aic8800（彻底规避 Jobserver 令牌死锁）..."
+        make package/aic8800/compile -j1 V=s
         
         echo "📦 [专项狙击 3/6] 单独全速编译 dockerd 守护进程核心..."
         make package/feeds/packages/dockerd/compile -j$(nproc) || make package/feeds/packages/dockerd/compile -j1 V=s
