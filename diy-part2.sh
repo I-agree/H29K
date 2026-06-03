@@ -173,36 +173,57 @@ CONFIG_ARM64_ASIMD=y
 CONFIG_CRYPTO_HW=y
 # CONFIG_CRYPTO_DEV_ROCKCHIP is not set
 
-# --- 主线标准显示架构与 ST7789V 屏幕驱动对齐 ---
+# =================================================================
+# 🛡️ 显示架构核心底座与防弹窗屏蔽词（对齐第一层 drivers/gpu/drm/Kconfig）
+# =================================================================
 CONFIG_DRM=y
 CONFIG_DRM_KMS_HELPER=y
-CONFIG_DRM_ROCKCHIP=y
-CONFIG_ROCKCHIP_DW_HDMI=y
-CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
-CONFIG_BACKLIGHT_PWM=y
-
-CONFIG_ROCKCHIP_IOMMU=y
-CONFIG_DRM_DW_HDMI=y
-
-# =================================================================
-# 🛡️ 必须补充的“防弹窗/防卡死”屏蔽词（Linux 6.12 新增的无用符号）
-# =================================================================
 # CONFIG_DRM_DEBUG_MM is not set
+# CONFIG_DRM_USE_DYNAMIC_DEBUG is not set
+# CONFIG_DRM_KUNIT_TEST is not set
 # CONFIG_DRM_PANIC is not set
 # CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS is not set
 # CONFIG_DRM_DEBUG_MODESET_LOCK is not set
 # CONFIG_DRM_FBDEV_EMULATION is not set
 # CONFIG_DRM_LOAD_EDID_FIRMWARE is not set
-# CONFIG_DRM_DISPLAY_DP_AUX_CEC is not set
-# CONFIG_DRM_DISPLAY_DP_AUX_CHARDEV is not set
+# CONFIG_DRM_VGEM is not set
+# CONFIG_DRM_HYPERV is not set
+# CONFIG_DRM_WERROR is not set
 
-# 物理屏蔽 X86/桌面级 显卡驱动，防止交叉编译时内核反复盘问
+# 彻底断绝 PC/桌面级 显卡驱动弹窗
 # CONFIG_DRM_RADEON is not set
 # CONFIG_DRM_AMDGPU is not set
 # CONFIG_DRM_NOUVEAU is not set
 # CONFIG_DRM_XE is not set
-# CONFIG_DRM_VGEM is not set
+# CONFIG_DRM_I915 is not set
 # CONFIG_DRM_VKMS is not set
+
+# =================================================================
+# 🚀 瑞芯微核心显示驱动（对齐第二层 drm/rockchip/Kconfig）
+# =================================================================
+CONFIG_ROCKCHIP_IOMMU=y
+CONFIG_DRM_ROCKCHIP=y
+
+# 核心 VOP 视频输出控制器（VOP2 专为 RK3568/RK3588 软路由设计，必须开）
+CONFIG_ROCKCHIP_VOP=y
+CONFIG_ROCKCHIP_VOP2=y
+
+# 开启你需要的 Synopsys HDMI 核心及瑞芯微扩展
+CONFIG_ROCKCHIP_DW_HDMI=y
+CONFIG_DRM_DW_HDMI=y
+
+# 物理物理封杀：其余所有不属于你的芯片平台的无用接口（全面拒绝，防止弹窗）
+# CONFIG_ROCKCHIP_ANALOGIX_DP is not set
+# CONFIG_ROCKCHIP_CDN_DP is not set
+# CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
+# CONFIG_ROCKCHIP_INNO_HDMI is not set
+# CONFIG_ROCKCHIP_LVDS is not set
+# CONFIG_ROCKCHIP_RGB is not set
+# CONFIG_ROCKCHIP_RK3066_HDMI is not set
+
+# 📺 用户专属扩展：外接小屏幕与背光支持
+CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
+CONFIG_BACKLIGHT_PWM=y
 # =================================================================
 
 # --- 主线标准高速总线与存储协议栈 ---
