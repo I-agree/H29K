@@ -184,7 +184,7 @@ jobs:
         make target/linux/refresh V=w
         
         echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
-        make target/linux/compile -j$(nproc)
+        make target/linux/compile -j1 V=s
         
         echo "🚀 [步骤 3/3] 开启满血专项狙击！让六大高负载包排队单挑，绝不给 CPU 和内存死锁留任何机会..."
         
