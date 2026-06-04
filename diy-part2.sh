@@ -279,11 +279,9 @@ CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 CONFIG_BACKLIGHT_PWM=y
 # =================================================================
 
-# --- 主线标准高速总线与存储协议栈 ---
+# --- 主线标准高速总线（主线 6.12 存储与 USB 已由原生的 DWCMSHC 和 OF_SIMPLE 承载） ---
 CONFIG_SPI_ROCKCHIP=y
 CONFIG_REGULATOR_FIXED_VOLTAGE=y
-CONFIG_MMC_SDHCI_OF_ROCKCHIP=y
-CONFIG_USB_DWC3_ROCKCHIP=y
 
 # --- CMA 连续物理内存调优 ---
 CONFIG_DMA_SHARED_BUFFER=y
