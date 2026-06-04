@@ -12,7 +12,7 @@ git clone --depth 1 -b openwrt-25.12 --filter=blob:none --sparse https://github.
 cd package/immortalwrt_temp
 git sparse-checkout set package/kernel/aic8800
 cd ../..
-cp -r package/immortalwrt_temp/package/kernel/aic8800 package/aic8800
+cp -r package/immortalwrt_temp/package/kernel/aic8800 package/kernel/aic8800
 rm -rf package/immortalwrt_temp
 
 # === 3. 安装 argon 主题
