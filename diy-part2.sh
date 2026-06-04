@@ -221,6 +221,59 @@ CONFIG_DRM_DW_HDMI=y
 # CONFIG_ROCKCHIP_RGB is not set
 # CONFIG_ROCKCHIP_RK3066_HDMI is not set
 
+# =================================================================
+# 🛡️ 彻底封杀显示桥接芯片及其子套娃（drivers/gpu/drm/bridge/Kconfig官方 Kconfig 闭环校准）
+# =================================================================
+CONFIG_DRM_BRIDGE=y
+
+# 主 Kconfig 文件中直接暴露的显式交互选项
+# CONFIG_DRM_CHIPONE_ICN6211 is not set
+# CONFIG_DRM_CHRONTEL_CH7033 is not set
+# CONFIG_DRM_DISPLAY_CONNECTOR is not set
+# CONFIG_DRM_ITE_IT6505 is not set
+# CONFIG_DRM_LONTIUM_LT8912B is not set
+# CONFIG_DRM_LONTIUM_LT9211 is not set
+# CONFIG_DRM_LONTIUM_LT9611 is not set
+# CONFIG_DRM_LONTIUM_LT9611UXC is not set
+# CONFIG_DRM_ITE_IT66121 is not set
+# CONFIG_DRM_LVDS_CODEC is not set
+# CONFIG_DRM_MEGACHIPS_STDPXXXX_GE_B850V3_FW is not set
+# CONFIG_DRM_NWL_MIPI_DSI is not set
+# CONFIG_DRM_NXP_PTN3460 is not set
+# CONFIG_DRM_PARADE_PS8622 is not set
+# CONFIG_DRM_PARADE_PS8640 is not set
+# CONFIG_DRM_SAMSUNG_DSIM is not set
+# CONFIG_DRM_SIL_SII8620 is not set
+# CONFIG_DRM_SII902X is not set
+# CONFIG_DRM_SII9234 is not set
+# CONFIG_DRM_SIMPLE_BRIDGE is not set
+# CONFIG_DRM_THINE_THC63LVD1024 is not set
+# CONFIG_DRM_TOSHIBA_TC358762 is not set
+# CONFIG_DRM_TOSHIBA_TC358764 is not set
+# CONFIG_DRM_TOSHIBA_TC358767 is not set
+# CONFIG_DRM_TOSHIBA_TC358768 is not set
+# CONFIG_DRM_TOSHIBA_TC358775 is not set
+# CONFIG_DRM_TI_DLPC3433 is not set
+# CONFIG_DRM_TI_TFP410 is not set
+# CONFIG_DRM_TI_SN65DSI83 is not set
+# CONFIG_DRM_TI_SN65DSI86 is not set
+# CONFIG_DRM_TI_TPD12S015 is not set
+
+# 主 Kconfig 文件中带条件限制的潜在隐形刺客（彻底斩草除根）
+# CONFIG_DRM_CROS_EC_ANX7688 is not set
+# CONFIG_DRM_FSL_LDB is not set
+# CONFIG_DRM_MICROCHIP_LVDS_SERIALIZER is not set
+
+# 源码底部由 source 引入的外部子目录弹窗（如 Analogix, Cadence, Synopsys 等）
+# CONFIG_DRM_ANALOGIX_ANX6345 is not set
+# CONFIG_DRM_ANALOGIX_ANX78XX is not set
+# CONFIG_DRM_ANALOGIX_ANX7625 is not set
+# CONFIG_DRM_I2C_ADV7511 is not set
+# CONFIG_DRM_CDNS_DSI is not set
+# CONFIG_DRM_CDNS_MHDP8546 is not set
+# CONFIG_DRM_DW_HDMI_AHB_AUDIO is not set
+# CONFIG_DRM_DW_HDMI_I2S_AUDIO is not set
+
 # 📺 用户专属扩展：外接小屏幕与背光支持
 CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 CONFIG_BACKLIGHT_PWM=y
