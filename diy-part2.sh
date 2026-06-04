@@ -923,30 +923,23 @@ docker save h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} -o files/usr/share/docker-
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine-FFmpeg@$FALLBACK_ALPINE_VER）已实现100%纯本地闭环！"
 
 # =================================================================================
-# 🚨 针对 aic8800 本地 Makefile 的终极补丁 (破除令牌死锁 + 完美闭环 GCC14 报错)
+# 🚨 针对 aic8800 本地 Makefile 的终极补丁
 # =================================================================================
-if [ -f "package/aic8800/Makefile" ]; then
-    echo "🛠️ 正在进行 aic8800 Makefile 终极闭环手术..."
+REAL_AIC_MAKEFILE="package/kernel/aic8800/Makefile"
+
+if [ -f "$REAL_AIC_MAKEFILE" ]; then
+    echo "📥 侦测到目标组件，正在从自定义仓库强制下载覆盖 aic8800 Makefile..."
     
-    # 1. 彻底删除哈希校验行 (防止新版下载校验挂掉)
-    sed -i '/PKG_MIRROR_HASH/d' package/aic8800/Makefile
+    # aic8800 本地仓库的Makefile
+    curl -sSL "https://raw.githubusercontent.com/I-agree/H29K/main/files/package/kernel/aic8800/Makefile" > "$REAL_AIC_MAKEFILE"
     
-    # 2. 补全无线底层依赖链 (确保与 mac80211 对齐不抢跑)
-    sed -i 's/DEPENDS:=+kmod-cfg80211/DEPENDS:=+kmod-mac80211 +kmod-cfg80211/g' package/aic8800/Makefile
-    
-    # 3. 🔥【核心修复】解除 GNU Make Jobserver 令牌死锁 🔥
-    # 将 "+$(KERNEL_MAKE) $(PKG_JOBS)" 精准替换为 "$(KERNEL_MAKE)"
-    # 移除 + 号与手动指定的并发参数，让其回归标准继承模式，彻底解决 6 小时卡死超时
-    sed -i 's/+\$(KERNEL_MAKE) \$(PKG_JOBS)/\$(KERNEL_MAKE)/g' package/aic8800/Makefile
-    
-    # 4. 强行屏蔽新版 Linux 6.x 内核 / GCC 14 的各类严苛语法与安全阻拦
-    # 额外追加了 GCC 14 独有的 -Wno-error=incompatible-pointer-types 和 -Wno-error=implicit-function-declaration
-    # 确保在破除死锁后，驱动源码不会因为老旧语法导致中途编译流产
-    sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning -Wno-unused-function -Wno-error=unused-function -Wno-incompatible-pointer-types -Wno-error=incompatible-pointer-types -Wno-implicit-function-declaration -Wno-error=implicit-function-declaration/g' package/aic8800/Makefile
-    
-    echo "✅ aic8800 令牌死锁解锁与 GCC14 终极修补成功！"
+    if [ $? -eq 0 ]; then
+        echo "✅ aic8800 Makefile 覆盖成功，令牌锁死与 GCC14 报错已物理粉碎！"
+    else
+        echo "❌ 严重错误：下载自定义 Makefile 失败，请检查网络链接或授权！"
+    fi
 else
-    echo "⚠️ 未找到 package/aic8800/Makefile，请检查路径！"
+    echo "⚠️ 警告：在 $REAL_AIC_MAKEFILE 未找到该组件，请确认源码路径！"
 fi
 
 # ======================== 【GraphicsMagick 适度优化补丁】 ========================
