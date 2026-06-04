@@ -922,9 +922,9 @@ docker save h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} -o files/usr/share/docker-
 
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine-FFmpeg@$FALLBACK_ALPINE_VER）已实现100%纯本地闭环！"
 
-# =================================================================
-# 🚨 针对 aic8800 本地 Makefile 的终极补丁 (通关下载 + 依赖 + 屏蔽 GCC14 所有强迫症报错)
-# =================================================================
+# =================================================================================
+# 🚨 针对 aic8800 本地 Makefile 的终极补丁 (破除令牌死锁 + 完美闭环 GCC14 报错)
+# =================================================================================
 if [ -f "package/aic8800/Makefile" ]; then
     echo "🛠️ 正在进行 aic8800 Makefile 终极闭环手术..."
     
@@ -934,13 +934,17 @@ if [ -f "package/aic8800/Makefile" ]; then
     # 2. 补全无线底层依赖链 (确保与 mac80211 对齐不抢跑)
     sed -i 's/DEPENDS:=+kmod-cfg80211/DEPENDS:=+kmod-mac80211 +kmod-cfg80211/g' package/aic8800/Makefile
     
-    # 3. 强行屏蔽新版 Linux 6.x 内核 / GCC 14 的各类严苛语法与安全阻拦
-    # -Wno-missing-prototypes: 忽略缺失函数原型的警告
-    # -Wno-expansion-to-defined: 忽略宏展开中包含 defined 的规范警告
-    # -Wno-attribute-warning: 忽略 Fortify String 等触发的内核编译期越界属性警告
-    # -Wno-unused-function: 忽略定义了但未使用的 static 函数警告 (解决电源管理挂起/恢复函数报错)
-    sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning -Wno-unused-function -Wno-error=unused-function/g' package/aic8800/Makefile
-    echo "✅ aic8800 九合一终极修补完成！"
+    # 3. 🔥【核心修复】解除 GNU Make Jobserver 令牌死锁 🔥
+    # 将 "+$(KERNEL_MAKE) $(PKG_JOBS)" 精准替换为 "$(KERNEL_MAKE)"
+    # 移除 + 号与手动指定的并发参数，让其回归标准继承模式，彻底解决 6 小时卡死超时
+    sed -i 's/+\$(KERNEL_MAKE) \$(PKG_JOBS)/\$(KERNEL_MAKE)/g' package/aic8800/Makefile
+    
+    # 4. 强行屏蔽新版 Linux 6.x 内核 / GCC 14 的各类严苛语法与安全阻拦
+    # 额外追加了 GCC 14 独有的 -Wno-error=incompatible-pointer-types 和 -Wno-error=implicit-function-declaration
+    # 确保在破除死锁后，驱动源码不会因为老旧语法导致中途编译流产
+    sed -i 's/-DBUILD_OPENWRT/-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning -Wno-unused-function -Wno-error=unused-function -Wno-incompatible-pointer-types -Wno-error=incompatible-pointer-types -Wno-implicit-function-declaration -Wno-error=implicit-function-declaration/g' package/aic8800/Makefile
+    
+    echo "✅ aic8800 令牌死锁解锁与 GCC14 终极修补成功！"
 else
     echo "⚠️ 未找到 package/aic8800/Makefile，请检查路径！"
 fi
