@@ -192,7 +192,7 @@ jobs:
         make package/kernel/mac80211/compile -j$(nproc) || make package/kernel/mac80211/compile -j1 V=s
         
         echo "📦 [专项狙击 2/6] 单独全速编译第三方无线驱动 aic8800（避免与主线网卡冲突）..."
-        make package/aic8800/compile -j$(nproc) || make package/aic8800/compile -j1 V=s
+        make package/kernel/aic8800/compile -j$(nproc) || make package/kernel/aic8800/compile -j1 V=s
         
         echo "📦 [专项狙击 3/6] 单独全速编译 dockerd 守护进程核心..."
         make package/feeds/packages/dockerd/compile -j$(nproc) || make package/feeds/packages/dockerd/compile -j1 V=s
