@@ -155,7 +155,7 @@ jobs:
           echo -e "\n❌【重大不完美警告】检测到未来新版内核引入了未决断的 (NEW) 交互选项！" > $GITHUB_WORKSPACE/kernel_complements.txt
           grep "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log >> $GITHUB_WORKSPACE/kernel_complements.txt
         elif [ ! -s $GITHUB_WORKSPACE/kernel_complements.txt ]; then
-          echo "🎉 真正完美！当前内核配置极其标准，既无结构变动，也未发现任何(NEW)隐形交互弹窗。" > $GITHUB_WORKSPACE/kernel_complements.txt
+          echo "🎉 和内核的 Kconfig 结构树进行比对，既无结构变动，也未发现任何(NEW)隐形交互弹窗，但是无法保证源码构建阶段没有问题！" > $GITHUB_WORKSPACE/kernel_complements.txt
         fi
 
         for i in {1..3}; do make download -j8 && break || sleep 5; done
