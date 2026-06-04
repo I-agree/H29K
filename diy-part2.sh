@@ -945,4 +945,29 @@ else
     echo "⚠️ 未找到 package/aic8800/Makefile，请检查路径！"
 fi
 
+# ======================== 【GraphicsMagick 适度优化补丁】 ========================
+echo "🛡️ 正在应用 GraphicsMagick 适度优化补丁（禁用 OpenMP / TIFF / 依赖追踪）..."
+GM_MAKEFILE=$(find package/ feeds/ -name "Makefile" | grep -E "graphicsmagick/Makefile$" | head -n 1 || true)
+
+if [ -n "$GM_MAKEFILE" ] && [ -f "$GM_MAKEFILE" ]; then
+    # 1. 移除编译时对 tiff 源码包的依赖，加快下载和依赖包编译速度
+    sed -i 's/PKG_BUILD_DEPENDS:=.*/PKG_BUILD_DEPENDS:=zlib freetype libpng libjpeg-turbo/g' "$GM_MAKEFILE"
+    
+    # 2. 移除打包时对 libtiff 运行时库的依赖，减少最终固件体积
+    sed -i 's/DEPENDS:=+libltdl.*/DEPENDS:=+libltdl +libpthread +zlib +libfreetype +libpng +libjpeg/g' "$GM_MAKEFILE"
+    
+    # 3. 将配置参数中的 --with-tiff 精确修改为 --without-tiff
+    sed -i 's/--with-tiff/--without-tiff/g' "$GM_MAKEFILE"
+    
+    # 4. 将 --enable-dependency-tracking 改为 --disable-dependency-tracking（减少编译时的无用 I/O 开销）
+    sed -i 's/--enable-dependency-tracking/--disable-dependency-tracking/g' "$GM_MAKEFILE"
+    
+    # 5. 在 --enable-shared 后面安全注入 --disable-openmp（解放 4 核 CPU，大幅缩短编译耗时）
+    sed -i 's/--enable-shared \\/--enable-shared \\\n\t--disable-openmp \\/g' "$GM_MAKEFILE"
+    
+    echo "✅ GraphicsMagick 适度优化补丁注入成功！"
+else
+    echo "⚠️ 未找到 GraphicsMagick 的 Makefile，请确认 feeds 更新是否正常。"
+fi
+
 echo "🚀 H29K 极致稳健的流媒体边缘切换矩阵离线改造，全部大功告成！"
