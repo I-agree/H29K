@@ -16,7 +16,7 @@ PKG_CONFIG_DEPENDS:=CONFIG_AIC8800_SDIO_BT_SUPPORT
 PKG_FLAGS:=nonshared
 
 # =================================================================
-# 🔒【核心银弹】强制声明编译期依赖 mac80211
+# 🔒【核心银弹】强制声明编译期依赖真正的内核包名 kmod-mac80211
 # 迫使总攻的 make -j$(nproc) 必须对两者进行串行排队，彻底粉碎并发冲撞内核导致的 6 小时死锁
 # =================================================================
 PKG_BUILD_DEPENDS:=kmod-mac80211
@@ -58,7 +58,7 @@ endef
 
 define KernelPackage/aic8800-sdio
   $(call KernelPackage/aic8800/Default,SDIO)
-  DEPENDS+= +aic8800-sdio-firmware +kmod-mmc +AIC8800_SDIO_BT_SUPPORT:kmod-bluetooth
+  DEPENDS+= +aic8800-sdio-firmware +kmod-mmc +CONFIG_AIC8800_SDIO_BT_SUPPORT:kmod-bluetooth
   FILES:= \
 	$(PKG_BUILD_DIR)/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic8800_bsp.ko \
 	$(PKG_BUILD_DIR)/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aic8800_fdrv.ko
