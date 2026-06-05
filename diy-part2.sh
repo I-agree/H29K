@@ -977,11 +977,9 @@ for TARGET_SCRIPT in "files/usr/bin/cam-monitor.sh" "files/usr/bin/live-push.sh"
     if [ -f "$TARGET_SCRIPT" ]; then
         echo "🎬 正在为 $TARGET_SCRIPT 注入运行时全自动 VPU/RGA 硬件自适应透传装甲..."
         
-        # 绝杀逻辑：利用 sed 在 docker run 前置注入一段内联 Bash 循环语句：
-        # 它会在 H29K 实际运行时动态扫描 /dev/rga, /dev/video*, /dev/media*
-        # 只要节点存在 [ -e "$dev" ]，就自动追加到 DOCKER_DEVICES 变量中，最后喂给 docker run
-        # ⚠️ 注意：sed 替换中的 \&\& 是为了在严格模式下逃逸转义，确保生成纯正的 bash && 逻辑门
-        sed -i 's|docker run|DOCKER_DEVICES=""; for dev in /dev/rga /dev/video* /dev/media*; do [ -e "$dev" ] \&\& DOCKER_DEVICES="$DOCKER_DEVICES --device $dev:$dev"; done; docker run $DOCKER_DEVICES|g' "$TARGET_SCRIPT"
+        # 绝杀修复：将原先的 [ -e "$dev" ] && ... 升级为标准的 if 语句
+        # 100% 免疫宿主脚本的 set -e 严格报错模式，即使没插摄像头、节点不存在也绝不闪退！
+        sed -i 's|docker run|DOCKER_DEVICES=""; for dev in /dev/rga /dev/video* /dev/media*; do if [ -e "$dev" ]; then DOCKER_DEVICES="$DOCKER_DEVICES --device $dev:$dev"; fi; done; docker run $DOCKER_DEVICES|g' "$TARGET_SCRIPT"
     fi
 done
 # =================================================================================
