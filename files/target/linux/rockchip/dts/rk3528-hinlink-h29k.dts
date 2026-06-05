@@ -472,3 +472,23 @@ status = "okay";
 &usb_host0_ohci {
 status = "okay";
 };
+
+/ {
+    chosen {
+        #address-cells = <2>;
+        #size-cells = <2>;
+        ranges;
+
+        /* 声明一个简单帧缓冲，U-Boot 会动态将状态改为 "okay" 并填入参数 */
+        framebuffer: framebuffer@90000000 {
+            compatible = "simple-framebuffer";
+            reg = <0x0 0x90000000 0x0 0x00800000>; /* 预留 8MB 显存，足足支持 1080P */
+            width = <1920>;
+            height = <1080>;
+            stride = <7680>; /* 1920 * 4 (32位色) */
+            format = "a8r8g8b8";
+            clocks = <&cru ACLK_VOP>, <&cru PCLK_HDMI>; /* 保持时钟开启，防止内核因节能关闭显示 */
+            status = "disabled"; /* 由 U-Boot 激活 */
+        };
+    };
+};
