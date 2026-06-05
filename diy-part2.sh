@@ -276,18 +276,24 @@ CONFIG_DRM_BRIDGE=y
 # CONFIG_DRM_DW_HDMI_I2S_AUDIO is not set
 # CONFIG_DRM_DW_HDMI_GP_AUDIO is not set
 
-# 📺 用户专属扩展：外接小屏幕与背光支持
-CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
-CONFIG_BACKLIGHT_PWM=y
+# =================================================================
+# 📺 核心闭环：HDMI的 SimpleDRM 路线 + ST7789V 专属显示总成
 # =================================================================
 
-# 支撑 HDMI 的 SimpleDRM 基础设施
+# 1. 支撑 HDMI 盲出的万能简单帧缓冲底层基础设施
 CONFIG_DRM_SIMPLEDRM=y
+CONFIG_FB_CORE=y
 CONFIG_FB_DEVICE=y
 
-# 支撑 ST7789V 小屏幕的 SPI 与 TinyDRM 驱动
+# 2. 支撑 ST7789V 小屏幕的 SPI 与 TinyDRM 驱动总线（补足关键母开关与面板底座）
 CONFIG_DRM_TINYDRM=y
+CONFIG_DRM_PANEL=y
+CONFIG_DRM_PANEL_ORIENTATION_REDUCED=y
 CONFIG_DRM_ST7789V=y
+
+# 3. 注入小屏幕背光系统核心底座（坚决粉碎内核交互式NEW提问弹窗）
+CONFIG_BACKLIGHT_CLASS_DEVICE=y
+CONFIG_BACKLIGHT_PWM=y
 
 # =================================================================
 
