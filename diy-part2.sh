@@ -286,9 +286,8 @@ CONFIG_DRM_SIMPLEDRM=y
 CONFIG_FB_DEVICE=y
 
 # 支撑 ST7789V 小屏幕的 SPI 与 TinyDRM 驱动
-CONFIG_SPI_ROCKCHIP=y       # 必须开启 RK3528 的 SPI 控制器驱动
-CONFIG_DRM_TINYDRM=y        # 开启轻量级 DRM 框架
-CONFIG_DRM_ST7789V=y        # 开启 ST7789V 专属驱动
+CONFIG_DRM_TINYDRM=y
+CONFIG_DRM_ST7789V=y
 
 # =================================================================
 
