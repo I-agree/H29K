@@ -176,6 +176,7 @@ CONFIG_CRYPTO_HW=y
 # 🛡️ 显示架构核心底座与防弹窗屏蔽词（对齐第一层 drivers/gpu/drm/Kconfig）
 # =================================================================
 CONFIG_DRM=y
+CONFIG_DRM_MIPI_DBI=y
 CONFIG_DRM_KMS_HELPER=y
 # CONFIG_DRM_DEBUG_MM is not set
 # CONFIG_DRM_USE_DYNAMIC_DEBUG is not set
@@ -183,7 +184,7 @@ CONFIG_DRM_KMS_HELPER=y
 # CONFIG_DRM_PANIC is not set
 # CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS is not set
 # CONFIG_DRM_DEBUG_MODESET_LOCK is not set
-# CONFIG_DRM_FBDEV_EMULATION is not set
+CONFIG_DRM_FBDEV_EMULATION=y
 # CONFIG_DRM_LOAD_EDID_FIRMWARE is not set
 # CONFIG_DRM_VGEM is not set
 # CONFIG_DRM_HYPERV is not set
@@ -200,16 +201,16 @@ CONFIG_DRM_KMS_HELPER=y
 # =================================================================
 # 🚀 瑞芯微核心显示驱动（对齐第二层 drm/rockchip/Kconfig）
 # =================================================================
-CONFIG_ROCKCHIP_IOMMU=y
-CONFIG_DRM_ROCKCHIP=y
+# CONFIG_ROCKCHIP_IOMMU is not set
+# CONFIG_DRM_ROCKCHIP is not set
 
 # 核心 VOP 视频输出控制器
 # CONFIG_ROCKCHIP_VOP is not set
 # CONFIG_ROCKCHIP_VOP2 is not set
 
-# 开启你需要的 Synopsys HDMI 核心及瑞芯微扩展
-CONFIG_ROCKCHIP_DW_HDMI=y
-CONFIG_DRM_DW_HDMI=y
+# Synopsys HDMI 核心及瑞芯微扩展
+# CONFIG_ROCKCHIP_DW_HDMI is not set
+# CONFIG_DRM_DW_HDMI is not set
 
 # 物理物理封杀：其余所有不属于你的芯片平台的无用接口（全面拒绝，防止弹窗）
 # CONFIG_ROCKCHIP_ANALOGIX_DP is not set
