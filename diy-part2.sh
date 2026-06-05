@@ -320,10 +320,10 @@ CONFIG_BT_LE=y
 # CONFIG_BT_FEATURE_DEBUG is not set
 
 # --- 2. 阻断外部 source 嵌套树 (对照 net/bluetooth/ 核心协议子框架) ---
-# CONFIG_BT_RFCOMM is not set
-# CONFIG_BT_BNEP is not set
+CONFIG_BT_RFCOMM=y
+CONFIG_BT_BNEP=y
 # CONFIG_BT_CMTP is not set
-# CONFIG_BT_HIDP is not set
+CONFIG_BT_HIDP=y
 
 # --- 3. 核心目标：仅放行 UART H4 总线 (对照 drivers/bluetooth/Kconfig) ---
 CONFIG_BT_HCIUART=y
