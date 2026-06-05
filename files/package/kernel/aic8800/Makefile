@@ -16,10 +16,10 @@ PKG_CONFIG_DEPENDS:=CONFIG_AIC8800_SDIO_BT_SUPPORT
 PKG_FLAGS:=nonshared
 
 # =================================================================
-# 🔒【核心银弹】强制声明编译期依赖真正的内核包名 kmod-mac80211
+# 🔒【核心银弹】强制声明编译期依赖包名 mac80211
 # 迫使总攻的 make -j$(nproc) 必须对两者进行串行排队，彻底粉碎并发冲撞内核导致的 6 小时死锁
 # =================================================================
-PKG_BUILD_DEPENDS:=kmod-mac80211
+PKG_BUILD_DEPENDS:=mac80211
 
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
