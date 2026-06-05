@@ -924,20 +924,22 @@ docker save h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} -o files/usr/share/docker-
 echo "🎁 离线全家桶镜像（版本: MediaMTX@$MEDIAMTX_VER, Alpine-FFmpeg@$FALLBACK_ALPINE_VER）已实现100%纯本地闭环！"
 
 # =================================================================================
-# 🚨 针对 aic8800 本地 Makefile 的终极补丁
+# 🚨 针对 aic8800 本地 Makefile 的终极补丁（支持 set -e 严格模式）
 # =================================================================================
 REAL_AIC_MAKEFILE="package/kernel/aic8800/Makefile"
 
 if [ -f "$REAL_AIC_MAKEFILE" ]; then
     echo "📥 侦测到目标组件，正在从自定义仓库强制下载覆盖 aic8800 Makefile..."
     
-    # aic8800 本地仓库的Makefile
-    curl -sSL "https://raw.githubusercontent.com/I-agree/H29K/main/files/package/kernel/aic8800/Makefile" > "$REAL_AIC_MAKEFILE"
+    # 注入 --retry 3 抵抗网络抖动；末尾加 || true 允许严格模式下捕获 $?
+    curl -sSL --connect-timeout 8 --retry 3 \
+      "https://raw.githubusercontent.com/I-agree/H29K/main/files/package/kernel/aic8800/Makefile" > "$REAL_AIC_MAKEFILE" || true
     
-    if [ $? -eq 0 ]; then
+    if [ -s "$REAL_AIC_MAKEFILE" ]; then  # -s 检查文件存在且大小大于 0 字节，比 $? 更稳妥
         echo "✅ aic8800 Makefile 覆盖成功，令牌锁死与 GCC14 报错已物理粉碎！"
     else
-        echo "❌ 严重错误：下载自定义 Makefile 失败，请检查网络链接或授权！"
+        echo "❌ 严重错误：下载自定义 Makefile 失败或文件为空，请检查网络链接！"
+        exit 1  # 既然是致命错误，主动抛出异常终止编译，防止带着错误的 Makefile 冲进大部队
     fi
 else
     echo "⚠️ 警告：在 $REAL_AIC_MAKEFILE 未找到该组件，请确认源码路径！"
