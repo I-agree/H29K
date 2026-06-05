@@ -97,14 +97,14 @@ NOSTDINC_FLAGS:= \
 define Build/Compile
 
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-btusb),)
-	$(KERNEL_MAKE) \
+	+$(KERNEL_MAKE) \
 		M="$(PKG_BUILD_DIR)/src/USB/driver_fw/drivers/aic_btusb" \
 		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
 		CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/usb" \
 		modules
 endif
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-sdio),)
-	$(KERNEL_MAKE) \
+	+$(KERNEL_MAKE) \
 		M="$(PKG_BUILD_DIR)/src/SDIO/driver_fw/driver/aic8800" \
 		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
 		CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/sdio" \
@@ -113,14 +113,14 @@ ifneq ($(CONFIG_PACKAGE_kmod-aic8800-sdio),)
 		modules
 endif
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-pcie),)
-	$(KERNEL_MAKE) \
+	+$(KERNEL_MAKE) \
 		M="$(PKG_BUILD_DIR)/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv" \
 		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
 		CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/pcie" \
 		modules
 endif
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-usb),)
-	$(KERNEL_MAKE) \
+	+$(KERNEL_MAKE) \
 		M="$(PKG_BUILD_DIR)/src/USB/driver_fw/drivers/aic8800" \
 		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
 		CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/usb" \
