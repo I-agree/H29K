@@ -966,8 +966,25 @@ EOF
 # ==============================================================================
 echo "🐳 正在通过模板引擎，将最新稳定版号固化进运行时脚本中..."
 sed -i "s/__MEDIAMTX_VER__/${MEDIAMTX_VER}/g" files/usr/bin/cam-monitor.sh
+# === 替换原有的版本号修改逻辑，并在此处强行注入硬件透传参数 ===
 sed -i "s/__ALPINE_VER__/${FALLBACK_ALPINE_VER}/g" files/usr/bin/cam-monitor.sh
 sed -i "s/__ALPINE_VER__/${FALLBACK_ALPINE_VER}/g" files/usr/bin/live-push.sh
+
+# =================================================================================
+# 🎥【硬解武装升级：动态节点自适应嗅探】通过 sed 注入动态探测，拒绝死锁与硬解失效
+# =================================================================================
+for TARGET_SCRIPT in "files/usr/bin/cam-monitor.sh" "files/usr/bin/live-push.sh"; do
+    if [ -f "$TARGET_SCRIPT" ]; then
+        echo "🎬 正在为 $TARGET_SCRIPT 注入运行时全自动 VPU/RGA 硬件自适应透传装甲..."
+        
+        # 绝杀逻辑：利用 sed 在 docker run 前置注入一段内联 Bash 循环语句：
+        # 它会在 H29K 实际运行时动态扫描 /dev/rga, /dev/video*, /dev/media*
+        # 只要节点存在 [ -e "$dev" ]，就自动追加到 DOCKER_DEVICES 变量中，最后喂给 docker run
+        # ⚠️ 注意：sed 替换中的 \&\& 是为了在严格模式下逃逸转义，确保生成纯正的 bash && 逻辑门
+        sed -i 's|docker run|DOCKER_DEVICES=""; for dev in /dev/rga /dev/video* /dev/media*; do [ -e "$dev" ] \&\& DOCKER_DEVICES="$DOCKER_DEVICES --device $dev:$dev"; done; docker run $DOCKER_DEVICES|g' "$TARGET_SCRIPT"
+    fi
+done
+# =================================================================================
 
 echo "🎁 正在通过宿主机 Docker，强行跨架构下发并封印 H29K(ARM64) 专属闭环离线包..."
 docker save bluenviron/mediamtx:${MEDIAMTX_VER} -o files/usr/share/docker-images/mediamtx.tar
