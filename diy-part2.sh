@@ -281,6 +281,17 @@ CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 CONFIG_BACKLIGHT_PWM=y
 # =================================================================
 
+# 支撑 HDMI 的 SimpleDRM 基础设施
+CONFIG_DRM_SIMPLEDRM=y
+CONFIG_FB_DEVICE=y
+
+# 支撑 ST7789V 小屏幕的 SPI 与 TinyDRM 驱动
+CONFIG_SPI_ROCKCHIP=y       # 必须开启 RK3528 的 SPI 控制器驱动
+CONFIG_DRM_TINYDRM=y        # 开启轻量级 DRM 框架
+CONFIG_DRM_ST7789V=y        # 开启 ST7789V 专属驱动
+
+# =================================================================
+
 # --- 主线标准高速总线（主线 6.12 存储与 USB 已由原生的 DWCMSHC 和 OF_SIMPLE 承载） ---
 CONFIG_SPI_ROCKCHIP=y
 CONFIG_REGULATOR_FIXED_VOLTAGE=y
