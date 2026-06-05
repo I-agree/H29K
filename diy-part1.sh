@@ -18,4 +18,7 @@ rm -rf package/immortalwrt_temp
 # === 3. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
+# === 4. 管理蓝牙设备的LuCI
+git clone https://github.com/sbwml/luci-app-bluetooth.git package/luci-app-bluetooth
+
 echo "🚀 [diy-part1.sh] 软件源与独立包预处理圆满完成！"
