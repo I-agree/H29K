@@ -285,20 +285,22 @@ CONFIG_DRM_SIMPLEDRM=y
 CONFIG_FB_CORE=y
 CONFIG_FB_DEVICE=y
 
-# 2. 支撑 ST7789V 小屏幕的 SPI 与 TinyDRM 驱动总线（补足关键母开关与面板底座）
+# 2. 支撑 ST7789V 小屏幕的 SPI 总线与 TinyDRM 驱动架构（100%对齐官方 Kconfig 闭环）
+CONFIG_SPI=y
+CONFIG_SPI_ROCKCHIP=y
+# CONFIG_SPI_ROCKCHIP_SFC is not set
 CONFIG_DRM_TINYDRM=y
 CONFIG_DRM_PANEL=y
 CONFIG_DRM_PANEL_ORIENTATION_REDUCED=y
 CONFIG_DRM_ST7789V=y
 
-# 3. 注入小屏幕背光系统核心底座（坚决粉碎内核交互式NEW提问弹窗）
+# 3. 注入小屏幕背光系统核心底座（坚决粉碎内核交互式 NEW 提问弹窗）
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 CONFIG_BACKLIGHT_PWM=y
 
 # =================================================================
 
-# --- 主线标准高速总线（主线 6.12 存储与 USB 已由原生的 DWCMSHC 和 OF_SIMPLE 承载） ---
-CONFIG_SPI_ROCKCHIP=y
+# --- 主线标准平台级外设与预留电压分配器 ---
 CONFIG_REGULATOR_FIXED_VOLTAGE=y
 
 # --- CMA 连续物理内存调优 ---
