@@ -150,7 +150,7 @@ CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
 
 # 清理可能引发覆盖的冲突条目
-sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d; /CONFIG_SND/d; /CONFIG_ARM64_SVE/d; /CONFIG_BT/d; /CONFIG_DRM_/d; /CONFIG_FB_/d; /CONFIG_BACKLIGHT_/d; /CONFIG_SPI/d' "$CONFIG_FILE" 2>/dev/null || true
+sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_ARM64_PA_BITS/d; /CONFIG_CMA_SIZE_MBYTES/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL/d; /CONFIG_SND/d; /CONFIG_ARM64_SVE/d; /CONFIG_BT/d; /CONFIG_DRM_/d; /CONFIG_FB_/d; /CONFIG_BACKLIGHT_/d; /CONFIG_SPI/d; /CONFIG_MEDIA/d; /CONFIG_VIDEO/d; /CONFIG_USB_VIDEO_CLASS/d' "$CONFIG_FILE" 2>/dev/null || true
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -299,7 +299,40 @@ CONFIG_DRM_ST7789V=y
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 CONFIG_BACKLIGHT_PWM=y
 
-# =================================================================
+# ==============================================================================
+# 🎥 补全核心：VPU视频硬解、RGA硬件转换加速与 USB 摄像头支持（全面防御 NEW 弹窗）
+# ==============================================================================
+CONFIG_MEDIA_SUPPORT=y
+CONFIG_MEDIA_CONTROLLER=y
+CONFIG_VIDEO_DEV=y
+CONFIG_VIDEO_V4L2=y
+CONFIG_VIDEO_V4L2_SUBDEV_API=y
+
+# --- 阻断 V4L2 树状结构中无用子协议，100% 防止 CI 自动化环境卡死 ---
+# CONFIG_MEDIA_ANALOG_TV_SUPPORT is not set
+# CONFIG_MEDIA_DIGITAL_TV_SUPPORT is not set
+# CONFIG_MEDIA_RADIO_SUPPORT is not set
+# CONFIG_MEDIA_SDR_SUPPORT is not set
+# CONFIG_MEDIA_TEST_SUPPORT is not set
+
+# --- 激活推流业务层：放行相机类与平台级驱动容器 ---
+CONFIG_MEDIA_CAMERA_SUPPORT=y
+CONFIG_MEDIA_PLATFORM_SUPPORT=y
+
+# --- A. 标准 USB 摄像头 UVC 驱动（点亮你的 cam-monitor.sh 输入源） ---
+CONFIG_USB_VIDEO_CLASS=y
+CONFIG_USB_VIDEO_CLASS_INPUT_EVDEV=y
+# CONFIG_USB_GSPCA is not set
+
+# --- B. 瑞芯微 RGA 硬件加速色彩转换引擎（路线 B 的性能解耦核心） ---
+CONFIG_VIDEO_ROCKCHIP_RGA=y
+
+# --- C. 瑞芯微主线 VPU 视频硬解编解码核心框架（对齐 Linux 6.12.y） ---
+CONFIG_VIDEO_HANTRO=y
+# CONFIG_VIDEO_HANTRO_IOMMU is not set
+# CONFIG_VIDEO_RKVDEC is not set
+
+# ==============================================================================
 
 # --- 主线标准平台级外设与预留电压分配器 ---
 CONFIG_REGULATOR_FIXED_VOLTAGE=y
