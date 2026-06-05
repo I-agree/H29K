@@ -21,4 +21,7 @@ git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-a
 # === 4. 管理蓝牙设备的LuCI
 git clone https://github.com/sbwml/luci-app-bluetooth.git package/luci-app-bluetooth
 
+# === 5. 磁盘扩容
+git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
+
 echo "🚀 [diy-part1.sh] 软件源与独立包预处理圆满完成！"
