@@ -172,6 +172,9 @@ CONFIG_ARM64_ASIMD=y
 CONFIG_CRYPTO_HW=y
 # CONFIG_CRYPTO_DEV_ROCKCHIP is not set
 
+# --- 触摸驱动内嵌
+CONFIG_TOUCHSCREEN_FT6236=y
+
 # =================================================================
 # 🛡️ 显示架构核心底座与防弹窗屏蔽词（对齐第一层 drivers/gpu/drm/Kconfig）
 # =================================================================
