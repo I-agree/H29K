@@ -20,8 +20,7 @@ git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-a
 
 # === 4. 管理蓝牙设备的LuCI
 git clone https://github.com/sbwml/package_new_expect.git package/utils/expect
-git clone https://github.com/sbwml/package_new_bluez-alsa.git package/bluez-alsa
-git clone https://github.com/sbwml/luci-app-bluetooth.git package/luci-app-bluetooth
+git clone https://github.com/I-agree/luci-app-bluetooth.git package/luci-app-bluetooth
 
 # === 5. 磁盘扩容
 git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
