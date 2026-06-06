@@ -17,7 +17,7 @@ PKG_FLAGS:=nonshared
 
 # =================================================================
 # 🔒【核心银弹】强制声明编译期依赖包名 mac80211
-# 迫使总攻的 make -j$(nproc) 必须对两者进行串行排队，彻底粉碎并发冲撞内核导致的 6 小时死锁
+# 迫使总攻的 make -j$(nproc) 必须对两者进行串行排队，彻底粉碎并发冲撞内核导致的死锁
 # =================================================================
 PKG_BUILD_DEPENDS:=mac80211
 
@@ -30,30 +30,13 @@ define Package/aic8800-firmware/Default
   TITLE:=Aicsemi aic8800 $(1) firmware
 endef
 
-Package/aic8800-pcie-firmware = $(call Package/aic8800-firmware/Default,PCIe)
 Package/aic8800-sdio-firmware = $(call Package/aic8800-firmware/Default,SDIO)
-Package/aic8800-usb-firmware = $(call Package/aic8800-firmware/Default,USB)
 
 define KernelPackage/aic8800/Default
   SUBMENU:=Wireless Drivers
   TITLE:=Aicsemi aic8800 Wi-Fi $(1) support
   DEPENDS:=+kmod-mac80211 +kmod-cfg80211 +@DRIVER_11N_SUPPORT +@DRIVER_11AC_SUPPORT \
     +@DRIVER_11AX_SUPPORT
-endef
-
-define KernelPackage/aic8800-btusb
-  SUBMENU:=Bluetooth Support
-  TITLE:=Aicsemi aic8800 Bluetooth USB support
-  DEPENDS:=+aic8800-usb-firmware +kmod-usb-core +kmod-bluetooth
-  FILES:=$(PKG_BUILD_DIR)/src/USB/driver_fw/drivers/aic_btusb/aic_btusb.ko
-  AUTOLOAD:=$(call AutoProbe,aic_btusb)
-endef
-
-define KernelPackage/aic8800-pcie
-  $(call KernelPackage/aic8800/Default,PCIe)
-  DEPENDS+= +aic8800-pcie-firmware @PCIE_SUPPORT
-  FILES:=$(PKG_BUILD_DIR)/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv/aic8800D80_fdrv.ko
-  AUTOLOAD:=$(call AutoProbe,aic8800D80_fdrv)
 endef
 
 define KernelPackage/aic8800-sdio
@@ -73,15 +56,6 @@ define KernelPackage/aic8800-sdio/config
   endif
 endef
 
-define KernelPackage/aic8800-usb
-  $(call KernelPackage/aic8800/Default,USB)
-  DEPENDS+= +aic8800-usb-firmware +kmod-usb-core
-  FILES:= \
-	$(PKG_BUILD_DIR)/src/USB/driver_fw/drivers/aic8800/aic_load_fw/aic_load_fw.ko \
-	$(PKG_BUILD_DIR)/src/USB/driver_fw/drivers/aic8800/aic8800_fdrv/aic8800DC_fdrv.ko
-  AUTOLOAD:=$(call AutoProbe,aic_load_fw aic8800DC_fdrv)
-endef
-
 NOSTDINC_FLAGS:= \
 	$(KERNEL_NOSTDINC_FLAGS) \
 	-I$(PKG_BUILD_DIR) \
@@ -95,14 +69,6 @@ NOSTDINC_FLAGS:= \
 	-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning -Wno-unused-function -Wno-error=unused-function -Wno-incompatible-pointer-types -Wno-error=incompatible-pointer-types -Wno-implicit-function-declaration -Wno-error=implicit-function-declaration
 
 define Build/Compile
-
-ifneq ($(CONFIG_PACKAGE_kmod-aic8800-btusb),)
-	$(KERNEL_MAKE) \
-		M="$(PKG_BUILD_DIR)/src/USB/driver_fw/drivers/aic_btusb" \
-		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
-		CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/usb" \
-		modules
-endif
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-sdio),)
 	$(KERNEL_MAKE) \
 		M="$(PKG_BUILD_DIR)/src/SDIO/driver_fw/driver/aic8800" \
@@ -112,27 +78,6 @@ ifneq ($(CONFIG_PACKAGE_kmod-aic8800-sdio),)
 		CONFIG_SDIO_BT=$(if $(CONFIG_AIC8800_SDIO_BT_SUPPORT),y,n) \
 		modules
 endif
-ifneq ($(CONFIG_PACKAGE_kmod-aic8800-pcie),)
-	$(KERNEL_MAKE) \
-		M="$(PKG_BUILD_DIR)/src/PCIE/driver_fw/driver/aic8800/aic8800_fdrv" \
-		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
-		CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/pcie" \
-		modules
-endif
-ifneq ($(CONFIG_PACKAGE_kmod-aic8800-usb),)
-	$(KERNEL_MAKE) \
-		M="$(PKG_BUILD_DIR)/src/USB/driver_fw/drivers/aic8800" \
-		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
-		CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/usb" \
-		modules
-endif
-endef
-
-define Package/aic8800-pcie-firmware/install
-	$(INSTALL_DIR) $(1)/lib/firmware/aic8800/pcie
-	$(CP) \
-		$(PKG_BUILD_DIR)/src/PCIE/driver_fw/fw/aic8800D80/* \
-		$(1)/lib/firmware/aic8800/pcie/
 endef
 
 define Package/aic8800-sdio-firmware/install
@@ -154,32 +99,5 @@ define Package/aic8800-sdio-firmware/install
 		$(1)/lib/firmware/aic8800/sdio/
 endef
 
-define Package/aic8800-usb-firmware/install
-	$(INSTALL_DIR) $(1)/lib/firmware/aic8800/usb
-	$(CP) \
-		$(PKG_BUILD_DIR)/src/USB/driver_fw/fw/aic8800/* \
-		$(1)/lib/firmware/aic8800/usb/
-	$(CP) \
-		$(PKG_BUILD_DIR)/src/USB/driver_fw/fw/aic8800D80/* \
-		$(1)/lib/firmware/aic8800/usb/
-	$(CP) \
-		$(PKG_BUILD_DIR)/src/USB/driver_fw/fw/aic8800D80N/* \
-		$(1)/lib/firmware/aic8800/usb/
-	$(CP) \
-		$(PKG_BUILD_DIR)/src/USB/driver_fw/fw/aic8800D80X2/* \
-		$(1)/lib/firmware/aic8800/usb/
-	$(CP) \
-		$(PKG_BUILD_DIR)/src/USB/driver_fw/fw/aic8800DC/* \
-		$(1)/lib/firmware/aic8800/usb/
-	$(CP) \
-		$(PKG_BUILD_DIR)/src/USB/driver_fw/fw/aic8800DLN/* \
-		$(1)/lib/firmware/aic8800/usb/
-endef
-
-$(eval $(call BuildPackage,aic8800-pcie-firmware))
 $(eval $(call BuildPackage,aic8800-sdio-firmware))
-$(eval $(call BuildPackage,aic8800-usb-firmware))
-$(eval $(call KernelPackage,aic8800-btusb))
-$(eval $(call KernelPackage,aic8800-pcie))
 $(eval $(call KernelPackage,aic8800-sdio))
-$(eval $(call KernelPackage,aic8800-usb))
