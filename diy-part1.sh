@@ -19,6 +19,8 @@ rm -rf package/immortalwrt_temp
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
 # === 4. 管理蓝牙设备的LuCI
+git clone https://github.com/sbwml/package_new_expect.git package/expect
+git clone https://github.com/sbwml/package_new_bluez-alsa.git package/bluez-alsa
 git clone https://github.com/sbwml/luci-app-bluetooth.git package/luci-app-bluetooth
 
 # === 5. 磁盘扩容
