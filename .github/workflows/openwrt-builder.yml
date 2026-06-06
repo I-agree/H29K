@@ -186,6 +186,9 @@ jobs:
         echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
         make target/linux/compile -j1 V=s
         
+        echo "🚀 [专项环境准备] 提前单挑解开 Go 编译器枷锁，确保后续狙击不落空..."
+        make package/feeds/packages/golang/compile -j$(nproc) || make package/feeds/packages/golang/compile -j1 V=s
+        
         echo "🚀 [步骤 3/3] 开启满血专项狙击！让六大高负载包排队单挑，绝不给 CPU 和内存死锁留任何机会..."
         
         echo "📦 [专项狙击 1/6] 单独全速编译无线核心架构 mac80211（断开内核符号抢夺）..."
