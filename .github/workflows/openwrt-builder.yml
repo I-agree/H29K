@@ -45,7 +45,7 @@ jobs:
         echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
         # 1. 停用系统可能存在的零碎、低效旧交换分区
         sudo swapoff -a || true
-        # 2. 直接在独立大盘 /mnt 上划出 8GB 专属全量 Swap 空间，为极端多包并发提供绝对容错兜底
+        # 2. Directly 在独立大盘 /mnt 上划出 8GB 专属全量 Swap 空间，为极端多包并发提供绝对容错兜底
         sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=8192
         sudo chmod 600 /mnt/swapfile
         sudo mkswap /mnt/swapfile
@@ -209,27 +209,36 @@ jobs:
         echo "📦 [专项狙击 6/6] 单独全速编译 Docker 面板 luci-app-dockerman（规避并发线程假死）..."
         make package/feeds/luci/luci-app-dockerman/compile -j$(nproc) || make package/feeds/luci/luci-app-dockerman/compile -j1 V=s
         
-        echo "🔥 [终极总攻] 六大硬骨头已被逐个物理超度！开始全包 4 核满血总攻残局..."
+        echo "🔥 [分段总攻] 六大硬骨头已被逐个物理超度且成果成功固化！"
         export GIT_TERMINAL_PROMPT=0
         export GIT_SSH_COMMAND="ssh -o BatchMode=yes -o StrictHostKeyChecking=no"
         
         # =================================================================
-        # 🛡️ 【通用型：全自动断点智能熔断技术】
+        # 🛡️ 【解耦型：分段全自动断点智能熔断技术】
         # =================================================================
-        if ! make -j$(nproc); then
-            echo -e "\n\n❌ [自动熔断] 全核并发编译在某个位置发生碰撞擦枪走火！"
+        echo "🔥 [总攻阶段 1/3] 开始全包满血总攻残局（常规轻量小包并发编译）..."
+        if ! make package/compile -j$(nproc); then
+            echo -e "\n\n❌ [自动熔断] 常规包并发编译在某个位置发生碰撞擦枪走火！"
             echo "🔍 正在自动降级至顶层单线程详细模式 (-j1 V=s)，精准捕捉当前破损包的核心报错..."
             echo "================================================================="
             echo "========= 🔥 OPENWRT CORE ERROR LOG AUTOMATIC CAPTURE ==========="
             echo "================================================================="
-            
-            make -j1 V=s
-            
+            make package/compile -j1 V=s
             echo "================================================================="
             echo "========= 🛑 ERROR LOG CAPTURE END. BUILD TERMINATED ==========="
             echo "================================================================="
             exit 1
         fi
+
+        echo "📦 [总攻阶段 2/3] 固件合体：打包并生成最终的系统镜像..."
+        if ! make target/install -j$(nproc); then
+            echo -e "\n\n❌ [自动熔断] 固件打包或内核安装阶段失败！"
+            make target/install -j1 V=s
+            exit 1
+        fi
+
+        echo "🗂️ [总攻阶段 3/3] 建立软件包索引..."
+        make package/index -j$(nproc)
         
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
