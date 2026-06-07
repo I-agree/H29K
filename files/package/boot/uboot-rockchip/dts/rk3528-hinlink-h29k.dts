@@ -20,6 +20,17 @@
 	chosen {
 		stdout-path = "serial0:1500000n8";
 		bootph-all;
+
+		framebuffer: framebuffer@90000000 {
+			compatible = "simple-framebuffer";
+			reg = <0x0 0x90000000 0x0 0x00800000>;
+			width = <1920>;
+			height = <1080>;
+			stride = <7680>;
+			format = "a8r8g8b8";
+			clocks = <&cru ACLK_VOP>, <&cru PCLK_HDMI>;
+			status = "disabled";
+		};
 	};
 
 	leds {
@@ -156,20 +167,6 @@
 		regulator-settling-time-up-us = <250>;
 		bootph-all;
 	};
-
-	/* ========================================================================= */
-	/* 🔧 U-Boot 2025.10 厂商外设虚拟打桩节点（防御 Label not found 编译错误）    */
-	/* ========================================================================= */
-	combphy: combphy-stub {};
-	usb2phy: usb2phy-stub {};
-	usb2phy_host: usb2phy-host-stub {};
-	usb2phy_otg: usb2phy-otg-stub {};
-	usb_host0_ehci: usb-host0-ehci-stub {};
-	usb_host0_ohci: usb-host0-ohci-stub {};
-};
-
-&combphy {
-	status = "okay";
 };
 
 &cpu0 {
@@ -293,28 +290,6 @@
 	pinctrl-0 = <&uart0m0_xfer>;
 	status = "okay";
 	bootph-all;
-};
-
-&usb2phy {
-	status = "okay";
-};
-
-&usb2phy_host {
-	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
-};
-
-&usb2phy_otg {
-	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
-};
-
-&usb_host0_ehci {
-	status = "okay";
-};
-
-&usb_host0_ohci {
-	status = "okay";
 };
 
 &uart0m0_xfer {
