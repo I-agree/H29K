@@ -62,15 +62,15 @@ NOSTDINC_FLAGS:= \
 	-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning -Wno-unused-function -Wno-error=unused-function -Wno-incompatible-pointer-types -Wno-error=incompatible-pointer-types -Wno-implicit-function-declaration -Wno-error=implicit-function-declaration
 
 define Build/Compile
-ifneq ($(CONFIG_PACKAGE_kmod-aic8800-sdio),)
-	$(KERNEL_MAKE) \
-		M="$(PKG_BUILD_DIR)/src/SDIO/driver_fw/driver/aic8800" \
-		NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
-		CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/sdio" \
-		CONFIG_AIC8800_BTLPM_SUPPORT=n \
-		CONFIG_SDIO_BT=$(if $(CONFIG_AIC8800_SDIO_BT_SUPPORT),y,n) \
-		modules
-endif
+	if [ -n "$(CONFIG_PACKAGE_kmod-aic8800-sdio)" ]; then \
+		$(KERNEL_MAKE) \
+			M="$(PKG_BUILD_DIR)/src/SDIO/driver_fw/driver/aic8800" \
+			NOSTDINC_FLAGS="$(NOSTDINC_FLAGS)" \
+			CONFIG_AIC_FW_PATH="/lib/firmware/aic8800/sdio" \
+			CONFIG_AIC8800_BTLPM_SUPPORT=n \
+			CONFIG_SDIO_BT=$(if $(CONFIG_AIC8800_SDIO_BT_SUPPORT),y,n) \
+			modules; \
+	fi
 endef
 
 define Package/aic8800-sdio-firmware/install
