@@ -195,8 +195,8 @@ jobs:
         make package/kernel/mac80211/compile -j$(nproc) || make package/kernel/mac80211/compile -j1 V=s
         
         echo "📦 [专项狙击 2/6] 使用标准单线程详细模式编译 aic8800（彻底规避假死悬空）..."
-        # 🛡️ 强制注入非交互环境变量阻断 [Y/n] 提问，外加 15 分钟强杀熔断机制，双重保险防装死
-        timeout 15m env DEBIAN_FRONTEND=noninteractive KCONFIG_NOSILENTUPDATE=1 CONF_COMMAND="oldconfig" make package/kernel/aic8800/compile -j1 V=s || { echo "❌ 警报：aic8800 编译遭遇15分钟超时熔断或致命交互冲突！"; exit 1; }
+        # 🛡️ 强制注入非交互环境变量阻断 [Y/n] 提问，外加 20 分钟强杀熔断机制，双重保险防装死
+        timeout 20m env DEBIAN_FRONTEND=noninteractive KCONFIG_NOSILENTUPDATE=1 CONF_COMMAND="oldconfig" make package/kernel/aic8800/compile -j1 V=s || { echo "❌ 警报：aic8800 编译遭遇20分钟超时熔断或致命交互冲突！"; exit 1; }
         
         echo "📦 [专项狙击 3/6] 单独全速编译 dockerd 守护进程核心..."
         make package/feeds/packages/dockerd/compile -j$(nproc) || make package/feeds/packages/dockerd/compile -j1 V=s
