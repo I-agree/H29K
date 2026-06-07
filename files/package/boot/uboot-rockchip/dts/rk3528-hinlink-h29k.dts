@@ -156,6 +156,16 @@
 		regulator-settling-time-up-us = <250>;
 		bootph-all;
 	};
+
+	/* ========================================================================= */
+	/* 🔧 U-Boot 2025.10 厂商外设虚拟打桩节点（防御 Label not found 编译错误）    */
+	/* ========================================================================= */
+	combphy: combphy-stub {};
+	usb2phy: usb2phy-stub {};
+	usb2phy_host: usb2phy-host-stub {};
+	usb2phy_otg: usb2phy-otg-stub {};
+	usb_host0_ehci: usb-host0-ehci-stub {};
+	usb_host0_ohci: usb-host0-ohci-stub {};
 };
 
 &combphy {
@@ -315,12 +325,34 @@
 	bootph-all;
 };
 
-&emmc_bus8 { bootph-pre-ram; };
-&emmc_clk { bootph-pre-ram; };
-&emmc_cmd { bootph-pre-ram; };
-&emmc_strb { bootph-pre-ram; };
+&emmc_bus8 {
+	bootph-pre-ram;
+};
 
-&sdmmc_bus4 { bootph-pre-ram; };
-&sdmmc_clk { bootph-pre-ram; };
-&sdmmc_cmd { bootph-pre-ram; };
-&sdmmc_det { bootph-pre-ram; };
+&emmc_clk {
+	bootph-pre-ram;
+};
+
+&emmc_cmd {
+	bootph-pre-ram;
+};
+
+&emmc_strb {
+	bootph-pre-ram;
+};
+
+&sdmmc_bus4 {
+	bootph-pre-ram;
+};
+
+&sdmmc_clk {
+	bootph-pre-ram;
+};
+
+&sdmmc_cmd {
+	bootph-pre-ram;
+};
+
+&sdmmc_det {
+	bootph-pre-ram;
+};
