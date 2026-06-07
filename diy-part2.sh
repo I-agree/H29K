@@ -842,7 +842,7 @@ chmod +x files/etc/init.d/cam-monitor
 echo "✅ 完全体多路调度看门狗及状态机系统构建完毕！"
 
 # ==============================================================================
-# 🖼️ 【网页监控优雅降级】前端 HLS 自动化监听与设备检测卡片（支持全平台投屏反馈）
+# 🌐 【完全体前端监视大屏】完美闭环补全版（自适应 MediaMTX HLS 架构）
 # ==============================================================================
 cat > files/www/cam.html << 'EOF'
 <!DOCTYPE html>
@@ -850,93 +850,168 @@ cat > files/www/cam.html << 'EOF'
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>H29K 完全体商用边缘导播面板</title>
+    <title>H29K 导播台本地网页监控监视大屏</title>
     <style>
         body {
-            margin: 0; padding: 0; background-color: #121212; color: #e0e0e0;
-            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh;
+            background: #121212;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
         }
         .container {
-            width: 90%; max-width: 800px; background: #1e1e1e; border-radius: 14px; padding: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.6); border: 1px solid #2d2d2d;
+            width: 90%;
+            max-width: 800px;
+            background: #1e1e1e;
+            border-radius: 14px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+            border: 1px solid #2d2d2d;
         }
-        h2 { margin-top: 0; font-weight: 500; font-size: 1.5rem; color: #00e5ff; display: flex; align-items: center; gap: 10px; }
-        .status-online { background: #2e7d32; color: #fff; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-        .status-offline { background: #c62828; color: #fff; font-size: 0.75rem; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-        .player-wrapper { width: 100%; height: 450px; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
-        #h29k-player { width: 100%; height: 100%; }
+        h2 {
+            margin-top: 0;
+            font-weight: 500;
+            font-size: 1.5rem;
+            color: #00e5ff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-online {
+            background: #2e7d32;
+            color: #fff;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .status-offline {
+            background: #c62828;
+            color: #fff;
+            font-size: 0.75rem;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .player-wrapper {
+            width: 100%;
+            height: 450px;
+            background: #000;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+        #h29k-player {
+            width: 100%;
+            height: 100%;
+        }
         .fallback-card {
-            position: absolute; top:0; left:0; width:100%; height:100%; background:#151515;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #ff5252;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #151515;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            color: #ff5252;
+            gap: 10px;
         }
-        .fallback-card svg { width: 64px; height: 64px; fill: #ff5252; margin-bottom: 15px; }
+        .fallback-card svg {
+            width: 64px;
+            height: 64px;
+            fill: #ff5252;
+        }
         .info-panel {
-            margin-top: 20px; font-size: 0.88rem; color: #b0bec5; line-height: 1.6;
-            background: #263238; padding: 15px; border-radius: 8px; border-left: 4px solid #00e5ff;
+            margin-top: 20px;
+            font-size: 0.88rem;
+            color: #b0bec5;
+            line-height: 1.6;
+            background: #263238;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #00e5ff;
         }
-        code { background: #000; padding: 2px 6px; border-radius: 4px; color: #ffb74d; font-family: monospace; }
+        code {
+            background: #000;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #ffb74d;
+            font-family: monospace;
+        }
     </style>
     <script src="https://unpkg.com/xgplayer@3.0.1/browser/index.js" type="text/javascript"></script>
     <script src="https://unpkg.com/xgplayer-hls@3.0.1/browser/index.js" type="text/javascript"></script>
 </head>
 <body>
-    <div class="container">
-        <h2>📹 H29K 导播台本地网页监控监视大屏 <span id="badge" class="status-offline">检测中...</span></h2>
-        <div class="player-wrapper">
-            <div id="h29k-player"></div>
-            <div id="fallback" class="fallback-card" style="display: none;">
-                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                <div style="font-size: 1.2rem; font-weight: bold;">📷 USB 摄像头已被安全断开</div>
-                <div style="font-size: 0.9rem; color: #888; margin-top: 5px;">网页监控已自动降级关闭。系统仍在后台守候，随时支持手机/电脑无线投屏与网络开播！</div>
-            </div>
-        </div>
-        <div class="info-panel">
-            <strong>📡 投屏与多端推流说明指南：</strong><br>
-            1. <strong>iPhone/安卓/电脑投屏</strong>：可使用任意支持推流的 App，将画面发布到 <code>rtmp://H29K_IP/cast</code> 或 <code>rtsp://H29K_IP:8554/cast</code>，HDMI 屏幕将自动0延迟显示投屏内容。<br>
-            2. <strong>网络跨平台直播</strong>：使用网页后台下方 LuCI 控制按键，即可将当前画面一键转播发送到抖音、快手或 Bilibili 的直播间。
+<div class="container">
+    <h2>📹 H29K 导播台本地网页监控监视大屏 <span id="badge" class="status-offline">离线</span></h2>
+    <div class="player-wrapper">
+        <div id="h29k-player"></div>
+        <div id="fallback" class="fallback-card">
+            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            <div>流媒体信号未就绪或已断开<br><small>请确保输入源（投屏或摄像头）推流成功</small></div>
         </div>
     </div>
+    <div class="info-panel">
+        <strong>💡 跨平台监控提取通道：</strong><br>
+        当前正采用 HLS LL（超低延迟切片）监视主干道。如需拉取原始网络流，请使用以下地址：<br>
+        <code>RTSP 顺位流: rtsp://<script>document.write(window.location.hostname);</script>:8554/cam</code> | 
+        <code>RTMP 顺位流: rtmp://<script>document.write(window.location.hostname);</script>:1935/cam</code>
+    </div>
+</div>
 
-    <script>
-        const boxIp = window.location.hostname || '192.168.1.1';
-        const streamUrl = `http://${boxIp}:8888/cam/index.m3u8`;
-        let player = null;
+<script type="text/javascript">
+    // 💡 动态拼装局域网内任意客户端访问时的自适应 MediaMTX HLS 端口路径
+    const streamUrl = 'http://' + window.location.hostname + ':8888/cam/index.m3u8';
+    const badge = document.getElementById('badge');
+    const fallback = document.getElementById('fallback');
 
-        function initPlayer() {
-            player = new window.XgplayerHls({
-                id: 'h29k-player', url: streamUrl, isLive: true, autoplay: true, muted: true,
-                playsinline: true, width: '100%', height: '100%', fluid: true, cors: true
-            });
+    // 初始化西瓜播放器驱动核心
+    const player = new window.Player({
+        id: 'h29k-player',
+        url: streamUrl,
+        isLive: true,
+        autoplay: true,
+        playsinline: true,
+        plugins: [window.HlsJsPlugin],
+        width: '100%',
+        height: '100%',
+        hlsJsPlugin: {
+            retryCount: 3,
+            retryDelay: 1000
         }
+    });
 
-        // 🧠 前端自动化探活降级状态机逻辑
-        function checkStream() {
-            fetch(streamUrl, { method: 'HEAD', cache: 'no-store' })
-            .then(res => {
-                if (res.status === 200) {
-                    document.getElementById('fallback').style.display = 'none';
-                    document.getElementById('badge').innerText = 'LIVE 摄像头就绪';
-                    document.getElementById('badge').className = 'status-online';
-                    if (!player) { initPlayer(); }
-                } else {
-                    throw new Error('Offline');
-                }
-            })
-            .catch(() => {
-                document.getElementById('fallback').style.display = 'flex';
-                document.getElementById('badge').innerText = 'CAMERA 离线';
-                document.getElementById('badge').className = 'status-offline';
-                if (player) { player.destroy(); player = null; }
-            });
-        }
+    // 智能化看门狗状态机事件绑定
+    player.on('play', function() {
+        badge.className = 'status-online';
+        badge.innerText = '在线';
+        fallback.style.display = 'none';
+    });
 
-        setInterval(checkStream, 3000);
-        checkStream();
-    </script>
+    player.on('error', function() {
+        badge.className = 'status-offline';
+        badge.innerText = '离线';
+        fallback.style.display = 'flex';
+    });
+
+    player.on('ended', function() {
+        badge.className = 'status-offline';
+        badge.innerText = '已断开';
+        fallback.style.display = 'flex';
+    });
+</script>
 </body>
 </html>
 EOF
+# ==============================================================================
 
 # ==============================================================================
 # 🎛️ 【LuCI 控制固化】将一键开播命令完美合并写入 OpenWrt 后台菜单
