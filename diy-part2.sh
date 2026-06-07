@@ -143,6 +143,7 @@ rm -f target/linux/ipq806x/patches-6.12/902-ARM-decompressor-support-for-ATAGs-r
 rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch || true
 rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch || true
 rm -rf target/linux/airoha
+rm -rf package/boot/uboot-rockchip/patches
 
 # ======================== 【3. H29K 主线内核配置合并注入】 ========================
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
