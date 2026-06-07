@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aic8800
-PKG_RELEASE:=4
+PKG_RELEASE:=5
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/radxa-pkg/aic8800.git
@@ -17,31 +17,24 @@ PKG_FLAGS:=nonshared
 
 # =================================================================
 # 🔒【核心银弹】强制声明编译期依赖包名 mac80211
-# 迫使总攻的 make -j$(nproc) 必须对两者进行串行排队，彻底粉碎并发冲撞内核导致的死锁
+# 迫使总攻的 make -j$(nproc) 必须对两者进行串行排队，彻底粉碎并发冲突
 # =================================================================
 PKG_BUILD_DEPENDS:=mac80211
 
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
 
-define Package/aic8800-firmware/Default
+define Package/aic8800-sdio-firmware
   SECTION:=firmware
   CATEGORY:=Firmware
-  TITLE:=Aicsemi aic8800 $(1) firmware
-endef
-
-Package/aic8800-sdio-firmware = $(call Package/aic8800-firmware/Default,SDIO)
-
-define KernelPackage/aic8800/Default
-  SUBMENU:=Wireless Drivers
-  TITLE:=Aicsemi aic8800 Wi-Fi $(1) support
-  DEPENDS:=+kmod-mac80211 +kmod-cfg80211 +@DRIVER_11N_SUPPORT +@DRIVER_11AC_SUPPORT \
-    +@DRIVER_11AX_SUPPORT
+  TITLE:=Aicsemi aic8800 SDIO firmware
 endef
 
 define KernelPackage/aic8800-sdio
-  $(call KernelPackage/aic8800/Default,SDIO)
-  DEPENDS+= +aic8800-sdio-firmware +kmod-mmc +CONFIG_AIC8800_SDIO_BT_SUPPORT:kmod-bluetooth
+  SUBMENU:=Wireless Drivers
+  TITLE:=Aicsemi aic8800 Wi-Fi SDIO support
+  DEPENDS:=+kmod-mac80211 +kmod-cfg80211 +@DRIVER_11N_SUPPORT +@DRIVER_11AC_SUPPORT \
+    +@DRIVER_11AX_SUPPORT +aic8800-sdio-firmware +kmod-mmc +CONFIG_AIC8800_SDIO_BT_SUPPORT:kmod-bluetooth
   FILES:= \
 	$(PKG_BUILD_DIR)/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aic8800_bsp.ko \
 	$(PKG_BUILD_DIR)/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/aic8800_fdrv.ko
