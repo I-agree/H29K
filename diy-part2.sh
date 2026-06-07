@@ -132,22 +132,6 @@ done
 
 echo "✅ 所有外部资源下载并校验通过！"
 
-# ======================== 【核心增补：破除 U-Boot 2025.10+ 路径断层 Bug】 ========================
-echo "🔧 正在通过 Makefile 注入技术，强行适配新版 U-Boot 的 rockchip/ 子目录架构..."
-
-if [ -f "package/boot/uboot-rockchip/Makefile" ]; then
-    # 1. 自动将 Makefile 中可能残留的过时路径全面升级
-    sed -i 's|arch/arm/dts/\$(|arch/arm/dts/rockchip/\$(|g' package/boot/uboot-rockchip/Makefile
-    sed -i 's|arch/arm/dts/rk3528|arch/arm/dts/rockchip/rk3528|g' package/boot/uboot-rockchip/Makefile
-    
-    # 2. 【核心大招】直接在 Makefile 的 Build/Prepare（解压源码阶段）开头，强行注入创建子目录并完美拷贝 DTS 的绝对指令
-    # 使用 sed 匹配 define Build/Prepare，并在其下方直接插入高精度拷贝动作
-    sed -i 's|define Build/Prepare|define Build/Prepare\n\tmkdir -p \$(PKG_BUILD_DIR)/arch/arm/dts/rockchip \&\& \$(CP) ./dts/rk3528-hinlink-h29k.dts \$(PKG_BUILD_DIR)/arch/arm/dts/rockchip/|g' package/boot/uboot-rockchip/Makefile
-    
-    echo "🎯 瑞芯微 U-Boot 2025.10+ 设备树生命周期补丁已完美注入！"
-fi
-# ==============================================================================================
-
 # ======================== 【2. 清理原生冲突架构源】 ========================
 echo "🧹 正在清理原生冲突的架构补丁..."
 rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch || true
