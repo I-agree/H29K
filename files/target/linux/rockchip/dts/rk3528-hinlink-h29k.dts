@@ -448,6 +448,18 @@ pinctrl-0 = <&uart0m0_xfer>;
 status = "okay";
 };
 
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1m0_xfer>;
+	status = "okay";
+};
+
+&uart2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart2m0_xfer>;
+	status = "okay";
+};
+
 &usb2phy {
 status = "okay";
 };
@@ -468,6 +480,11 @@ status = "okay";
 
 &usb_host0_ohci {
 status = "okay";
+};
+
+&usb_host0_xhci {
+	dr_mode = "host";
+	status = "okay";
 };
 
 / {
