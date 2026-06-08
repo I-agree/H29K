@@ -62,6 +62,9 @@ define Build/Prepare
 	
 	# 3. 仅将你的 H29K 独立板级 DTS 放入该目录，它会自动 include 官方原生的 rk3528.dtsi
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+
+	# 🛠️ 核心修正：强行触发 U-Boot 原生的 NO_YAML 编译分支，完美绕过 OpenWrt 的环境隔离机制
+	sed -i '/usr\/include\/yaml.h/s/ifeq .*/ifeq (,)/' $(PKG_BUILD_DIR)/scripts/dtc/Makefile
 endef
 
 define Build/InstallDev
