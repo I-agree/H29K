@@ -243,6 +243,9 @@ pinctrl-0 = <&rgmii_miim &rgmii_tx_bus2 &rgmii_rx_bus2 &rgmii_rgmii_clk &rgmii_r
 phy-handle = <&rgmii_phy>;
 phy-mode = "rgmii-id";
 phy-supply = <&vcc_3v3>;
+snps,reset-active-low;
+snps,reset-delays-us = <0 20000 100000>;
+snps,reset-gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
 status = "okay";
 };
 
@@ -484,6 +487,10 @@ status = "okay";
 
 &usb_host0_xhci {
 	dr_mode = "host";
+	status = "okay";
+};
+
+&i2c1 {
 	status = "okay";
 };
 
