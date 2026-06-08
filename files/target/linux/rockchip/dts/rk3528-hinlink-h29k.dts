@@ -208,7 +208,7 @@ vdd_logic: regulator-vdd-logic {
 
 backlight: backlight {
 	compatible = "pwm-backlight";
-	pwms = <&pwm5 0 5000000 PWM_POLARITY_NORMAL>;
+	pwms = <&pwm5 0 5000000 0>;
 	brightness-levels = <
 		0 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 255
 	>;
