@@ -50,7 +50,7 @@ UBOOT_CUSTOMIZE_CONFIG := \
 UBOOT_MAKE_FLAGS += \
   BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
   $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL)) \
-  HOSTLOADLIBES_dtc="-lyaml"
+  HOSTLDLIBS_dtc="-lyaml"
 
 # 🚀 【现代主线化】仅注入 H29K 独有配置，其余完全借用 U-Boot 官方原生 DTSI
 define Build/Prepare
