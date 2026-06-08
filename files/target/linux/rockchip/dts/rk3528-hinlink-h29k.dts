@@ -4,6 +4,7 @@
 #include <dt-bindings/leds/common.h>
 #include <dt-bindings/pwm/pwm.h>
 #include <dt-bindings/pinctrl/rockchip.h>
+#include <dt-bindings/gpio/gpio.h>
 #include "rk3528.dtsi"
 
 / {
@@ -16,6 +17,11 @@ aliases {
 	mmc1 = &sdmmc;
 	mmc2 = &sdio0;
 	serial0 = &uart0;
+
+	led-boot = &led_work;
+	led-failsafe = &led_work;
+	led-running = &led_work;
+	led-upgrade = &led_work;
 };
 
 chosen {
@@ -47,23 +53,19 @@ leds {
 	pinctrl-names = "default";
 	pinctrl-0 = <&led_4g_en>, <&led_5g_en>, <&led_work_en>;
 
-	led-0 {
-		color = <LED_COLOR_ID_RED>;
-		function = LED_FUNCTION_WAN;
+	led_4g: 4g {
+		label = "red:4g";
 		gpios = <&gpio4 RK_PC0 GPIO_ACTIVE_LOW>;
 	};
 
-	led-1 {
-		color = <LED_COLOR_ID_BLUE>;
-		function = LED_FUNCTION_WLAN;
+	led_5g: 5g {
+		label = "blue:5g";
 		gpios = <&gpio4 RK_PC3 GPIO_ACTIVE_LOW>;
 	};
 
-	led-2 {
-		color = <LED_COLOR_ID_GREEN>;
-		function = LED_FUNCTION_STATUS;
+	led_work: work {
+		label = "green:work";
 		gpios = <&gpio4 RK_PB7 GPIO_ACTIVE_LOW>;
-		linux,default-trigger = "default-on";
 	};
 };
 
