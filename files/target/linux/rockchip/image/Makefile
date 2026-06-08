@@ -5,6 +5,30 @@ include $(INCLUDE_DIR)/image.mk
 
 DEVICE_VARS += UBOOT_DEVICE_NAME
 
+# ==============================================================================
+# 🛠️ 核心修复：重写 DTB 编译基础设施，彻底打通 C 预处理器（CPP）的内核头文件通道
+# ==============================================================================
+define Image/BuildDTB
+	$(TARGET_CROSS)cpp -nostdinc -x assembler-with-cpp \
+		-I$(DTS_DIR) \
+		-I$(DEVICE_DTS_DIR) \
+		-I$(DTS_DIR)/include \
+		-I$(LINUX_DIR)/include \
+		-I$(LINUX_DIR)/arch/arm64/boot/dts/include \
+		-undef -D__DTS__ $(1) $(2).tmp
+	$(LINUX_DIR)/scripts/dtc/dtc -O dtb -i$(DTS_DIR) -i$(DEVICE_DTS_DIR) \
+		$(if $(CONFIG_OF_OVERLAY),-@) \
+		-Wno-interrupt_provider \
+		-Wno-unique_unit_address \
+		-Wno-unit_address_vs_reg \
+		-Wno-avoid_unnecessary_addr_size \
+		-Wno-alias_paths \
+		-Wno-graph_child_address \
+		-Wno-simple_bus_reg \
+		-o $(2) $(2).tmp
+endef
+# ==============================================================================
+
 define Build/Compile
 	$(CP) $(LINUX_DIR)/COPYING $(KDIR)/COPYING.linux
 endef
@@ -40,7 +64,7 @@ define Build/pine64-img
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
 		32768
 
-	# 🛠️ 核心修改：智能识别 Binman 合体固件或传统拆分固件
+	# 🛠️ 智能识别 Binman 合体固件或传统拆分固件
 	if [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
 		echo "Found Binman combined image, flashing..."; \
 		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc; \
