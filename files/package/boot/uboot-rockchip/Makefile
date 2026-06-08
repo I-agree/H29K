@@ -49,7 +49,8 @@ UBOOT_CUSTOMIZE_CONFIG := \
 
 UBOOT_MAKE_FLAGS += \
   BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
-  $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
+  $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL)) \
+  HOSTLOADLIBES_dtc="-lyaml"
 
 # 🚀 【现代主线化】仅注入 H29K 独有配置，其余完全借用 U-Boot 官方原生 DTSI
 define Build/Prepare
@@ -62,9 +63,6 @@ define Build/Prepare
 	
 	# 3. 仅将你的 H29K 独立板级 DTS 放入该目录，它会自动 include 官方原生的 rk3528.dtsi
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-
-	# 🛠️ 核心修正：强行触发 U-Boot 原生的 NO_YAML 编译分支，完美绕过 OpenWrt 的环境隔离机制
-	sed -i '/usr\/include\/yaml.h/s/ifeq .*/ifeq (,)/' $(PKG_BUILD_DIR)/scripts/dtc/Makefile
 endef
 
 define Build/InstallDev
