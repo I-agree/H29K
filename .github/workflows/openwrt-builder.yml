@@ -189,13 +189,14 @@ jobs:
         echo "🚀 [专项环境准备] 提前单挑解开 Go 编译器枷锁，确保后续狙击不落空..."
         make package/feeds/packages/golang/compile -j$(nproc) || make package/feeds/packages/golang/compile -j1 V=s
         
-        echo "🚀 [步骤 3/3] 开启满血专项狙击！让六大高负载包排队单挑，绝不给 CPU 和内存死锁留任何机会..."
+        # =================================================================
+        # 🚀 [步骤 3/3] 开启满血专项狙击！让六大高负载包排队单挑
+        # =================================================================
         
         echo "📦 [专项狙击 1/6] 单独全速编译无线核心架构 mac80211（断开内核符号抢夺）..."
         make package/kernel/mac80211/compile -j$(nproc) || make package/kernel/mac80211/compile -j1 V=s
         
         echo "📦 [专项狙击 2/6] 使用标准单线程详细模式编译 aic8800（彻底规避假死悬空）..."
-        # 🛡️ 强制注入非交互环境变量阻断 [Y/n] 提问，外加 20 分钟强杀熔断机制，双重保险防装死
         timeout 20m env DEBIAN_FRONTEND=noninteractive KCONFIG_NOSILENTUPDATE=1 CONF_COMMAND="oldconfig" make package/kernel/aic8800/compile -j1 V=s || { echo "❌ 警报：aic8800 编译遭遇20分钟超时熔断或致命交互冲突！"; exit 1; }
         
         echo "📦 [专项狙击 3/6] 单独全速编译 dockerd 守护进程核心..."
@@ -215,24 +216,23 @@ jobs:
         # =================================================================
         echo "🔥 [总攻阶段 1/3] 开始全包满血总攻残局（常规轻量小包并发编译）..."
         
-        # 💡 4核15G硬件极快，常规小包并发编译正常情况下 10-15 分钟内绝对能收尾。
-        # 如果超过 20 分钟没动静，百分之百是陷入了 fakeroot 纯软件死锁。
-        # 此时用 timeout 20m 强行断电，把进程踢进 if ! 的降级安全通道。
         if ! timeout 20m make package/compile -j$(nproc); then
             echo -e "\n\n🚨 [自动熔断触发] 检测到常规包并发编译遭遇多线程并发死锁（挂起超时）！"
             echo "🔍 正在强杀卡死的 fakeroot 守护进程、物理清除残留全局锁..."
             
-            # 🔨 强行击碎死锁链条，扫清现场
             killall -9 faked fakeroot 2>/dev/null || true
             rm -rf tmp/.root-copy.flock || true
             
             echo "================================================================="
             echo "========= 🔄 正在降级至顶层单线程安全模式 (-j1 V=s) 磨过残局 ========="
             echo "================================================================="
-            # 此时绝大部分小包在前面多线程的十几分钟里早就交卷了，剩下的几个刺头在单线程下会秒过，绝对不卡
             make package/compile -j1 V=s
             echo "================================================================="
         fi
+
+        # 🚀【核心修复点：将编译好的 ipk 释放安装到 root-rockchip 中】
+        echo "📦 [新增关键衔接] 正在解压并铺设所有编译好的组件至目标根文件系统..."
+        make package/install -j$(nproc) || make package/install -j1 V=s
 
         echo "📦 [总攻阶段 2/3] 固件合体：打包并生成最终的系统镜像..."
         if ! make target/install -j$(nproc); then
