@@ -1152,4 +1152,42 @@ else
     echo "⚠️ 警告：在 $REAL_AIC_MAKEFILE 未找到该组件，请确认源码路径！"
 fi
 
+# =================================================================================
+# 下载 RK3528 RNG 驱动到 OpenWrt 正确位置，并且生成硬件随机数补丁包
+# =================================================================================
+
+mkdir -p target/linux/rockchip/files/drivers/char/hw_random
+wget -O target/linux/rockchip/files/drivers/char/hw_random/rockchip-rng.c https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/files/drivers/char/hw_random/rockchip-rng.c
+
+# 验证是否下载成功
+if [ -f target/linux/rockchip/files/drivers/char/hw_random/rockchip-rng.c ]; then
+    echo "OK: rockchip-rng.c 下载成功"
+else
+    echo "ERROR: 下载失败"
+fi
+
+# 创建内核补丁目录（如果不存在）
+mkdir -p target/linux/rockchip/patches-6.12
+
+# 动态生成内核补丁，告诉 Makefile 去编译下载的 rockchip-rng.c
+cat << 'EOF' > target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch
+--- a/drivers/char/hw_random/Makefile
++++ b/drivers/char/hw_random/Makefile
+@@ -1,3 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
+ #
+ # Makefile for HW Random Number Generator (RNG) device drivers.
++
++obj-$(CONFIG_HW_RANDOM) += rockchip-rng.o
+EOF
+
+# 验证补丁是否生成成功
+if [ -f target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch ]; then
+    echo "OK: Makefile 编译补丁生成成功"
+else
+    echo "ERROR: 补丁生成失败"
+fi
+
+# =================================================================================
+
 echo "🚀 H29K 极致稳健的流媒体边缘切换矩阵离线改造，全部大功告成！"
