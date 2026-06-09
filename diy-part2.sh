@@ -1153,7 +1153,7 @@ else
 fi
 
 # =================================================================================
-# 下载 RK3528 RNG 驱动到 OpenWrt 正确位置，并且放置硬件随机数补丁包
+# 下载 RK3528 RNG 驱动到 OpenWrt 正确位置，并且放置 Kbuild 文件，内核构建系统（Kbuild）会优先读取 Kbuild 文件
 # =================================================================================
 
 mkdir -p target/linux/rockchip/files/drivers/char/hw_random
@@ -1166,14 +1166,11 @@ else
     echo "ERROR: 下载失败"
 fi
 
-# 创建内核补丁目录（如果不存在）
-mkdir -p target/linux/rockchip/patches-6.12
-
-wget -O target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch
+wget -O target/linux/rockchip/files/drivers/char/hw_random/Kbuild https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/files/drivers/char/hw_random/Kbuild
 
 # 验证是否下载成功
-if [ -f target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch ]; then
-    echo "OK: rockchip-rng 补丁下载成功"
+if [ -f target/linux/rockchip/files/drivers/char/hw_random/Kbuild ]; then
+    echo "OK: Kbuild 文件下载成功"
 else
     echo "ERROR: 下载失败"
 fi
