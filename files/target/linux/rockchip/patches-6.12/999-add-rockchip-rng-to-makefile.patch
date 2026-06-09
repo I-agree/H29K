@@ -1,0 +1,7 @@
+--- a/drivers/char/hw_random/Makefile
++++ b/drivers/char/hw_random/Makefile
+@@ -1,3 +1,4 @@
+ # SPDX-License-Identifier: GPL-2.0
++obj-$(CONFIG_HW_RANDOM) += rockchip-rng.o
+ #
+ # Makefile for HW Random Number Generator (RNG) device drivers.
