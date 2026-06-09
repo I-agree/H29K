@@ -1,5 +1,0 @@
-# 1. 强制引入原厂的 Makefile（确保内核原装的 rng_core.o 等核心驱动正常编译）
-include $(src)/Makefile
-
-# 2. 追加编译 Rockchip 硬件随机数驱动
-obj-$(CONFIG_HW_RANDOM) += rockchip-rng.o
