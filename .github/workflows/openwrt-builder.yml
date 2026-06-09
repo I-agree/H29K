@@ -177,8 +177,8 @@ jobs:
         echo -e "$(nproc) thread compile"
         
         echo "🛠️ [步骤 1/3] 全速轰炸编译交叉编译工具链（此时无内核配置干扰）..."
-        make tools/compile -j$(nproc)
-        make toolchain/compile -j$(nproc)
+        make tools/install -j$(nproc)
+        make toolchain/install -j$(nproc)
         
         echo "🤖 [步骤 2/3] 工具链已就位！使用真实交叉编译器精准校准内核..."
         make target/linux/refresh V=w
