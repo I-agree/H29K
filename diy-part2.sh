@@ -1169,23 +1169,13 @@ fi
 # 创建内核补丁目录（如果不存在）
 mkdir -p target/linux/rockchip/patches-6.12
 
-# 动态生成内核补丁，告诉 Makefile 去编译下载的 rockchip-rng.c
-cat << 'EOF' > target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch
---- a/drivers/char/hw_random/Makefile
-+++ b/drivers/char/hw_random/Makefile
-@@ -1,3 +1,5 @@
- # SPDX-License-Identifier: GPL-2.0
- #
- # Makefile for HW Random Number Generator (RNG) device drivers.
-+
-+obj-$(CONFIG_HW_RANDOM) += rockchip-rng.o
-EOF
+wget -O target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch
 
-# 验证补丁是否生成成功
+# 验证是否下载成功
 if [ -f target/linux/rockchip/patches-6.12/999-add-rockchip-rng-to-makefile.patch ]; then
-    echo "OK: Makefile 编译补丁生成成功"
+    echo "OK: rockchip-rng 补丁下载成功"
 else
-    echo "ERROR: 补丁生成失败"
+    echo "ERROR: 下载失败"
 fi
 
 # =================================================================================
