@@ -355,7 +355,7 @@
 			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none_drv_level_2>;
 		};
 		lcd_bl_pin: lcd-bl-pin {
-			rockchip,pins = <0 RK_PA1 1 &pcfg_pull_none_drv_level_2>; /* 修复：RK_FUNC_PWM5 修改为复用数字 1 */
+			rockchip,pins = <0 RK_PA1 1 &pcfg_pull_none_drv_level_2>;
 		};
 	};
 };
