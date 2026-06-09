@@ -1152,29 +1152,4 @@ else
     echo "⚠️ 警告：在 $REAL_AIC_MAKEFILE 未找到该组件，请确认源码路径！"
 fi
 
-# =================================================================================
-# 下载 RK3528 RNG 驱动到 OpenWrt 正确位置，并且放置 Kbuild 文件，内核构建系统（Kbuild）会优先读取 Kbuild 文件
-# =================================================================================
-
-mkdir -p target/linux/rockchip/files/drivers/char/hw_random
-wget -O target/linux/rockchip/files/drivers/char/hw_random/rockchip-rng.c https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/files/drivers/char/hw_random/rockchip-rng.c
-
-# 验证是否下载成功
-if [ -f target/linux/rockchip/files/drivers/char/hw_random/rockchip-rng.c ]; then
-    echo "OK: rockchip-rng.c 下载成功"
-else
-    echo "ERROR: 下载失败"
-fi
-
-wget -O target/linux/rockchip/files/drivers/char/hw_random/Kbuild https://raw.githubusercontent.com/I-agree/H29K/main/files/target/linux/rockchip/files/drivers/char/hw_random/Kbuild
-
-# 验证是否下载成功
-if [ -f target/linux/rockchip/files/drivers/char/hw_random/Kbuild ]; then
-    echo "OK: Kbuild 文件下载成功"
-else
-    echo "ERROR: 下载失败"
-fi
-
-# =================================================================================
-
 echo "🚀 H29K 极致稳健的流媒体边缘切换矩阵离线改造，全部大功告成！"
