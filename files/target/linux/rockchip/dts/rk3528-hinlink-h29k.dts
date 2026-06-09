@@ -499,10 +499,10 @@
 	rng: rng@ffc50000 {
 		compatible = "rockchip,rkrng";
 		reg = <0x0 0xffc50000 0x0 0x200>;
-		interrupts = <0 23 4>; /* GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH 的硬编码写法 */
-		clocks = <&scmi_clk 32>; /* 32 对应 LEDE 中的 SCMI_HCLK_TRNG */
+		interrupts = <0 23 4>;
+		clocks = <&scmi_clk 32>;
 		clock-names = "hclk_trng";
-		resets = <&cru 0xa3>;    /* 0xa3 对应 LEDE 中的 SRST_HRESETN_TRNG_NS (0x000000A3) */
+		resets = <&cru 0xa3>;
 		reset-names = "reset";
 		status = "okay";
 	};
