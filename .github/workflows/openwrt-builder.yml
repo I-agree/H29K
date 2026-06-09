@@ -186,7 +186,7 @@ jobs:
         echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
         make target/linux/compile -j1 V=s
         
-        # ✅【创建 root-rockchip 目录结构】
+        # ✅【关键步骤：提前触发核心目录树及底层初始化】
         make target/compile -j$(nproc)
         
         echo "🚀 [专项环境准备] 提前单挑解开 Go 编译器枷锁，确保后续狙击不落空..."
