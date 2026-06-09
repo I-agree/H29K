@@ -355,7 +355,7 @@
 			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none_drv_level_2>;
 		};
 		lcd_bl_pin: lcd-bl-pin {
-			rockchip,pins = <0 RK_PA1 RK_FUNC_PWM5 &pcfg_pull_none_drv_level_2>;
+			rockchip,pins = <0 RK_PA1 1 &pcfg_pull_none_drv_level_2>; /* 修复：RK_FUNC_PWM5 修改为复用数字 1 */
 		};
 	};
 };
@@ -377,10 +377,6 @@
 &pwm5 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&lcd_bl_pin>;
-	status = "okay";
-};
-
-&rng {
 	status = "okay";
 };
 
@@ -458,10 +454,6 @@
 	};
 };
 
-&tsadc {
-	status = "okay";
-};
-
 &uart0 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart0m0_xfer>;
@@ -478,33 +470,6 @@
 &uart2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart2m0_xfer>;
-	status = "okay";
-};
-
-&usb2phy {
-	status = "okay";
-};
-
-&usb2phy_host {
-	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
-};
-
-&usb2phy_otg {
-	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
-};
-
-&usb_host0_ehci {
-	status = "okay";
-};
-
-&usb_host0_ohci {
-	status = "okay";
-};
-
-&usb_host0_xhci {
-	dr_mode = "host";
 	status = "okay";
 };
 
