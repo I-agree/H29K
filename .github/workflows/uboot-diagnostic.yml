@@ -24,7 +24,7 @@ jobs:
 
     steps:
     - name: 检出源码
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6.0.3
 
     - name: 准备大盘工作目录与物理 Swap
       run: |
@@ -148,7 +148,7 @@ jobs:
         cat $GITHUB_WORKSPACE/uboot_diagnostic.txt
 
     - name: 📤 上传 U-Boot 专项排错日志与诊断报告
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       if: always()
       with:
         name: Hinlink_H29K_U-Boot诊断数据包
