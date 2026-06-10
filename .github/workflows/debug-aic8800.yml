@@ -19,7 +19,7 @@ jobs:
 
     steps:
     - name: 1. 检出本地配置
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6.0.3
 
     - name: 2. 初始化高容错大盘环境 (带 Swap 固若金汤)
       run: |
