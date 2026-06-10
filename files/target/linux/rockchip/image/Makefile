@@ -3,7 +3,7 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
-DEVICE_VARS += UBOOT_DEVICE_NAME
+DEVICE_VARS += UBOOT_DEVICE_NAME GUID
 
 # ==============================================================================
 # 🛠️ 核心修复：重写 DTB 编译基础设施，彻底打通 C 预处理器（CPP）的内核头文件通道
