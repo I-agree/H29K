@@ -3,7 +3,7 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
 
-DEVICE_VARS += UBOOT_DEVICE_NAME GUID
+DEVICE_VARS += UBOOT_DEVICE_NAME
 
 # ==============================================================================
 # 🛠️ 核心修复：重写 DTB 编译基础设施，彻底打通 C 预处理器（CPP）的内核头文件通道
@@ -58,7 +58,7 @@ define Build/pine64-img
 	# http://opensource.rock-chips.com/wiki_Boot_option#Boot_flow
 	#
 	# U-Boot SPL expects the U-Boot ITB to be located at sector 0x4000 (8 MiB) on the MMC storage
-	PADDING=1 $(SCRIPT_DIR)/gen_image_generic.sh \
+	GUID="54444e4b-5341-4c41-4d41-4e44414e4749" PADDING=1 $(SCRIPT_DIR)/gen_image_generic.sh \
 		$@ \
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
@@ -83,7 +83,7 @@ define Build/pine64-bin
 	# Generate a new partition table in $@ with 32 MiB of alignment
 	# padding for the idbloader, uboot and trust image to fit:
 	# http://opensource.rock-chips.com/wiki_Boot_option#Boot_flow
-	PADDING=1 $(SCRIPT_DIR)/gen_image_generic.sh \
+	GUID="54444e4b-5341-4c41-4d41-4e44414e4749" PADDING=1 $(SCRIPT_DIR)/gen_image_generic.sh \
 		$@ \
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
@@ -100,7 +100,6 @@ define Device/Default
   PROFILES := Default
   KERNEL := kernel-bin
   IMAGES := sysupgrade.img.gz
-  GUID := 54444e4b-5341-4c41-4d41-4e44414e4749
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
 endef
