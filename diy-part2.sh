@@ -5,7 +5,7 @@
 
 set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终止
 
-# ======================== 【0. 🚀 编译期：最新稳定版动态嗅探与自愈中心】 ========================
+# ======================== 【1. 🚀 编译期：最新稳定版动态嗅探与自愈中心】 ========================
 echo "🔍 正在动态获取互联网当前最新的稳定版版本号..."
 
 # 🌟【自愈】防止 GitHub Actions 共享 IP 触发 API 限流时导致 grep 失败
@@ -69,66 +69,6 @@ sudo docker run --privileged --rm tonistiigi/binfmt --install arm64
 
 # --- 下面是 Docker 编译命令 ---
 docker buildx build --platform linux/arm64 -f Dockerfile.alpine -t h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} --load .
-
-# ======================== 【1. 统一下载与文件校验中心】 ========================
-echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
-
-# 创建全局所需的所有目录架构 (新增 files/www 网页容器支撑)
-mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
-         package/boot/uboot-rockchip/configs \
-         package/boot/uboot-rockchip/dts \
-         target/linux/rockchip/image \
-         files/etc/config/screen \
-         files/etc/docker/mediamtx \
-         files/etc/init.d \
-         files/etc/fonts/conf.d \
-         files/usr/bin \
-         files/www \
-         files/usr/share/docker-images
-
-BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main/files"
-LOGO_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
-
-# [工具函数] 统一的下载与基础大小校验
-download_and_check() {
-    local url="$1"
-    local dest="$2"
-    echo "正在下载: $dest ..."
-    if ! curl -fsSL --retry 3 --retry-delay 2 --connect-timeout 10 "$url" -o "$dest"; then
-        echo "❌ 错误: $url 网络请求或连接失败！"
-        exit 1
-    fi
-    if [ ! -s "$dest" ]; then
-        echo "❌ 错误: $dest 下载成功但文件为空！"
-        exit 1
-    fi
-}
-
-# --- 批量下载核心底座组件 ---
-download_and_check "${BASE_URL}/target/linux/rockchip/dts/rk3528-hinlink-h29k.dts" "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig" "package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig"
-download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
-download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/rockchip/Makefile"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
-download_and_check "${BASE_URL}/package/boot/uboot-tools/Makefile" "package/boot/uboot-tools/Makefile"
-download_and_check "${BASE_URL}/target/linux/rockchip/image/Makefile" "target/linux/rockchip/image/Makefile"
-download_and_check "${BASE_URL}/target/linux/rockchip/image/mmc.bootscript" "target/linux/rockchip/image/mmc.bootscript"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
-
-# --- 深度内容专项校验 ---
-if grep -q "hinlink_h28k" "target/linux/rockchip/image/armv8.mk"; then
-    echo "❌ 错误: armv8.mk 包含非法内容 (h28k)" && exit 1
-fi
-if ! grep -q "智能识别 Binman 合体固件或传统拆分固件" "target/linux/rockchip/image/Makefile"; then
-    echo "❌ 错误: Makefile 核心打包规则不匹配" && exit 1
-fi
-
-# --- 统一拉取应用层开机 LOGO 组 ---
-for i in 1 2 3; do
-    download_and_check "${LOGO_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg"
-done
-
-echo "✅ 所有外部资源下载并校验通过！"
 
 # ======================== 【2. 清理原生冲突架构源】 ========================
 echo "🧹 正在清理原生冲突的架构补丁..."
