@@ -83,7 +83,7 @@ jobs:
         sudo timedatectl set-timezone "$TZ"
 
     - name: 恢复/持久化 ccache 缓存
-      uses: actions/cache@v4
+      uses: actions/cache@v5.0.5
       with:
         path: ${{ env.CCACHE_DIR }}
         key: ${{ runner.os }}-openwrt-ccache-${{ env.REPO_BRANCH }}-${{ hashFiles('**/*.config', '**/diy-part2.sh') }}
