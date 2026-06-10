@@ -9,10 +9,8 @@ fi
 OUTPUT="$1"
 KERNELSIZE="$2"
 KERNELDIR="$3"
-KERNELPARTTYPE=${KERNELPARTTYPE:-83}
 ROOTFSSIZE="$4"
 ROOTFSIMAGE="$5"
-ROOTFSPARTTYPE=${ROOTFSPARTTYPE:-83}
 ALIGN="$6"
 
 rm -f "$OUTPUT"
@@ -21,12 +19,17 @@ head=16
 sect=63
 
 # create partition table
-set $(ptgen -o "$OUTPUT" -h $head -s $sect ${GUID:+-g} -t "${KERNELPARTTYPE}" -p "${KERNELSIZE}m${PARTOFFSET:+@$PARTOFFSET}" -t "${ROOTFSPARTTYPE}" -p "${ROOTFSSIZE}m" ${ALIGN:+-l $ALIGN} ${SIGNATURE:+-S 0x$SIGNATURE} ${GUID:+-G $GUID})
+# 🛠️ 核心修复：GPT 模式下使用绝对偏移 @32m，不再使用 -l 产生恶心的 BIOS Boot 伪分区
+if [ -n "$GUID" ]; then
+    set $(ptgen -o "$OUTPUT" -h $head -s $sect -g -p "${KERNELSIZE}m@32m" -p "${ROOTFSSIZE}m" ${SIGNATURE:+-S 0x$SIGNATURE} -G "$GUID")
+else
+    set $(ptgen -o "$OUTPUT" -h $head -s $sect -p "${KERNELSIZE}m" -p "${ROOTFSSIZE}m" ${ALIGN:+-l $ALIGN} ${SIGNATURE:+-S 0x$SIGNATURE})
+fi
 
 KERNELOFFSET="$(($1 / 512))"
 KERNELSIZE="$2"
 ROOTFSOFFSET="$(($3 / 512))"
-ROOTFSSIZE="$(($4 / 512))"
+ROOTFSSIZE="$4"
 
 # Using mcopy -s ... is using READDIR(3) to iterate through the directory
 # entries, hence they end up in the FAT filesystem in traversal order which
@@ -50,7 +53,7 @@ dos_dircopy() {
 dd if="$ROOTFSIMAGE" of="$OUTPUT" bs=512 seek="$ROOTFSOFFSET" conv=notrunc
 
 if [ -n "$GUID" ]; then
-    [ -n "$PADDING" ] && dd if=/dev/zero of="$OUTPUT" bs=512 seek="$((ROOTFSOFFSET + ROOTFSSIZE))" conv=notrunc count="$sect"
+    # 🛠️ 核心修复：彻底删除了原本会将 Backup GPT 清零的 dd 毁灭命令，誓死保卫末尾的 GPT 备份表！
     mkfs.fat --invariant -n kernel -C "$OUTPUT.kernel" -S 512 "$((KERNELSIZE / 1024))"
     LC_ALL=C dos_dircopy "$KERNELDIR" /
 else
