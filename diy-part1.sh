@@ -24,4 +24,26 @@ git clone https://github.com/I-agree/luci-app-bluetooth.git package/luci-app-blu
 # === 5. 磁盘扩容
 git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
 
+# ==============================================================================
+# 🛠️ 自动同步官方 main 分支最新的 uboot-tools 文件夹
+# ==============================================================================
+
+# 1. 强力清理本地原有的 uboot-tools 文件夹（防止旧文件残留导致冲突）
+rm -rf package/boot/uboot-tools
+
+# 2. 使用 Git 稀疏模式克隆官方仓库的 main 分支（只拉取元数据，不下载文件主体）
+git clone --branch main --depth=1 --filter=blob:none --sparse https://github.com/openwrt/openwrt.git tmp/openwrt-main
+
+# 3. 进入临时目录，精准命中并只检出 package/boot/uboot-tools 文件夹
+cd tmp/openwrt-main
+git sparse-checkout set package/boot/uboot-tools
+cd ../..
+
+# 4. 确保本地父目录存在，将完美的 uboot-tools 移动到本地，并彻底销毁临时垃圾
+mkdir -p package/boot
+mv tmp/openwrt-main/package/boot/uboot-tools package/boot/
+rm -rf tmp/openwrt-main
+
+# ==============================================================================
+
 echo "🚀 [diy-part1.sh] 软件源与独立包预处理圆满完成！"
