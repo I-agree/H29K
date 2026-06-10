@@ -257,7 +257,7 @@ jobs:
       run: df -hT
 
     - name: 上传 bin 目录（使用绝对路径，防止软连接失效导致空包）
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6.0.3
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
         name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
@@ -273,7 +273,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: 上传固件输出目录
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
@@ -288,7 +288,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: 上传固件至 GitHub Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3.0.0
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -298,16 +298,7 @@ jobs:
         files: ${{ env.FIRMWARE }}/*
 
     - name: 清理历史工作流运行记录
-      uses: Mattraks/delete-workflow-runs@main
+      uses: Mattraks/delete-workflow-runs@v2.1.0
       with:
         retain_days: 0
         keep_minimum_runs: 2
-
-    - name: 清理旧版 GitHub Release
-      uses: dev-drprasad/delete-older-releases@master
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      with:
-        keep_latest: 3
-        delete_tags: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
