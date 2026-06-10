@@ -77,11 +77,13 @@ define Build/Configure
 		--disable TOOLS_MKEFICAPSULE
 endef
 
+# 🚀 【核心修改点】在这里注入强制拦截命令
 MAKE_FLAGS += \
 	ARCH="sandbox" \
 	TARGET_CFLAGS="$(TARGET_CFLAGS)" \
 	TARGET_LDFLAGS="$(TARGET_LDFLAGS)" \
 	PKG_CONFIG_SYSROOT_DIR="$(STAGING_DIR_HOST)" \
+	cmd_genenv="touch $(PKG_BUILD_DIR)/u-boot-initial-env" \
 	NO_PYTHON=1 \
 	V=$(if $(findstring c,$(OPENWRT_VERBOSE)),1,)
 
