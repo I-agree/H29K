@@ -133,8 +133,8 @@ jobs:
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         echo "CONFIG_CCACHE=y" >> .config
-        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
-        mkdir -p $CCACHE_DIR
+        echo 'CONFIG_CCACHE_DIR="${{ env.CCACHE_DIR }}"' >> .config
+        mkdir -p ${{ env.CCACHE_DIR }}
 
     - name: 主线内核智能补全与下载依赖软件
       id: package
