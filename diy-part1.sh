@@ -106,18 +106,30 @@ if ! grep -q "智能识别 Binman 合体固件或传统拆分固件" "target/lin
     echo "❌ 错误: Makefile 核心打包规则不匹配" && exit 1
 fi
 
-# ===================== 新增：校验 uboot-tools 核心修改点 =====================
+# ===================== 更新：校验 uboot-tools 核心修改点 =====================
 UBOOT_MAKEFILE="package/boot/uboot-tools/Makefile"
 
-# 校验1：已删除 PKG_CONFIG_SYSROOT_DIR（不该存在）
-if grep -q "PKG_CONFIG_SYSROOT_DIR" "$UBOOT_MAKEFILE"; then
-    echo "❌ 校验失败：$UBOOT_MAKEFILE 仍存在 PKG_CONFIG_SYSROOT_DIR，核心修改未生效！"
+# 校验1：PKG_CONFIG_SYSROOT_DIR 已安全置空（不能是原版的 STAGING_DIR_HOST，也不能被彻底删掉导致语法断裂）
+if ! grep -q 'PKG_CONFIG_SYSROOT_DIR=""' "$UBOOT_MAKEFILE"; then
+    echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 PKG_CONFIG_SYSROOT_DIR=\"\"，环境未安全置空！"
     exit 1
 fi
 
-# 校验2：已禁用 EFI 胶囊工具（修复grep参数问题）
+# 校验2：已禁用 EFI 胶囊工具
 if ! grep -F -- "--disable TOOLS_MKEFICAPSULE" "$UBOOT_MAKEFILE"; then
     echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 --disable TOOLS_MKEFICAPSULE，EFI 工具未禁用！"
+    exit 1
+fi
+
+# 校验3：死循环拦截参数已挂载（无空格安全命令）
+if ! grep -q "cmd_genenv=:" "$UBOOT_MAKEFILE"; then
+    echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 cmd_genenv=:，死循环拦截未生效！"
+    exit 1
+fi
+
+# 校验4：提前伪造环境文件逻辑已注入
+if ! grep -q "touch \$(PKG_BUILD_DIR)/u-boot-initial-env" "$UBOOT_MAKEFILE"; then
+    echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 touch 伪造环境命令，编译将因缺少环境文件报错！"
     exit 1
 fi
 
