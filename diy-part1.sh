@@ -106,6 +106,24 @@ if ! grep -q "智能识别 Binman 合体固件或传统拆分固件" "target/lin
     echo "❌ 错误: Makefile 核心打包规则不匹配" && exit 1
 fi
 
+# ===================== 新增：校验 uboot-tools 核心修改点 =====================
+UBOOT_MAKEFILE="package/boot/uboot-tools/Makefile"
+
+# 校验1：已删除 PKG_CONFIG_SYSROOT_DIR（不该存在）
+if grep -q "PKG_CONFIG_SYSROOT_DIR" "$UBOOT_MAKEFILE"; then
+    echo "❌ 校验失败：$UBOOT_MAKEFILE 仍存在 PKG_CONFIG_SYSROOT_DIR，核心修改未生效！"
+    exit 1
+fi
+
+# 校验2：已禁用 EFI 胶囊工具（必须存在禁用项）
+if ! grep -q "--disable TOOLS_MKEFICAPSULE" "$UBOOT_MAKEFILE"; then
+    echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 --disable TOOLS_MKEFICAPSULE，EFI 工具未禁用！"
+    exit 1
+fi
+
+echo "✅ uboot-tools/Makefile 核心修改点校验通过"
+# ============================================================================
+
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
     download_and_check "${LOGO_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg"
