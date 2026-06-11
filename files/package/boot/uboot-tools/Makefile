@@ -77,17 +77,19 @@ define Build/Configure
 		--disable TOOLS_MKEFICAPSULE
 endef
 
-# 🚀 【核心修改点】在这里注入强制拦截命令
+# 🚀 cmd_genenv 统一转为无空格的空命令 `:`，彻底终结多层 Make 递归的解包死循环
 MAKE_FLAGS += \
 	ARCH="sandbox" \
 	TARGET_CFLAGS="$(TARGET_CFLAGS)" \
 	TARGET_LDFLAGS="$(TARGET_LDFLAGS)" \
 	PKG_CONFIG_SYSROOT_DIR="" \
-	cmd_genenv="touch $(PKG_BUILD_DIR)/u-boot-initial-env" \
+	cmd_genenv=: \
 	NO_PYTHON=1 \
 	V=$(if $(findstring c,$(OPENWRT_VERBOSE)),1,)
 
 define Build/Compile
+	# ⚡ 【提前拦截】在底层 Make 跑起来之前，由宿主机 Shell 将假环境文件创建出来
+	touch $(PKG_BUILD_DIR)/u-boot-initial-env
 
 ifneq ($(CONFIG_PACKAGE_uboot-envtools),)
 	$(call Build/Compile/Default,envtools)
