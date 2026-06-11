@@ -15,8 +15,8 @@ env:
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
-  WORK_DIR: /mnt/workdir
-  CCACHE_DIR: /mnt/ccache
+  WORK_DIR: /workdir
+  CCACHE_DIR: /ccache
 
 jobs:
   build:
@@ -30,45 +30,30 @@ jobs:
     - name: 检出源码
       uses: actions/checkout@v6.0.3
 
-    - name: 准备大盘工作目录（强制Go/Docker全走大盘，重构物理Swap永不卡死）
+    - name: 创建大空间根目录和临时盘目录
       run: |
-        sudo mkdir -p $WORK_DIR $CCACHE_DIR /mnt/tmp
-        sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR /mnt/tmp
-        sudo mount --bind /mnt/tmp /tmp
-        sudo mount --bind /mnt/tmp /var/tmp
-        
-        # 强制恢复 system 标准临时目录权限，防止底层安全组件权限不足导致构建死锁
-        sudo chmod 1777 /tmp
-        sudo chmod 1777 /var/tmp
+        sudo mkdir -p $WORK_DIR $CCACHE_DIR
+        sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR
         
         # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
         echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
         # 1. 停用系统可能存在的零碎、低效旧交换分区
         sudo swapoff -a || true
-        # 2. Directly 在独立大盘 /mnt 上划出 8GB 专属全量 Swap 空间，为极端多包并发提供绝对容错兜底
-        sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=8192
-        sudo chmod 600 /mnt/swapfile
-        sudo mkswap /mnt/swapfile
-        sudo swapon /mnt/swapfile
+        # 2. 划出 4GB 专属全量 Swap 空间
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
         # 3. 强行修改内核虚拟内存激进系数（从默认 60 压榨到 10）
         # 迫使 CPU 优先榨干物理内存，不到最后一刻绝不读写硬盘，从底层物理掐断 Swap 造成的 I/O 假死
         sudo sysctl vm.swappiness=10
-        echo "✅ Swap 扩容 8GB 且 swappiness=10 校准完毕！"
+        echo "✅ Swap 扩容 4GB 且 swappiness=10 校准完毕！"
         
-        # 关闭 Git 密码终端交互，如果遇到坏包凭证错误立刻弹回报错，绝不后台死等
-        echo "GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
-        
-        export TMPDIR=/mnt/tmp
-        export TEMP=/mnt/tmp
-        export TMP=/mnt/tmp
-        export GO_TMPDIR=/mnt/tmp
-        export CGO_TMPDIR=/mnt/tmp
+        echo "📊 检查当前磁盘空间分布："
         df -h
+        # 写入环境变量以便后续步骤继承
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
         echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
-        echo "TMPDIR=/mnt/tmp" >> $GITHUB_ENV
-        echo "GO_TMPDIR=/mnt/tmp" >> $GITHUB_ENV
-        echo "CGO_TMPDIR=/mnt/tmp" >> $GITHUB_ENV
 
     - name: 初始化构建环境
       env:
@@ -173,7 +158,7 @@ jobs:
       id: compile
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        ccache -M 9G
+        ccache -M 5G
         echo -e "$(nproc) thread compile"
         
         echo "🛠️ [步骤 1/3] 全速轰炸编译交叉编译工具链（此时无内核配置干扰）..."
