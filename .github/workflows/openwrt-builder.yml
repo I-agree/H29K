@@ -16,7 +16,6 @@ env:
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
-  CCACHE_DIR: /ccache
 
 jobs:
   build:
@@ -30,10 +29,10 @@ jobs:
     - name: 检出源码
       uses: actions/checkout@v6.0.3
 
-    - name: 创建大空间根目录和临时盘目录
+    - name: 调整磁盘空间
       run: |
-        sudo mkdir -p $WORK_DIR $CCACHE_DIR
-        sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
         
         # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
         echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
@@ -53,7 +52,6 @@ jobs:
         df -h
         # 写入环境变量以便后续步骤继承
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
-        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
 
     - name: 初始化构建环境
       env:
@@ -66,14 +64,6 @@ jobs:
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-
-    - name: 恢复/持久化 ccache 缓存
-      uses: actions/cache@v5.0.5
-      with:
-        path: ${{ env.CCACHE_DIR }}
-        key: ${{ runner.os }}-openwrt-ccache-${{ env.REPO_BRANCH }}-${{ hashFiles('**/*.config', '**/diy-part2.sh') }}
-        restore-keys: |
-          ${{ runner.os }}-openwrt-ccache-${{ env.REPO_BRANCH }}-
 
     - name: 查看编译环境硬件规格 (CPU/内存)
       run: |
@@ -114,13 +104,6 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 启用 ccache 加速（大盘）
-      run: |
-        cd ${{ env.WORK_DIR }}/openwrt
-        echo "CONFIG_CCACHE=y" >> .config
-        echo 'CONFIG_CCACHE_DIR="${{ env.CCACHE_DIR }}"' >> .config
-        mkdir -p ${{ env.CCACHE_DIR }}
-
     - name: 主线内核智能补全与下载依赖软件
       id: package
       run: |
@@ -158,7 +141,6 @@ jobs:
       id: compile
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        ccache -M 5G
         echo -e "$(nproc) thread compile"
         
         echo "🛠️ [步骤 1/3] 全速轰炸编译交叉编译工具链（此时无内核配置干扰）..."
