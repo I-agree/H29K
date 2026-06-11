@@ -115,8 +115,8 @@ if grep -q "PKG_CONFIG_SYSROOT_DIR" "$UBOOT_MAKEFILE"; then
     exit 1
 fi
 
-# 校验2：已禁用 EFI 胶囊工具（必须存在禁用项）
-if ! grep -q "--disable TOOLS_MKEFICAPSULE" "$UBOOT_MAKEFILE"; then
+# 校验2：已禁用 EFI 胶囊工具（修复grep参数问题）
+if ! grep -F -- "--disable TOOLS_MKEFICAPSULE" "$UBOOT_MAKEFILE"; then
     echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 --disable TOOLS_MKEFICAPSULE，EFI 工具未禁用！"
     exit 1
 fi
