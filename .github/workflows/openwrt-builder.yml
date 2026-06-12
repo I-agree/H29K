@@ -212,9 +212,9 @@ jobs:
         make package/install -j$(nproc) || make package/install -j1 V=s
 
         echo "📦 [总攻阶段 2/3] 固件合体：打包并生成最终的系统镜像..."
-        if ! make target/install -j$(nproc); then
+        if ! make target/install -j$(nproc) > target_install.log 2>&1; then
             echo -e "\n\n❌ [自动熔断] 固件打包或内核安装阶段失败！"
-            make target/install -j1 V=s
+            make target/install -j1 V=s > target_install.log 2>&1
             exit 1
         fi
 
