@@ -11,9 +11,9 @@ touch /etc/config/ubootenv
 board=$(board_name)
 
 case "$board" in
-hinlink,h29k)
-	# 🎯 精准适配 H29K GPT 分区布局：固定读写第 2 分区，偏移量 0x0，大小 32KB
-	ubootenv_add_uci_config "/dev/mmcblk0p2" "0x0" "0x8000"
+hinlink,h29k-rk3528)
+	# 🎯 与 U-Boot defconfig 严格对齐：整盘偏移 0x3f8000，大小 32KB
+	ubootenv_add_uci_config "/dev/mmcblk0" "0x3f8000" "0x8000"
 	;;
 xunlong,orangepi-r1-plus|\
 xunlong,orangepi-r1-plus-lts)
