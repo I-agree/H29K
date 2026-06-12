@@ -29,7 +29,7 @@ fi
 KERNELOFFSET="$(($1 / 512))"
 KERNELSIZE="$2"
 ROOTFSOFFSET="$(($3 / 512))"
-ROOTFSSIZE="$4"
+ROOTFSSIZE="$(($4 / 512))"
 
 # Using mcopy -s ... is using READDIR(3) to iterate through the directory
 # entries, hence they end up in the FAT filesystem in traversal order which
