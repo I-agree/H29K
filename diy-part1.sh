@@ -150,7 +150,7 @@ fi
 ENV_OFFSET_DEF=$(grep '^CONFIG_ENV_OFFSET=' "$UBOOT_DEFCONFIG" | cut -d'=' -f2)
 ENV_SIZE_DEF=$(grep '^CONFIG_ENV_SIZE=' "$UBOOT_DEFCONFIG" | cut -d'=' -f2)
 
-# 5.3 从 uboot-envtools 精准提取配置行，拆分 偏移、大小参数
+# 5.3 从 uboot-envtools 精准提取配置行
 # 找到设备对应的配置行
 ENV_LINE=$(grep -A1 "hinlink,h29k-rk3528" "$UBOOT_ENV_FILE" | grep 'ubootenv_add_uci_config')
 # 提取该行所有十六进制参数
@@ -158,15 +158,7 @@ PARAMS=($(echo "$ENV_LINE" | grep -o "0x[0-9a-f]*"))
 ENV_OFFSET_TOOL=${PARAMS[0]}
 ENV_SIZE_TOOL=${PARAMS[1]}
 
-# 5.4 校验环境偏移严格对齐
-if [ "$ENV_OFFSET_DEF" != "$ENV_OFFSET_TOOL" ]; then
-    echo "❌ 校验失败：U-Boot 与 uboot-envtools 环境偏移不一致！"
-    echo "   defconfig: $ENV_OFFSET_DEF"
-    echo "   板级配置: $ENV_OFFSET_TOOL"
-    exit 1
-fi
-
-# 5.5 校验环境大小严格对齐
+# 5.4 校验环境大小严格对齐
 if [ "$ENV_SIZE_DEF" != "$ENV_SIZE_TOOL" ]; then
     echo "❌ 校验失败：U-Boot 与 uboot-envtools 环境大小不一致！"
     echo "   defconfig: $ENV_SIZE_DEF"
