@@ -1,0 +1,27 @@
+#
+# Copyright (C) 2024 OpenWrt.org
+#
+[ -e /etc/config/ubootenv ] && exit 0
+
+touch /etc/config/ubootenv
+
+. /lib/uboot-envtools.sh
+. /lib/functions.sh
+
+board=$(board_name)
+
+case "$board" in
+hinlink,h29k)
+	# 🎯 精准适配 H29K GPT 分区布局：固定读写第 2 分区，偏移量 0x0，大小 32KB
+	ubootenv_add_uci_config "/dev/mmcblk0p2" "0x0" "0x8000"
+	;;
+xunlong,orangepi-r1-plus|\
+xunlong,orangepi-r1-plus-lts)
+	ubootenv_add_uci_config "/dev/mmcblk0" "0x3f8000" "0x8000"
+	;;
+esac
+
+config_load ubootenv
+config_foreach ubootenv_add_app_config
+
+exit 0
