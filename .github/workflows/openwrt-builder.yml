@@ -46,7 +46,7 @@ jobs:
         # 3. 强行修改内核虚拟内存激进系数（从默认 60 压榨到 10）
         # 迫使 CPU 优先榨干物理内存，不到最后一刻绝不读写硬盘，从底层物理掐断 Swap 造成的 I/O 假死
         sudo sysctl vm.swappiness=10
-        echo "✅ Swap 扩容至 4GB 且 swappiness=10 校准完毕！"
+        echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
         echo "📊 扩容系统全局 /tmp 至 16G"
         # 扩容系统默认 /tmp 临时分区（关键修复）
         sudo umount /tmp || true
