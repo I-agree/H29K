@@ -9,8 +9,10 @@ fi
 OUTPUT="$1"
 KERNELSIZE="$2"
 KERNELDIR="$3"
+KERNELPARTTYPE=${KERNELPARTTYPE:-83}
 ROOTFSSIZE="$4"
 ROOTFSIMAGE="$5"
+ROOTFSPARTTYPE=${ROOTFSPARTTYPE:-83}
 ALIGN="$6"
 
 rm -f "$OUTPUT"
@@ -19,11 +21,16 @@ head=16
 sect=63
 
 # create partition table
-# 🛠️ 核心修复：GPT 模式下使用绝对偏移 @32m，不再使用 -l 产生恶心的 BIOS Boot 伪分区
 if [ -n "$GUID" ]; then
-    set $(ptgen -o "$OUTPUT" -h $head -s $sect -g -p "${KERNELSIZE}m@32m" -p "${ROOTFSSIZE}m" ${SIGNATURE:+-S 0x$SIGNATURE} -G "$GUID")
+    set $(ptgen -o "$OUTPUT" -h $head -s $sect -g \
+        -t "${KERNELPARTTYPE}" -p "${KERNELSIZE}m${PARTOFFSET:+@$PARTOFFSET}" \
+        -t "${ROOTFSPARTTYPE}" -p "${ROOTFSSIZE}m" \
+        ${SIGNATURE:+-S 0x$SIGNATURE} -G "$GUID")
 else
-    set $(ptgen -o "$OUTPUT" -h $head -s $sect -p "${KERNELSIZE}m" -p "${ROOTFSSIZE}m" ${ALIGN:+-l $ALIGN} ${SIGNATURE:+-S 0x$SIGNATURE})
+    set $(ptgen -o "$OUTPUT" -h $head -s $sect \
+        -t "${KERNELPARTTYPE}" -p "${KERNELSIZE}m" \
+        -t "${ROOTFSPARTTYPE}" -p "${ROOTFSSIZE}m" \
+        ${ALIGN:+-l $ALIGN} ${SIGNATURE:+-S 0x$SIGNATURE})
 fi
 
 KERNELOFFSET="$(($1 / 512))"
@@ -53,11 +60,13 @@ dos_dircopy() {
 dd if="$ROOTFSIMAGE" of="$OUTPUT" bs=512 seek="$ROOTFSOFFSET" conv=notrunc
 
 if [ -n "$GUID" ]; then
-    # 🛠️ 核心修复：彻底删除了原本会将 Backup GPT 清零的 dd 毁灭命令，誓死保卫末尾的 GPT 备份表！
+    # 预留GPT备份表空间，修复文件末端错误
+    [ -n "$PADDING" ] && dd if=/dev/zero of="$OUTPUT" bs=512 seek="$((ROOTFSOFFSET + ROOTFSSIZE))" conv=notrunc count="$sect"
     mkfs.fat --invariant -F 32 -n kernel -C "$OUTPUT.kernel" -S 512 "$((KERNELSIZE / 1024))"
     LC_ALL=C dos_dircopy "$KERNELDIR" /
 else
     make_ext4fs -J -L kernel -l "$KERNELSIZE" ${SOURCE_DATE_EPOCH:+-T ${SOURCE_DATE_EPOCH}} "$OUTPUT.kernel" "$KERNELDIR"
 fi
+
 dd if="$OUTPUT.kernel" of="$OUTPUT" bs=512 seek="$KERNELOFFSET" conv=notrunc
 rm -f "$OUTPUT.kernel"
