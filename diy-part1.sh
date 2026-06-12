@@ -93,6 +93,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/li
 download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-tools/Makefile" "package/boot/uboot-tools/Makefile"
+download_and_check "${BASE_URL}/package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8" "package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/Makefile" "target/linux/rockchip/image/Makefile"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/mmc.bootscript" "target/linux/rockchip/image/mmc.bootscript"
 download_and_check "${BASE_URL}/scripts/gen_image_generic.sh" "scripts/gen_image_generic.sh"
