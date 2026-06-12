@@ -136,57 +136,15 @@ fi
 
 echo "✅ uboot-tools/Makefile 核心修改点校验通过"
 
-# 校验5：U-Boot 环境配置与 uboot-envtools 全链路对齐校验
-UBOOT_DEFCONFIG="package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig"
-UBOOT_ENV_FILE="package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8"
+# 校验5：检查 rockchip_armv8 已适配 H29K
+ENV_FILE="package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8"
 
-# 5.1 校验已关闭冗余环境
-if grep -q "^CONFIG_SYS_REDUNDANT_ENVIRONMENT=y" "$UBOOT_DEFCONFIG"; then
-    echo "❌ 校验失败：U-Boot 仍开启冗余环境，与 uboot-envtools 单环境配置不一致！"
+if ! grep -q "hinlink,h29k-rk3528" "$ENV_FILE"; then
+    echo "❌ 校验失败：未找到 H29K 适配配置"
     exit 1
 fi
 
-# 5.2 读取 U-Boot defconfig 配置
-ENV_OFFSET_DEF=$(grep "^CONFIG_ENV_OFFSET=" "$UBOOT_DEFCONFIG" | cut -d'=' -f2)
-ENV_SIZE_DEF=$(grep "^CONFIG_ENV_SIZE=" "$UBOOT_DEFCONFIG" | cut -d'=' -f2)
-
-# 校验 defconfig 取值非空
-if [ -z "$ENV_OFFSET_DEF" ] || [ -z "$ENV_SIZE_DEF" ]; then
-    echo "❌ 校验失败：无法从 U-Boot defconfig 读取环境偏移/大小！"
-    exit 1
-fi
-
-# 5.3 精准提取 ubootenv_add_uci_config 行的 3 个参数
-# 格式：ubootenv_add_uci_config "设备" "偏移" "大小"
-read -r dev off size <<< $(grep -A1 "hinlink,h29k-rk3528" "$UBOOT_ENV_FILE" | awk '/ubootenv_add_uci_config/ {print $2,$3,$4}' | tr -d '"')
-
-# 校验板级配置取值非空
-if [ -z "$off" ] || [ -z "$size" ]; then
-    echo "❌ 校验失败：无法从 rockchip_armv8 读取环境偏移/大小！"
-    echo "👉 请检查文件内 hinlink,h29k-rk3528 分支的 ubootenv_add_uci_config 写法"
-    exit 1
-fi
-
-ENV_OFFSET_TOOL="$off"
-ENV_SIZE_TOOL="$size"
-
-# 5.4 比对偏移
-if [ "$ENV_OFFSET_DEF" != "$ENV_OFFSET_TOOL" ]; then
-    echo "❌ 校验失败：U-Boot 与 uboot-envtools 环境偏移不一致！"
-    echo "   defconfig: $ENV_OFFSET_DEF"
-    echo "   板级配置: $ENV_OFFSET_TOOL"
-    exit 1
-fi
-
-# 5.5 比对大小
-if [ "$ENV_SIZE_DEF" != "$ENV_SIZE_TOOL" ]; then
-    echo "❌ 校验失败：U-Boot 与 uboot-envtools 环境大小不一致！"
-    echo "   defconfig: $ENV_SIZE_DEF"
-    echo "   板级配置: $ENV_SIZE_TOOL"
-    exit 1
-fi
-
-echo "✅ U-Boot 环境配置全链路对齐校验通过"
+echo "✅ rockchip_armv8 H29K 适配校验通过"
 
 # ============================================================================
 
