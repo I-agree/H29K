@@ -1,10 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0-only
-
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
-
 DEVICE_VARS += UBOOT_DEVICE_NAME
-
 # ==============================================================================
 # 🛠️ 核心修复：重写 DTB 编译基础设施，彻底打通 C 预处理器（CPP）的内核头文件通道
 # ==============================================================================
@@ -28,7 +25,6 @@ define Image/BuildDTB
 		-o $(2) $(2).tmp
 endef
 # ==============================================================================
-
 define Build/Compile
 	$(CP) $(LINUX_DIR)/COPYING $(KDIR)/COPYING.linux >/dev/null
 endef
@@ -39,7 +35,6 @@ define Build/boot-common
 	# and the kernel image (as kernel.img)
 	rm -fR $@.boot >/dev/null
 	mkdir -p $@.boot >/dev/null
-
 	$(CP) $(KDIR)/image-$(firstword $(notdir $(DEVICE_DTS))).dtb $@.boot/rockchip.dtb >/dev/null
 	$(CP) $(IMAGE_KERNEL) $@.boot/kernel.img >/dev/null
 endef
@@ -52,18 +47,16 @@ endef
 define Build/pine64-img
 	# Creates the final SD/eMMC images, 
 	# combining boot partition, root partition as well as the u-boot bootloader
-
 	# Generate a new partition table in $@ with 32 MiB of 
 	# alignment padding for the idbloader and u-boot to fit:
 	# http://opensource.rock-chips.com/wiki_Boot_option#Boot_flow
 	#
 	# U-Boot SPL expects the U-Boot ITB to be located at sector 0x4000 (8 MiB) on the MMC storage
-	GUID="54444e4b-5341-4c41-4d41-4e44414e4749" PADDING=1 $(SCRIPT_DIR)/gen_image_generic.sh \
+	GUID="54444e4b-5341-4c41-4d41-4e44414e4749" PADDING=1 PARTOFFSET=32m $(SCRIPT_DIR)/gen_image_generic.sh \
 		$@ \
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
-		32768 >/dev/null
-
+		>/dev/null
 	# 🛠️ 智能识别 Binman 合体固件或传统拆分固件
 	if [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
 		echo "Found Binman combined image, flashing..."; \
@@ -79,16 +72,14 @@ define Build/pine64-bin
 	# Typical Rockchip boot flow with Rockchip miniloader
 	# Rockchp idbLoader which is combinded by Rockchip ddr init bin
 	# and miniloader bin from Rockchip rkbin project
-
 	# Generate a new partition table in $@ with 32 MiB of alignment
 	# padding for the idbloader, uboot and trust image to fit:
 	# http://opensource.rock-chips.com/wiki_Boot_option#Boot_flow
-	GUID="54444e4b-5341-4c41-4d41-4e44414e4749" PADDING=1 $(SCRIPT_DIR)/gen_image_generic.sh \
+	GUID="54444e4b-5341-4c41-4d41-4e44414e4749" PADDING=1 PARTOFFSET=32m $(SCRIPT_DIR)/gen_image_generic.sh \
 		$@ \
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
-		32768 >/dev/null
-
+		>/dev/null
 	# Copy the idbloader, uboot and trust image to the image at sector 0x40, 0x4000 and 0x6000
 	dd if="$(STAGING_DIR_IMAGE)"/$(SOC)-idbloader.bin of="$@" seek=64 conv=notrunc status=none
 	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-uboot.img of="$@" seek=16384 conv=notrunc status=none
@@ -105,5 +96,4 @@ define Device/Default
 endef
 
 include $(SUBTARGET).mk
-
 $(eval $(call BuildImage))
