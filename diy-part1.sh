@@ -135,6 +135,27 @@ if ! grep -q "touch \$(PKG_BUILD_DIR)/u-boot-initial-env" "$UBOOT_MAKEFILE"; the
 fi
 
 echo "✅ uboot-tools/Makefile 核心修改点校验通过"
+
+# 校验5：uboot-envtools 板级配置已完成 H29K 适配
+UBOOT_ENV_FILE="package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8"
+
+if [ ! -f "$UBOOT_ENV_FILE" ]; then
+    echo "❌ 校验失败：$UBOOT_ENV_FILE 文件不存在，uboot-envtools 运行时将无法识别 H29K 设备！"
+    exit 1
+fi
+
+if ! grep -q "hinlink,h29k-rk3528" "$UBOOT_ENV_FILE"; then
+    echo "❌ 校验失败：$UBOOT_ENV_FILE 未添加 H29K 设备匹配项，fw_printenv/fw_setenv 将全部失效！"
+    exit 1
+fi
+
+if ! grep -q "ubootenv_add_uci_config.*/dev/mmcblk0p2" "$UBOOT_ENV_FILE"; then
+    echo "❌ 校验失败：$UBOOT_ENV_FILE 未配置正确的环境变量分区，读写会错位破坏分区表！"
+    exit 1
+fi
+
+echo "✅ uboot-envtools 板级配置 H29K 适配校验通过"
+
 # ============================================================================
 
 # --- 统一拉取应用层开机 LOGO 组 ---
