@@ -50,7 +50,7 @@ jobs:
         echo "📊 扩容系统全局 /tmp 至 8G"
         # 扩容系统默认 /tmp 临时分区（关键修复）
         sudo umount /tmp || true
-        sudo mount -t tmpfs tmpfs /tmp -o size=8G
+        sudo mount -t tmpfs tmpfs /tmp -o size=8G,nr_inodes=4000000
         echo "✅ /tmp 扩容至 8GB 完成"
         
         echo "📊 检查当前磁盘空间分布："
