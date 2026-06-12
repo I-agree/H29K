@@ -233,7 +233,7 @@ jobs:
       if: always()  # 无论编译是否成功都上传日志
       with:
         name: H29K_target_install_日志
-        path: ${{ github.workspace }}/target_install.log
+        path: ${{ env.WORK_DIR }}/openwrt/target_install.log
 
     - name: 检查磁盘空间使用情况
       if: (!cancelled())
