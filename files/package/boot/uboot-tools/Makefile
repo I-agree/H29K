@@ -77,7 +77,7 @@ define Build/Configure
 		--disable TOOLS_MKEFICAPSULE
 endef
 
-# 🚀 cmd_genenv 统一转为无空格的空命令 `:`，彻底终结多层 Make 递归的解包死循环
+# 🚀 cmd_genenv 统一转为无空格的空命令 `:`，彻底终结多层 Make 递归的解包死循环，另外强制关闭 u-boot 详细编译输出，仅保留错误
 MAKE_FLAGS += \
 	ARCH="sandbox" \
 	TARGET_CFLAGS="$(TARGET_CFLAGS)" \
@@ -85,7 +85,7 @@ MAKE_FLAGS += \
 	PKG_CONFIG_SYSROOT_DIR="" \
 	cmd_genenv=: \
 	NO_PYTHON=1 \
-	V=$(if $(findstring c,$(OPENWRT_VERBOSE)),1,)
+	V=0
 
 define Build/Compile
 	# ⚡ 【提前拦截】在底层 Make 跑起来之前，由宿主机 Shell 将假环境文件创建出来
