@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: GPL-2.0-only
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/image.mk
+
 DEVICE_VARS += UBOOT_DEVICE_NAME
+
 # ==============================================================================
 # 🛠️ 核心修复：重写 DTB 编译基础设施，彻底打通 C 预处理器（CPP）的内核头文件通道
 # ==============================================================================
@@ -25,6 +27,7 @@ define Image/BuildDTB
 		-o $(2) $(2).tmp
 endef
 # ==============================================================================
+
 define Build/Compile
 	$(CP) $(LINUX_DIR)/COPYING $(KDIR)/COPYING.linux >/dev/null
 endef
@@ -41,7 +44,8 @@ endef
 
 define Build/boot-script
 	# Make an U-boot image and copy it to the boot partition
-	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),mmc).bootscript $@.boot/boot.scr >/dev/null
+	mkimage -A arm -O linux \
+		-T script -C none -a 0 -e 0 -d $(if $(1),$(1),mmc).bootscript $@.boot/boot.scr >/dev/null
 endef
 
 define Build/pine64-img
@@ -57,7 +61,7 @@ define Build/pine64-img
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
 		>/dev/null
-	# 🛠️ 智能识别 Binman 合体固件或传统拆分固件
+	# 🛠️ 核心修复：补全所有断行的反斜杠 \，确保整个 if-then-else-fi 块在同一个 Shell 进程中正确闭环
 	if [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
 		echo "Found Binman combined image, flashing..."; \
 		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc status=none; \
