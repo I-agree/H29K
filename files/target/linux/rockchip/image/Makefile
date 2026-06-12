@@ -30,23 +30,23 @@ endef
 # ==============================================================================
 
 define Build/Compile
-	$(CP) $(LINUX_DIR)/COPYING $(KDIR)/COPYING.linux
+	$(CP) $(LINUX_DIR)/COPYING $(KDIR)/COPYING.linux >/dev/null
 endef
 
 ### Image scripts ###
 define Build/boot-common
 	# This creates a new folder copies the dtb (as rockchip.dtb) 
 	# and the kernel image (as kernel.img)
-	rm -fR $@.boot
-	mkdir -p $@.boot
+	rm -fR $@.boot >/dev/null
+	mkdir -p $@.boot >/dev/null
 
-	$(CP) $(KDIR)/image-$(firstword $(notdir $(DEVICE_DTS))).dtb $@.boot/rockchip.dtb
-	$(CP) $(IMAGE_KERNEL) $@.boot/kernel.img
+	$(CP) $(KDIR)/image-$(firstword $(notdir $(DEVICE_DTS))).dtb $@.boot/rockchip.dtb >/dev/null
+	$(CP) $(IMAGE_KERNEL) $@.boot/kernel.img >/dev/null
 endef
 
 define Build/boot-script
 	# Make an U-boot image and copy it to the boot partition
-	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),mmc).bootscript $@.boot/boot.scr
+	mkimage -A arm -O linux -T script -C none -a 0 -e 0 -d $(if $(1),$(1),mmc).bootscript $@.boot/boot.scr >/dev/null
 endef
 
 define Build/pine64-img
@@ -62,16 +62,16 @@ define Build/pine64-img
 		$@ \
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
-		32768
+		32768 >/dev/null
 
 	# 🛠️ 智能识别 Binman 合体固件或传统拆分固件
 	if [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
 		echo "Found Binman combined image, flashing..."; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc status=none; \
 	else \
 		echo "Binman image not found, falling back to split legacy images..."; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img of="$@" seek=64 conv=notrunc; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb of="$@" seek=16384 conv=notrunc; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img of="$@" seek=64 conv=notrunc status=none; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb of="$@" seek=16384 conv=notrunc status=none; \
 	fi
 endef
 
@@ -87,12 +87,13 @@ define Build/pine64-bin
 		$@ \
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
-		32768
+		32768 >/null
 
 	# Copy the idbloader, uboot and trust image to the image at sector 0x40, 0x4000 and 0x6000
-	dd if="$(STAGING_DIR_IMAGE)"/$(SOC)-idbloader.bin of="$@" seek=64 conv=notrunc
-	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-uboot.img of="$@" seek=16384 conv=notrunc
-	dd if="$(STAGING_DIR_IMAGE)"/$(SOC)-trust.bin of="$@" seek=24576 conv=notrunc
+	dd if="$(STAGING_DIR_IMAGE)"/$(SOC)-idbloader.bin of="$@" seek=64 conv=notrunc status=none
+	dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-uboot.img of="$@" seek=16384 conv=notrunc status=none
+	dd if="$(STAGING_DIR_IMAGE)"/$(SOC)-trust.bin of="$@" seek=24576 conv=notrunc status=none
+endef
 endef
 
 ### Devices ###
