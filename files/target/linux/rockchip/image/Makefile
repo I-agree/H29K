@@ -61,7 +61,7 @@ define Build/pine64-img
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
 		>/dev/null
-	# 🛠️ 核心修复：补全所有断行的反斜杠 \，确保整个 if-then-else-fi 块在同一个 Shell 进程中正确闭环
+	# 🛠️ 智能识别 Binman 合体固件或传统拆分固件
 	if [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
 		echo "Found Binman combined image, flashing..."; \
 		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc status=none; \
