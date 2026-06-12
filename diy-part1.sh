@@ -136,25 +136,39 @@ fi
 
 echo "✅ uboot-tools/Makefile 核心修改点校验通过"
 
-# 校验5：uboot-envtools 板级配置已完成 H29K 适配
+# 校验5：U-Boot 环境配置与 uboot-envtools 全链路对齐校验
+UBOOT_DEFCONFIG="package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig"
 UBOOT_ENV_FILE="package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8"
 
-if [ ! -f "$UBOOT_ENV_FILE" ]; then
-    echo "❌ 校验失败：$UBOOT_ENV_FILE 文件不存在，uboot-envtools 运行时将无法识别 H29K 设备！"
+# 5.1 校验已关闭冗余环境，避免双份不一致
+if grep -q "CONFIG_SYS_REDUNDANT_ENVIRONMENT=y" "$UBOOT_DEFCONFIG"; then
+    echo "❌ 校验失败：U-Boot 仍开启冗余环境，与 uboot-envtools 单环境配置不一致！"
     exit 1
 fi
 
-if ! grep -q "hinlink,h29k-rk3528" "$UBOOT_ENV_FILE"; then
-    echo "❌ 校验失败：$UBOOT_ENV_FILE 未添加 H29K 设备匹配项，fw_printenv/fw_setenv 将全部失效！"
+# 5.2 校验环境偏移严格对齐
+ENV_OFFSET_DEF=$(grep "CONFIG_ENV_OFFSET=" "$UBOOT_DEFCONFIG" | cut -d= -f2)
+ENV_OFFSET_TOOL=$(grep -A1 "hinlink,h29k-rk3528" "$UBOOT_ENV_FILE" | grep -o "0x[0-9a-f]*" | head -1)
+
+if [ "$ENV_OFFSET_DEF" != "$ENV_OFFSET_TOOL" ]; then
+    echo "❌ 校验失败：U-Boot 与 uboot-envtools 环境偏移不一致，读写会错位！"
+    echo "   defconfig: $ENV_OFFSET_DEF"
+    echo "   板级配置: $ENV_OFFSET_TOOL"
     exit 1
 fi
 
-if ! grep -q "ubootenv_add_uci_config.*/dev/mmcblk0p2" "$UBOOT_ENV_FILE"; then
-    echo "❌ 校验失败：$UBOOT_ENV_FILE 未配置正确的环境变量分区，读写会错位破坏分区表！"
+# 5.3 校验环境大小严格对齐
+ENV_SIZE_DEF=$(grep "CONFIG_ENV_SIZE=" "$UBOOT_DEFCONFIG" | cut -d= -f2)
+ENV_SIZE_TOOL=$(grep -A1 "hinlink,h29k-rk3528" "$UBOOT_ENV_FILE" | grep -o "0x[0-9a-f]*" | tail -1)
+
+if [ "$ENV_SIZE_DEF" != "$ENV_SIZE_TOOL" ]; then
+    echo "❌ 校验失败：U-Boot 与 uboot-envtools 环境大小不一致！"
+    echo "   defconfig: $ENV_SIZE_DEF"
+    echo "   板级配置: $ENV_SIZE_TOOL"
     exit 1
 fi
 
-echo "✅ uboot-envtools 板级配置 H29K 适配校验通过"
+echo "✅ U-Boot 环境配置全链路对齐校验通过"
 
 # ============================================================================
 
