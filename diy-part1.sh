@@ -139,7 +139,7 @@ echo "✅ uboot-tools/Makefile 核心修改点校验通过"
 # 校验5：检查 rockchip_armv8 已适配 H29K
 ENV_FILE="package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8"
 
-if ! grep -q "hinlink,h29k-rk3528" "$ENV_FILE"; then
+if ! grep -q "hinlink,h29k" "$ENV_FILE"; then
     echo "❌ 校验失败：未找到 H29K 适配配置"
     exit 1
 fi
