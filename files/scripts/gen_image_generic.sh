@@ -24,9 +24,9 @@ sect=63
 # create partition table
 if [ -n "$GUID" ]; then
     # 🌟 核心修复：GPT 模式下移除 -t 规避传统 MBR 83 类型污染；
-    # 🌟 安全兜底：如果 PARTOFFSET 为空，强制指定 @32m 绝对偏移，誓死保护 Rockchip U-Boot 引导区，添加 -b 0 禁止自动生成 BIOS Boot 分区，保持 2 个分区的预期布局
+    # 🌟 安全兜底：如果 PARTOFFSET 为空，强制指定 @32m 绝对偏移，誓死保护 Rockchip U-Boot 引导区，添加：-D 禁用自动生成BIOS Boot分区，保持2个分区的预期布局
     BOOTOFFSET="${PARTOFFSET:-32m}"
-    set $(ptgen -o "$OUTPUT" -h $head -s $sect -g -b 0 \
+    set $(ptgen -o "$OUTPUT" -h $head -s $sect -g -D \
         -p "${KERNELSIZE}m@${BOOTOFFSET}" \
         -p "${ROOTFSSIZE}m" \
         ${SIGNATURE:+-S 0x$SIGNATURE} -G "$GUID")
