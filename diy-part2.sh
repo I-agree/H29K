@@ -1093,4 +1093,19 @@ else
     echo "⚠️ 警告：在 $REAL_AIC_MAKEFILE 未找到该组件，请确认源码路径！"
 fi
 
+# =================================================================================
+# U-Boot 中保留 PKG_BUILD_DEPENDS:=libyaml/host 并彻底消灭警告
+# =================================================================================
+LIBYAML_MAKEFILE="package/libs/libyaml/Makefile"
+
+if [ -f "$LIBYAML_MAKEFILE" ]; then
+    echo "正在为纯 C 语言 libyaml 注入 host 编译支持..."
+    # 1. 在 include package.mk 后面引入 host 编译核心骨架
+    sed -i '/include $(INCLUDE_DIR)\/package.mk/a include $(INCLUDE_DIR)\/host-build.mk' $LIBYAML_MAKEFILE
+    
+    # 2. 在文件末尾追加主机编译的实例化调用
+    echo '$(eval $(call BuildHost))' >> $LIBYAML_MAKEFILE
+fi
+# =================================================================================
+
 echo "🚀 H29K 极致稳健的流媒体边缘切换矩阵离线改造，全部大功告成！"
