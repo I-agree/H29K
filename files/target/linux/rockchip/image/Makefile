@@ -70,7 +70,7 @@ endef
 define Device/Default
   PROFILES := Default
   KERNEL := kernel-bin
-  IMAGES := sysupgrade.img.gz
+  IMAGES := factory.img.gz
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
 endef
