@@ -103,7 +103,10 @@ CONFIG_COMMON_CLK_ROCKCHIP=y
 CONFIG_PWM_ROCKCHIP=y
 CONFIG_OF_GPIO=y
 
-# === 修复某个警告依赖 ===
+# === 修复kmod-fs-netfs警告依赖 ===
+CONFIG_NFS_FS=m
+CONFIG_NFS_V3=y
+CONFIG_NFS_V4=y
 CONFIG_NETFS_SUPPORT=m
 
 # --- 针对 A53 架构彻底关闭不支持的 SVE 扩展，全力确保 ASIMD(NEON) 跑满 ---
