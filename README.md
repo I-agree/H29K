@@ -4,7 +4,7 @@
 直接使用OpenWrt官方最新稳定版源码库
 含小屏幕显示的完整系统镜像
 
-注意：我仓库直接编译出来的固件不支持从 SD 卡启动，但是你可以修改mmc.bootscript文件来改变启动方式。
+注意：我仓库直接编译出来的固件不支持从 SD 卡启动，但是你可以修改mmc.bootscript和rockchip_armv8两个文件来改变启动方式。
 当从 eMMC 启动时，${devnum} 是 0，内核收到的就是 root=/dev/mmcblk0p2（点对点直达 eMMC）。
 当从 SD 卡启动时，${devnum} 是 1，内核收到的就是 root=/dev/mmcblk1p2（点对点直达 SD 卡）
 
