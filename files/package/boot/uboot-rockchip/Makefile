@@ -52,17 +52,18 @@ UBOOT_MAKE_FLAGS += \
 	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL)) \
 	HOSTLDLIBS_dtc="-lyaml"
 
-# 🚀 【现代主线化】仅注入 H29K 独有配置，其余完全借用 U-Boot 官方原生 DTSI
+# 🚀 【现代主线化】彻底打通 U-Boot 原生设备树目录
 define Build/Prepare
 	$(call Build/Prepare/Default)
 	# 1. 复制自定义 H29K defconfig 到 U-Boot 基础配置目录
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
 	
-	# 2. 确保主线标准的 rockchip 源码设备树目录存在
-	mkdir -p $(PKG_BUILD_DIR)/arch/arm/dts/rockchip
+	# 2. 🛠️ 核心修正：直接放入 arch/arm/dts/ 根目录
+	# 这样才能与 U-Boot 官方自带的 rk3528.dtsi 处于同级目录，正确完成 #include 展开
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/arch/arm/dts/
 	
-	# 3. 仅将你的 H29K 独立板级 DTS 放入该目录，它会自动 include 官方原生的 rk3528.dtsi
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/arch/arm/dts/rockchip/
+	# 3. 🛠️ 核心补丁：将 dtb 目标无条件注册进 U-Boot 设备树 Makefile，防止报 No rule to make target 错误
+	echo 'dtb-y += rk3528-hinlink-h29k.dtb' >> $(PKG_BUILD_DIR)/arch/arm/dts/Makefile
 endef
 
 define Build/Configure
