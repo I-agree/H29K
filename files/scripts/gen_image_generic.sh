@@ -24,9 +24,9 @@ sect=63
 # create partition table
 if [ -n "$GUID" ]; then
     # 🌟 核心修复：GPT 模式下移除 -t 规避传统 MBR 83 类型污染；
-    # 🌟 安全兜底：如果 PARTOFFSET 为空，强制指定 @32m 绝对偏移，誓死保护 Rockchip U-Boot 引导区
+    # 🌟 安全兜底：如果 PARTOFFSET 为空，强制指定 @32m 绝对偏移，誓死保护 Rockchip U-Boot 引导区，添加 -b 0 禁止自动生成 BIOS Boot 分区，保持 2 个分区的预期布局
     BOOTOFFSET="${PARTOFFSET:-32m}"
-    set $(ptgen -o "$OUTPUT" -h $head -s $sect -g \
+    set $(ptgen -o "$OUTPUT" -h $head -s $sect -g -b 0 \
         -p "${KERNELSIZE}m@${BOOTOFFSET}" \
         -p "${ROOTFSSIZE}m" \
         ${SIGNATURE:+-S 0x$SIGNATURE} -G "$GUID")
@@ -64,7 +64,7 @@ dos_dircopy() {
 dd if="$ROOTFSIMAGE" of="$OUTPUT" bs=512 seek="$ROOTFSOFFSET" conv=notrunc
 
 if [ -n "$GUID" ]; then
-    # 🌟 核心修复：坚决不能在这里用 dd if=/dev/zero 冲掉 ptgen 刚写好的 Backup GPT！
+    [ -n "$PADDING" ] && dd if=/dev/zero of="$OUTPUT" bs=512 seek="$((ROOTFSOFFSET + ROOTFSSIZE))" conv=notrunc count="$sect"
     # 强刷标准 FAT32 格式，确保主线 U-Boot 100% 识别内核
     mkfs.fat --invariant -F 32 -n kernel -C "$OUTPUT.kernel" -S 512 "$((KERNELSIZE / 1024))"
     LC_ALL=C dos_dircopy "$KERNELDIR" /
