@@ -4,30 +4,6 @@ include $(INCLUDE_DIR)/image.mk
 
 DEVICE_VARS += UBOOT_DEVICE_NAME
 
-# ==============================================================================
-# 🛠️ 核心修复：重写 DTB 编译基础设施，彻底打通 C 预处理器（CPP）的内核头文件通道
-# ==============================================================================
-define Image/BuildDTB
-	$(TARGET_CROSS)cpp -nostdinc -x assembler-with-cpp \
-		-I$(DTS_DIR) \
-		-I$(DEVICE_DTS_DIR) \
-		-I$(DTS_DIR)/include \
-		-I$(LINUX_DIR)/include \
-		-I$(LINUX_DIR)/arch/arm64/boot/dts/include \
-		-undef -D__DTS__ $(1) $(2).tmp
-	$(LINUX_DIR)/scripts/dtc/dtc -O dtb -i$(DTS_DIR) -i$(DEVICE_DTS_DIR) \
-		$(if $(CONFIG_OF_OVERLAY),-@) \
-		-Wno-interrupt_provider \
-		-Wno-unique_unit_address \
-		-Wno-unit_address_vs_reg \
-		-Wno-avoid_unnecessary_addr_size \
-		-Wno-alias_paths \
-		-Wno-graph_child_address \
-		-Wno-simple_bus_reg \
-		-o $(2) $(2).tmp
-endef
-# ==============================================================================
-
 define Build/Compile
 	$(CP) $(LINUX_DIR)/COPYING $(KDIR)/COPYING.linux >/dev/null
 endef
