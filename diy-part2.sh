@@ -5,17 +5,6 @@
 
 set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终止
 
-# ======================== 【0. 🚀 核心准备期：注册H29K内核使用的DTS】 ========================
-# 向内核DTS编译规则追加H29K设备树
-KERNEL_DIR=$(find build_dir/target-* -maxdepth 1 -name "linux-rockchip_armv8" -type d | head -1)
-if [ -d "$KERNEL_DIR" ]; then
-    DTS_MAKEFILE="$KERNEL_DIR/$(ls $KERNEL_DIR | head -1)/arch/arm64/boot/dts/rockchip/Makefile"
-    if [ -f "$DTS_MAKEFILE" ]; then
-        grep -q "rk3528-hinlink-h29k" "$DTS_MAKEFILE" || \
-        echo 'dtb-$(CONFIG_ARCH_ROCKCHIP) += rk3528-hinlink-h29k.dtb' >> "$DTS_MAKEFILE"
-    fi
-fi
-
 # ======================== 【1. 🚀 编译期：最新稳定版动态嗅探与自愈中心】 ========================
 echo "🔍 正在动态获取互联网当前最新的稳定版版本号..."
 
