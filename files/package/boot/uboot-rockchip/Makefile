@@ -59,10 +59,10 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
 	
 	# 2. 确保主线标准的 rockchip 源码设备树目录存在
-	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	mkdir -p $(PKG_BUILD_DIR)/arch/arm/dts/rockchip
 	
 	# 3. 仅将你的 H29K 独立板级 DTS 放入该目录，它会自动 include 官方原生的 rk3528.dtsi
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/arch/arm/dts/rockchip/
 endef
 
 define Build/InstallDev
