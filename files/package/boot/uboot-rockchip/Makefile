@@ -50,7 +50,7 @@ UBOOT_CUSTOMIZE_CONFIG := \
 UBOOT_MAKE_FLAGS += \
 	BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
 	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL)) \
-	HOSTLDLIBS_dtc="-lyaml"
+	HOSTLDLIBS_dtc=-lyaml
 
 # 🚀 【现代主线化】彻底打通 U-Boot 原生设备树目录
 define Build/Prepare
