@@ -17,7 +17,8 @@ define Device/hinlink_h29k
   UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   KERNEL_LOADADDR := 0x03000000
   BOOT_SCRIPT := mmc
-  IMAGE/sysupgrade.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
+  IMAGES := factory.img.gz
+  IMAGE/factory.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-aic8800-sdio -dnsmasq dnsmasq-full \
     kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
