@@ -16,7 +16,6 @@ UBOOT_USE_INTREE_DTC:=1
 
 include $(INCLUDE_DIR)/u-boot.mk
 include $(INCLUDE_DIR)/package.mk
-PKG_BUILD_DEPENDS:=libyaml/host
 
 define U-Boot/Default
   BUILD_TARGET:=rockchip
