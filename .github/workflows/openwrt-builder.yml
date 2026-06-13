@@ -47,11 +47,11 @@ jobs:
         # 迫使 CPU 优先榨干物理内存，不到最后一刻绝不读写硬盘，从底层物理掐断 Swap 造成的 I/O 假死
         sudo sysctl vm.swappiness=10
         echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
-        echo "📊 扩容系统全局 /tmp 至 16G"
+        echo "📊 扩容系统全局 /tmp 至 10G"
         # 扩容系统默认 /tmp 临时分区（关键修复）
         sudo umount /tmp || true
-        sudo mount -t tmpfs tmpfs /tmp -o size=16G,nr_inodes=0
-        echo "✅ /tmp 扩容至 16GB 完成"
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "✅ /tmp 扩容至 10GB 完成"
         
         echo "📊 检查当前磁盘空间分布："
         df -h
