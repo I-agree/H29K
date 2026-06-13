@@ -1096,15 +1096,28 @@ fi
 # =================================================================================
 # U-Boot 中保留 PKG_BUILD_DEPENDS:=libyaml/host 并彻底消灭警告
 # =================================================================================
-LIBYAML_MAKEFILE="package/libs/libyaml/Makefile"
+# 探测 libyaml 在 feeds 中的真实路径
+LIBYAML_PATH=""
+if [ -f "feeds/packages/libs/libyaml/Makefile" ]; then
+    LIBYAML_PATH="feeds/packages/libs/libyaml/Makefile"
+elif [ -f "package/feeds/packages/libyaml/Makefile" ]; then
+    LIBYAML_PATH="package/feeds/packages/libyaml/Makefile"
+fi
 
-if [ -f "$LIBYAML_MAKEFILE" ]; then
-    echo "正在为纯 C 语言 libyaml 注入 host 编译支持..."
-    # 1. 在 include package.mk 后面引入 host 编译核心骨架
-    sed -i '/include $(INCLUDE_DIR)\/package.mk/a include $(INCLUDE_DIR)\/host-build.mk' $LIBYAML_MAKEFILE
+if [ -n "$LIBYAML_PATH" ]; then
+    echo "发现 libyaml 路径: $LIBYAML_PATH，正在注入 host 编译支持..."
     
-    # 2. 在文件末尾追加主机编译的实例化调用
-    echo '$(eval $(call BuildHost))' >> $LIBYAML_MAKEFILE
+    # 1. 检查是否已经包含 host-build.mk，防止重复添加
+    if ! grep -q "host-build.mk" "$LIBYAML_PATH"; then
+        sed -i '/include $(INCLUDE_DIR)\/package.mk/a include $(INCLUDE_DIR)\/host-build.mk' "$LIBYAML_PATH"
+    fi
+    
+    # 2. 检查是否已经包含 BuildHost，防止重复添加
+    if ! grep -q "call BuildHost" "$LIBYAML_PATH"; then
+        echo '$(eval $(call BuildHost))' >> "$LIBYAML_PATH"
+    fi
+else
+    echo "⚠️ 未找到 libyaml 的 Makefile，请确保此脚本在 ./scripts/feeds install -a 之后执行！"
 fi
 # =================================================================================
 
