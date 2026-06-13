@@ -48,9 +48,9 @@ UBOOT_CUSTOMIZE_CONFIG := \
 	--set-str MKIMAGE_DTC_PATH $(PKG_BUILD_DIR)/scripts/dtc/dtc
 
 UBOOT_MAKE_FLAGS += \
+	PKG_CONFIG=pkg-config \
 	BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
-	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL)) \
-	HOSTLDLIBS_dtc=-lyaml
+	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
 # 🚀 【现代主线化全面适配】彻底打通 U-Boot 2026+ 原生 OF_UPSTREAM 设备树目录
 define Build/Prepare
