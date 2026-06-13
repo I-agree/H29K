@@ -8,7 +8,7 @@ define Device/rk3528
 endef
 
 define Device/hinlink_h29k
-  SOC := rk3528
+  $(Device/rk3528)
   SUBTARGET := armv8
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
