@@ -49,6 +49,7 @@ UBOOT_CUSTOMIZE_CONFIG := \
 
 UBOOT_MAKE_FLAGS += \
 	PKG_CONFIG=pkg-config \
+	PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig" \
 	BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
 	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
