@@ -104,7 +104,7 @@ CONFIG_PWM_ROCKCHIP=y
 CONFIG_OF_GPIO=y
 
 # =====================================================================
-# NFS 客户端及网络文件系统核心内核依赖链（100% 完整对齐版）
+# NFS 客户端及网络文件系统核心内核依赖链（完美对齐 fs.mk 版）
 # =====================================================================
 
 # --- NetFS 与 缓存支持 (对应 kmod-fs-netfs) ---
@@ -120,14 +120,14 @@ CONFIG_LOCKD=m
 CONFIG_GRACE_PERIOD=m
 CONFIG_DNS_RESOLVER=y
 
-# --- NFS 基础客户端平台 (对应 kmod-fs-nfs) ---
+# --- NFS 基础客户端 platform (对应 kmod-fs-nfs) ---
 CONFIG_NFS_FS=m
 CONFIG_NFS_USE_LEGACY_DNS=n
 CONFIG_NFS_USE_NEW_IDMAPPER=n
 
-# --- NFS v3 协议支持 (对应 kmod-fs-nfs-v3) ---
+# --- NFS v3 协议支持 (对应 kmod-fs-nfs-v3，关闭 ACL 以对齐官方 fs.mk 账本) ---
 CONFIG_NFS_V3=y
-CONFIG_NFS_V3_ACL=y
+CONFIG_NFS_V3_ACL=n
 
 # --- NFS v4 协议及微调子项 (对应 kmod-fs-nfs-v4，严格对齐 fs.mk 字符串) ---
 CONFIG_NFS_V4=y
