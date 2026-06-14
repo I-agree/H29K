@@ -1,4 +1,4 @@
-# part uuid mmc ${devnum}:2 uuid
+setenv devnum 0
 
 if test $soc = 'rk3308'; then
 	serial_addr=',0xff0c0000'; serial_port='ttyS2';
