@@ -18,7 +18,9 @@ PKG_BUILD_DEPENDS:=fstools
 PKG_LICENSE:=GPL-2.0 GPL-2.0+
 PKG_LICENSE_FILES:=Licenses/README
 
-PKG_BUILD_PARALLEL:=1
+# 🔒【核心银弹】将 1 改为 0，并强制指定单线程，彻底粉碎 wait: No child processes 并发冲突
+PKG_BUILD_PARALLEL:=0
+PKG_JOBS:=1
 #PKG_FLAGS:=nonshared # Use PKGFLAGS instead of PKG_FLAGS for per-binary flags
 
 include $(INCLUDE_DIR)/package.mk
