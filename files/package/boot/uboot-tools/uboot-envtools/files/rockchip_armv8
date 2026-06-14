@@ -11,10 +11,10 @@ touch /etc/config/ubootenv
 board=$(board_name)
 
 case "$board" in
-hinlink,h29k)
-	# 🎯 与 U-Boot defconfig 严格对齐：整盘偏移 0x3f8000，大小 32KB
-	ubootenv_add_uci_config "/dev/mmcblk0" "0x3f8000" "0x8000"
-	;;
+# hinlink,h29k)
+# 	# 暂不启用：因为 U-Boot 采用了 CONFIG_ENV_IS_NOWHERE=y 纯净引导
+# 	ubootenv_add_uci_config "/dev/mmcblk0" "0x3f8000" "0x8000"
+# 	;;
 xunlong,orangepi-r1-plus|\
 xunlong,orangepi-r1-plus-lts)
 	ubootenv_add_uci_config "/dev/mmcblk0" "0x3f8000" "0x8000"
