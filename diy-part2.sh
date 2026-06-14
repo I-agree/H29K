@@ -104,15 +104,11 @@ CONFIG_PWM_ROCKCHIP=y
 CONFIG_OF_GPIO=y
 
 # =====================================================================
-# NFS 客户端及网络文件系统核心内核依赖链
+# 解决kmod-fs-netfs核心内核依赖链
 # =====================================================================
-# --- 强制激活宿主，带活隐藏的 NETFS_SUPPORT 并保持 =m ---
-CONFIG_NFS_FS=m
-
-# --- 严格对齐 6.12 源码：NETFS 是模块，而 FSCACHE 必须是 bool (y) ---
+CONFIG_CIFS=m
 CONFIG_NETFS_SUPPORT=m
 CONFIG_FSCACHE=y
-CONFIG_FSCACHE_STATS=y
 
 # =====================================================================
 
