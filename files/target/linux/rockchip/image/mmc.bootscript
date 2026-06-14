@@ -16,7 +16,7 @@ elif test $soc = 'rk3588'; then
 	serial_addr=',0xfeb50000'; serial_port='ttyS2';
 fi
 
-setenv bootargs "console=${serial_port},1500000n8 earlycon=uart8250,mmio32${serial_addr} root=/dev/mmcblk0p2 rw rootwait";
+setenv bootargs "console=${serial_port},1500000n8 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait";
 
 load mmc ${devnum}:1 ${fdt_addr_r} rockchip.dtb
 load mmc ${devnum}:1 ${kernel_addr_r} kernel.img
