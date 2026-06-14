@@ -68,7 +68,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/www \
          files/usr/share/docker-images
 
-BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main/files"
+BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
 LOGO_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 
 # [工具函数] 统一的下载与基础大小校验
