@@ -225,16 +225,6 @@
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
-		bootph-all;
-	};
-
-	backlight: backlight {
-		compatible = "pwm-backlight";
-		pwms = <&pwm5 0 5000000 0>;
-		brightness-levels = <
-			0 16 32 48 64 80 96 112 128 144 160 176 192 208 224 240 255
-		>;
-		default-brightness-level = <15>;
 	};
 };
 
@@ -326,11 +316,6 @@
 	};
 
 	spi1 {
-		spi1_pins: spi1-pins {
-			rockchip,pins =
-				<1 RK_PB6 2 &pcfg_pull_none_drv_level_2>,
-				<1 RK_PB7 2 &pcfg_pull_none_drv_level_2>;
-		};
 		lcd_rs_pin: lcd-rs-pin {
 			rockchip,pins = <1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
@@ -352,9 +337,6 @@
 		lcd_pwr_pin: lcd-pwr-pin {
 			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none_drv_level_2>;
 		};
-		lcd_bl_pin: lcd-bl-pin {
-			rockchip,pins = <0 RK_PA1 1 &pcfg_pull_none_drv_level_2>;
-		};
 	};
 };
 
@@ -368,13 +350,6 @@
 &pwm2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pwm2m0_pins>;
-	status = "okay";
-	bootph-all;
-};
-
-&pwm5 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&lcd_bl_pin>;
 	status = "okay";
 };
 
@@ -445,7 +420,7 @@
 		compatible = "sitronix,st7789v";
 		reg = <0>;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
-		backlight = <&backlight>;
+		led-gpios = <&gpio0 RK_PA1 GPIO_ACTIVE_HIGH>;
 		spi-max-frequency = <15000000>;
 		power-supply = <&vcc_3v3_lcd>;
 		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
