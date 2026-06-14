@@ -103,20 +103,41 @@ CONFIG_COMMON_CLK_ROCKCHIP=y
 CONFIG_PWM_ROCKCHIP=y
 CONFIG_OF_GPIO=y
 
-# === 修复kmod-fs-netfs警告依赖 ===
-CONFIG_SUNRPC=m
-CONFIG_SUNRPC_GSS=m
-CONFIG_LOCKD=m
-CONFIG_GRACE=m
-CONFIG_DNS_RESOLVER=y
+# =====================================================================
+# NFS 客户端及网络文件系统核心内核依赖链（100% 完整对齐版）
+# =====================================================================
+
+# --- NetFS 与 缓存支持 (对应 kmod-fs-netfs) ---
 CONFIG_NETFS_SUPPORT=m
 CONFIG_FSCACHE=y
+CONFIG_FSCACHE_STATS=y
+
+# --- RPC、锁与核心安全机制 (对应 kmod-fs-nfs-common) ---
+CONFIG_SUNRPC=m
+CONFIG_SUNRPC_GSS=m
+CONFIG_RPCSEC_GSS_KRB5=m
+CONFIG_LOCKD=m
+CONFIG_GRACE_PERIOD=m
+CONFIG_DNS_RESOLVER=y
+
+# --- NFS 基础客户端平台 (对应 kmod-fs-nfs) ---
 CONFIG_NFS_FS=m
+CONFIG_NFS_USE_LEGACY_DNS=n
+CONFIG_NFS_USE_NEW_IDMAPPER=n
+
+# --- NFS v3 协议支持 (对应 kmod-fs-nfs-v3) ---
 CONFIG_NFS_V3=y
 CONFIG_NFS_V3_ACL=y
+
+# --- NFS v4 协议及微调子项 (对应 kmod-fs-nfs-v4，严格对齐 fs.mk 字符串) ---
 CONFIG_NFS_V4=y
 CONFIG_NFS_V4_1=y
+CONFIG_NFS_V4_1_IMPLEMENTATION_ID_DOMAIN="kernel.org"
+CONFIG_NFS_V4_1_MIGRATION=n
 CONFIG_NFS_V4_2=y
+CONFIG_NFS_V4_2_READ_PLUS=n
+
+# =====================================================================
 
 # --- 针对 A53 架构彻底关闭不支持的 SVE 扩展，全力确保 ASIMD(NEON) 跑满 ---
 # CONFIG_ARM64_SVE is not set
