@@ -443,12 +443,12 @@
 	status = "okay";
 };
 
-&usb2phy0_host {
+&usb2phy_host {
 	phy-supply = <&vcc5v0_usb>;
 	status = "okay";
 };
 
-&usb2phy0_otg {
+&usb2phy_otg {
 	phy-supply = <&vcc5v0_usb>;
 	status = "okay";
 };
@@ -468,4 +468,17 @@
 
 &i2c1 {
 	status = "okay";
+};
+
+/ {
+	rng: rng@ffc50000 {
+		compatible = "rockchip,rkrng";
+		reg = <0x0 0xffc50000 0x0 0x200>;
+		interrupts = <0 23 4>;
+		clocks = <&scmi_clk 32>;
+		clock-names = "hclk_trng";
+		resets = <&cru 0xa3>;
+		reset-names = "reset";
+		status = "okay";
+	};
 };
