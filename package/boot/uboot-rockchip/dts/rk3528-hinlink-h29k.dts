@@ -207,12 +207,11 @@
 		regulator-name = "vdd_arm";
 		regulator-min-microvolt = <746000>;
 		regulator-max-microvolt = <1201000>;
-		pwms = <&pwm1 0 5000 PWM_POLARITY_INVERTED>;
+		pwms = <&pwm1 0 5000 1>;
 		pwm-supply = <&vcc5v0_sys>;
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
-		regulator-pwm-continuous;
 		bootph-all;
 	};
 
@@ -221,12 +220,11 @@
 		regulator-name = "vdd_logic";
 		regulator-min-microvolt = <705000>;
 		regulator-max-microvolt = <1006000>;
-		pwms = <&pwm2 0 5000 PWM_POLARITY_INVERTED>;
+		pwms = <&pwm2 0 5000 1>;
 		pwm-supply = <&vcc5v0_sys>;
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
-		regulator-pwm-continuous;
 		bootph-all;
 	};
 
@@ -469,7 +467,7 @@
 
 &uart2 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&uart2m0_xfer>;
+	pinctrl-0 = <&uart2m1_ctsn &uart2m1_xfer>;
 	status = "okay";
 };
 
