@@ -346,7 +346,7 @@
 			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 		lcd_bl_pin: lcd-bl-pin {
-			    rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 };
