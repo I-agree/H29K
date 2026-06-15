@@ -72,15 +72,6 @@ docker buildx build --platform linux/arm64 -f Dockerfile.alpine -t h29k-alpine-f
 
 # ======================== 【2. 清理原生冲突架构源】 ========================
 echo "🧹 正在清理原生冲突的架构补丁..."
-rm -f target/linux/bcm27xx/patches-6.12/950-0076-OF-DT-Overlay-configfs-interface.patch || true
-rm -f target/linux/ipq806x/patches-6.12/901-02-ARM-decompressor-add-option-to-ignore-MEM-ATAGs.patch || true
-rm -f target/linux/mpc85xx/patches-6.12/102-powerpc-add-cmdline-override.patch || true
-rm -f package/boot/uboot-mediatek/patches/280-image-fdt-save-name-of-FIT-configuration-in-chosen-node.patch || true
-rm -f target/linux/qualcommax/patches-6.12/0911-arm64-cmdline-replacement.patch || true
-rm -f target/linux/ipq806x/patches-6.12/902-ARM-decompressor-support-for-ATAGs-rootblock-parsing.patch || true
-rm -f target/linux/ipq806x/patches-6.12/900-arm-add-cmdline-override.patch || true
-rm -f target/linux/mvebu/patches-6.12/300-mvebu-Mangle-bootloader-s-kernel-arguments.patch || true
-rm -rf target/linux/airoha
 rm -rf package/boot/uboot-rockchip/patches
 
 # ======================== 【3. H29K 主线内核配置合并注入】 ========================
