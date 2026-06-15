@@ -66,6 +66,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/etc/fonts/conf.d \
          files/usr/bin \
          files/www \
+         package/boot/rkbin \
          files/usr/share/docker-images
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
@@ -98,6 +99,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/image/Makefile" "target/li
 download_and_check "${BASE_URL}/target/linux/rockchip/image/mmc.bootscript" "target/linux/rockchip/image/mmc.bootscript"
 download_and_check "${BASE_URL}/scripts/gen_image_generic.sh" "scripts/gen_image_generic.sh"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
+download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
 
 # --- 深度内容专项校验 ---
 if grep -q "hinlink_h28k" "target/linux/rockchip/image/armv8.mk"; then
