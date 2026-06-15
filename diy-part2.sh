@@ -97,6 +97,39 @@ CONFIG_OF_GPIO=y
 # TSADC 温度传感器
 CONFIG_ROCKCHIP_TSADC=y
 
+# 分区解析
+CONFIG_BLOCK=y
+CONFIG_PARTITION_ADVANCED=y
+CONFIG_MSDOS_PARTITION=y
+CONFIG_EFI_PARTITION=y
+CONFIG_MMC_BLOCK_MINORS=y
+
+# 8250 串口驱动（RK3528 控制台 uart0 依赖）
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+CONFIG_CONSOLE=y
+
+# SDIO WiFi 依赖（设备带 SDIO 无线）
+CONFIG_MMC_SDIO=y
+
+CONFIG_PLATFORM_DEVICE=y
+CONFIG_PROBE_PRIORITY_DEVICE=y
+
+CONFIG_NET=y
+CONFIG_ETHERNET=y
+
+# OpenWrt 必备文件系统
+CONFIG_SQUASHFS=y
+
+CONFIG_GPIO_KEYS=y
+
+CONFIG_MMC_HS200=y
+CONFIG_MMC_HS400=y
+CONFIG_MMC_PWRSEQ=y
+CONFIG_ROOT_WAIT=y
+CONFIG_RW_ROOT=y
+CONFIG_MMC_SD=y
+
 # =====================================================================
 # 解决kmod-fs-netfs核心内核依赖链
 # =====================================================================
@@ -358,26 +391,6 @@ CONFIG_BT_HCIUART_H4=y
 # CONFIG_BT_VIRTIO is not set
 # CONFIG_BT_NXPUART is not set
 # CONFIG_BT_INTEL_PCIE is not set
-# ==============================================================================
-
-# 8250 串口驱动（RK3528 控制台 uart0 依赖）
-CONFIG_SERIAL_8250=y
-CONFIG_SERIAL_8250_CONSOLE=y
-CONFIG_CONSOLE=y
-
-# SDIO WiFi 依赖（你的设备带 SDIO 无线）
-CONFIG_MMC_SDIO=y
-
-CONFIG_PLATFORM_DEVICE=y
-CONFIG_PROBE_PRIORITY_DEVICE=y
-
-CONFIG_NET=y
-CONFIG_ETHERNET=y
-
-# OpenWrt 必备文件系统
-CONFIG_SQUASHFS=y
-
-CONFIG_GPIO_KEYS=y
 
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数"
