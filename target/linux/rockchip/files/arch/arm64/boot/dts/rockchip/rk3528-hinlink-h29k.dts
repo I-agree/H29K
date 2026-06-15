@@ -393,6 +393,7 @@
 	bus-width = <4>;
 	cap-sd-highspeed;
 	cap-sdio-irq;
+	supports-sdio;
 	keep-power-in-suspend;
 	max-frequency = <200000000>;
 	mmc-pwrseq = <&sdio_pwrseq>;
