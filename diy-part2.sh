@@ -1183,7 +1183,7 @@ if [ -f "$REAL_AIC_MAKEFILE" ]; then
     
     # 注入 --retry 3 抵抗网络抖动；末尾加 || true 允许严格模式下捕获 $?
     curl -sSL --connect-timeout 8 --retry 3 \
-      "https://raw.githubusercontent.com/I-agree/H29K/main/files/package/kernel/aic8800/Makefile" > "$REAL_AIC_MAKEFILE" || true
+      "https://raw.githubusercontent.com/I-agree/H29K/main/package/kernel/aic8800/Makefile" > "$REAL_AIC_MAKEFILE" || true
     
     if [ -s "$REAL_AIC_MAKEFILE" ]; then  # -s 检查文件存在且大小大于 0 字节，比 $? 更稳妥
         echo "✅ aic8800 Makefile 覆盖成功，令牌锁死与 GCC14 报错已物理粉碎！"
