@@ -19,7 +19,6 @@
 		serial0 = &uart0;
 		serial1 = &uart1;
 		serial2 = &uart2;
-
 		led-boot = &led_work;
 		led-failsafe = &led_work;
 		led-running = &led_work;
@@ -146,7 +145,7 @@
 		regulator-name = "vcc_3v3_lcd";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+		gpio = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
 		enable-active-high;
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_pwr_pin>;
@@ -159,7 +158,7 @@
 		regulator-name = "vcc3v3_sd";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
-		gpios = <&gpio4 RK_PA1 GPIO_ACTIVE_LOW>;
+		gpio = <&gpio4 RK_PA1 GPIO_ACTIVE_LOW>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&sdmmc_pwren_l>;
 		vin-supply = <&vcc_3v3>;
@@ -218,6 +217,23 @@
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
+	};
+
+	soc {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		rng: rng@ffc50000 {
+			compatible = "rockchip,rk3528-rng", "rockchip,rk3588-rng";
+			reg = <0x0 0xffc50000 0x0 0x200>;
+			interrupts = <0 23 4>;
+			clocks = <&cru HCLK_TRNG>;
+			clock-names = "hclk_trng";
+			resets = <&cru 0xa3>;
+			reset-names = "reset";
+			status = "okay";
+		};
 	};
 };
 
@@ -328,7 +344,7 @@
 
 	lcd {
 		lcd_pwr_pin: lcd-pwr-pin {
-			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none_drv_level_2>;
+			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 };
@@ -463,17 +479,4 @@
 
 &i2c1 {
 	status = "okay";
-};
-
-/ {
-	rng: rng@ffc50000 {
-		compatible = "rockchip,rkrng";
-		reg = <0x0 0xffc50000 0x0 0x200>;
-		interrupts = <0 23 4>;
-		clocks = <&scmi_clk 32>;
-		clock-names = "hclk_trng";
-		resets = <&cru 0xa3>;
-		reset-names = "reset";
-		status = "okay";
-	};
 };
