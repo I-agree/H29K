@@ -158,7 +158,7 @@ jobs:
         make target/linux/refresh V=w
         
         echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
-        make target/linux/compile -j1 V=w
+        make target/linux/compile -j1 V=s
         
         # ✅【关键步骤：提前触发核心目录树及底层初始化】
         make target/compile -j$(nproc)
