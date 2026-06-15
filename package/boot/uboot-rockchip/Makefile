@@ -39,7 +39,7 @@ define U-Boot/hinlink-h29k-rk3528
     hinlink_h29k
 endef
 
-UBOOT_TARGETS := hinlink-h29k-rk3528
+UBOOT_TARGETS :=hinlink-h29k-rk3528
 
 UBOOT_CONFIGURE_VARS += USE_PRIVATE_LIBGCC=yes
 
