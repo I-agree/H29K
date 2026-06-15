@@ -1181,16 +1181,18 @@ REAL_AIC_MAKEFILE="package/kernel/aic8800/Makefile"
 if [ -f "$REAL_AIC_MAKEFILE" ]; then
     echo "📥 侦测到目标组件，正在从自定义仓库强制下载覆盖 aic8800 Makefile..."
     
-    # 注入 --retry 3 抵抗网络抖动；末尾加 || true 允许严格模式下捕获 $?
+    # 下载文件
     curl -sSL --connect-timeout 8 --retry 3 \
       "https://raw.githubusercontent.com/I-agree/H29K/main/package/kernel/aic8800/Makefile" > "$REAL_AIC_MAKEFILE" || true
     
-    if [ -s "$REAL_AIC_MAKEFILE" ]; then  # -s 检查文件存在且大小大于 0 字节，比 $? 更稳妥
+    # 核心校验：判断是否包含 PKG_BUILD_DEPENDS:=mac80211
+    if grep -q "PKG_BUILD_DEPENDS:=mac80211" "$REAL_AIC_MAKEFILE"; then
         echo "✅ aic8800 Makefile 覆盖成功，令牌锁死与 GCC14 报错已物理粉碎！"
     else
-        echo "❌ 严重错误：下载自定义 Makefile 失败或文件为空，请检查网络链接！"
-        exit 1  # 既然是致命错误，主动抛出异常终止编译，防止带着错误的 Makefile 冲进大部队
+        echo "❌ 校验失败：Makefile 中缺失 PKG_BUILD_DEPENDS:=mac80211，编译将终止！"
+        exit 1
     fi
+
 else
     echo "⚠️ 警告：在 $REAL_AIC_MAKEFILE 未找到该组件，请确认源码路径！"
 fi
