@@ -94,6 +94,9 @@ CONFIG_COMMON_CLK_ROCKCHIP=y
 CONFIG_PWM_ROCKCHIP=y
 CONFIG_OF_GPIO=y
 
+# TSADC 温度传感器
+CONFIG_ROCKCHIP_TSADC=y
+
 # =====================================================================
 # 解决kmod-fs-netfs核心内核依赖链
 # =====================================================================
