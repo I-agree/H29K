@@ -25,63 +25,13 @@ define Trusted-Firmware-A/Default
   BUILD_TARGET:=rockchip
 endef
 
-define Trusted-Firmware-A/rk3308
-  BUILD_SUBTARGET:=armv8
-  ATF:=rk33/rk3308_bl31_v2.27.elf
-  TPL:=rk33/rk3308_ddr_589MHz_uart2_m1_v2.10.bin
-endef
-
-define Trusted-Firmware-A/rk3308-tpl-rock-pi-s
-  NAME:=Radxa ROCK Pi S board
-  BUILD_SUBTARGET:=armv8
-  TPL:=rk33/rk3308_ddr_589MHz_uart0_m0_v2.10.bin
-endef
-
 define Trusted-Firmware-A/rk3528
   BUILD_SUBTARGET:=armv8
   ATF:=rk35/rk3528_bl31_v1.17.elf
   TPL:=rk35/rk3528_ddr_1056MHz_v1.10.bin
 endef
 
-define Trusted-Firmware-A/rk3566
-  BUILD_SUBTARGET:=armv8
-  ATF:=rk35/rk3568_bl31_v1.45.elf
-  TPL:=rk35/rk3566_ddr_1056MHz_v1.23.bin
-endef
-
-define Trusted-Firmware-A/rk3568
-  BUILD_SUBTARGET:=armv8
-  ATF:=rk35/rk3568_bl31_v1.45.elf
-  TPL:=rk35/rk3568_ddr_1560MHz_v1.23.bin
-endef
-
-define Trusted-Firmware-A/rk3568-tpl-e25
-  NAME:=Radxa E25 board
-  BUILD_SUBTARGET:=armv8
-  TPL:=rk35/rk3568_ddr_1560MHz_uart2_m0_115200_v1.23.bin
-endef
-
-define Trusted-Firmware-A/rk3576-tpl
-  NAME:=Rockchip RK3576 SoCs
-  BUILD_SUBTARGET:=armv8
-  TPL:=rk35/rk3576_ddr_lp4_2112MHz_lp5_2736MHz_v1.09.bin
-endef
-
-define Trusted-Firmware-A/rk3588-tpl
-  NAME:=Rockchip RK3588 SoCs
-  BUILD_SUBTARGET:=armv8
-  TPL:=rk35/rk3588_ddr_lp4_2112MHz_lp5_2400MHz_v1.19.bin
-endef
-
-TFA_TARGETS:= \
-	rk3308 \
-	rk3308-tpl-rock-pi-s \
-	rk3528 \
-	rk3566 \
-	rk3568 \
-	rk3568-tpl-e25 \
-	rk3576-tpl \
-	rk3588-tpl
+TFA_TARGETS:=rk3528
 
 ifeq ($(BUILD_VARIANT),rk3308-tpl-rock-pi-s)
   define Download/rk3308-tpl-rock-pi-s
