@@ -39,8 +39,8 @@ endef
 
 define Trusted-Firmware-A/rk3528
   BUILD_SUBTARGET:=armv8
-  ATF:=rk35/rk3528_bl31_v1.20.elf
-  TPL:=rk35/rk3528_ddr_1056MHz_v1.11.bin
+  ATF:=rk35/rk3528_bl31_v1.17.elf
+  TPL:=rk35/rk3528_ddr_1056MHz_v1.10.bin
 endef
 
 define Trusted-Firmware-A/rk3566
