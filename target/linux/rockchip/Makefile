@@ -22,13 +22,4 @@ DEFAULT_PACKAGES += uboot-envtools partx-utils e2fsprogs mkf2fs kmod-input-gpio-
 
 KERNELNAME:=Image dtbs
 
-# ==============================================================================
-# 内核准备钩子：在内核解压、文件同步完成后，向DTS编译规则追加H29K设备树
-# ==============================================================================
-define Kernel/Prepare/extra
-	if ! grep -q "rk3528-hinlink-h29k" $(LINUX_DIR)/arch/arm64/boot/dts/rockchip/Makefile; then \
-		echo 'dtb-$$(CONFIG_ARCH_ROCKCHIP) += rk3528-hinlink-h29k.dtb' >> $(LINUX_DIR)/arch/arm64/boot/dts/rockchip/Makefile; \
-	fi
-endef
-
 $(eval $(call BuildTarget))
