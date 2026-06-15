@@ -345,6 +345,9 @@
 		lcd_pwr_pin: lcd-pwr-pin {
 			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
+		lcd_bl_pin: lcd-bl-pin {
+			    rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
 	};
 };
 
@@ -417,17 +420,17 @@
 
 &spi1 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&spi1_pins>, <&lcd_rs_pin>, <&lcd_rst_pin>;
+	pinctrl-0 = <&spi1_pins>, <&lcd_rs_pin>, <&lcd_rst_pin>, <&lcd_bl_pin>;
 	status = "okay";
 
 	panel@0 {
 		compatible = "sitronix,st7789v";
 		reg = <0>;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
-		led-gpios = <&gpio0 RK_PA1 GPIO_ACTIVE_HIGH>;
-		spi-max-frequency = <15000000>;
-		power-supply = <&vcc_3v3_lcd>;
 		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
+		power-supply = <&vcc_3v3_lcd>;
+		backlight = <&backlight_lcd>;
+		spi-max-frequency = <15000000>;
 	};
 };
 
