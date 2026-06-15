@@ -282,7 +282,7 @@ CONFIG_REGULATOR_FIXED_VOLTAGE=y
 
 # --- CMA 连续物理内存调优 ---
 CONFIG_DMA_SHARED_BUFFER=y
-CONFIG_CMA_SIZE_MBYTES=32
+CONFIG_CMA_SIZE_MBYTES=64
 # --- 网络高并发 TCP BBR + FQ 底层内建 ---
 CONFIG_TCP_CONG_ADVANCED=y
 CONFIG_TCP_CONG_BBR=y
@@ -381,13 +381,6 @@ CONFIG_GPIO_KEYS=y
 
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数"
-
-GENERIC_CONFIG="target/linux/generic/config-6.12"
-if [ -f "$GENERIC_CONFIG" ]; then
-    sed -i '/CONFIG_ARM64_SVE/d; /CONFIG_ARM64_ASIMD/d' "$GENERIC_CONFIG" 2>/dev/null || true
-    echo "# CONFIG_ARM64_SVE is not set" >> "$GENERIC_CONFIG"
-    echo "CONFIG_ARM64_ASIMD=y" >> "$GENERIC_CONFIG"
-fi
 
 echo -e "# H29K OVERRIDE\n# CONFIG_TARGET_MULTI_ARCH is not set\nCONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" > .config.override
 
