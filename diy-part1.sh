@@ -105,7 +105,7 @@ download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin
 if grep -q "hinlink_h28k" "target/linux/rockchip/image/armv8.mk"; then
     echo "❌ 错误: armv8.mk 包含非法内容 (h28k)" && exit 1
 fi
-if ! grep -q "智能识别 Binman 合体固件或传统拆分固件" "target/linux/rockchip/image/Makefile"; then
+if ! grep -q "H29K 引导打包层调试" "target/linux/rockchip/image/Makefile"; then
     echo "❌ 错误: Makefile 核心打包规则不匹配" && exit 1
 fi
 
