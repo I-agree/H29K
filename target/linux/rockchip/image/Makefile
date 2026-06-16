@@ -43,23 +43,47 @@ define Build/pine64-img
 		>/dev/null
 
 	@echo "=========================================================="
-	@echo " 🔍 [H29K 引导打包层调试] 正在验证并注入 U-Boot 引导组件..."
+	@echo " 🔍 [H29K 引导打包层调试] 正在验证并智能检索 U-Boot 引导组件..."
 	@echo " 🚀 目标前缀变量 UBOOT_DEVICE_NAME = $(UBOOT_DEVICE_NAME)"
 	@echo "=========================================================="
 
-	if [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
-		echo "🎯 [检测成功] 发现 Binman 一体化合体固件，正在注入到 32KB 头部..."; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc; \
+	u_boot_bin=""; \
+	if [ -n "$(UBOOT_DEVICE_NAME)" ] && [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
+		u_boot_bin="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin; \
+	elif [ -f "$(STAGING_DIR_IMAGE)"/hinlink-h29k-rk3528-u-boot-rockchip.bin ]; then \
+		u_boot_bin="$(STAGING_DIR_IMAGE)"/hinlink-h29k-rk3528-u-boot-rockchip.bin; \
+	elif [ -f "$(STAGING_DIR_IMAGE)"/h29k-rk3528-u-boot-rockchip.bin ]; then \
+		u_boot_bin="$(STAGING_DIR_IMAGE)"/h29k-rk3528-u-boot-rockchip.bin; \
+	fi; \
+	if [ -n "$$u_boot_bin" ]; then \
+		echo "🎯 [检测成功] 发现 Binman 一体化合体固件: $$u_boot_bin"; \
+		echo "👉 正在向 32KB 头部 (seek=64) 砸入完整引导链..."; \
+		dd if="$$u_boot_bin" of="$@" seek=64 conv=notrunc; \
 	else \
-		echo "⚠️ [提示] 未发现 Binman 合体固件，正在尝试传统拆分式组件注入..."; \
-		echo "👉 1/2: 正在强行注入第一级引导 (IDBLoader) 到 seek=64 (32KB)..."; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img of="$@" seek=64 conv=notrunc && \
-		echo "👉 2/2: 正在强行注入第二级引导 (U-Boot ITB) 到 seek=16384 (8MB)..."; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb of="$@" seek=16384 conv=notrunc; \
+		echo "⚠️ [提示] 未发现常规命名 Binman 固件，正在尝试传统拆分组件与多重名模糊匹配..."; \
+		idb_img=""; uboot_itb=""; \
+		if [ -n "$(UBOOT_DEVICE_NAME)" ] && [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img ]; then \
+			idb_img="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img; \
+			uboot_itb="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb; \
+		elif [ -f "$(STAGING_DIR_IMAGE)"/hinlink-h29k-rk3528-idbloader.img ]; then \
+			idb_img="$(STAGING_DIR_IMAGE)"/hinlink-h29k-rk3528-idbloader.img; \
+			uboot_itb="$(STAGING_DIR_IMAGE)"/hinlink-h29k-rk3528-u-boot.itb; \
+		fi; \
+		if [ -n "$$idb_img" ]; then \
+			echo "🎯 [检测成功] 发现有效拆分引导组件，执行分段注入..."; \
+			echo "👉 1/2: 正在强行注入第一级引导 (IDBLoader) 到 seek=64 (32KB)..."; \
+			dd if="$$idb_img" of="$@" seek=64 conv=notrunc; \
+			if [ -f "$$uboot_itb" ]; then \
+				echo "👉 2/2: 正在强行注入第二级引导 (U-Boot ITB) 到 seek=16384 (8MB)..."; \
+				dd if="$$uboot_itb" of="$@" seek=16384 conv=notrunc; \
+			fi; \
+		else \
+			echo "❌ [严重错误] 警告：在临时存储区找不到任何适用于 H29K 的引导固件！固件将无法开机！"; \
+		fi; \
 	fi
 
 	@echo "=========================================================="
-	@echo " ✅ [H29K 引导打包层调试] 引导程序成功砸入指定扇区！"
+	@echo " ✅ [H29K 引导打包层调试] 引导程序处理流程结束！"
 	@echo "=========================================================="
 endef
 
@@ -88,6 +112,8 @@ define Device/Default
   IMAGES := factory.img.gz
   DEVICE_DTS_DIR = $$(DTS_DIR)/rockchip
   DEVICE_DTS = $$(SOC)-$(lastword $(subst _, ,$(1)))
+  # 🎯 核心修复：恢复原版被遗漏的设备名称基础计算公式，保障体系变量连贯性
+  UBOOT_DEVICE_NAME = $(lastword $(subst _, ,$(1)))-$$(SOC)
 endef
 
 include $(SUBTARGET).mk
