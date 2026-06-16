@@ -201,15 +201,15 @@ jobs:
             rm -rf tmp/.root-copy.flock || true
             
             echo "================================================================="
-            echo "========= 🔄 正在降级至顶层单线程安全模式 (-j1 V=s) 磨过残局 ========="
+            echo "========= 🔄 正在降级至顶层单线程安全模式 (-j1 V=w) 磨过残局 ========="
             echo "================================================================="
-            make package/compile -j1 V=s
+            make package/compile -j1 V=w
             echo "================================================================="
         fi
 
         # 🚀【核心修复点：将编译好的 ipk 释放安装到 root-rockchip 中】
         echo "📦 [新增关键衔接] 正在解压并铺设所有编译好的组件至目标根文件系统..."
-        make package/install -j$(nproc) || make package/install -j1 V=s
+        make package/install -j$(nproc) || make package/install -j1 V=w
 
         echo "📦 [总攻阶段 2/3] 固件合体：打包并生成最终的系统镜像..."
         if ! make target/install -j$(nproc); then
