@@ -65,7 +65,8 @@ define Build/Prepare
 	# 2. 🛠️ 核心修正：适配现代 U-Boot 规范，直接放入真正的 upstream 源码根目录
 	# 这样才能与 U-Boot 官方从 Linux 内核同步过来的 rk3528.dtsi 处于绝对同级目录，正确完成 #include 展开
 	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	$(CP) $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	
 	# 3. 🛠️ 核心补丁：将 dtb 目标无条件注册进真正的 upstream 设备树 Makefile，彻底根治 No rule to make target 错误
 	echo 'dtb-y += rk3528-hinlink-h29k.dtb' >> $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/Makefile
