@@ -1,0 +1,130 @@
+// SPDX-License-Identifier: GPL-2.0+
+/*
+ * U-Boot SPL/TPL Core Boot Phase Overrides for Hinlink H29K (RK3528)
+ * 专供 U-Boot 阶段进行静态精准裁剪（fdtgrep）的生命线文件
+ * 强制保留早起引导必需的基础设施，剔除 spi1、面板、LED 等无关节点
+ */
+
+/ {
+	bootph-all;
+};
+
+&chosen {
+	bootph-all;
+};
+
+/* ========================================== */
+/* ⚡ 核心时钟树与引脚控制器（SPL死活的关键）   */
+/* ========================================== */
+&cru {
+	bootph-all;
+};
+
+&pinctrl {
+	bootph-all;
+};
+
+/* ========================================== */
+/* 调试串口及引脚：确保通电瞬间第一行日志喷出   */
+/* ========================================== */
+&uart0 {
+	bootph-all;
+};
+
+&uart0m0_xfer {
+	bootph-all;
+};
+
+/* ========================================== */
+/* 核心电源与 PWM：防低压死机、防核心断电      */
+/* ========================================== */
+&vcc5v0_sys {
+	bootph-all;
+};
+
+&vcc_3v3 {
+	bootph-all;
+};
+
+&vcc_1v8 {
+	bootph-all;
+};
+
+&vdd_0v9 {
+	bootph-all;
+};
+
+&vcc_ddr {
+	bootph-all;
+};
+
+&vdd_arm {
+	bootph-all;
+};
+
+&vdd_logic {
+	bootph-all;
+};
+
+/* 核心供电背后的 PWM 控制器及引脚 */
+&pwm1 {
+	bootph-all;
+};
+
+&pwm1m0_pins {
+	bootph-all;
+};
+
+&pwm2 {
+	bootph-all;
+};
+
+&pwm2m0_pins {
+	bootph-all;
+};
+
+/* ========================================== */
+/* 存储介质：允许 SPL 寻址并读取主 U-Boot 镜像 */
+/* ========================================== */
+
+/* 1. eMMC (sdhci) */
+&sdhci {
+	bootph-pre-ram;
+};
+
+&emmc_bus8 {
+	bootph-pre-ram;
+};
+
+&emmc_clk {
+	bootph-pre-ram;
+};
+
+&emmc_cmd {
+	bootph-pre-ram;
+};
+
+&emmc_strb {
+	bootph-pre-ram;
+};
+
+/* 2. SD卡 (sdmmc) */
+&sdmmc {
+	bootph-pre-ram;
+};
+
+&sdmmc_bus4 {
+	bootph-pre-ram;
+};
+
+&sdmmc_clk {
+	bootph-pre-ram;
+};
+
+&sdmmc_cmd {
+	bootph-pre-ram;
+};
+
+&sdmmc_det {
+	bootph-pre-ram;
+};
