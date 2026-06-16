@@ -27,7 +27,8 @@ endef
 
 define U-Boot/rk3528/Default
   BUILD_SUBTARGET:=armv8
-  DEPENDS:=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3528
+  # 🎯 修复：直接强依赖 ATF 包，确保 rk3528_bl31_v1.17.elf 绝对提前就位
+  DEPENDS:=+trusted-firmware-a-rk3528
   ATF:=rk3528_bl31_v1.17.elf
   TPL:=rk3528_ddr_1056MHz_v1.10.bin
 endef
@@ -50,6 +51,8 @@ UBOOT_CUSTOMIZE_CONFIG := \
 UBOOT_MAKE_FLAGS += \
 	PKG_CONFIG=pkg-config \
 	PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig" \
+	BINMAN_ALLOW_MISSING=0 \
+	BINMAN_INTRUSIVE_AS_NEEDED=1 \
 	BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
 	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
