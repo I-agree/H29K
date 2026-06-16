@@ -148,6 +148,16 @@ fi
 
 echo "✅ rockchip_armv8 H29K 适配校验通过"
 
+# 校验6：检查 rk3528-hinlink-h29k-u-boot.dtsi 是否下载成功
+ENV_FILE="package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi"
+
+if ! grep -q "bootph-all" "$ENV_FILE"; then
+    echo "❌ 校验失败：未找到rk3528-hinlink-h29k-u-boot.dtsi"
+    exit 1
+fi
+
+echo "✅ rk3528-hinlink-h29k-u-boot.dtsi下载校验通过"
+
 # ============================================================================
 
 # --- 统一拉取应用层开机 LOGO 组 ---
