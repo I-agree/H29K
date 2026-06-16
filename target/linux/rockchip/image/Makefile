@@ -10,11 +10,20 @@ endef
 
 ### Image scripts ###
 define Build/boot-common
-	# This creates a new folder copies the dtb (as rockchip.dtb) 
-	# and the kernel image (as kernel.img)
+	# This creates a new folder, copies the dtb into rockchip/ sub-folder with its original name,
+	# and copies the kernel image (as kernel.img)
 	rm -fR $@.boot >/dev/null
 	mkdir -p $@.boot >/dev/null
-	$(CP) $(KDIR)/image-$(firstword $(notdir $(DEVICE_DTS))).dtb $@.boot/rockchip.dtb >/dev/null
+
+	# 🎯 核心修改 1：在 FAT32 引导分区的临时根目录下创建 rockchip 子目录
+	mkdir -p $@.boot/rockchip >/dev/null
+
+	# 🎯 核心修改 2：拒绝改名！直接以原名复制到 rockchip/ 目录下
+	# $(firstword $(notdir $(DEVICE_DTS))) 会被精准展开为 rk3528-hinlink-h29k
+	$(CP) $(KDIR)/image-$(firstword $(notdir $(DEVICE_DTS))).dtb \
+		$@.boot/rockchip/$(firstword $(notdir $(DEVICE_DTS))).dtb >/dev/null
+
+	# 保持原样：复制内核镜像
 	$(CP) $(IMAGE_KERNEL) $@.boot/kernel.img >/dev/null
 endef
 
