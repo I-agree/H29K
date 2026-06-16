@@ -1,9 +1,7 @@
 part uuid ${devtype} ${devnum}:2 uuid
 
-# 🎯 绝杀瘦身：因为只编译 H29K，直接硬编码 RK3528 的 ttyS0 和 0xff9f0000 基地址！
 setenv bootargs "console=ttyS0,1500000 earlycon=uart8250,mmio32,0xff9f0000 root=PARTUUID=${uuid} rw rootwait";
 
-# 🎯 现代化主线：顺着我们用 Build/boot-common 建立的标准规范路径去动态加载设备树
 load ${devtype} ${devnum}:1 ${fdt_addr_r} ${fdtfile}
 load ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img
 
