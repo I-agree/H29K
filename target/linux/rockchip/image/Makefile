@@ -27,25 +27,31 @@ endef
 define Build/pine64-img
 	# Creates the final SD/eMMC images, 
 	# combining boot partition, root partition as well as the u-boot bootloader
-	# Generate a new partition table in $@ with 32 MiB of 
-	# alignment padding for the idbloader and u-boot to fit:
-	# http://opensource.rock-chips.com/wiki_Boot_option#Boot_flow
-	#
-	# U-Boot SPL expects the U-Boot ITB to be located at sector 0x4000 (8 MiB) on the MMC storage
 	GUID="54444e4b-5341-4c41-4d41-4e44414e4749" PADDING=1 PARTOFFSET=32m $(SCRIPT_DIR)/gen_image_generic.sh \
 		$@ \
 		$(CONFIG_TARGET_KERNEL_PARTSIZE) $@.boot \
 		$(CONFIG_TARGET_ROOTFS_PARTSIZE) $(IMAGE_ROOTFS) \
 		>/dev/null
-	# 🛠️ 智能识别 Binman 合体固件或传统拆分固件
+
+	@echo "=========================================================="
+	@echo " 🔍 [H29K 引导打包层调试] 正在验证并注入 U-Boot 引导组件..."
+	@echo " 🚀 目标前缀变量 UBOOT_DEVICE_NAME = $(UBOOT_DEVICE_NAME)"
+	@echo "=========================================================="
+
 	if [ -f "$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin ]; then \
-		echo "Found Binman combined image, flashing..."; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc status=none; \
+		echo "🎯 [检测成功] 发现 Binman 一体化合体固件，正在注入到 32KB 头部..."; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot-rockchip.bin of="$@" seek=64 conv=notrunc; \
 	else \
-		echo "Binman image not found, falling back to split legacy images..."; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img of="$@" seek=64 conv=notrunc status=none; \
-		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb of="$@" seek=16384 conv=notrunc status=none; \
+		echo "⚠️ [提示] 未发现 Binman 合体固件，正在尝试传统拆分式组件注入..."; \
+		echo "👉 1/2: 正在强行注入第一级引导 (IDBLoader) 到 seek=64 (32KB)..."; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-idbloader.img of="$@" seek=64 conv=notrunc && \
+		echo "👉 2/2: 正在强行注入第二级引导 (U-Boot ITB) 到 seek=16384 (8MB)..."; \
+		dd if="$(STAGING_DIR_IMAGE)"/$(UBOOT_DEVICE_NAME)-u-boot.itb of="$@" seek=16384 conv=notrunc; \
 	fi
+
+	@echo "=========================================================="
+	@echo " ✅ [H29K 引导打包层调试] 引导程序成功砸入指定扇区！"
+	@echo "=========================================================="
 endef
 
 define Build/pine64-bin
