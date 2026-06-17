@@ -200,6 +200,7 @@
 		gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&sdmmc_vol_ctrl_h>;
+		startup-delay-us = <2000>;
 		states = <1800000 0x0>, <3300000 0x1>;
 		vin-supply = <&vcc5v0_sys>;
 	};
@@ -264,6 +265,8 @@
 	clock_in_out = "output";
 	phy-handle = <&rgmii_phy>;
 	phy-mode = "rgmii-id";
+	tx_delay = <0x3>;
+	rx_delay = <0x6>;
 	phy-supply = <&vcc_3v3>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&rgmii_miim &rgmii_tx_bus2 &rgmii_rx_bus2 &rgmii_rgmii_clk &rgmii_rgmii_bus>;
@@ -400,6 +403,7 @@
 	cap-sd-highspeed;
 	cap-sdio-irq;
 	supports-sdio;
+	broken-cd;
 	keep-power-in-suspend;
 	max-frequency = <200000000>;
 	mmc-pwrseq = <&sdio_pwrseq>;
