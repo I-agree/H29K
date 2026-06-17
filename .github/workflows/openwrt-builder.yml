@@ -125,78 +125,7 @@ jobs:
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         echo -e "$(nproc) thread compile"
-        
-        echo "🛠️ [步骤 1/3] 全速轰炸编译交叉编译工具链（此时无内核配置干扰）..."
-        make tools/compile -j$(nproc)
-        make toolchain/compile -j$(nproc)
-        
-        echo "🤖 [步骤 2/3] 工具链已就位！使用真实交叉编译器精准校准内核..."
-        make target/linux/refresh V=w
-        
-        echo "🔄 [衔接步骤] 释放校准成果，物理编译内核底座以修复构建树空洞..."
-        make target/linux/compile -j1 V=w
-        
-        # ✅【关键步骤：提前触发核心目录树及底层初始化】
-        make target/compile -j$(nproc)
-        
-        echo "🚀 [专项环境准备] 提前单挑解开 Go 编译器枷锁，确保后续狙击不落空..."
-        make package/feeds/packages/golang/compile -j$(nproc) || make package/feeds/packages/golang/compile -j1 V=s
-        
-        # =================================================================
-        # 🚀 [步骤 3/3] 开启满血专项狙击！让六大高负载包排队单挑
-        # =================================================================
-        
-        echo "📦 [专项狙击 1/6] 单独全速编译无线核心架构 mac80211（断开内核符号抢夺）..."
-        make package/kernel/mac80211/compile -j$(nproc) || make package/kernel/mac80211/compile -j1 V=s
-        
-        echo "📦 [专项狙击 2/6] 使用标准单线程详细模式编译 aic8800（彻底规避假死悬空）..."
-        make package/kernel/aic8800/compile -j1 V=w
-        
-        echo "📦 [专项狙击 3/6] 单独全速编译 dockerd 守护进程核心..."
-        make package/feeds/packages/dockerd/compile -j$(nproc) || make package/feeds/packages/dockerd/compile -j1 V=s
-        
-        echo "📦 [专项狙击 4/6] 单独全速编译 docker 客户端核心..."
-        make package/feeds/packages/docker/compile -j$(nproc) || make package/feeds/packages/docker/compile -j1 V=s
-        
-        echo "📦 [专项狙击 5/6] 单独全速编译重头戏 docker-compose 编排引擎..."
-        make package/feeds/packages/docker-compose/compile -j$(nproc) || make package/feeds/packages/docker-compose/compile -j1 V=s
-        
-        echo "📦 [专项狙击 6/6] 单独全速编译 Docker 面板 luci-app-dockerman（规避并发线程假死）..."
-        make package/feeds/luci/luci-app-dockerman/compile -j$(nproc) || make package/feeds/luci/luci-app-dockerman/compile -j1 V=s
-        
-        # =================================================================
-        # 🛡️ 【解耦型：分段全自动断点智能熔断技术 - 4核15G环境专属优化版】
-        # =================================================================
-        echo "🔥 [总攻阶段 1/3] 开始全包满血总攻残局（常规轻量小包并发编译）..."
-        
-        if ! timeout 20m make package/compile -j$(nproc); then
-            echo -e "\n\n🚨 [自动熔断触发] 检测到常规包并发编译遭遇多线程并发死锁（挂起超时）！"
-            echo "🔍 正在强杀卡死的 fakeroot 守护进程、物理清除残留全局锁..."
-            
-            killall -9 faked fakeroot 2>/dev/null || true
-            rm -rf tmp/.root-copy.flock || true
-            
-            echo "================================================================="
-            echo "========= 🔄 正在降级至顶层单线程安全模式 (-j1 V=w) 磨过残局 ========="
-            echo "================================================================="
-            make package/compile -j1 V=w
-            echo "================================================================="
-        fi
-
-        # 🚀【核心修复点：将编译好的 ipk 释放安装到 root-rockchip 中】
-        echo "📦 [新增关键衔接] 正在解压并铺设所有编译好的组件至目标根文件系统..."
-        make package/install -j$(nproc) || make package/install -j1 V=w
-
-        echo "📦 [总攻阶段 2/3] 固件合体：打包并生成最终的系统镜像..."
-        if ! make target/install -j$(nproc); then
-            echo -e "\n\n❌ [自动熔断] 固件打包或内核安装阶段失败！"
-            make target/install -j1 V=s
-            exit 1
-        fi
-
-        echo "🗂️ [总攻阶段 3/3] 建立软件包索引..."
-        make package/index -j$(nproc)
-        
+        make -j$(nproc) || make -j1 V=w
         echo "status=success" >> $GITHUB_OUTPUT
         grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
