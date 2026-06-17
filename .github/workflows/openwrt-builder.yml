@@ -80,7 +80,7 @@ jobs:
         echo -e "\n==================== 内存大小 ===================="
         free -h
 
-    - name: 克隆 OpenWrt 源码到大盘
+    - name: 克隆 OpenWrt 源码到磁盘
       run: |
         cd $WORK_DIR
         df -hT $PWD
@@ -111,38 +111,14 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 主线内核智能补全与下载依赖软件
+    - name: 下载依赖软件
       id: package
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         make defconfig
-        
-        git add target/linux/
-        
-        echo "🤖 启动内核符号冷启动补全，正在校准 Kconfig 技术栈..."
-        make target/linux/refresh V=s KCONFIG_NOTIMEOUT=1 > $GITHUB_WORKSPACE/kconfig_scan.log 2>&1 || true
-        cat $GITHUB_WORKSPACE/kconfig_scan.log
-        echo "✅ 内核依赖树重构完毕"
-        
-        git diff target/linux/ > $GITHUB_WORKSPACE/kernel_complements.txt || true
-        
-        if grep -q "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log; then
-          echo -e "\n❌【重大不完美警告】检测到未来新版内核引入了未决断的 (NEW) 交互选项！" > $GITHUB_WORKSPACE/kernel_complements.txt
-          grep "(NEW)" $GITHUB_WORKSPACE/kconfig_scan.log >> $GITHUB_WORKSPACE/kernel_complements.txt
-        elif [ ! -s $GITHUB_WORKSPACE/kernel_complements.txt ]; then
-          echo "🎉 和内核的 Kconfig 结构树进行比对，既无结构变动，也未发现任何(NEW)隐形交互弹窗，但是无法保证源码构建阶段没有问题！" > $GITHUB_WORKSPACE/kernel_complements.txt
-        fi
-
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-
-    - name: 上传内核自动补全对比清单
-      uses: actions/upload-artifact@v7.0.1
-      if: always()
-      with:
-        name: H29K_内核自动补全明细表
-        path: ${{ github.workspace }}/kernel_complements.txt
 
     - name: 编译固件镜像
       id: compile
