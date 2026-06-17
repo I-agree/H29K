@@ -215,6 +215,7 @@
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
+		regulator-pwm-continuous;
 	};
 
 	vdd_logic: regulator-vdd-logic {
@@ -227,6 +228,7 @@
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
+		regulator-pwm-continuous;
 	};
 
 	rng: rng@ffc50000 {
