@@ -9,6 +9,11 @@ PKG_VERSION:=2026.04
 PKG_RELEASE:=1
 PKG_HASH:=skip
 
+# 使用GitHub官方镜像
+PKG_SOURCE_URL:=https://github.com/u-boot/u-boot.git
+# 固定锁定v2026.04正式标签，和Bootlin在线源码完全一致
+PKG_SOURCE_VERSION:=v2026.04
+
 PKG_MAINTAINER:=Sarah Maedel <openwrt@tbspace.de>
 
 UBOOT_USE_BINMAN:=1
