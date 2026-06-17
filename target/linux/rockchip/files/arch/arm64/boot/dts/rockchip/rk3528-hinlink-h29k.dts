@@ -436,7 +436,6 @@
 		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
 		power-supply = <&vcc_3v3_lcd>;
 		backlight = <&backlight_lcd>;
-		spi-max-frequency = <15000000>;
 	};
 };
 
