@@ -403,12 +403,12 @@
 	cap-sd-highspeed;
 	cap-sdio-irq;
 	supports-sdio;
-	broken-cd;
 	keep-power-in-suspend;
 	max-frequency = <200000000>;
 	mmc-pwrseq = <&sdio_pwrseq>;
 	non-removable;
 	sd-uhs-sdr104;
+	broken-cd;
 	pinctrl-names = "default";
 	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
 	status = "okay";
@@ -426,6 +426,7 @@
 &spi1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi1_pins>, <&lcd_rs_pin>, <&lcd_rst_pin>, <&lcd_bl_pin>;
+	spi-max-frequency = <15000000>;
 	status = "okay";
 
 	panel@0 {
