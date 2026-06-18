@@ -99,7 +99,6 @@ download_and_check "${BASE_URL}/target/linux/rockchip/image/Makefile" "target/li
 download_and_check "${BASE_URL}/target/linux/rockchip/image/mmc.bootscript" "target/linux/rockchip/image/mmc.bootscript"
 download_and_check "${BASE_URL}/scripts/gen_image_generic.sh" "scripts/gen_image_generic.sh"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.d" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.d"
 download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
 
 # --- 深度内容专项校验 ---
@@ -158,16 +157,6 @@ if ! grep -q "bootph-all" "$ENV_FILE"; then
 fi
 
 echo "✅ rk3528-hinlink-h29k-u-boot.dtsi下载校验通过"
-
-# 校验7：检查 rk3528-hinlink-h29k.d 是否下载成功
-ENV_FILE="package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.d"
-
-if ! grep -q "rk3528-hinlink-h29k-u-boot.dtsi" "$ENV_FILE"; then
-    echo "❌ 校验失败：未找到rk3528-hinlink-h29k.d"
-    exit 1
-fi
-
-echo "✅ rk3528-hinlink-h29k.d下载校验通过"
 
 # ============================================================================
 
