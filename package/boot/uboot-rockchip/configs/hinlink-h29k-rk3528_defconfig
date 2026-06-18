@@ -187,6 +187,7 @@ CONFIG_FASTBOOT_BUF_ADDR=0x10000000
 # CONFIG_CMD_IO is not set
 # CONFIG_CMD_PMC is not set
 # CONFIG_IO_SPACE is not set
+# CONFIG_DM_USB is not set
 # CONFIG_USB_EMUL is not set
 # CONFIG_USB_SANDBOX is not set
 # CONFIG_PCI_EMUL is not set
