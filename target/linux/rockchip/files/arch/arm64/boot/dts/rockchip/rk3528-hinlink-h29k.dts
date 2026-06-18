@@ -406,6 +406,7 @@
 	cap-sdio-irq;
 	supports-sdio;
 	keep-power-in-suspend;
+	no-sdio-pm;
 	max-frequency = <200000000>;
 	mmc-pwrseq = <&sdio_pwrseq>;
 	non-removable;
@@ -416,6 +417,7 @@
 	status = "okay";
 
 	wifi@1 {
+		compatible = "aic,aic8800";
 		reg = <1>;
 		interrupt-parent = <&gpio1>;
 		interrupts = <RK_PA7 IRQ_TYPE_LEVEL_HIGH>;
