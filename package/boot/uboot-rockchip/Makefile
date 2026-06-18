@@ -64,6 +64,8 @@ UBOOT_MAKE_FLAGS += \
 # 🚀 【现代主线化全面适配】彻底打通 U-Boot 2026+ 原生 OF_UPSTREAM 设备树目录
 define Build/Prepare
 	$(call Build/Prepare/Default)
+	# 彻底删除沙盒USB主机驱动，消除 usb_emul_* 全部链接错误
+	rm -f $(PKG_BUILD_DIR)/drivers/usb/host/usb-sandbox.c
 	# 1. 复制自定义 H29K defconfig 到 U-Boot 基础配置目录
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
 	
