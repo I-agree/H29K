@@ -1154,4 +1154,88 @@ fi
 
 # =================================================================================
 
+# ====================== 日志优化：Docker容器日志全部存入tmp内存，完全不写入eMMC闪存 ======================
+echo "配置Docker日志输出至系统内存syslog，彻底消除容器持久化日志写入"
+
+# 1.MediaMTX源头降低日志输出，只输出warn/error，从根源减少日志总量
+mkdir -p files/etc/docker/mediamtx
+cat > files/etc/docker/mediamtx.yml << 'EOF'
+logLevel: warn
+logDestinations: [stdout]
+dumpPackets: false
+metrics: no
+pprof: no
+writeQueueSize: 256
+api: true
+apiAddress: 127.0.0.1:9997
+rtsp: true
+rtspTransports: [udp, tcp]
+rtspAddress: :8554
+rtpAddress: :8000
+rtcpAddress: :8001
+rtmp: true
+rtmpAddress: :1935
+hls: true
+hlsAddress: :8888
+hlsAllowOrigins: ["*"]
+hlsAlwaysRemux: true
+hlsVariant: lowLatency
+hlsSegmentCount: 3
+hlsSegmentDuration: 1s
+hlsPartDuration: 200ms
+hlsSegmentMaxSize: 20M
+hlsDirectory: ""
+webrtc: true
+webrtcAddress: :8889
+webrtcAllowOrigins: ["*"]
+webrtcLocalUDPAddress: :8189
+webrtcIPsFromInterfaces: true
+srt: false
+pathDefaults:
+  source: publisher
+  overridePublisher: true
+EOF
+
+# 2.Docker全局日志驱动切换为syslog，日志全部输出到/dev/log（内存tmpfs，断电清空，无磁盘写入）
+mkdir -p files/etc/docker
+cat > files/etc/docker/daemon.json << 'EOF'
+{
+  "log-driver": "syslog",
+  "log-opts": {
+    "syslog-address": "unixgram:///dev/log"
+  }
+}
+EOF
+
+# 3.OpenWrt系统日志仅驻留内存，禁止落地文件，进一步减少底层写盘
+mkdir -p files/etc/config
+cat >> files/etc/config/system << 'EOF'
+config system
+        option log_size '64'
+        option log_file ''
+        option log_remote ''
+        option conloglevel 'warn'
+        option cronloglevel 'error'
+EOF
+
+# 4.开机优化内核打印等级+overlay挂载延迟写入，减少细碎闪存擦写
+mkdir -p files/etc/uci-defaults
+cat > files/etc/uci-defaults/90-limit-kernel-log << 'EOF'
+#!/bin/sh
+# 降低内核冗余打印
+echo 1 > /proc/sys/kernel/printk
+# overlay挂载参数：延迟刷盘、关闭访问时间，减少频繁小写入
+uci -q add fstab mount
+uci set fstab.@mount[-1].target="/overlay"
+uci set fstab.@mount[-1].options="async,noatime,nodiratime,commit=60,barrier=0"
+uci set fstab.@mount[-1].fstype="squashfs"
+uci set fstab.@mount[-1].enabled=1
+uci commit fstab
+exit 0
+EOF
+chmod +x files/etc/uci-defaults
+
+echo "✅ Docker内存日志模式配置完成，容器日志不再写入板载eMMC"
+# =================================================================================
+
 echo "🚀 H29K 极致稳健的流媒体边缘切换矩阵离线改造，全部大功告成！"
