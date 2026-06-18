@@ -5,14 +5,9 @@
 include $(TOPDIR)/rules.mk
 include $(INCLUDE_DIR)/kernel.mk
 
-PKG_VERSION:=2026.04
+PKG_VERSION:=2025.10
 PKG_RELEASE:=1
-PKG_HASH:=skip
-
-# 使用GitHub官方镜像
-PKG_SOURCE_URL:=https://github.com/u-boot/u-boot.git
-# 固定锁定v2026.04正式标签，和Bootlin在线源码完全一致
-PKG_SOURCE_VERSION:=v2026.04
+PKG_HASH:=b4f032848e56cc8f213ad59f9132c084dbbb632bc29176d024e58220e0efdf4a
 
 PKG_MAINTAINER:=Sarah Maedel <openwrt@tbspace.de>
 
