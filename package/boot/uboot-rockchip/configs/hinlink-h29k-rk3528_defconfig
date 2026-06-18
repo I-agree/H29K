@@ -182,3 +182,15 @@ CONFIG_FASTBOOT_BUF_ADDR=0x10000000
 # CONFIG_USB_DWC3_GENERIC is not set
 # CONFIG_CMD_USB is not set
 # CONFIG_CMD_USB_MASS_STORAGE is not set
+
+# 新增屏蔽沙盒IO、虚拟PCI/USB仿真，修复大量undefined符号
+# CONFIG_CMD_IO is not set
+# CONFIG_CMD_PMC is not set
+# CONFIG_IO_SPACE is not set
+# CONFIG_P2SB is not set
+# CONFIG_USB_EMUL is not set
+# CONFIG_USB_SANDBOX is not set
+# CONFIG_PCI_EMUL is not set
+# CONFIG_SANDBOX_IO is not set
+# CONFIG_HAS_IO_PORT is not set
+# CONFIG_ARCH_IO is not set
