@@ -60,10 +60,14 @@
 
 &vdd_arm {
 	bootph-all;
+	/* U-Boot上电初始电压，和H28K对齐，保证DDR稳定初始化 */
+	regulator-init-microvolt = <953000>;
 };
 
 &vdd_logic {
 	bootph-all;
+	/* U-Boot上电初始电压，和H28K对齐 */
+	regulator-init-microvolt = <900000>;
 };
 
 /* 核心供电背后的 PWM 控制器及引脚 */
