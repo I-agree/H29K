@@ -6,7 +6,7 @@
 set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终止
 
 # =================================================================================
-# 🎯 工业级自愈补丁：将 rk3528-hinlink-h29k 安全注册进内核 Makefile
+# 1. 🎯 工业级自愈补丁：将 rk3528-hinlink-h29k 安全注册进内核 Makefile
 # =================================================================================
 # 使用原生 Shell 循环替代 ls/find 管道，100% 免疫 set -e 报错自杀机制
 PATCH_DIR=""
@@ -34,7 +34,7 @@ else
     echo "⚠️ 提示：未探测到 rockchip 补丁目录，跳过内核补丁修改。"
 fi
 
-# ======================== 【1. 🚀 编译期：最新稳定版动态嗅探与自愈中心】 ========================
+# ======================== 【2. 🚀 编译期：最新稳定版动态嗅探与自愈中心】 ========================
 echo "🔍 正在动态获取互联网当前最新的稳定版版本号..."
 
 # 🌟【自愈】防止 GitHub Actions 共享 IP 触发 API 限流时导致 grep 失败
@@ -98,10 +98,6 @@ sudo docker run --privileged --rm tonistiigi/binfmt --install arm64
 
 # --- 下面是 Docker 编译命令 ---
 docker buildx build --platform linux/arm64 -f Dockerfile.alpine -t h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} --load .
-
-# ======================== 【2. 清理原生冲突架构源】 ========================
-echo "🧹 正在清理原生冲突的架构补丁..."
-rm -rf package/boot/uboot-rockchip/patches
 
 # ======================== 【3. H29K 主线内核配置合并注入】 ========================
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
