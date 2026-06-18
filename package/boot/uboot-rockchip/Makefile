@@ -29,8 +29,8 @@ define U-Boot/rk3528/Default
   BUILD_SUBTARGET:=armv8
   # 🎯 修复：直接强依赖 ATF 包，确保 rk3528_bl31_v1.17.elf 绝对提前就位
   DEPENDS:=+trusted-firmware-a-rk3528
-  ATF:=rk3528_bl31_v1.17.elf
-  TPL:=rk3528_ddr_1056MHz_v1.10.bin
+  ATF:=rk35/rk3528_bl31_v1.20.elf
+  TPL:=rk35/rk3528_ddr_1056MHz_v1.11.bin
 endef
 
 define U-Boot/hinlink-h29k-rk3528
