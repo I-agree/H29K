@@ -1211,7 +1211,7 @@ EOF
 mkdir -p files/etc/config
 cat >> files/etc/config/system << 'EOF'
 config system
-        option log_size '64'
+        option log_size '2048'
         option log_file ''
         option log_remote ''
         option conloglevel 'warn'
