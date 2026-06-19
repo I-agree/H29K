@@ -66,9 +66,6 @@ define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	
-	# 3. 🛠️ 核心补丁：将 dtb 目标无条件注册进真正的 upstream 设备树 Makefile，彻底根治 No rule to make target 错误
-	echo 'dtb-y += rk3528-hinlink-h29k.dtb' >> $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/Makefile
 endef
 
 define Build/InstallDev
