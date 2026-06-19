@@ -67,3 +67,26 @@ CONFIG_USB_GADGET=y
 CONFIG_USB_GADGET_DOWNLOAD=y
 CONFIG_USB_FUNCTION_ROCKUSB=y
 CONFIG_ERRNO_STR=y
+
+# ===== 核心基础依赖（必选，缺失会导致全量符号未定义） =====
+CONFIG_DM=y
+CONFIG_OF_CONTROL=y
+CONFIG_OF_LIBFDT=y
+CONFIG_TIMER=y
+
+# ===== 强制禁用沙盒/仿真/ACPI类无用驱动 =====
+# CONFIG_SANDBOX is not set
+# CONFIG_USB_SANDBOX_HOST is not set
+# CONFIG_USB_EMUL is not set
+# CONFIG_I2C_EMUL is not set
+# CONFIG_ACPI is not set
+# CONFIG_ACPI_PMC is not set
+# CONFIG_P2SB is not set
+# CONFIG_VIRTIO_SANDBOX is not set
+# CONFIG_TEST_DRV is not set
+# CONFIG_SWAP_CASE is not set
+# CONFIG_CMD_IO is not set
+
+# ===== SPL/TPL 启动链完整依赖 =====
+CONFIG_SPL=y
+CONFIG_TPL=y
