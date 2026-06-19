@@ -28,6 +28,9 @@
 
 	chosen {
 		stdout-path = "serial0:1500000n8";
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
 	};
 
 	gpio-keys {
@@ -215,17 +218,6 @@
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
 		regulator-pwm-continuous;
-	};
-
-	rng: rng@ffc50000 {
-		compatible = "rockchip,rk3528-rng", "rockchip,rk3588-rng";
-		reg = <0x0 0xffc50000 0x0 0x200>;
-		interrupts = <0 23 4>;
-		clocks = <&scmi_clk 32>;
-		clock-names = "hclk_trng";
-		resets = <&cru 0xa3>;
-		reset-names = "reset";
-		status = "okay";
 	};
 };
 
