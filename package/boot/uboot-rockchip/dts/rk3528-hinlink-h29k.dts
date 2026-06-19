@@ -4,8 +4,6 @@
 #include <dt-bindings/pwm/pwm.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/interrupt-controller/irq.h>
-#include <dt-bindings/interrupt-controller/arm-gic.h>
 #include "rk3528.dtsi"
 
 / {
@@ -28,9 +26,6 @@
 
 	chosen {
 		stdout-path = "serial0:1500000n8";
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
 	};
 
 	gpio-keys {
@@ -44,13 +39,6 @@
 			linux,code = <KEY_RESTART>;
 			debounce-interval = <20>;
 		};
-	};
-
-	ir-receiver {
-		compatible = "gpio-ir-receiver";
-		gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&ir_int_pin>;
 	};
 
 	leds {
@@ -72,28 +60,6 @@
 			label = "green:work";
 			gpios = <&gpio4 RK_PB7 GPIO_ACTIVE_LOW>;
 		};
-	};
-
-	backlight_lcd: backlight-lcd {
-		compatible = "gpio-backlight";
-		gpios = <&gpio0 RK_PA1 GPIO_ACTIVE_HIGH>;
-		default-on;
-	};
-
-	rfkill-modem {
-		compatible = "rfkill-gpio";
-		label = "rfkill-modem";
-		radio-type = "wwan";
-		shutdown-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
-	};
-
-	sdio_pwrseq: sdio-pwrseq {
-		compatible = "mmc-pwrseq-simple";
-		pinctrl-names = "default";
-		pinctrl-0 = <&wifi_reg_on>;
-		post-power-on-delay-ms = <100>;
-		power-off-delay-us = <5000000>;
-		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
 	};
 
 	vdd_0v9: regulator-0v9-vdd {
@@ -268,12 +234,6 @@
 		};
 	};
 
-	ir {
-		ir_int_pin: ir-int-pin {
-			rockchip,pins = <4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_up>;
-		};
-	};
-
 	keys {
 		key_reset_pin: key-reset-pin {
 			rockchip,pins = <4 RK_PC1 RK_FUNC_GPIO &pcfg_pull_up>;
@@ -375,16 +335,6 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
 	status = "okay";
-
-	wifi@1 {
-		compatible = "aic,aic8800";
-		reg = <1>;
-		interrupt-parent = <&gpio1>;
-		interrupts = <RK_PA7 IRQ_TYPE_LEVEL_HIGH>;
-		interrupt-names = "host-wake";
-		pinctrl-names = "default";
-		pinctrl-0 = <&wl_wake_host>;
-	};
 };
 
 &uart0 {
