@@ -1,9 +1,4 @@
 // SPDX-License-Identifier: GPL-2.0+
-/*
- * U-Boot SPL/TPL Core Boot Phase Overrides for Hinlink H29K (RK3528)
- * 专供 U-Boot 阶段进行静态精准裁剪（fdtgrep）的生命线文件
- * 强制保留早起引导必需的基础设施，剔除 spi1、面板、LED 等无关节点
- */
 
 / {
 	bootph-all;
@@ -13,9 +8,6 @@
 	bootph-all;
 };
 
-/* ========================================== */
-/* ⚡ 核心时钟树与引脚控制器（SPL死活的关键）   */
-/* ========================================== */
 &cru {
 	bootph-all;
 };
@@ -24,9 +16,6 @@
 	bootph-all;
 };
 
-/* ========================================== */
-/* 调试串口及引脚：确保通电瞬间第一行日志喷出   */
-/* ========================================== */
 &uart0 {
 	bootph-all;
 };
@@ -35,7 +24,6 @@
 	bootph-all;
 };
 
-/* 额外串口1、2 U-Boot阶段需要DM枚举，加入保留 */
 &uart1 {
 	bootph-all;
 };
@@ -52,9 +40,6 @@
 	bootph-all;
 };
 
-/* ========================================== */
-/* 核心电源与 PWM：防低压死机、防核心断电      */
-/* ========================================== */
 &vcc5v0_sys {
 	bootph-all;
 };
@@ -77,17 +62,14 @@
 
 &vdd_arm {
 	bootph-all;
-	/* U-Boot上电初始电压，和H28K对齐，保证DDR稳定初始化 */
 	regulator-init-microvolt = <953000>;
 };
 
 &vdd_logic {
 	bootph-all;
-	/* U-Boot上电初始电压，和H28K对齐 */
 	regulator-init-microvolt = <900000>;
 };
 
-/* 核心供电背后的 PWM 控制器及引脚 */
 &pwm1 {
 	bootph-all;
 };
@@ -104,7 +86,6 @@
 	bootph-all;
 };
 
-/* SD卡GPIO可控3.3V供电 + 1.8V/3.3V电压切换调节器 */
 &vcc3v3_sd {
 	bootph-all;
 };
@@ -121,7 +102,6 @@
 	bootph-all;
 };
 
-/* SDIO WiFi上电时序节点，U-Boot DM需要枚举 */
 &sdio_pwrseq {
 	bootph-all;
 };
@@ -134,11 +114,6 @@
 	bootph-all;
 };
 
-/* ========================================== */
-/* 存储介质：允许 SPL 寻址并读取主 U-Boot 镜像 */
-/* ========================================== */
-
-/* 1. eMMC (sdhci) */
 &sdhci {
 	bootph-pre-ram;
 };
@@ -159,7 +134,6 @@
 	bootph-pre-ram;
 };
 
-/* 2. SD卡 (sdmmc) */
 &sdmmc {
 	bootph-pre-ram;
 };
@@ -180,7 +154,6 @@
 	bootph-pre-ram;
 };
 
-/* SDIO WiFi控制器 U-Boot阶段需要初始化上电时序 */
 &sdio0 {
 	bootph-all;
 };
@@ -197,7 +170,6 @@
 	bootph-all;
 };
 
-/* 以太网及MDIO PHY，U-Boot网络功能依赖 */
 &gmac1 {
 	bootph-all;
 };
@@ -230,7 +202,6 @@
 	bootph-all;
 };
 
-/* 按键、LED 用于U-Boot状态指示 */
 &gpio_keys {
 	bootph-all;
 };
@@ -255,9 +226,6 @@
 	bootph-all;
 };
 
-/* I2C总线后续可能用于外设，保留 */
 &i2c1 {
 	bootph-all;
 };
-
-/* LCD相关引脚仅保留复用定义，不需要上电初始化，不标记bootph，会被裁剪，交给内核处理 */
