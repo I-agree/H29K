@@ -16,7 +16,7 @@ env:
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
-  
+
 jobs:
   build:
     runs-on: ubuntu-22.04
