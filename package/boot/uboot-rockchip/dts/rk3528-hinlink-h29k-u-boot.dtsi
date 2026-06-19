@@ -35,6 +35,23 @@
 	bootph-all;
 };
 
+/* 额外串口1、2 U-Boot阶段需要DM枚举，加入保留 */
+&uart1 {
+	bootph-all;
+};
+
+&uart2 {
+	bootph-all;
+};
+
+&uart2m1_ctsn {
+	bootph-all;
+};
+
+&uart2m1_xfer {
+	bootph-all;
+};
+
 /* ========================================== */
 /* 核心电源与 PWM：防低压死机、防核心断电      */
 /* ========================================== */
@@ -87,6 +104,36 @@
 	bootph-all;
 };
 
+/* SD卡GPIO可控3.3V供电 + 1.8V/3.3V电压切换调节器 */
+&vcc3v3_sd {
+	bootph-all;
+};
+
+&vccio_sd {
+	bootph-all;
+};
+
+&sdmmc_vol_ctrl_h {
+	bootph-all;
+};
+
+&sdmmc_pwren_l {
+	bootph-all;
+};
+
+/* SDIO WiFi上电时序节点，U-Boot DM需要枚举 */
+&sdio_pwrseq {
+	bootph-all;
+};
+
+&wifi_reg_on {
+	bootph-all;
+};
+
+&wl_wake_host {
+	bootph-all;
+};
+
 /* ========================================== */
 /* 存储介质：允许 SPL 寻址并读取主 U-Boot 镜像 */
 /* ========================================== */
@@ -132,3 +179,85 @@
 &sdmmc_det {
 	bootph-pre-ram;
 };
+
+/* SDIO WiFi控制器 U-Boot阶段需要初始化上电时序 */
+&sdio0 {
+	bootph-all;
+};
+
+&sdio0_bus4 {
+	bootph-all;
+};
+
+&sdio0_cmd {
+	bootph-all;
+};
+
+&sdio0_clk {
+	bootph-all;
+};
+
+/* 以太网及MDIO PHY，U-Boot网络功能依赖 */
+&gmac1 {
+	bootph-all;
+};
+
+&mdio1 {
+	bootph-all;
+};
+
+&rgmii_miim {
+	bootph-all;
+};
+
+&rgmii_tx_bus2 {
+	bootph-all;
+};
+
+&rgmii_rx_bus2 {
+	bootph-all;
+};
+
+&rgmii_rgmii_clk {
+	bootph-all;
+};
+
+&rgmii_rgmii_bus {
+	bootph-all;
+};
+
+&gmac1_rstn_l {
+	bootph-all;
+};
+
+/* 按键、LED 用于U-Boot状态指示 */
+&gpio_keys {
+	bootph-all;
+};
+
+&key_reset_pin {
+	bootph-all;
+};
+
+&leds {
+	bootph-all;
+};
+
+&led_4g_en {
+	bootph-all;
+};
+
+&led_5g_en {
+	bootph-all;
+};
+
+&led_work_en {
+	bootph-all;
+};
+
+/* I2C总线后续可能用于外设，保留 */
+&i2c1 {
+	bootph-all;
+};
+
+/* LCD相关引脚仅保留复用定义，不需要上电初始化，不标记bootph，会被裁剪，交给内核处理 */
