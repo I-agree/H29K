@@ -62,6 +62,15 @@
 		};
 	};
 
+	sdio_pwrseq: sdio-pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		pinctrl-names = "default";
+		pinctrl-0 = <&wifi_reg_on>;
+		post-power-on-delay-ms = <100>;
+		power-off-delay-us = <5000000>;
+		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
+	};
+
 	vdd_0v9: regulator-0v9-vdd {
 		compatible = "regulator-fixed";
 		regulator-name = "vdd_0v9";
@@ -99,19 +108,6 @@
 		regulator-max-microvolt = <3300000>;
 		regulator-always-on;
 		regulator-boot-on;
-		vin-supply = <&vcc5v0_sys>;
-	};
-
-	vcc_3v3_lcd: regulator-3v3-lcd {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc_3v3_lcd";
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		gpio = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
-		enable-active-high;
-		pinctrl-names = "default";
-		pinctrl-0 = <&lcd_pwr_pin>;
-		regulator-always-on;
 		vin-supply = <&vcc5v0_sys>;
 	};
 
