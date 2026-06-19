@@ -1,0 +1,6 @@
+--- a/drivers/net/dwc_eth_qos.c
++++ b/drivers/net/dwc_eth_qos.c
+@@ -25,3 +25,4 @@
+ #include <asm/io.h>
++#include <asm/barrier.h>
+ #include <linux/bitfield.h>
