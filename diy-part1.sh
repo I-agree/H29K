@@ -24,60 +24,6 @@ git clone https://github.com/I-agree/luci-app-bluetooth.git package/luci-app-blu
 # === 5. 磁盘扩容
 git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
 
-# ==============================================================================
-# 🛠️ [diy-part1.sh] 自动同步官方 main 分支最新的 uboot-rockchip 文件夹
-# ==============================================================================
-
-# 1. 强力清理本地原有的 uboot-rockchip 文件夹（防止旧文件残留）
-rm -rf package/boot/uboot-rockchip
-
-# 2. 确保创建临时工作目录
-mkdir -p tmp
-
-# 3. 使用 Git 稀疏模式克隆官方仓库的 main 分支
-git clone --branch main --depth=1 --filter=blob:none --sparse https://github.com/openwrt/openwrt.git tmp/openwrt-main
-
-# 4. 进入临时目录，精准命中并只检出 package/boot/uboot-rockchip 文件夹
-cd tmp/openwrt-main
-git sparse-checkout set package/boot/uboot-rockchip
-cd ../..
-
-# 5. 确保本地父目录存在，将完美的 uboot-rockchip 移动到本地核心包目录
-mkdir -p package/boot
-mv tmp/openwrt-main/package/boot/uboot-rockchip package/boot/
-
-# 6. 彻底销毁临时垃圾，绝不污染源码树
-rm -rf tmp/openwrt-main
-
-# ==============================================================================
-
-# ==============================================================================
-# 🛠️ [diy-part1.sh] 自动同步官方 main 分支最新的 uboot-tools 文件夹
-# ==============================================================================
-
-# 1. 强力清理本地原有的 uboot-tools 文件夹（防止旧文件残留）
-rm -rf package/boot/uboot-tools
-
-# 2. 确保创建临时工作目录
-mkdir -p tmp
-
-# 3. 使用 Git 稀疏模式克隆官方仓库的 main 分支
-git clone --branch main --depth=1 --filter=blob:none --sparse https://github.com/openwrt/openwrt.git tmp/openwrt-main
-
-# 4. 进入临时目录，精准命中并只检出 package/boot/uboot-tools 文件夹
-cd tmp/openwrt-main
-git sparse-checkout set package/boot/uboot-tools
-cd ../..
-
-# 5. 确保本地父目录存在，将完美的 uboot-tools 移动到本地核心包目录
-mkdir -p package/boot
-mv tmp/openwrt-main/package/boot/uboot-tools package/boot/
-
-# 6. 彻底销毁临时垃圾，绝不污染源码树
-rm -rf tmp/openwrt-main
-
-# ==============================================================================
-
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
@@ -121,77 +67,15 @@ download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/li
 download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-tools/Makefile" "package/boot/uboot-tools/Makefile"
-download_and_check "${BASE_URL}/package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8" "package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/Makefile" "target/linux/rockchip/image/Makefile"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/mmc.bootscript" "target/linux/rockchip/image/mmc.bootscript"
 download_and_check "${BASE_URL}/scripts/gen_image_generic.sh" "scripts/gen_image_generic.sh"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi"
-download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
-
-# --- 深度内容专项校验 ---
-if grep -q "hinlink_h28k" "target/linux/rockchip/image/armv8.mk"; then
-    echo "❌ 错误: armv8.mk 包含非法内容 (h28k)" && exit 1
-fi
-if ! grep -q "H29K 引导打包层调试" "target/linux/rockchip/image/Makefile"; then
-    echo "❌ 错误: Makefile 核心打包规则不匹配" && exit 1
-fi
-
-# ===================== 更新：校验 uboot-tools 核心修改点 =====================
-UBOOT_MAKEFILE="package/boot/uboot-tools/Makefile"
-
-# 校验1：PKG_CONFIG_SYSROOT_DIR 已安全置空（不能是原版的 STAGING_DIR_HOST，也不能被彻底删掉导致语法断裂）
-if ! grep -q 'PKG_CONFIG_SYSROOT_DIR=""' "$UBOOT_MAKEFILE"; then
-    echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 PKG_CONFIG_SYSROOT_DIR=\"\"，环境未安全置空！"
-    exit 1
-fi
-
-# 校验2：已禁用 EFI 胶囊工具
-if ! grep -F -- "--disable TOOLS_MKEFICAPSULE" "$UBOOT_MAKEFILE"; then
-    echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 --disable TOOLS_MKEFICAPSULE，EFI 工具未禁用！"
-    exit 1
-fi
-
-# 校验3：死循环拦截参数已挂载（无空格安全命令）
-if ! grep -q "cmd_genenv=:" "$UBOOT_MAKEFILE"; then
-    echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 cmd_genenv=:，死循环拦截未生效！"
-    exit 1
-fi
-
-# 校验4：提前伪造环境文件逻辑已注入
-if ! grep -q "touch \$(PKG_BUILD_DIR)/u-boot-initial-env" "$UBOOT_MAKEFILE"; then
-    echo "❌ 校验失败：$UBOOT_MAKEFILE 未找到 touch 伪造环境命令，编译将因缺少环境文件报错！"
-    exit 1
-fi
-
-echo "✅ uboot-tools/Makefile 核心修改点校验通过"
-
-# 校验5：检查 rockchip_armv8 已适配 H29K
-ENV_FILE="package/boot/uboot-tools/uboot-envtools/files/rockchip_armv8"
-
-if ! grep -q "hinlink,h29k" "$ENV_FILE"; then
-    echo "❌ 校验失败：未找到 H29K 适配配置"
-    exit 1
-fi
-
-echo "✅ rockchip_armv8 H29K 适配校验通过"
-
-# 校验6：检查 rk3528-hinlink-h29k-u-boot.dtsi 是否下载成功
-ENV_FILE="package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi"
-
-if ! grep -q "bootph-all" "$ENV_FILE"; then
-    echo "❌ 校验失败：未找到rk3528-hinlink-h29k-u-boot.dtsi"
-    exit 1
-fi
-
-echo "✅ rk3528-hinlink-h29k-u-boot.dtsi下载校验通过"
-
-# ============================================================================
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
     download_and_check "${LOGO_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg"
 done
 
-echo "✅ 所有外部资源下载并校验通过！"
 # ==============================================================================
 echo "🚀 [diy-part1.sh] 软件源与独立包与配置文件预处理圆满完成！"
