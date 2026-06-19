@@ -1,10 +1,9 @@
 # Hinlink H29K (RK3528) U-Boot defconfig
 # OpenWrt 25.12+ Linux6.12
 
-# ===== 架构配置（核心修正：ARM64 依赖 ARM 架构，关闭 ARM 会导致架构回退到默认 SANDBOX） =====
+# ===== 架构配置 =====
 CONFIG_ARM=y
 CONFIG_ARM64=y
-CONFIG_SKIP_LOWLEVEL_INIT=y
 CONFIG_COUNTER_FREQUENCY=24000000
 
 # ===== 平台与板级基础配置 =====
@@ -19,7 +18,7 @@ CONFIG_DEBUG_UART=y
 CONFIG_DEFAULT_FDT_FILE="rockchip/rk3528-hinlink-h29k.dtb"
 # CONFIG_DISPLAY_CPUINFO is not set
 
-# ===== 关闭依赖专属板级代码的功能（无H29K专属板级C代码，开启会链接失败） =====
+# ===== 关闭依赖专属板级代码的功能 =====
 # CONFIG_BOARD_RNG_SEED is not set
 
 # ===== SPL 启动基础配置 =====
@@ -66,6 +65,7 @@ CONFIG_MMC_SDHCI_ROCKCHIP=y
 # ===== 网络驱动 =====
 CONFIG_PHY_REALTEK=y
 CONFIG_DM_MDIO=y
+CONFIG_DM_ETH=y
 CONFIG_DWC_ETH_QOS=y
 CONFIG_DWC_ETH_QOS_ROCKCHIP=y
 
@@ -104,7 +104,7 @@ CONFIG_TIMER=y
 CONFIG_DM_GPIO=y
 CONFIG_DM_SERIAL=y
 
-# ===== 强制禁用沙盒/仿真/ACPI类无用驱动（ARM架构下自动失效，双重保险） =====
+# ===== 强制禁用沙盒/仿真/ACPI类无用驱动 =====
 # CONFIG_SANDBOX is not set
 # CONFIG_USB_EMUL is not set
 # CONFIG_I2C_EMUL is not set
@@ -119,7 +119,7 @@ CONFIG_DM_SERIAL=y
 # ===== TPL 启动链配置 =====
 CONFIG_TPL=y
 
-# ===== 补充：DDR 与 SPL/TPL 基础支持 (RK3528 必需) =====
+# ===== 补充：DDR 与 SPL/TPL 底层驱动基础 (RK3528 必需) =====
 CONFIG_SPL_DRIVERS_MISC=y
 CONFIG_SPL_RAM_SUPPORT=y
 CONFIG_TPL_DRIVERS_MISC=y
@@ -128,7 +128,7 @@ CONFIG_TPL_DRIVERS_MISC=y
 CONFIG_SPL_SERIAL_SUPPORT=y
 CONFIG_SPL_DM_SERIAL=y
 
-# ===== 补充：环境变量存储 (eMMC) =====
+# ===== 补充：环境变量存储 (eMMC mmc0) =====
 CONFIG_ENV_IS_IN_MMC=y
 CONFIG_SYS_MMC_ENV_DEV=0
 CONFIG_ENV_SIZE=0x4000
@@ -137,10 +137,8 @@ CONFIG_ENV_OFFSET=0x3F0000
 # ===== 补充：SPL 阶段 MMC 驱动 (识别 eMMC/SD) =====
 CONFIG_DM_MMC=y
 CONFIG_SPL_DM_MMC=y
-# 注意：已移除 CONFIG_ROCKCHIP_MMC，使用标准的 DWC_MMC 驱动
 
-# ===== 补充：I2C 支持 (匹配 DTS &i2c1) =====
+# ===== 补充：I2C 驱动，匹配DTS &i2c1 =====
 CONFIG_DM_I2C=y
 CONFIG_SPL_DM_I2C=y
 CONFIG_ROCKCHIP_I2C=y
-
