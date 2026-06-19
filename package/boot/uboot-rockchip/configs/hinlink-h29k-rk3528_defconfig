@@ -119,22 +119,28 @@ CONFIG_DM_SERIAL=y
 # ===== TPL 启动链配置 =====
 CONFIG_TPL=y
 
-# DDR / SPL / TPL 底层驱动基础（RK3528 DDR初始化必需）
+# ===== 补充：DDR 与 SPL/TPL 基础支持 (RK3528 必需) =====
 CONFIG_SPL_DRIVERS_MISC=y
 CONFIG_SPL_RAM_SUPPORT=y
 CONFIG_TPL_DRIVERS_MISC=y
 
-# MMC 环境变量（eMMC mmc0 存储）
+# ===== 补充：SPL 阶段串口支持 (调试必需) =====
+CONFIG_SPL_SERIAL_SUPPORT=y
+CONFIG_SPL_DM_SERIAL=y
+
+# ===== 补充：环境变量存储 (eMMC) =====
 CONFIG_ENV_IS_IN_MMC=y
 CONFIG_SYS_MMC_ENV_DEV=0
 CONFIG_ENV_SIZE=0x4000
 CONFIG_ENV_OFFSET=0x3F0000
-# 关键补充：SPL阶段MMC驱动，SPL才能识别eMMC
+
+# ===== 补充：SPL 阶段 MMC 驱动 (识别 eMMC/SD) =====
 CONFIG_DM_MMC=y
 CONFIG_SPL_DM_MMC=y
-CONFIG_ROCKCHIP_MMC=y
+# 注意：已移除 CONFIG_ROCKCHIP_MMC，使用标准的 DWC_MMC 驱动
 
-# I2C 驱动（匹配DTS & SPL硬件枚举）
+# ===== 补充：I2C 支持 (匹配 DTS &i2c1) =====
 CONFIG_DM_I2C=y
 CONFIG_SPL_DM_I2C=y
 CONFIG_ROCKCHIP_I2C=y
+
