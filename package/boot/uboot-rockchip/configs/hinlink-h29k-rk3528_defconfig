@@ -90,3 +90,6 @@ CONFIG_TIMER=y
 # ===== SPL/TPL 启动链完整依赖 =====
 CONFIG_SPL=y
 CONFIG_TPL=y
+
+# ===== 建议追加 =====
+CONFIG_DM_GPIO=y
