@@ -16,7 +16,7 @@ env:
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
-  EXTRA_CFLAGS: "-Wno-error=implicit-function-declaration"
+  EXTRA_CFLAGS: "-Wno-error=implicit-function-declaration -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast"
 
 jobs:
   build:
