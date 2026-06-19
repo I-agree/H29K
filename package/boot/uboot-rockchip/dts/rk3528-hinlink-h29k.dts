@@ -4,6 +4,8 @@
 #include <dt-bindings/pwm/pwm.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
 #include "rk3528.dtsi"
 
 / {
@@ -26,20 +28,6 @@
 
 	chosen {
 		stdout-path = "serial0:1500000n8";
-		#address-cells = <2>;
-		#size-cells = <2>;
-		ranges;
-
-		framebuffer: framebuffer@90000000 {
-			compatible = "simple-framebuffer";
-			reg = <0x0 0x90000000 0x0 0x00800000>;
-			width = <1920>;
-			height = <1080>;
-			stride = <7680>;
-			format = "a8r8g8b8";
-			clocks = <&cru ACLK_VOP>, <&cru PCLK_HDMI>;
-			status = "disabled";
-		};
 	};
 
 	gpio-keys {
