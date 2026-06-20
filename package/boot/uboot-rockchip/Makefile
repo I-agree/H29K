@@ -63,7 +63,6 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
 	
 	# 2. 🛠️ 核心修正：适配现代 U-Boot 规范，直接放入真正的 upstream 源码根目录
-	# 这样才能与 U-Boot 官方从 Linux 内核同步过来的 rk3528.dtsi 处于绝对同级目录，正确完成 #include 展开
 	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
@@ -72,6 +71,31 @@ endef
 define Build/InstallDev
 	$(INSTALL_DIR) $(STAGING_DIR_IMAGE)
 	$(CP) $(PKG_BUILD_DIR)/u-boot-rockchip.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot-rockchip.bin
+
+    # 单独导出 TPL / SPL / idbloader / u-boot.itb 用于校验
+    $(CP) $(PKG_BUILD_DIR)/tpl/u-boot-tpl.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin
+    $(CP) $(PKG_BUILD_DIR)/spl/u-boot-spl.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin
+    $(CP) $(PKG_BUILD_DIR)/idbloader.img $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-idbloader.img
+    $(CP) $(PKG_BUILD_DIR)/u-boot.itb $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot.itb
+
+    # ===================== TPL+SPL 强制完整性校验 =====================
+    @echo "============================================="
+    @echo "【UBoot 引导组件校验：$(BUILD_VARIANT)】"
+    
+    # 校验TPL存在且非空 (修复了Makefile换行语法)
+    @if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin" ]; then \
+        echo "ERROR: TPL DDR初始化二进制缺失/为空！检查defconfig CONFIG_TPL=y 是否正确，禁止CONFIG_T=y笔误！"; \
+        exit 1; \
+    fi
+    
+    # 校验SPL存在且非空 (修复了缺失 exit 1 的问题)
+    @if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin" ]; then \
+        echo "ERROR: SPL二级引导二进制缺失/为空！检查defconfig CONFIG_SPL=y 是否开启！"; \
+        exit 1; \
+    fi
+    
+    @echo "✅ TPL+SPL 校验全部通过，DDR初始化组件编译正常"
+    @echo "============================================="
 endef
 
 define Package/u-boot/install/default
