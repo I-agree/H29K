@@ -86,6 +86,10 @@
 	bootph-all;
 };
 
+&vcc_3v3_lcd {
+	bootph-all;
+};
+
 &vcc3v3_sd {
 	bootph-all;
 };
