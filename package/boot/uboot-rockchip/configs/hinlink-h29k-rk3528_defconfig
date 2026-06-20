@@ -58,6 +58,7 @@ CONFIG_SPL_ATF=y
 # ===== 时钟总开关 =====
 CONFIG_CLK=y
 CONFIG_SPL_CLK=y
+CONFIG_TPL_CLK=y
 
 # ===== 命令集 =====
 CONFIG_CMD_MEMINFO=y
