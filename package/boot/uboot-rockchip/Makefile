@@ -78,20 +78,30 @@ define Build/InstallDev
 	$(CP) $(PKG_BUILD_DIR)/idbloader.img $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-idbloader.img
 	$(CP) $(PKG_BUILD_DIR)/u-boot.itb $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot.itb
 
-	# ===================== TPL+SPL 强制完整性校验 =====================
+	# ===================== 四组件完整强制校验 =====================
 	@echo "============================================="
 	@echo "【UBoot 引导组件校验：$(BUILD_VARIANT)】"
 	# 校验TPL存在且非空
 	@if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin" ]; then \
-		echo "ERROR: TPL DDR初始化二进制缺失/为空！检查defconfig CONFIG_TPL=y 是否正确，禁止CONFIG_T=y笔误！"; \
+		echo "ERROR: TPL DDR初始化二进制缺失/为空！检查 CONFIG_SUPPORT_TPL=y CONFIG_TPL=y"; \
 		exit 1; \
 	fi
 	# 校验SPL存在且非空
 	@if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin" ]; then \
-		echo "ERROR: SPL二级引导二进制缺失/为空！检查defconfig CONFIG_SPL=y 是否开启！"; \
+		echo "ERROR: SPL二级引导二进制缺失/为空！检查 CONFIG_SUPPORT_SPL=y CONFIG_SPL=y"; \
 		exit 1; \
 	fi
-	@echo "✅ TPL+SPL 校验全部通过，DDR初始化组件编译正常"
+	# 校验 idbloader.img 存在且非空
+	@if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-idbloader.img" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-idbloader.img" ]; then \
+		echo "ERROR: idbloader 合并引导镜像缺失/为空！"; \
+		exit 1; \
+	fi
+	# 校验 u-boot.itb (ATF+主U-Boot FIT) 存在且非空
+	@if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot.itb" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot.itb" ]; then \
+		echo "ERROR: u-boot.itb FIT镜像(含ATF BL31)缺失/为空！"; \
+		exit 1; \
+	fi
+	@echo "✅ TPL + SPL + idbloader + u-boot.itb 全部校验通过"
 	@echo "============================================="
 endef
 
