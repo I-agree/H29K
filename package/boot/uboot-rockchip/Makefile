@@ -68,43 +68,9 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 endef
 
-# ========== 新增：编译完成后置校验（编译结束才执行，无时序提前校验报错） ==========
-define Build/PostCompile
-	echo "============================================="
-	echo "【UBoot 编译产物校验：$(BUILD_VARIANT)】"
-	# 校验TPL二进制
-	if [ ! -f $(PKG_BUILD_DIR)/tpl/u-boot-tpl.bin ] || [ ! -s $(PKG_BUILD_DIR)/tpl/u-boot-tpl.bin ]; then
-		echo "ERROR: TPL DDR镜像缺失/空，检查 defconfig CONFIG_SUPPORT_TPL=y CONFIG_TPL=y"
-		exit 1
-	fi
-	# 校验SPL二进制
-	if [ ! -f $(PKG_BUILD_DIR)/spl/u-boot-spl.bin ] || [ ! -s $(PKG_BUILD_DIR)/spl/u-boot-spl.bin ]; then
-		echo "ERROR: SPL二级引导缺失/空，检查 defconfig CONFIG_SUPPORT_SPL=y CONFIG_SPL=y"
-		exit 1
-	fi
-	# 校验idbloader合并镜像
-	if [ ! -f $(PKG_BUILD_DIR)/idbloader.img ] || [ ! -s $(PKG_BUILD_DIR)/idbloader.img ]; then
-		echo "ERROR: idbloader.img 缺失，确认 BINMAN/TPL/SPL 全部开启"
-		exit 1
-	fi
-	# 校验带ATF的FIT镜像
-	if [ ! -f $(PKG_BUILD_DIR)/u-boot.itb ] || [ ! -s $(PKG_BUILD_DIR)/u-boot.itb ]; then
-		echo "ERROR: u-boot.itb FIT镜像缺失，检查 FIT/SPL_FIT/SPL_ATF 配置"
-		exit 1
-	fi
-	echo "✅ TPL + SPL + idbloader + u-boot.itb 全部合法非空"
-	echo "============================================="
-endef
-
-# ========== 扩充InstallDev，复制四份引导镜像到staging ==========
 define Build/InstallDev
 	$(INSTALL_DIR) $(STAGING_DIR_IMAGE)
 	$(CP) $(PKG_BUILD_DIR)/u-boot-rockchip.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot-rockchip.bin
-	# 新增复制TPL/SPL/idbloader/u-boot.itb
-	$(CP) $(PKG_BUILD_DIR)/tpl/u-boot-tpl.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin
-	$(CP) $(PKG_BUILD_DIR)/spl/u-boot-spl.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin
-	$(CP) $(PKG_BUILD_DIR)/idbloader.img $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-idbloader.img
-	$(CP) $(PKG_BUILD_DIR)/u-boot.itb $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot.itb
 endef
 
 define Package/u-boot/install/default
