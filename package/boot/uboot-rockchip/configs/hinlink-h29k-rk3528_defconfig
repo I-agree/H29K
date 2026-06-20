@@ -49,6 +49,12 @@ CONFIG_TPL_DRIVERS_MISC=y
 CONFIG_SPL_SERIAL_SUPPORT=y
 CONFIG_SPL_DM_SERIAL=y
 
+# ===== 保证 u-boot.itb 正常包含 bl31（boot/Kconfig + spl 配套） =====
+CONFIG_FIT=y
+CONFIG_SPL_FIT=y
+CONFIG_SPL_LOAD_FIT=y
+CONFIG_SPL_ATF=y
+
 # ===== 时钟总开关 =====
 CONFIG_CLK=y
 CONFIG_SPL_CLK=y
