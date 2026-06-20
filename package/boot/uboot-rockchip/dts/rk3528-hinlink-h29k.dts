@@ -59,6 +59,7 @@
 		led_work: led-work {
 			label = "green:work";
 			gpios = <&gpio4 RK_PB7 GPIO_ACTIVE_LOW>;
+			default-state = "off";
 		};
 	};
 
