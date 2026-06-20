@@ -71,33 +71,6 @@ endef
 define Build/InstallDev
 	$(INSTALL_DIR) $(STAGING_DIR_IMAGE)
 	$(CP) $(PKG_BUILD_DIR)/u-boot-rockchip.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot-rockchip.bin
-
-	# 导出4段引导镜像
-	$(CP) $(PKG_BUILD_DIR)/tpl/u-boot-tpl.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin
-	$(CP) $(PKG_BUILD_DIR)/spl/u-boot-spl.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin
-	$(CP) $(PKG_BUILD_DIR)/idbloader.img $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-idbloader.img
-	$(CP) $(PKG_BUILD_DIR)/u-boot.itb $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot.itb
-
-	@echo "============================================="
-	@echo "【UBoot 完整四组件校验：$(BUILD_VARIANT)】"
-	# 校验TPL
-	@if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-tpl.bin" ]; then \
-		echo "ERROR: TPL缺失/空，检查 SUPPORT_TPL=y TPL=y"; exit 1; \
-	fi
-	# 校验SPL
-	@if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-spl.bin" ]; then \
-		echo "ERROR: SPL缺失/空，检查 SUPPORT_SPL=y SPL=y"; exit 1; \
-	fi
-	# 校验 idbloader
-	@if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-idbloader.img" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-idbloader.img" ]; then \
-		echo "ERROR: idbloader缺失/空，确认BINMAN、TPL、SPL全部开启"; exit 1; \
-	fi
-	# 校验 u-boot.itb
-	@if [ ! -f "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot.itb" ] || [ ! -s "$(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot.itb" ]; then \
-		echo "ERROR: u-boot.itb缺失/空，检查 FIT=y SPL_FIT=y SPL_ATF=y"; exit 1; \
-	fi
-	@echo "✅ TPL + SPL + idbloader + u-boot.itb 全部合法非空"
-	@echo "============================================="
 endef
 
 define Package/u-boot/install/default
