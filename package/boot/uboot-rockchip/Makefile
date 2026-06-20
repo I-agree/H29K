@@ -47,7 +47,10 @@ UBOOT_CUSTOMIZE_CONFIG := \
 	--disable TOOLS_MKEFICAPSULE \
 	--set-str MKIMAGE_DTC_PATH $(PKG_BUILD_DIR)/scripts/dtc/dtc
 
+# 新增 -j1 单线程 + V=s 详细日志，仅作用于U-Boot内部编译，用于核查TPL/SPL/idbloader/u-boot.itb打包日志
 UBOOT_MAKE_FLAGS += \
+	-j1 \
+	V=s \
 	PKG_CONFIG=pkg-config \
 	PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig" \
 	BINMAN_ALLOW_MISSING=0 \
