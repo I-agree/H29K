@@ -13,6 +13,7 @@ env:
   DIY_P2_SH: diy-part2.sh
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
+  UBOOT_BIN_NAME: hinlink-h29k-rk3528-u-boot-rockchip.bin
 
 jobs:
   build:
@@ -145,7 +146,13 @@ jobs:
         find build_dir/target-* \( -name "u-boot-rockchip.bin" -o -name "u-boot.itb" -o -name "idbloader.img" -o -name "u-boot-tpl.bin" -o -name "u-boot-spl.bin" \) 2>/dev/null | xargs ls -lh
         
         echo -e "\n==================== 【2】staging 镜像导出检查 ===================="
-        ls -lh staging_dir/target-*/image/*u-boot* 2>/dev/null || echo "未在 staging 目录发现 U-Boot 镜像"
+        UBOOT_SRC=$(find staging_dir/target-*/image -name "*u-boot-rockchip.bin" | head -n1)
+        if [ -f "$UBOOT_SRC" ]; then
+          cp "$UBOOT_SRC" $GITHUB_WORKSPACE/${{ env.UBOOT_BIN_NAME }}
+          echo "✅ 已复制 U-Boot 固件: $UBOOT_SRC -> ${{ env.UBOOT_BIN_NAME }}"
+        else
+          echo "❌ 未在 staging 目录发现 U-Boot 一体化镜像"
+        fi
         
         echo -e "\n==================== 【3】关键日志关键词检索 ===================="
         echo ">>> TPL 编译生成记录:"
@@ -168,14 +175,15 @@ jobs:
       if: always()
       run: df -hT
 
-    - name: 上传完整编译日志
+    - name: 上传完整编译日志 + U-Boot 一体化固件
       uses: actions/upload-artifact@v7.0.1
       if: always()
       with:
-        name: build-full-logs
+        name: build-full-logs-and-uboot
         path: |
           ${{ env.WORK_DIR }}/openwrt/rkbin-build.log
           ${{ env.WORK_DIR }}/openwrt/uboot-rockchip-full.log
+          ${{ env.UBOOT_BIN_NAME }}
 
     - name: 清理历史工作流运行记录
       uses: Mattraks/delete-workflow-runs@v2.1.0
