@@ -16,7 +16,6 @@ define Device/hinlink_h29k
   UBOOT_CONFIG := hinlink-h29k-rk3528
   UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   KERNEL_LOADADDR := 0x03000000
-  BOOT_SCRIPT := mmc
   IMAGES := factory.img.gz
   IMAGE/factory.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
   DEVICE_PACKAGES := \
