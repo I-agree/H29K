@@ -95,18 +95,12 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 生成配置并预构建宿主工具依赖（修复 libdeflate-gzip 缺失）
+    - name: 生成默认配置
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         make defconfig
-        # 多线程编译宿主工具 + 依赖，解决所有 host 端工具缺失问题
-        make tools/compile -j$(nproc)
-        make toolchain/compile -j$(nproc)
-        # 验证关键宿主工具是否就绪
-        ls -lh staging_dir/host/bin/libdeflate-gzip staging_dir/host/bin/mkimage staging_dir/host/bin/dtc 2>/dev/null
-        echo "✅ 宿主工具依赖构建完成"
 
-    - name: 下载 uboot-rockchip 专属编译依赖
+    - name: 下载 uboot-rockchip 编译依赖
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         for i in {1..3}; do make package/boot/uboot-rockchip/download -j8 && break || sleep 5; done
@@ -116,7 +110,6 @@ jobs:
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         
-        # 单线程 + 完整日志编译，同时输出控制台 + 保存到文件
         make -j1 package/boot/uboot-rockchip/compile V=s 2>&1 | tee uboot-rockchip-full.log
         
         echo "status=success" >> $GITHUB_OUTPUT
@@ -126,6 +119,7 @@ jobs:
         
         echo -e "\n==================== 【2】staging 镜像导出检查 ===================="
         ls -lh staging_dir/target-*/image/*u-boot* 2>/dev/null || echo "未在 staging 目录发现 U-Boot 镜像"
+        ls -lh staging_dir/target-*/image/rk35/ 2>/dev/null || echo "未在 staging 目录发现 rk35 子目录固件"
         
         echo -e "\n==================== 【3】关键日志关键词检索 ===================="
         echo ">>> TPL 编译生成记录:"
@@ -140,8 +134,8 @@ jobs:
         echo -e "\n>>> u-boot.itb FIT 镜像打包记录:"
         grep -E "MKIMAGE.*u-boot.itb|FIT image for U-Boot" uboot-rockchip-full.log || echo "未找到 u-boot.itb 打包记录"
         
-        echo -e "\n>>> binman 执行记录:"
-        grep -E "binman|Binman" uboot-rockchip-full.log || echo "未找到 binman 执行记录"
+        echo -e "\n>>> BL31 相关日志:"
+        grep -iE "bl31" uboot-rockchip-full.log || echo "未找到 BL31 相关记录"
       continue-on-error: true
 
     - name: 检查磁盘空间
