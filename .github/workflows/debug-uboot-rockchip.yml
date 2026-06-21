@@ -121,10 +121,11 @@ jobs:
         make -j1 package/boot/rkbin/compile V=s 2>&1 | tee rkbin-build.log
         
         echo -e "\n==================== rkbin 固件安装校验 ===================="
-        ls -lh staging_dir/target-*/image/rk35/
+        ls -lh staging_dir/target-*/image/rk3528_bl31_v1.20.elf
+        ls -lh staging_dir/target-*/image/rk3528_ddr_1056MHz_v1.11.bin
         
         echo -e "\n>>> 校验 BL31 固件架构:"
-        file staging_dir/target-*/image/rk35/rk3528_bl31_v1.20.elf
+        file staging_dir/target-*/image/rk3528_bl31_v1.20.elf
 
     - name: 下载 uboot-rockchip 编译依赖
       run: |
@@ -145,7 +146,6 @@ jobs:
         
         echo -e "\n==================== 【2】staging 镜像导出检查 ===================="
         ls -lh staging_dir/target-*/image/*u-boot* 2>/dev/null || echo "未在 staging 目录发现 U-Boot 镜像"
-        ls -lh staging_dir/target-*/image/rk35/ 2>/dev/null || echo "未在 staging 目录发现 rk35 子目录固件"
         
         echo -e "\n==================== 【3】关键日志关键词检索 ===================="
         echo ">>> TPL 编译生成记录:"
