@@ -21,6 +21,6 @@ define Device/hinlink_h29k
   DEVICE_PACKAGES := \
     kmod-usb3 kmod-aic8800-sdio -dnsmasq dnsmasq-full \
     kmod-usb-net-cdc-mbim uqmi qmi-utils kmod-usb-serial-option kmod-usb-net-rndis-host \
-    kmod-usb-net-cdc-ether kmod-usb-wdm u-boot-hinlink-h29k-rk3528
+    kmod-usb-net-cdc-ether kmod-usb-wdm
 endef
 TARGET_DEVICES += hinlink_h29k
