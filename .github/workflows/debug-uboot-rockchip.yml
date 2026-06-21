@@ -102,8 +102,8 @@ jobs:
         make tools/compile -j$(nproc)
         
         echo -e "==================== 关键宿主工具校验 ===================="
-        ls -lh staging_dir/host/bin/libdeflate-gzip staging_dir/host/bin/mkimage staging_dir/host/bin/dtc
-        echo "✅ 宿主工具集编译完成"
+        ls -lh staging_dir/host/bin/libdeflate-gzip staging_dir/host/bin/mkimage
+        echo "✅ 基础宿主工具集编译完成"
 
     - name: 编译 rkbin 固件包并校验产物
       run: |
