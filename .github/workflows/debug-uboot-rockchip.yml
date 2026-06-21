@@ -103,7 +103,17 @@ jobs:
         
         echo -e "==================== 关键宿主工具校验 ===================="
         ls -lh staging_dir/host/bin/libdeflate-gzip staging_dir/host/bin/mkimage
-        echo "✅ 基础宿主工具集编译完成"
+        echo "✅ 宿主工具集编译完成"
+
+    - name: 编译目标交叉工具链
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make toolchain/compile -j$(nproc)
+        
+        echo -e "==================== 交叉编译器校验 ===================="
+        ls -lh staging_dir/toolchain-aarch64_*/bin/aarch64-openwrt-linux-musl-gcc
+        ls -lh staging_dir/toolchain-aarch64_*/lib/libgcc_s.so.*
+        echo "✅ 目标工具链编译完成"
 
     - name: 编译 rkbin 固件包并校验产物
       run: |
