@@ -95,10 +95,26 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 生成默认配置
+    - name: 生成默认配置并编译宿主工具集
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         make defconfig
+        make tools/compile -j$(nproc)
+        
+        echo -e "==================== 关键宿主工具校验 ===================="
+        ls -lh staging_dir/host/bin/libdeflate-gzip staging_dir/host/bin/mkimage staging_dir/host/bin/dtc
+        echo "✅ 宿主工具集编译完成"
+
+    - name: 编译 rkbin 固件包并校验产物
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make -j1 package/boot/rkbin/compile V=s 2>&1 | tee rkbin-build.log
+        
+        echo -e "\n==================== rkbin 固件安装校验 ===================="
+        ls -lh staging_dir/target-*/image/rk35/
+        
+        echo -e "\n>>> 校验 BL31 固件架构:"
+        file staging_dir/target-*/image/rk35/rk3528_bl31_v1.20.elf
 
     - name: 下载 uboot-rockchip 编译依赖
       run: |
@@ -142,12 +158,14 @@ jobs:
       if: always()
       run: df -hT
 
-    - name: 上传 U-Boot 完整编译日志
+    - name: 上传完整编译日志
       uses: actions/upload-artifact@v7.0.1
       if: always()
       with:
-        name: uboot-rockchip-build-log
-        path: ${{ env.WORK_DIR }}/openwrt/uboot-rockchip-full.log
+        name: build-full-logs
+        path: |
+          ${{ env.WORK_DIR }}/openwrt/rkbin-build.log
+          ${{ env.WORK_DIR }}/openwrt/uboot-rockchip-full.log
 
     - name: 清理历史工作流运行记录
       uses: Mattraks/delete-workflow-runs@v2.1.0
