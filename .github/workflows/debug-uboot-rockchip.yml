@@ -103,7 +103,7 @@ jobs:
         make tools/compile -j$(nproc)
         
         echo -e "==================== 关键宿主工具校验 ===================="
-        ls -lh staging_dir/host/bin/libdeflate-gzip staging_dir/host/bin/mkimage
+        ls -lh staging_dir/host/bin/libdeflate-gzip staging_dir/host/bin/mkimage staging_dir/host/bin/binman
         echo "✅ 宿主工具集编译完成"
 
     - name: 编译目标交叉工具链
@@ -145,23 +145,25 @@ jobs:
         echo -e "\n==================== 【1】构建目录关键产物检查 ===================="
         find build_dir/target-* -name "*u-boot-rockchip.bin" 2>/dev/null | xargs ls -lh
         
-        echo -e "\n==================== 【2】staging 镜像导出检查 ===================="
+        echo -e "\n==================== 【2】staging 镜像导出 ===================="
         UBOOT_SRC=$(find staging_dir/target-*/image -name "*u-boot-rockchip.bin" | head -n1)
         if [ -f "$UBOOT_SRC" ]; then
           cp "$UBOOT_SRC" $GITHUB_WORKSPACE/${{ env.UBOOT_BIN_NAME }}
           echo "✅ 已复制 U-Boot 固件: $UBOOT_SRC -> ${{ env.UBOOT_BIN_NAME }}"
+          echo "UBOOT_BIN_PATH=$UBOOT_SRC" >> $GITHUB_ENV
         else
           echo "❌ 未在 staging 目录发现 U-Boot 一体化镜像"
+          echo "UBOOT_BIN_PATH=" >> $GITHUB_ENV
         fi
         
-        echo -e "\n==================== 【3】关键日志关键词检索（适配Binman一体化打包） ===================="
+        echo -e "\n==================== 【3】关键日志关键词检索 ===================="
         echo ">>> Binman 一体化打包执行记录:"
         grep -E "binman|binman\.dts|packing image|Output image" uboot-rockchip-full.log || echo "未找到 Binman 一体化打包记录"
 
-        echo -e "\n>>> TPL 编译链接记录:"
+        echo -e "\n>>> TPL 编译记录:"
         grep -E "tpl/u-boot-tpl\.elf|built for TPL" uboot-rockchip-full.log || echo "未找到 TPL 编译记录"
 
-        echo -e "\n>>> SPL 编译链接记录:"
+        echo -e "\n>>> SPL 编译记录:"
         grep -E "spl/u-boot-spl\.elf|built for SPL" uboot-rockchip-full.log || echo "未找到 SPL 编译记录"
 
         echo -e "\n>>> FIT镜像(u-boot.itb)内置打包记录:"
@@ -174,11 +176,39 @@ jobs:
         grep -E "u-boot-rockchip\.bin|Writing.*u-boot-rockchip" uboot-rockchip-full.log || echo "未找到一体化BIN生成记录"
       continue-on-error: true
 
+    # 新增：binman 自动解析固件所有分段，输出清单+十六进制头部
+    - name: Binman 解析一体化固件分段
+      if: env.UBOOT_BIN_PATH != ''
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        BIN_PATH=${{ env.UBOOT_BIN_PATH }}
+        BINMAN_TOOL=staging_dir/host/bin/bin
+        BINMAN_TOOL=staging_dir/host/bin/binman
+        
+        echo "=================================================="
+        echo "binman ls 完整分段清单 | 固件: $BIN_PATH"
+        echo "=================================================="
+        $BINMAN_TOOL ls "$BIN_PATH" 2>&1 | tee binman-segments.log
+        
+        echo -e "\n=================================================="
+        echo 十六进制头部预览(前1024字节魔数校验)
+        echo "=================================================="
+        xxd -l 1024 "$BIN_PATH"
+        
+        echo -e "\n=================================================="
+        echo 文件大小与文件类型校验
+        echo "=================================================="
+        ls -lh "$BIN_PATH"
+        file "$BIN_PATH"
+        
+        # 复制日志到工作区用于上传制品
+        cp binman-segments.log $GITHUB_WORKSPACE/
+
     - name: 检查磁盘空间
       if: always()
       run: df -hT
 
-    - name: 上传完整编译日志 + U-Boot 一体化固件
+    - name: 上传全部制品(日志+固件+分段解析记录)
       uses: actions/upload-artifact@v7.0.1
       if: always()
       with:
@@ -186,6 +216,7 @@ jobs:
         path: |
           ${{ env.WORK_DIR }}/openwrt/rkbin-build.log
           ${{ env.WORK_DIR }}/openwrt/uboot-rockchip-full.log
+          ${{ env.WORK_DIR }}/openwrt/binman-segments.log
           ${{ env.UBOOT_BIN_NAME }}
 
     - name: 清理历史工作流运行记录
