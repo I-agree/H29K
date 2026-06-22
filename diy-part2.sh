@@ -387,6 +387,7 @@ CONFIG_FB_CORE=y
 CONFIG_FB_DEVICE=y
 
 # 2. ST7789V SPI屏幕全套总线依赖
+CONFIG_SPI_SPIDEV=y
 CONFIG_SPI=y
 CONFIG_SPI_MASTER=y
 CONFIG_SPI_ROCKCHIP=y
@@ -679,7 +680,11 @@ uci set system.@system.zonename=Asia/Shanghai
 uci set system.@system.timezone=CST-8
 uci commit system
 /etc/init.d/irqbalance enable
-/etc/init.d/modemmanager disable
+# 安全禁用 ModemManager，防止其与 5G 模组的 USB 串口/MBIM 驱动抢占控制权
+uci set modemmanager.@modemmanager[0].disabled='1' 2>/dev/null || true
+uci commit modemmanager 2>/dev/null || true
+# 兜底：如果 init.d 脚本存在，则执行 disable
+[ -x /etc/init.d/modemmanager ] && /etc/init.d/modemmanager disable
 /etc/init.d/h29k-screen enable
 exit 0
 EOF
@@ -1298,13 +1303,22 @@ EOF
 
 # 3.OpenWrt系统日志仅驻留内存，禁止落地文件，进一步减少底层写盘
 mkdir -p files/etc/config
-cat >> files/etc/config/system << 'EOF'
+cat > files/etc/config/system << 'EOF'
 config system
-        option log_size '2048'
-        option log_file ''
-        option log_remote ''
-        option conloglevel 'warn'
-        option cronloglevel 'error'
+    option hostname 'H29K'
+    option timezone 'CST-8'
+    option zonename 'Asia/Shanghai'
+    option log_size '2048'
+    option log_file ''
+    option log_remote ''
+    option conloglevel 'warn'
+    option cronloglevel 'error'
+
+config timeserver 'ntp'
+    option enabled '1'
+    option enable_server '0'
+    list server 'ntp.aliyun.com'
+    list server 'time1.cloud.tencent.com'
 EOF
 
 # 4. 开机优化内核打印等级，减少细碎闪存擦写
