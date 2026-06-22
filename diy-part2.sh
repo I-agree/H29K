@@ -1109,8 +1109,8 @@ cat > files/www/cam.html << 'EOF'
             font-family: monospace;
         }
     </style>
-    <script src="https://unpkg.com/xgplayer@3.0.1/browser/index.js" type="text/javascript"></script>
-    <script src="https://unpkg.com/xgplayer-hls.js@3.0.1/browser/index.js" type="text/javascript"></script>
+    <script src="xgplayer.min.js" type="text/javascript"></script>
+    <script src="xgplayer-hls.min.js" type="text/javascript"></script>
 </head>
 <body>
 <div class="container">
