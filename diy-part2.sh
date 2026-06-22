@@ -302,24 +302,28 @@ CONFIG_DRM_BRIDGE=y
 # CONFIG_DRM_DW_HDMI_GP_AUDIO is not set
 
 # =================================================================
-# 📺 核心闭环：HDMI的 SimpleDRM 路线 + ST7789V 专属显示总成
+# 📺 核心闭环：HDMI SimpleDRM 路线 + ST7789 SPI屏 双显示兼容
 # =================================================================
 
-# 1. HDMI简易帧缓冲底层
+# 1. HDMI简易帧缓冲底层（uboot framebuffer复用）
 CONFIG_DRM_SIMPLEDRM=y
 CONFIG_FB_CORE=y
 CONFIG_FB_DEVICE=y
 
-# 2. ST7789V SPI屏幕总线+官方面板驱动
+# 2. ST7789V SPI屏幕全套总线依赖
 CONFIG_SPI=y
+CONFIG_SPI_MASTER=y
 CONFIG_SPI_ROCKCHIP=y
 # CONFIG_SPI_ROCKCHIP_SFC is not set
+
+# DRM面板基础框架+屏幕旋转支持
 CONFIG_DRM_PANEL=y
-CONFIG_DRM_PANEL_ORIENTATION_REDUCED=y
-# ST7789V 主线原生驱动（唯一合法配置名）
+CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y
+
+# Linux v6.12 官方ST7789V面板驱动（匹配sitronix,st7789v DTS兼容串）
 CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 
-# 3. 背光依赖（驱动强制要求BACKLIGHT_CLASS_DEVICE）
+# 3. ST7789驱动强制背光依赖
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 CONFIG_BACKLIGHT_PWM=y
 
