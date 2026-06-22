@@ -821,8 +821,13 @@ case "$ACTION" in
         
         echo "📡 正在从内部通道 [/$WANTED_SRC] 提取视听信号源并向目标网络平台开播..."
         docker run -d --name live-pusher --restart always --network host \
-            h29k-alpine-ffmpeg:__ALPINE_VER__ ffmpeg -re -i "rtsp://127.0.0.1:8554/$WANTED_SRC" -c:v copy -c:a aac -f flv "$RTMP_URL"
-        
+            h29k-alpine-ffmpeg:__ALPINE_VER__ ffmpeg \
+            -re -analyzeduration 2000000 -probesize 2000000 \
+            -rtsp_transport tcp -i "rtsp://127.0.0.1:8554/$WANTED_SRC" \
+            -c:v copy -bsf:v h264_mp4toannexb \
+            -c:a aac -b:a 128k -ar 44100 -async 1 \
+            -vsync cfr -fflags +genpts+igndts \
+            -f flv -flvflags add_keyframe_index+aac_seq_header_detect "$RTMP_URL"
         if [ $? -eq 0 ]; then
             echo "✅ 直播推流已成功在后台建立并发布！"
             echo "🔗 信号提取通道: /$WANTED_SRC ---> 目标平台: $RTMP_URL"
@@ -923,8 +928,12 @@ while true; do
             docker rm -f cam-publisher >/dev/null 2>&1
             docker run -d --name cam-publisher --restart always --network host \
                 --privileged --device /dev/video0:/dev/video0 --device /dev/snd:/dev/snd \
-                h29k-alpine-ffmpeg:__ALPINE_VER__ ffmpeg -f v4l2 -input_format h264 -i /dev/video0 -f alsa -i hw:1,0 -c:v copy -c:a aac -b:a 128k -f rtsp rtsp://127.0.0.1:8554/cam
-        else
+                h29k-alpine-ffmpeg:__ALPINE_VER__ ffmpeg \
+                -f v4l2 -input_format h264 -timestamps abs -i /dev/video0 \
+                -f alsa -i hw:1,0 \
+                -c:v copy -bsf:v h264_mp4toannexb \
+                -c:a aac -b:a 128k -ar 44100 -async 1 -af aresample=async=1000 \
+                -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/cam
             echo "🚨 [硬件动作] 警告！USB 摄像头突然被意外拔出！触发看门狗安全评估..." > /dev/console
             docker rm -f cam-publisher >/dev/null 2>&1
             
@@ -984,10 +993,21 @@ while true; do
             else
                 # 🌟【自愈防爆垫片】引入 FFmpeg 动态比例滤镜，强行拦截并修复手机竖屏投屏导致的 Linux 显存锁死和绿屏崩溃
                 docker run -d --name cam-hdmi-player --restart always --network host \
-                    --privileged --device /dev/fb0:/dev/fb0 --device /dev/snd:/dev/snd \
-                    h29k-alpine-ffmpeg:__ALPINE_VER__ ffmpeg -re -i "$TARGET_HDMI_SRC" \
+                    --privileged --device "$HDMI_FB":/dev/fb0 --device /dev/snd:/dev/snd \
+                    h29k-alpine-ffmpeg:__ALPINE_VER__ sh -c '
+                    # 优先尝试硬件加速，失败自动回退软解码
+                    ffmpeg -hide_banner -hwaccel v4l2m2m \
+                    -re -analyzeduration 2000000 -probesize 2000000 \
+                    -rtsp_transport tcp -i "$0" \
                     -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
-                    -f fbdev "$HDMI_FB" -f alsa hw:0,0
+                    -vsync cfr -async 1 -af aresample=async=1000 \
+                    -f fbdev "$1" -f alsa hw:0,0 || \
+                    ffmpeg -hide_banner \
+                    -rtsp_transport tcp -i "$0" \
+                    -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
+                    -vsync cfr -async 1 -af aresample=async=1000 \
+                    -f fbdev "$1" -f alsa hw:0,0
+                    ' "$TARGET_HDMI_SRC" "$HDMI_FB"
             fi
             CURRENT_HDMI_VIEW_SRC="$TARGET_HDMI_SRC"
         fi
