@@ -150,22 +150,100 @@ CONFIG_SERIAL_8250_DW=y
 CONFIG_SERIAL_8250_DWLIB=y
 CONFIG_SERIAL_OF_PLATFORM=y
 
-# === 千兆以太网核心驱动 ===
+# =================================================================
+# 🌐 网络核心与 IPv6 支持 (OpenWrt 必选)
+# =================================================================
+CONFIG_NET=y
+CONFIG_NETDEVICES=y
+CONFIG_INET=y
+CONFIG_IPV6=y
+CONFIG_IPV6_ROUTER_PREF=y
+CONFIG_IPV6_ROUTE_INFO=y
+CONFIG_IPV6_SIT=y
+CONFIG_IPV6_NDISC_NODETYPE=y
+
+# =================================================================
+# 🌐 千兆以太网核心驱动 (STMMAC + Rockchip Glue)
+# =================================================================
+CONFIG_NET_VENDOR_STMICRO=y
 CONFIG_STMMAC_ETH=y
 CONFIG_STMMAC_PLATFORM=y
-CONFIG_DWMAC_DWC_QOS_ETH=y
 CONFIG_DWMAC_ROCKCHIP=y
-CONFIG_FIXED_PHY=y
+# CONFIG_DWMAC_DWC_QOS_ETH is not set 
+
+# PTP 时钟依赖 (STMMAC 强依赖)
+CONFIG_PTP_1588_CLOCK_OPTIONAL=y
+
+# =================================================================
+# 🔌 MDIO 总线与 PHY 框架 (RTL8211F 依赖)
+# =================================================================
 CONFIG_PHYLIB=y
+CONFIG_MDIO_DEVICE=y
 CONFIG_MDIO_BUS=y
 CONFIG_MDIO_DEVRES=y
-CONFIG_REALTEK_PHY=y
-CONFIG_REALTEK_PHY_HWMON=y
 CONFIG_OF_MDIO=y
+CONFIG_FIXED_PHY=y
 
-# SDIO WiFi 依赖（设备带 SDIO 无线）
+CONFIG_REALTEK_PHY=y
+CONFIG_MOTORCOMM_PHY=y
+CONFIG_MICREL_PHY=y
+
+# =================================================================
+# 💾 MMC/SDIO 总线核心 (AIC8800-SDIO 物理层依赖)
+# =================================================================
+CONFIG_MMC=y
+CONFIG_MMC_BLOCK=y
+CONFIG_MMC_SDHCI=y
+CONFIG_MMC_SDHCI_PLTFM=y
+CONFIG_MMC_SDHCI_OF_DWCMSHC=y
+CONFIG_MMC_DW=y
+CONFIG_MMC_DW_PLTFM=y
+CONFIG_MMC_DW_ROCKCHIP=y
+CONFIG_MMC_CQHCI=y
+
+# 📶 SDIO WiFi 基础依赖 (电源序列)
 CONFIG_MMC_PWRSEQ_SIMPLE=y
-CONFIG_MMC_SDIO=y
+CONFIG_MMC_PWRSEQ_EMMC=y
+
+# =================================================================
+# 🔌 USB 核心与物理层 (5G 模块底层依赖)
+# =================================================================
+CONFIG_USB_SUPPORT=y
+CONFIG_USB=y
+CONFIG_USB_XHCI_HCD=y
+CONFIG_USB_EHCI_HCD=y
+CONFIG_USB_ACM=y
+CONFIG_USB_WDM=y
+CONFIG_USB_STORAGE=y
+
+# =================================================================
+# 📡 5G 模块数据通道：USB 网络框架与 RNDIS/NCM 驱动
+# =================================================================
+CONFIG_USB_NET_DRIVERS=y
+CONFIG_USB_USBNET=y
+CONFIG_USB_NET_CDCETHER=y
+CONFIG_USB_NET_RNDIS_HOST=y
+CONFIG_USB_NET_CDC_NCM=y
+
+# =================================================================
+# 📡 5G 模块控制通道：USB 串口与 AT 指令驱动
+# =================================================================
+CONFIG_USB_SERIAL=y
+CONFIG_USB_SERIAL_CONSOLE=y
+CONFIG_USB_SERIAL_GENERIC=y
+CONFIG_USB_SERIAL_OPTION=y
+
+# =================================================================
+# 📡 PPP 拨号支持 (兼容性与备用通道)
+# =================================================================
+CONFIG_PPP=y
+CONFIG_PPP_BSDCOMP=y
+CONFIG_PPP_DEFLATE=y
+CONFIG_PPP_FILTER=y
+CONFIG_PPP_MPPE=y
+CONFIG_PPP_MULTILINK=y
+CONFIG_PPP_ASYNC=y
+CONFIG_PPP_SYNC_TTY=y
 
 # OpenWrt 必备文件系统
 CONFIG_SQUASHFS=y
