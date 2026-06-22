@@ -150,7 +150,6 @@ CONFIG_SERIAL_8250_DW=y
 CONFIG_SERIAL_8250_DWLIB=y
 CONFIG_SERIAL_OF_PLATFORM=y
 
-
 # === 千兆以太网核心驱动 ===
 CONFIG_STMMAC_ETH=y
 CONFIG_STMMAC_PLATFORM=y
@@ -306,21 +305,21 @@ CONFIG_DRM_BRIDGE=y
 # 📺 核心闭环：HDMI的 SimpleDRM 路线 + ST7789V 专属显示总成
 # =================================================================
 
-# 1. 支撑 HDMI 盲出的万能简单帧缓冲底层基础设施
+# 1. HDMI简易帧缓冲底层
 CONFIG_DRM_SIMPLEDRM=y
 CONFIG_FB_CORE=y
 CONFIG_FB_DEVICE=y
 
-# 2. 支撑 ST7789V 小屏幕的 SPI 总线与 TinyDRM 驱动架构（100%对齐官方 Kconfig 闭环）
+# 2. ST7789V SPI屏幕总线+官方面板驱动
 CONFIG_SPI=y
 CONFIG_SPI_ROCKCHIP=y
 # CONFIG_SPI_ROCKCHIP_SFC is not set
-CONFIG_DRM_TINYDRM=y
 CONFIG_DRM_PANEL=y
 CONFIG_DRM_PANEL_ORIENTATION_REDUCED=y
-CONFIG_TINYDRM_ST7789V=y
+# ST7789V 主线原生驱动（唯一合法配置名）
+CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 
-# 3. 注入小屏幕背光系统核心底座（坚决粉碎内核交互式 NEW 提问弹窗）
+# 3. 背光依赖（驱动强制要求BACKLIGHT_CLASS_DEVICE）
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 CONFIG_BACKLIGHT_PWM=y
 
