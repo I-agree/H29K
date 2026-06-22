@@ -105,7 +105,7 @@ CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
 
 # 清理可能引发覆盖的冲突条目
-sed -i '/CONFIG_EMAC_ROCKCHIP/d; /CONFIG_CMA_SIZE_MBYTES=16/d; /CONFIG_CRYPTO_HW/d; /CONFIG_CRYPTO_DEV_/d; /CONFIG_CRYPTO_AKCIPHER/d; /CONFIG_CRYPTO_KPP/d; /CONFIG_DEFAULT_NET_CONG/d; /CONFIG_DEFAULT_BBR/d; /CONFIG_ARM64_SVE/d; /CONFIG_BT/d; /CONFIG_DRM_/d; /CONFIG_FB_/d; /CONFIG_BACKLIGHT_/d; /CONFIG_MEDIA/d; /CONFIG_VIDEO/d; /CONFIG_USB_VIDEO_CLASS/d' "$CONFIG_FILE" 2>/dev/null || true
+sed -i '/CONFIG_ARM64_SVE=y/d; /CONFIG_CMA_SIZE_MBYTES=16/d' "$CONFIG_FILE" 2>/dev/null || true
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -523,8 +523,6 @@ CONFIG_BT_HCIUART_H4=y
 
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数"
-
-echo -e "# H29K OVERRIDE\n# CONFIG_TARGET_MULTI_ARCH is not set\nCONFIG_TARGET_rockchip_armv8_DEVICE_hinlink_h29k=y" > .config.override
 
 # ======================== 【4. 屏幕驱动与核心系统组件注入】 ========================
 mkdir -p files/etc
