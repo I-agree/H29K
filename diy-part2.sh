@@ -231,7 +231,6 @@ CONFIG_DRM_FBDEV_OVERALLOC=100
 # 🚀 瑞芯微核心显示驱动（对齐第二层 drm/rockchip/Kconfig）
 # =================================================================
 # CONFIG_ROCKCHIP_IOMMU is not set
-# CONFIG_DRM_ROCKCHIP is not set
 
 # 核心 VOP 视频输出控制器
 # CONFIG_ROCKCHIP_VOP is not set
