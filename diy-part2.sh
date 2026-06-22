@@ -105,7 +105,7 @@ CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
 
 # ⚠️ 使用 sed 原位替换，防止 Kconfig 忽略 EOF 末尾追加的重复项
-# 原生配置中 SVE=y, CMA=16, QoS ETH=y，如果不先用 sed 替换，后面追加的 =n 和 =64 会失效！
+# 原生配置中 SVE=y, CMA=16，如果不先用 sed 替换，后面追加的 =n 和 =64 会失效！
 sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_CMA_SIZE_MBYTES=16$/CONFIG_CMA_SIZE_MBYTES=64/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_CMA_AREAS=7$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
@@ -156,14 +156,14 @@ CONFIG_IPV6_SIT=y
 CONFIG_IPV6_NDISC_NODETYPE=y
 
 # =================================================================
-# 🌐 千兆以太网核心驱动 (STMMAC + Rockchip Glue)
+# 🚫 彻底封杀 STMMAC 千兆以太网驱动 (RK3528 硬件不兼容)
+# RK3528 无原生 GMAC QoS IP 核，强行加载会导致总线冲突！
 # =================================================================
 CONFIG_NET_VENDOR_STMICRO=y
 CONFIG_STMMAC_ETH=y
 CONFIG_STMMAC_PLATFORM=y
-CONFIG_DWMAC_ROCKCHIP=y
-# ⚠️RK3528 GMAC1 强依赖 QoS ETH 变体，必须开启，否则网卡无法 Probe！
-CONFIG_DWMAC_DWC_QOS_ETH=y
+# CONFIG_DWMAC_ROCKCHIP is not set
+# CONFIG_DWMAC_DWC_QOS_ETH is not set
 
 # PTP 时钟依赖 (STMMAC 强依赖)
 CONFIG_PTP_1588_CLOCK_OPTIONAL=y
