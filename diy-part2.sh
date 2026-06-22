@@ -140,6 +140,8 @@ CONFIG_SERIAL_8250_CONSOLE=y
 CONFIG_CONSOLE=y
 
 # 千兆以太网核心驱动
+CONFIG_STMMAC_ETH=y
+CONFIG_MII=y
 CONFIG_DWMAC_DWC_QOS_ETH=y
 CONFIG_DWMAC_ROCKCHIP=y
 CONFIG_FIXED_PHY=y
@@ -201,6 +203,7 @@ CONFIG_TOUCHSCREEN_FT6236=y
 # 🛡️ 显示架构核心底座与防弹窗屏蔽词（对齐第一层 drivers/gpu/drm/Kconfig）
 # =================================================================
 CONFIG_DRM=y
+CONFIG_DRM_ROCKCHIP=y
 CONFIG_DRM_MIPI_DBI=y
 CONFIG_DRM_KMS_HELPER=y
 # CONFIG_DRM_DEBUG_MM is not set
