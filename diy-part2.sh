@@ -575,11 +575,27 @@ cat > files/usr/bin/h29k_screen.sh <<'EOF'
 FONT="/usr/share/fonts/truetype/MiSans-Regular.ttf"
 TMP_IMG="/tmp/screen_final.jpg"
 LOGO_DIR="/etc/config/screen"
+
+# 自动匹配 ST7789 小屏对应的帧缓冲设备
+get_st7789_fb() {
+    for fb in /sys/class/graphics/fb*; do
+        if [ -f "$fb/device/of_node/compatible" ]; then
+            if grep -q "sitronix,st7789v" "$fb/device/of_node/compatible" 2>/dev/null; then
+                echo "/dev/$(basename "$fb")"
+                return 0
+            fi
+        fi
+    done
+    # 兜底：匹配失败时降级为 fb1，兼容旧逻辑
+    echo "/dev/fb1"
+}
+SCREEN_FB=$(get_st7789_fb)
+
 sleep 12
 
 # 启动连续开机 LOGO 动画
 for i in 1 2 3; do 
-    [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -f "$LOGO_DIR/LOGO$i.jpg" && sleep 0.8
+    [ -f "$LOGO_DIR/LOGO$i.jpg" ] && fbv -d "$SCREEN_FB" -f "$LOGO_DIR/LOGO$i.jpg" && sleep 0.8
 done
 
 while true; do
@@ -663,7 +679,7 @@ while true; do
             "$TMP_IMG" 2>/dev/null || echo "Render Error"
     fi
     
-    [ -s "$TMP_IMG" ] && fbv -f "$TMP_IMG" 2>/dev/null
+    [ -s "$TMP_IMG" ] && fbv -d "$SCREEN_FB" -f "$TMP_IMG" 2>/dev/null
     sleep 25
 done
 EOF
@@ -759,12 +775,25 @@ EOF
 # ==============================================================================
 # 📡 【智能直播推流脚本】支持自适应路由、智能指定源与无感并线
 # ==============================================================================
-cat > files/usr/bin/live-push.sh << 'EOF'
 #!/bin/sh
 
-ACTION=$1
-RTMP_URL=$2
-WANTED_SRC=$3  # 可选参数: cam 或 cast
+# 自动匹配 HDMI 大屏对应的帧缓冲设备
+get_hdmi_fb() {
+    for conn in /sys/class/drm/card*-HDMI-A-1; do
+        if [ -d "$conn" ]; then
+            card_path=$(dirname "$conn")
+            for fb in "$card_path"/graphics/fb*; do
+                if [ -d "$fb" ]; then
+                    echo "/dev/$(basename "$fb")"
+                    return 0
+                fi
+            done
+        fi
+    done
+    # 兜底：匹配失败时降级为 fb0，兼容旧逻辑
+    echo "/dev/fb0"
+}
+HDMI_FB=$(get_hdmi_fb)
 
 is_container_running() {
     docker ps --format '{{.Names}}' | grep -q "^$1$"
@@ -958,7 +987,7 @@ while true; do
                     --privileged --device /dev/fb0:/dev/fb0 --device /dev/snd:/dev/snd \
                     h29k-alpine-ffmpeg:__ALPINE_VER__ ffmpeg -re -i "$TARGET_HDMI_SRC" \
                     -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
-                    -f fbdev /dev/fb0 -f alsa hw:0,0
+                    -f fbdev "$HDMI_FB" -f alsa hw:0,0
             fi
             CURRENT_HDMI_VIEW_SRC="$TARGET_HDMI_SRC"
         fi
@@ -967,7 +996,7 @@ while true; do
         if is_container_running "cam-hdmi-player" || [ -n "$CURRENT_HDMI_VIEW_SRC" ]; then
             echo "🔌 [HDMI 热插拔] 屏幕已被拔出，即刻注销本地 UI 渲染，后台所有网络推流与直播保留就绪！" > /dev/console
             docker rm -f cam-hdmi-player >/dev/null 2>&1
-            dd if=/dev/zero of=/dev/fb0 bs=1M count=1 >/dev/null 2>&1 || true
+            dd if=/dev/zero of="$HDMI_FB" bs=1M count=1 >/dev/null 2>&1 || true
             CURRENT_HDMI_VIEW_SRC=""
         fi
     fi
