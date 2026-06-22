@@ -104,8 +104,12 @@ CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
 
 echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
 
-# 清理可能引发覆盖的冲突条目
-sed -i '/CONFIG_ARM64_SVE=y/d; /CONFIG_CMA_SIZE_MBYTES=16/d' "$CONFIG_FILE" 2>/dev/null || true
+# ⚠️ 使用 sed 原位替换，防止 Kconfig 忽略 EOF 末尾追加的重复项
+# 原生配置中 SVE=y, CMA=16, QoS ETH=y，如果不先用 sed 替换，后面追加的 =n 和 =64 会失效！
+sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_SIZE_MBYTES=16$/CONFIG_CMA_SIZE_MBYTES=64/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_AREAS=7$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/CONFIG_DWMAC_DWC_QOS_ETH=y/' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -169,7 +173,8 @@ CONFIG_NET_VENDOR_STMICRO=y
 CONFIG_STMMAC_ETH=y
 CONFIG_STMMAC_PLATFORM=y
 CONFIG_DWMAC_ROCKCHIP=y
-# CONFIG_DWMAC_DWC_QOS_ETH is not set 
+# ⚠️RK3528 GMAC1 强依赖 QoS ETH 变体，必须开启，否则网卡无法 Probe！
+CONFIG_DWMAC_DWC_QOS_ETH=y
 
 # PTP 时钟依赖 (STMMAC 强依赖)
 CONFIG_PTP_1588_CLOCK_OPTIONAL=y
@@ -263,7 +268,7 @@ CONFIG_FSCACHE=y
 # =====================================================================
 
 # --- 针对 A53 架构彻底关闭不支持的 SVE 扩展，全力确保 ASIMD(NEON) 跑满 ---
-CONFIG_ARM64_SVE=n
+# CONFIG_ARM64_SVE is not set
 CONFIG_ARM64_ASIMD=y
 CONFIG_ARM64_NEON=y
 
@@ -278,7 +283,9 @@ CONFIG_TOUCHSCREEN_FT6236=y
 # 🛡️ 显示架构核心底座与防弹窗屏蔽词（对齐第一层 drivers/gpu/drm/Kconfig）
 # =================================================================
 CONFIG_DRM=y
-CONFIG_DRM_ROCKCHIP=y
+# ⚠️由于下方封杀了所有 VOP/VOP2/HDMI 后端，开启 DRM_ROCKCHIP 会导致
+# Kconfig 依赖树崩溃或被自动降级为 n。使用 SimpleDRM + MIPI DBI 不需要此平台驱动。
+# CONFIG_DRM_ROCKCHIP is not set
 CONFIG_DRM_MIPI_DBI=y
 CONFIG_DRM_KMS_HELPER=y
 # CONFIG_DRM_DEBUG_MM is not set
