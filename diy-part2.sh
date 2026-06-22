@@ -297,8 +297,6 @@ CONFIG_FSCACHE=y
 
 # --- 针对 A53 架构彻底关闭不支持的 SVE 扩展，全力确保 ASIMD(NEON) 跑满 ---
 # CONFIG_ARM64_SVE is not set
-CONFIG_ARM64_ASIMD=y
-CONFIG_ARM64_NEON=y
 
 # --- 禁用低效且冲突的板载硬件加密，全力释放更强的 ARMv8 CPU 内置加密扩展性能 ---
 CONFIG_CRYPTO_HW=y
