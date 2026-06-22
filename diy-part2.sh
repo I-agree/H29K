@@ -727,13 +727,17 @@ net.core.wmem_max=16777216
 EOF
 
 # ==============================================================================
-# 📹 【完全体调度矩阵】MediaMTX 配置中心（开启控制 API）
+# 📹 【完全体调度矩阵】MediaMTX 配置中心（开启控制 API + 日志优化）
 # ==============================================================================
 echo "🚀 正在注入 H29K 流媒体中转矩阵核心控制网关..."
 
+mkdir -p files/etc/docker/mediamtx
 cat > files/etc/docker/mediamtx/mediamtx.yml << 'EOF'
 logLevel: warn
 logDestinations: [stdout]
+dumpPackets: false
+metrics: false
+pprof: false
 writeQueueSize: 256
 
 # 🌟 开启本地控制 API，赋予守护进程动态嗅探流状态的能力
@@ -778,23 +782,9 @@ EOF
 cat > files/usr/bin/live-push.sh << 'EOF'
 #!/bin/sh
 
-# 自动匹配 HDMI 大屏对应的帧缓冲设备
-get_hdmi_fb() {
-    for conn in /sys/class/drm/card*-HDMI-A-1; do
-        if [ -d "$conn" ]; then
-            card_path=$(dirname "$conn")
-            for fb in "$card_path"/graphics/fb*; do
-                if [ -d "$fb" ]; then
-                    echo "/dev/$(basename "$fb")"
-                    return 0
-                fi
-            done
-        fi
-    done
-    # 兜底：匹配失败时降级为 fb0，兼容旧逻辑
-    echo "/dev/fb0"
-}
-HDMI_FB=$(get_hdmi_fb)
+ACTION=$1
+RTMP_URL=$2
+WANTED_SRC=$3  # 可选参数: cam 或 cast
 
 is_container_running() {
     docker ps --format '{{.Names}}' | grep -q "^$1$"
@@ -829,6 +819,7 @@ case "$ACTION" in
             -c:a aac -b:a 128k -ar 44100 -async 1 \
             -vsync cfr -fflags +genpts+igndts \
             -f flv -flvflags add_keyframe_index+aac_seq_header_detect "$RTMP_URL"
+        
         if [ $? -eq 0 ]; then
             echo "✅ 直播推流已成功在后台建立并发布！"
             echo "🔗 信号提取通道: /$WANTED_SRC ---> 目标平台: $RTMP_URL"
@@ -872,6 +863,24 @@ chmod +x files/usr/bin/live-push.sh
 # ==============================================================================
 cat > files/usr/bin/cam-monitor.sh << 'EOF'
 #!/bin/sh
+
+# 自动匹配 HDMI 大屏对应的帧缓冲设备
+get_hdmi_fb() {
+    for conn in /sys/class/drm/card*-HDMI-A-1; do
+        if [ -d "$conn" ]; then
+            card_path=$(dirname "$conn")
+            for fb in "$card_path"/graphics/fb*; do
+                if [ -d "$fb" ]; then
+                    echo "/dev/$(basename "$fb")"
+                    return 0
+                fi
+            done
+        fi
+    done
+    # 兜底：匹配失败时降级为 fb0，兼容旧逻辑
+    echo "/dev/fb0"
+}
+HDMI_FB=$(get_hdmi_fb)
 
 is_container_running() {
     docker ps --format '{{.Names}}' | grep -q "^$1$"
@@ -935,6 +944,7 @@ while true; do
                 -c:v copy -bsf:v h264_mp4toannexb \
                 -c:a aac -b:a 128k -ar 44100 -async 1 -af aresample=async=1000 \
                 -f rtsp -rtsp_transport tcp rtsp://127.0.0.1:8554/cam
+        else
             echo "🚨 [硬件动作] 警告！USB 摄像头突然被意外拔出！触发看门狗安全评估..." > /dev/console
             docker rm -f cam-publisher >/dev/null 2>&1
             
@@ -990,7 +1000,7 @@ while true; do
             docker rm -f cam-hdmi-player >/dev/null 2>&1
             
             if [ "$TARGET_HDMI_SRC" = "LOGO" ]; then
-                [ -f /etc/config/screen/LOGO3.jpg ] && fbv -f /etc/config/screen/LOGO3.jpg 2>/dev/null || true
+                [ -f /etc/config/screen/LOGO3.jpg ] && fbv -d "$HDMI_FB" -f /etc/config/screen/LOGO3.jpg 2>/dev/null || true
             else
                 # 🌟【自愈防爆垫片】引入 FFmpeg 动态比例滤镜，强行拦截并修复手机竖屏投屏导致的 Linux 显存锁死和绿屏崩溃
                 docker run -d --name cam-hdmi-player --restart always --network host \
@@ -1004,6 +1014,7 @@ while true; do
                     -vsync cfr -async 1 -af aresample=async=1000 \
                     -f fbdev "$1" -f alsa hw:0,0 || \
                     ffmpeg -hide_banner \
+                    -re -analyzeduration 2000000 -probesize 2000000 \
                     -rtsp_transport tcp -i "$0" \
                     -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
                     -vsync cfr -async 1 -af aresample=async=1000 \
@@ -1214,7 +1225,6 @@ cat > files/www/cam.html << 'EOF'
 </body>
 </html>
 EOF
-# ==============================================================================
 
 # ==============================================================================
 # 🎛️ 【LuCI 控制固化】将一键开播命令完美合并写入 OpenWrt 后台菜单
@@ -1266,6 +1276,7 @@ done
 # =================================================================================
 
 echo "🎁 正在通过宿主机 Docker，强行跨架构下发并封印 H29K(ARM64) 专属闭环离线包..."
+mkdir -p files/usr/share/docker-images
 docker save bluenviron/mediamtx:${MEDIAMTX_VER} -o files/usr/share/docker-images/mediamtx.tar
 docker save h29k-alpine-ffmpeg:${FALLBACK_ALPINE_VER} -o files/usr/share/docker-images/alpine.tar
 
