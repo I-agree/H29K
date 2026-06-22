@@ -71,6 +71,8 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/900-fix-mb-m
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch" "package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
 download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
+download_and_check "https://unpkg.com/xgplayer@3.0.1/browser/index.js" "files/www/xgplayer.min.js"
+download_and_check "https://unpkg.com/xgplayer-hls@3.0.1/browser/index.js" "files/www/xgplayer-hls.min.js"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
