@@ -1307,22 +1307,15 @@ config system
         option cronloglevel 'error'
 EOF
 
-# 4.开机优化内核打印等级+overlay挂载延迟写入，减少细碎闪存擦写
+# 4. 开机优化内核打印等级，减少细碎闪存擦写
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/90-limit-kernel-log << 'EOF'
 #!/bin/sh
-# 降低内核冗余打印
+# 仅降低内核控制台日志级别（1=仅紧急错误），减少串口和日志文件写入
 echo 1 > /proc/sys/kernel/printk
-# overlay挂载参数：延迟刷盘、关闭访问时间，减少频繁小写入
-uci -q add fstab mount
-uci set fstab.@mount[-1].target="/overlay"
-uci set fstab.@mount[-1].options="async,noatime,nodiratime,commit=60,barrier=0"
-uci set fstab.@mount[-1].fstype="squashfs"
-uci set fstab.@mount[-1].enabled=1
-uci commit fstab
 exit 0
 EOF
-chmod +x files/etc/uci-defaults
+chmod +x files/etc/uci-defaults/90-limit-kernel-log
 
 echo "✅ Docker内存日志模式配置完成，容器日志不再写入板载eMMC"
 # =================================================================================
