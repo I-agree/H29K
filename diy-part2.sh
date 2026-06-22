@@ -157,14 +157,13 @@ CONFIG_IPV6_SIT=y
 CONFIG_IPV6_NDISC_NODETYPE=y
 
 # =================================================================
-# 🚫 彻底封杀 STMMAC 千兆以太网驱动 (RK3528 硬件不兼容)
-# RK3528 无原生 GMAC QoS IP 核，强行加载会导致总线冲突！
+# 🚫 标准 DW MAC 驱动配置 (RK3528 适配)
 # =================================================================
 CONFIG_NET_VENDOR_STMICRO=y
 CONFIG_STMMAC_ETH=y
 CONFIG_STMMAC_PLATFORM=y
 CONFIG_DWMAC_ROCKCHIP=y
-# ⚠️ RK3528 使用的是标准 DW MAC IP，不兼容 QoS 变体，必须封杀！
+# ⚠️ RK3528 使用的是标准 DW MAC IP，不兼容 QoS 变体
 # CONFIG_DWMAC_DWC_QOS_ETH is not set
 
 # PTP 时钟依赖 (STMMAC 强依赖)
@@ -690,9 +689,9 @@ mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k <<'EOF'
 #!/bin/sh
 uci set luci.main.lang=zh_cn
-uci set system.@system.hostname=H29K
-uci set system.@system.zonename=Asia/Shanghai
-uci set system.@system.timezone=CST-8
+uci set system.@system[0].hostname=H29K
+uci set system.@system[0].zonename=Asia/Shanghai
+uci set system.@system[0].timezone=CST-8
 uci commit system
 /etc/init.d/irqbalance enable
 # 安全禁用 ModemManager，防止其与 5G 模组的 USB 串口/MBIM 驱动抢占控制权
@@ -724,56 +723,6 @@ net.netfilter.nf_conntrack_max=262144
 net.core.netdev_max_backlog=10000
 net.core.rmem_max=16777216
 net.core.wmem_max=16777216
-EOF
-
-# ==============================================================================
-# 📹 【完全体调度矩阵】MediaMTX 配置中心（开启控制 API + 日志优化）
-# ==============================================================================
-echo "🚀 正在注入 H29K 流媒体中转矩阵核心控制网关..."
-
-mkdir -p files/etc/docker/mediamtx
-cat > files/etc/docker/mediamtx/mediamtx.yml << 'EOF'
-logLevel: warn
-logDestinations: [stdout]
-dumpPackets: false
-metrics: false
-pprof: false
-writeQueueSize: 256
-
-# 🌟 开启本地控制 API，赋予守护进程动态嗅探流状态的能力
-api: true
-apiAddress: 127.0.0.1:9997
-
-rtsp: true
-rtspTransports: [udp, tcp]
-rtspAddress: :8554
-rtpAddress: :8000
-rtcpAddress: :8001
-
-rtmp: true
-rtmpAddress: :1935
-
-hls: true
-hlsAddress: :8888
-hlsAllowOrigins: ["*"]          
-hlsAlwaysRemux: true            
-hlsVariant: lowLatency          
-hlsSegmentCount: 3              
-hlsSegmentDuration: 1s          
-hlsPartDuration: 200ms
-hlsSegmentMaxSize: 20M
-hlsDirectory: ""                
-
-webrtc: true
-webrtcAddress: :8889
-webrtcAllowOrigins: ["*"]
-webrtcLocalUDPAddress: :8189
-webrtcIPsFromInterfaces: true
-srt: false
-
-pathDefaults:
-  source: publisher
-  overridePublisher: true
 EOF
 
 # ==============================================================================
@@ -1012,14 +961,14 @@ while true; do
                     -rtsp_transport tcp -i "$0" \
                     -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
                     -vsync cfr -async 1 -af aresample=async=1000 \
-                    -f fbdev "$1" -f alsa hw:0,0 || \
+                    -f fbdev /dev/fb0 -f alsa hw:0,0 || \
                     ffmpeg -hide_banner \
                     -re -analyzeduration 2000000 -probesize 2000000 \
                     -rtsp_transport tcp -i "$0" \
                     -vf "scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2:black" \
                     -vsync cfr -async 1 -af aresample=async=1000 \
-                    -f fbdev "$1" -f alsa hw:0,0
-                    ' "$TARGET_HDMI_SRC" "$HDMI_FB"
+                    -f fbdev /dev/fb0 -f alsa hw:0,0
+                    ' "$TARGET_HDMI_SRC"
             fi
             CURRENT_HDMI_VIEW_SRC="$TARGET_HDMI_SRC"
         fi
@@ -1161,7 +1110,7 @@ cat > files/www/cam.html << 'EOF'
         }
     </style>
     <script src="https://unpkg.com/xgplayer@3.0.1/browser/index.js" type="text/javascript"></script>
-    <script src="https://unpkg.com/xgplayer-hls@3.0.1/browser/index.js" type="text/javascript"></script>
+    <script src="https://unpkg.com/xgplayer-hls.js@3.0.1/browser/index.js" type="text/javascript"></script>
 </head>
 <body>
 <div class="container">
@@ -1301,7 +1250,6 @@ if [ -f "$REAL_AIC_MAKEFILE" ]; then
         echo "❌ 校验失败：Makefile 中缺失 PKG_BUILD_DEPENDS:=mac80211，编译将终止！"
         exit 1
     fi
-
 else
     echo "⚠️ 警告：在 $REAL_AIC_MAKEFILE 未找到该组件，请确认源码路径！"
 fi
