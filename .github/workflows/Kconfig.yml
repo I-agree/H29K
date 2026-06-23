@@ -84,15 +84,41 @@ jobs:
     - name: 安装软件源组件
       run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
 
-    - name: 加载自定义配置文件(修复files同源复制报错)
+    - name: 加载自定义配置文件(修复files同源复制报错与路径幽灵)
       run: |
+        # 1. 处理 files 目录
         if [ -d "$GITHUB_WORKSPACE/files" ]; then
           mkdir -p ${{ env.WORK_DIR }}/openwrt/files
           # -n 不覆盖已存在文件，避免同源软链接复制报错
           cp -rn $GITHUB_WORKSPACE/files/* ${{ env.WORK_DIR }}/openwrt/files/
         fi
-        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
-        chmod +x $DIY_P2_SH
+        
+        # 2. 🚨 核心修复：使用绝对路径，并加入强制校验！
+        # 明确指定配置文件在仓库根目录的绝对路径
+        ABS_CONFIG_PATH="$GITHUB_WORKSPACE/${CONFIG_FILE}"
+        
+        echo "🔍 正在检查配置文件: ${ABS_CONFIG_PATH}"
+        if [ ! -f "${ABS_CONFIG_PATH}" ]; then
+            echo "❌ 致命错误：未找到自定义配置文件 ${CONFIG_FILE}！"
+            echo "💡 请确认该文件存在于仓库根目录，或修改 YML 中的 CONFIG_FILE 变量路径。"
+            # 列出根目录文件，帮助排查拼写错误
+            echo "当前仓库根目录文件列表："
+            ls -la $GITHUB_WORKSPACE
+            exit 1 # 强制中断 CI，防止带着空配置继续编译！
+        fi
+        
+        echo "✅ 成功找到配置文件，正在复制到 OpenWrt 源码目录..."
+        cp -f "${ABS_CONFIG_PATH}" "${{ env.WORK_DIR }}/openwrt/.config"
+        
+        # 3. 验证复制是否成功且文件不为空
+        if [ ! -s "${{ env.WORK_DIR }}/openwrt/.config" ]; then
+            echo "❌ 致命错误：.config 复制失败或为空文件！"
+            exit 1
+        fi
+        echo "✅ .config 加载成功，文件大小: $(wc -c < ${{ env.WORK_DIR }}/openwrt/.config) bytes"
+
+        # 4. 执行 diy-part2.sh
+        chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
