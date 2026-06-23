@@ -116,11 +116,10 @@ sed -i 's/^CONFIG_SPI_ROCKCHIP_SFC=y$/# CONFIG_SPI_ROCKCHIP_SFC is not set/' "$C
 cat >> "$CONFIG_FILE" << 'EOF'
 
 # === RK3528 主线核心与平台级别底座驱动（对齐 Linux 6.12）===
-CONFIG_ARM64_VA_BITS=48
+
 CONFIG_ARM64_PA_BITS_48=y
 CONFIG_COMMON_CLK_ROCKCHIP=y
 CONFIG_PWM_ROCKCHIP=y
-CONFIG_GPIO_SYSFS=y
 
 CONFIG_NF_TABLES_BRIDGE=y
 
@@ -154,7 +153,6 @@ CONFIG_IPV6_NDISC_NODETYPE=y
 # 🚫 标准 DW MAC 驱动配置 (RK3528 适配)
 # =================================================================
 CONFIG_NET_VENDOR_STMICRO=y
-CONFIG_STMMAC_ETH=y
 CONFIG_STMMAC_PLATFORM=y
 CONFIG_DWMAC_ROCKCHIP=y
 # ⚠️ RK3528 使用的是标准 DW MAC IP，不兼容 QoS 变体
@@ -180,7 +178,6 @@ CONFIG_MICREL_PHY=y
 # =================================================================
 # 💾 MMC/SDIO 总线核心 (AIC8800-SDIO 物理层依赖)
 # =================================================================
-CONFIG_MMC=y
 CONFIG_MMC_BLOCK=y
 CONFIG_MMC_SDHCI=y
 CONFIG_MMC_SDHCI_PLTFM=y
@@ -198,7 +195,6 @@ CONFIG_MMC_PWRSEQ_EMMC=y
 # 🔌 USB 核心与物理层 (5G 模块底层依赖)
 # =================================================================
 CONFIG_USB_SUPPORT=y
-CONFIG_USB=y
 CONFIG_USB_XHCI_HCD=y
 CONFIG_USB_EHCI_HCD=y
 CONFIG_USB_ACM=y
@@ -208,7 +204,6 @@ CONFIG_USB_STORAGE=y
 # =================================================================
 # 📡 5G 模块数据通道：USB 网络框架与 RNDIS/NCM 驱动
 # =================================================================
-CONFIG_USB_NET_DRIVERS=y
 CONFIG_USB_USBNET=y
 CONFIG_USB_NET_CDCETHER=y
 CONFIG_USB_NET_RNDIS_HOST=y
