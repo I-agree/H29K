@@ -1,4 +1,4 @@
-name: OpenWrt Kconfig配置预校验日志收集工作流
+name: OpenWrt Kconfig配置预校验日志收集
 
 on:
   repository_dispatch:
@@ -13,7 +13,6 @@ env:
   DIY_P2_SH: diy-part2.sh
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
-  KERNEL_VERSION: 6.12.94
 
 jobs:
   kconfig-check:
@@ -21,98 +20,141 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: 检出源码仓库
-        uses: actions/checkout@v6.0.3
+    - name: 检出源码
+      uses: actions/checkout@v6.0.3
 
-      - name: 系统基础环境初始化
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo apt-get -qq update
-          sudo apt-get -qq install build-essential bison flex git libncurses5-dev libelf-dev device-tree-compiler ccache
-          sudo timedatectl set-timezone "$TZ"
-          sudo mkdir -p $WORK_DIR
-          sudo chown -R $USER:$USER $WORK_DIR
-          echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+    - name: 调整磁盘空间
+      run: |
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
+        
+        sudo swapoff -a || true
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        sudo sysctl vm.swappiness=10
+        echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
+        echo "📊 扩容系统全局 /tmp 至 10G"
+        sudo umount /tmp || true
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "✅ /tmp 扩容至 10GB 完成"
+        
+        df -h
+        df -i /tmp
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
 
-      - name: 克隆OpenWrt源码
-        run: |
-          cd $WORK_DIR
-          git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
-          ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+    - name: 初始化构建环境
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
 
-      - name: 加载自定义Feeds与配置脚本
-        run: |
-          [ -e $FEEDS_CONF ] && mv $FEEDS_CONF $WORK_DIR/openwrt/feeds.conf.default
-          chmod +x $DIY_P1_SH $DIY_P2_SH
-          cd $WORK_DIR/openwrt
-          $GITHUB_WORKSPACE/$DIY_P1_SH
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
-          [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE $WORK_DIR/openwrt/.config
-          if [ -d "$GITHUB_WORKSPACE/files" ]; then
-            mkdir -p $WORK_DIR/openwrt/files
-            cp -rn $GITHUB_WORKSPACE/files/* $WORK_DIR/openwrt/files/
-          fi
-          $GITHUB_WORKSPACE/$DIY_P2_SH
-          make defconfig
+    - name: 查看编译环境硬件规格 (CPU/内存)
+      run: |
+        echo "==================== CPU 核心数 ===================="
+        echo "逻辑核心数: $(nproc)"
+        cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+        echo -e "\n==================== 内存大小 ===================="
+        free -h
 
-      - name: 下载内核源码准备校验环境
-        run: |
-          cd $WORK_DIR/openwrt
-          make target/linux/prepare V=s
+    - name: 克隆 OpenWrt 源码到磁盘
+      run: |
+        cd $WORK_DIR
+        df -hT $PWD
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
 
-      - name: 执行Kconfig一键依赖&NEW项校验
-        id: kconfig_verify
-        run: |
-          set -o errexit
-          set -o pipefail
-          OPENWRT_ROOT=$WORK_DIR/openwrt
-          GENERIC_CONF="$OPENWRT_ROOT/target/linux/generic/config-6.12"
-          PLATFORM_CONF="$OPENWRT_ROOT/target/linux/rockchip/armv8/config-6.12"
-          BUILD_KERNEL_DIR="$OPENWRT_ROOT/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-${{ env.KERNEL_VERSION }}"
-          TMP_CONF="$OPENWRT_ROOT/tmp/kernel_check.config"
-          CHECK_LOG="$OPENWRT_ROOT/kconfig_check_result.log"
+    - name: 加载自定义软件源
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
 
-          echo "=====================================" >> $CHECK_LOG
-          echo "【Kconfig预校验日志 开始】 $(date '+%Y-%m-%d %H:%M:%S')" >> $CHECK_LOG
-          echo "=====================================" >> $CHECK_LOG
+    - name: 更新软件源索引
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
 
-          # 1. 合并通用内核配置 + 平台内核配置
-          $OPENWRT_ROOT/scripts/kconfig.pl + "$GENERIC_CONF" "$PLATFORM_CONF" > "$TMP_CONF"
-          # 合并.config衍生的KERNEL_开头配置
-          awk '/^(#[[:space:]]+)?CONFIG_KERNEL/{sub("CONFIG_KERNEL_","CONFIG_");print}' "$OPENWRT_ROOT/.config" >> "$TMP_CONF"
+    - name: 安装软件源组件
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
 
-          # 过滤INITRAMFS并补充默认参数，对齐OpenWrt构建逻辑
-          grep -v INITRAMFS "$TMP_CONF" > "${TMP_CONF}.tmp"
-          mv "${TMP_CONF}.tmp" "$TMP_CONF"
-          echo 'CONFIG_INITRAMFS_SOURCE=""' >> "$TMP_CONF"
-          echo "# CONFIG_INITRAMFS_FORCE is not set" >> "$TMP_CONF"
-          echo "# CONFIG_INITRAMFS_PRESERVE_MTIME is not set" >> "$TMP_CONF"
+    - name: 加载自定义配置文件(修复files同源复制报错)
+      run: |
+        if [ -d "$GITHUB_WORKSPACE/files" ]; then
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+          # -n 不覆盖已存在文件，避免同源软链接复制报错
+          cp -rn $GITHUB_WORKSPACE/files/* ${{ env.WORK_DIR }}/openwrt/files/
+        fi
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
 
-          # 备份原始待校验配置
-          cp "$TMP_CONF" "${TMP_CONF}.origin"
+    - name: 生成基础配置并准备内核源码
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make defconfig
+        make target/linux/prepare V=s
 
-          # 进入内核目录执行syncconfig非交互校验
-          cd "$BUILD_KERNEL_DIR"
-          cp "$TMP_CONF" .config
-          echo "1. 正在执行syncconfig校验（捕获NEW交互项、依赖语法错误）" >> $CHECK_LOG
-          make ARCH=arm64 syncconfig 2>> $CHECK_LOG
+    - name: Kconfig一键校验(动态识别官方内核目录，不硬编码版本)
+      id: kconfig_check
+      run: |
+        set -euo pipefail
+        OPENWRT_ROOT="${{ env.WORK_DIR }}/openwrt"
+        GENERIC_CONF="${OPENWRT_ROOT}/target/linux/generic/config-6.12"
+        PLATFORM_CONF="${OPENWRT_ROOT}/target/linux/rockchip/armv8/config-6.12"
+        TMP_CONF="${OPENWRT_ROOT}/tmp/kernel_merge.config"
+        CHECK_LOG="${OPENWRT_ROOT}/kconfig_verify_result.log"
 
-          # 对比配置变更，找出依赖不满足被自动禁用的配置
-          echo -e "\n2. 依赖校验结果：以下配置因依赖缺失从=y被自动置为n" >> $CHECK_LOG
-          diff -u "${TMP_CONF}.origin" .config | grep -E '^(\-CONFIG|\+# CONFIG)' | grep -v INITRAMFS >> $CHECK_LOG || echo "无配置因依赖失效被禁用" >> $CHECK_LOG
+        # 动态匹配openwrt官方内核目录 linux-6.12.xxx
+        KERNEL_BASE="${OPENWRT_ROOT}/build_dir/target-aarch64_generic_musl/linux-rockchip_armv8"
+        BUILD_KERNEL_DIR=$(find "${KERNEL_BASE}" -maxdepth 1 -type d -name "linux-6.12.*" | head -1)
 
-          echo -e "\n=====================================" >> $CHECK_LOG
-          echo "【Kconfig预校验日志 结束】 $(date '+%Y-%m-%d %H:%M:%S')" >> $CHECK_LOG
-          echo "=====================================" >> $CHECK_LOG
+        if [[ -z "${BUILD_KERNEL_DIR}" || ! -d "${BUILD_KERNEL_DIR}" ]]; then
+          echo "ERROR: 未找到Linux 6.12内核编译目录，请检查make target/linux/prepare执行是否成功" >> "${CHECK_LOG}"
+          exit 1
+        fi
+        echo "使用内核目录: ${BUILD_KERNEL_DIR}" >> "${CHECK_LOG}"
 
-          echo "校验完成，日志路径：$CHECK_LOG"
-          cat $CHECK_LOG
-          echo "check_status=pass" >> $GITHUB_OUTPUT
+        echo "======================== Kconfig校验开始 ========================" >> "${CHECK_LOG}"
+        echo "执行时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "${CHECK_LOG}"
 
-      - name: 上传Kconfig校验日志制品
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: Kconfig校验日志文件
-          path: ${{ env.WORK_DIR }}/openwrt/kconfig_check_result.log
+        # 合并通用+平台内核配置
+        ${OPENWRT_ROOT}/scripts/kconfig.pl + "${GENERIC_CONF}" "${PLATFORM_CONF}" > "${TMP_CONF}"
+        # 合并全局衍生KERNEL_配置
+        awk '/^(#[[:space:]]+)?CONFIG_KERNEL/{sub("CONFIG_KERNEL_","CONFIG_");print}' "${OPENWRT_ROOT}/.config" >> "${TMP_CONF}"
+
+        # 过滤INITRAMFS
+        grep -v INITRAMFS "${TMP_CONF}" > "${TMP_CONF}.tmp"
+        mv "${TMP_CONF}.tmp" "${TMP_CONF}"
+        echo 'CONFIG_INITRAMFS_SOURCE=""' >> "${TMP_CONF}"
+        echo "# CONFIG_INITRAMFS_FORCE is not set" >> "${TMP_CONF}"
+        echo "# CONFIG_INITRAMFS_PRESERVE_MTIME is not set" >> "${TMP_CONF}"
+
+        cp "${TMP_CONF}" "${TMP_CONF}.origin"
+
+        # 执行syncconfig捕获NEW交互式配置、依赖错误
+        cd "${BUILD_KERNEL_DIR}"
+        cp "${TMP_CONF}" .config
+        echo "1. 执行syncconfig校验..." >> "${CHECK_LOG}"
+        make ARCH=arm64 syncconfig 2>> "${CHECK_LOG}"
+
+        # 输出被自动降级禁用的配置项
+        echo -e "\n2. 依赖不满足被自动从=y置为n的配置列表:" >> "${CHECK_LOG}"
+        diff -u "${TMP_CONF}.origin" .config | grep -E '^(\-CONFIG|\+# CONFIG)' | grep -v INITRAMFS >> "${CHECK_LOG}" || echo "无配置因依赖失效被禁用" >> "${CHECK_LOG}"
+
+        echo -e "\n======================== Kconfig校验结束 ========================" >> "${CHECK_LOG}"
+        cat "${CHECK_LOG}"
+        echo "check_result=success" >> $GITHUB_OUTPUT
+
+    - name: 上传Kconfig校验日志
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: Kconfig校验结果日志
+        path: ${{ env.WORK_DIR }}/openwrt/kconfig_verify_result.log
