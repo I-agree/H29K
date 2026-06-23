@@ -440,26 +440,38 @@ echo "✅ 已向 $CONFIG_FILE 注入目标内核参数"
 # =================================================================================
 echo "🔓 正在解锁 OpenWrt 外层全局依赖，确保 BBR 与 CIFS 编译生效..."
 
-# 1. 强制开启 OpenWrt 内核高级 TCP 拥塞控制选项（BBR 的生死符）
-if grep -q "CONFIG_KERNEL_TCP_CONG_ADVANCED" "$OPENWRT_CONFIG"; then
-    sed -i 's/^.*CONFIG_KERNEL_TCP_CONG_ADVANCED.*$/CONFIG_KERNEL_TCP_CONG_ADVANCED=y/' "$OPENWRT_CONFIG"
-else
-    echo "CONFIG_KERNEL_TCP_CONG_ADVANCED=y" >> "$OPENWRT_CONFIG"
-fi
-
-# 2. 强制开启网络文件系统支持（CIFS 的通行证）
-if grep -q "CONFIG_PACKAGE_kmod-fs-cifs" "$OPENWRT_CONFIG"; then
-    sed -i 's/^.*CONFIG_PACKAGE_kmod-fs-cifs.*$/CONFIG_PACKAGE_kmod-fs-cifs=y/' "$OPENWRT_CONFIG"
-else
-    echo "CONFIG_PACKAGE_kmod-fs-cifs=y" >> "$OPENWRT_CONFIG"
-fi
-
-# 3. 强制开启 NetFS 核心依赖
-if grep -q "CONFIG_PACKAGE_kmod-fs-netfs" "$OPENWRT_CONFIG"; then
-    sed -i 's/^.*CONFIG_PACKAGE_kmod-fs-netfs.*$/CONFIG_PACKAGE_kmod-fs-netfs=y/' "$OPENWRT_CONFIG"
-else
-    echo "CONFIG_PACKAGE_kmod-fs-netfs=y" >> "$OPENWRT_CONFIG"
-fi
+# 使用 awk 一次性完成“存在则替换，不存在则追加”，100% 免疫 grep 在 set -e 下的退出码陷阱
+awk -v targets="CONFIG_KERNEL_TCP_CONG_ADVANCED=y CONFIG_PACKAGE_kmod-fs-cifs=y CONFIG_PACKAGE_kmod-fs-netfs=y" '
+BEGIN {
+    # 解析需要强制注入的目标配置
+    n = split(targets, arr, " ");
+    for (i = 1; i <= n; i++) {
+        split(arr[i], kv, "=");
+        keys[kv[1]] = arr[i];
+    }
+}
+{
+    # 如果当前行匹配到目标 key，则替换为强制开启的值，并标记已处理
+    matched = 0;
+    for (k in keys) {
+        if ($0 ~ "^#? ?" k "(=| is not set|$)") {
+            print keys[k];
+            handled[k] = 1;
+            matched = 1;
+            break;
+        }
+    }
+    if (!matched) print $0;
+}
+END {
+    # 将原文件中不存在的配置追加到末尾
+    for (k in keys) {
+        if (!(k in handled)) {
+            print keys[k];
+        }
+    }
+}
+' "$OPENWRT_CONFIG" > "${OPENWRT_CONFIG}.tmp" && mv -f "${OPENWRT_CONFIG}.tmp" "$OPENWRT_CONFIG"
 
 echo "✅ OpenWrt 外层依赖锁已物理粉碎，BBR 与 CIFS 将 100% 编入固件！"
 
