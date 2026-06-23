@@ -1,4 +1,4 @@
-name: OpenWrt 固件生成脚本
+name: 采集 U-Boot defconfig 完整 Kconfig 输出日志
 
 on:
   repository_dispatch:
