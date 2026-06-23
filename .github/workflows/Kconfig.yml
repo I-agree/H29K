@@ -169,7 +169,7 @@ jobs:
 
     - name: 上传真实 Kconfig 配置文件 (真理日志)
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7.0.1
       with:
         name: Real-Kconfig-Truth-Logs
         path: |
