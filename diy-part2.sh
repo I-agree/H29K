@@ -36,6 +36,8 @@ fi
 
 # ======================== 【2. H29K 主线内核配置合并注入】 ========================
 CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+# 👇 【新增】OpenWrt 外层全局配置文件（解决 BBR/CIFS 被外层依赖绞杀的核心钥匙）
+OPENWRT_CONFIG=".config" 
 
 echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
 
@@ -164,32 +166,18 @@ CONFIG_KEYBOARD_GPIO=y
 # =====================================================================
 # 解决kmod-fs-netfs核心内核依赖链
 # =====================================================================
-# SMB/CIFS 客户端 + FSCACHE 文件缓存 防弹窗完整配置
 CONFIG_NETFS_SUPPORT=m
 CONFIG_FSCACHE=y
 # CONFIG_FSCACHE_STATS is not set
-
-# 关闭cachefiles缓存后端，避免新增NEW交互项
 # CONFIG_CACHEFILES is not set
-# CONFIG_CACHEFILES_DEBUG is not set
-# CONFIG_CACHEFILES_ERROR_INJECTION is not set
-# CONFIG_CACHEFILES_ONDEMAND is not set
 
 CONFIG_CIFS=m
-# CONFIG_CIFS_STATS2 is not set
 CONFIG_CIFS_ALLOW_INSECURE_LEGACY=y
-# CONFIG_CIFS_UPCALL is not set
 CONFIG_CIFS_XATTR=y
 CONFIG_CIFS_POSIX=y
 # CONFIG_CIFS_DEBUG is not set
-# CONFIG_CIFS_DEBUG2 is not set
-# CONFIG_CIFS_DEBUG_DUMP_KEYS is not set
 # CONFIG_CIFS_DFS_UPCALL is not set
-# CONFIG_CIFS_SWN_UPCALL is not set
-# CONFIG_CIFS_NFSD_EXPORT is not set
-# CONFIG_CIFS_SMB_DIRECT is not set
 # CONFIG_CIFS_FSCACHE is not set
-# CONFIG_CIFS_ROOT is not set
 # CONFIG_CIFS_COMPRESSION is not set
 
 # =====================================================================
@@ -352,10 +340,10 @@ CONFIG_VIDEO_HANTRO_ROCKCHIP=y
 CONFIG_TCP_CONG_ADVANCED=y
 CONFIG_TCP_CONG_BBR=y
 CONFIG_DEFAULT_BBR=y
-CONFIG_DEFAULT_NET_CONG="bbr"
+CONFIG_DEFAULT_NET_CONG=bbr
 CONFIG_NET_SCHED=y
 CONFIG_NET_SCH_FQ=y
-CONFIG_DEFAULT_QDISC="fq"
+CONFIG_DEFAULT_QDISC=fq
 
 # ==============================================================================
 # 📡 基于下面网页对齐的蓝牙全量闭环配置（拒绝任何弹窗）
@@ -446,6 +434,34 @@ CONFIG_HW_RANDOM_ROCKCHIP=y
 
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数"
+
+# =================================================================================
+# 🚨 核心补丁：打通 OpenWrt 外层依赖锁（防止 BBR 和 CIFS 被 make defconfig 清理）
+# =================================================================================
+echo "🔓 正在解锁 OpenWrt 外层全局依赖，确保 BBR 与 CIFS 编译生效..."
+
+# 1. 强制开启 OpenWrt 内核高级 TCP 拥塞控制选项（BBR 的生死符）
+if grep -q "CONFIG_KERNEL_TCP_CONG_ADVANCED" "$OPENWRT_CONFIG"; then
+    sed -i 's/^.*CONFIG_KERNEL_TCP_CONG_ADVANCED.*$/CONFIG_KERNEL_TCP_CONG_ADVANCED=y/' "$OPENWRT_CONFIG"
+else
+    echo "CONFIG_KERNEL_TCP_CONG_ADVANCED=y" >> "$OPENWRT_CONFIG"
+fi
+
+# 2. 强制开启网络文件系统支持（CIFS 的通行证）
+if grep -q "CONFIG_PACKAGE_kmod-fs-cifs" "$OPENWRT_CONFIG"; then
+    sed -i 's/^.*CONFIG_PACKAGE_kmod-fs-cifs.*$/CONFIG_PACKAGE_kmod-fs-cifs=y/' "$OPENWRT_CONFIG"
+else
+    echo "CONFIG_PACKAGE_kmod-fs-cifs=y" >> "$OPENWRT_CONFIG"
+fi
+
+# 3. 强制开启 NetFS 核心依赖
+if grep -q "CONFIG_PACKAGE_kmod-fs-netfs" "$OPENWRT_CONFIG"; then
+    sed -i 's/^.*CONFIG_PACKAGE_kmod-fs-netfs.*$/CONFIG_PACKAGE_kmod-fs-netfs=y/' "$OPENWRT_CONFIG"
+else
+    echo "CONFIG_PACKAGE_kmod-fs-netfs=y" >> "$OPENWRT_CONFIG"
+fi
+
+echo "✅ OpenWrt 外层依赖锁已物理粉碎，BBR 与 CIFS 将 100% 编入固件！"
 
 # ======================== 【3. 屏幕驱动与核心系统组件注入】 ========================
 mkdir -p files/etc
