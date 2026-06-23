@@ -50,9 +50,9 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE $WORK_DIR/openwrt/.config
-          if [ -d files ]; then
+          if [ -d "$GITHUB_WORKSPACE/files" ]; then
             mkdir -p $WORK_DIR/openwrt/files
-            cp -r files/* $WORK_DIR/openwrt/files/
+            cp -rn $GITHUB_WORKSPACE/files/* $WORK_DIR/openwrt/files/
           fi
           $GITHUB_WORKSPACE/$DIY_P2_SH
           make defconfig
