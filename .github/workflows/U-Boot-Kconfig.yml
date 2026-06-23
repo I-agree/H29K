@@ -1,0 +1,100 @@
+name: 仅采集U-Boot Kconfig校验日志专用流水线
+on:
+  repository_dispatch
+  workflow_dispatch
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: openwrt-25.12
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
+  UBOOT_DEF_NAME: hinlink-h29k-rk3528
+  UBOOT_LOG_FILE: uboot_kconfig_verify.log
+
+jobs:
+  capture_uboot_log:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - name: 检出本地仓库配置文件
+        uses: actions/checkout@v6.0.3
+
+      - name: 扩容Swap与临时分区
+        run: |
+          sudo mkdir -p $WORK_DIR
+          sudo chown -R $USER:$USER $WORK_DIR
+          sudo swapoff -a
+          sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sudo sysctl vm.swappiness=10
+          sudo umount /tmp || true
+          sudo mount -t tmpfs tmpfs -o size=10G /tmp
+          echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+
+      - name: 安装完整编译依赖
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev
+          sudo timedatectl set-timezone "$TZ"
+
+      - name: 克隆OpenWrt源码
+        run: |
+          cd $WORK_DIR
+          git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+          ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+
+      - name: 加载feeds与diy-part1脚本
+        run: |
+          [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+          chmod +x $GITHUB_WORKSPACE/$DIY_P1_SH
+          cd ${{ env.WORK_DIR }}/openwrt
+          $GITHUB_WORKSPACE/$DIY_P1_SH
+
+      - name: 更新&安装feeds组件
+        run: |
+          cd ${{ env.WORK_DIR }}/openwrt
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: 导入设备配置 + diy-part2内核脚本
+        run: |
+          if [ -d files ]; then
+            mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+            cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
+          fi
+          [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+          chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
+          cd ${{ env.WORK_DIR }}/openwrt
+          $GITHUB_WORKSPACE/$DIY_P2_SH
+
+      - name: 预下载u-boot源码包（仅拉取依赖，不编译固件）
+        run: |
+          cd ${{ env.WORK_DIR }}/openwrt
+          make download package/boot/u-boot-rockchip/compile -j4
+
+      - name: U-Boot defconfig 执行并捕获完整Kconfig校验日志
+        id: uboot_kconfig_run
+        run: |
+          cd ${{ env.WORK_DIR }}/openwrt
+          UBOOT_BUILD=$(find build_dir -name "*u-boot-rockchip*" -type d | head -n1)
+          cd "$UBOOT_BUILD"
+          make distclean
+          make ${{ env.UBOOT_DEF_NAME }} ARCH=arm64 CROSS_COMPILE=aarch64-openwrt-linux- 2>&1 | tee ${{ env.WORK_DIR }}/${{ env.UBOOT_LOG_FILE }}
+          echo "U-Boot Kconfig日志生成完成：${{ env.WORK_DIR }}/${{ env.UBOOT_LOG_FILE }}"
+
+      - name: 上传U-Boot日志Artifact
+        uses: actions/upload-art@v7.0.1
+        with:
+          name: uboot_kconfig_log
+          path: ${{ env.WORK_DIR }}/${{ env.UBOOT_LOG_FILE }}
