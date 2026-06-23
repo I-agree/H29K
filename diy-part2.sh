@@ -609,16 +609,32 @@ cat > files/etc/10-h29k <<'EOF'
 
 # === 基础系统设置：LuCI中文、主机名、时区 ===
 uci -q set luci.main.lang=zh_cn
-uci -q set system.@system[0].hostname=H29K
 uci -q set system.@system[0].zonename=Asia/Shanghai
 uci -q set system.@system[0].timezone=CST-8
+# 仅当system节点存在时设置主机名，防止新固件空配置报错
+uci -q get system.@system >/dev/null && uci -q set system.@system[0].hostname=H29K
 uci -q commit system
 
-# === 中断均衡：开机启用并立即启动（修复路径错误）
-/etc/init.d/irqbalance enable
-/etc/init.d/irqbalance start 2>/dev/null || true
+# === WiFi AP 配置：SSID=H29K，开放无密码 ===
+# 无线设备名称（通用wlan0）
+uci -q set wireless.radio0.type=mac80211
+uci -q set wireless.radio0.channel=6
+uci -q set wireless.radio0.htmode=HT40
+uci -q set wireless.default_radio0=ap
+uci -q set wireless.ap.mode=ap
+uci -q set wireless.ap.ssid=H29K
+# 开放网络，无加密
+uci -q set wireless.ap.encryption=none
+# 广播SSID不隐藏
+uci -q set wireless.ap.disabled=0
+# 绑定LAN网段
+uci -q set wireless.ap.network=lan
+uci -q commit wireless
 
-# === SPI屏幕自定义服务开机自启
+# === 中断均衡：仅设置开机自启，不即时启动
+/etc/init.d/irqbalance enable
+
+# === SPI屏幕自定义服务：仅设置开机自启，不即时启动
 /etc/init.d/h29k-screen enable
 
 exit 0
