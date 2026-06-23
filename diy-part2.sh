@@ -454,7 +454,13 @@ CONFIG_VIDEO_ROCKCHIP_RGA=y
 CONFIG_V4L_MEM2MEM_DRIVERS=y
 CONFIG_VIDEO_HANTRO=y
 CONFIG_VIDEO_HANTRO_ROCKCHIP=y
-# CONFIG_VIDEO_RKVDEC is not set
+# 关闭HEVC参考帧压缩，消除NEW交互弹窗
+# CONFIG_VIDEO_HANTRO_HEVC_RFC is not set
+# 非瑞芯平台全部显式禁用
+# CONFIG_VIDEO_HANTRO_IMX8M is not set
+# CONFIG_VIDEO_HANTRO_SAMA5D4 is not set
+# CONFIG_VIDEO_HANTRO_SUNXI is not set
+# CONFIG_VIDEO_HANTRO_STM32MP25 is not set
 
 # ==============================================================================
 
