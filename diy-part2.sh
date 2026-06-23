@@ -35,8 +35,72 @@ else
 fi
 
 # =================================================================================
-# 🚨 核心补丁：打通 OpenWrt 外层依赖锁
+# 2. 🚨 终极补丁：打通 OpenWrt 外层依赖锁（保护 diy-part1.sh 的内核种子配置）
 # =================================================================================
+echo "🔓 正在注入外层包依赖，防止内核 Kconfig 降维打击..."
+
+OPENWRT_CONFIG=".config"
+touch "$OPENWRT_CONFIG"
+
+# 必须与 diy-part1.sh 中的内核配置严格对齐！
+TARGETS="
+# 1. 网络高并发：BBR + FQ
+CONFIG_KERNEL_TCP_CONG_ADVANCED=y
+CONFIG_PACKAGE_kmod-tcp-bbr=y
+
+# 2. 文件系统：CIFS + NetFS
+CONFIG_PACKAGE_kmod-fs-cifs=y
+CONFIG_PACKAGE_kmod-fs-netfs=y
+
+# 3. 显示架构：DRM 核心 + 简单帧缓冲
+CONFIG_PACKAGE_kmod-drm=y
+
+# 4. 多媒体与摄像头：V4L2 核心 + UVC
+CONFIG_PACKAGE_kmod-video-core=y
+CONFIG_PACKAGE_kmod-video-uvc=y
+
+# 5. 5G 模块：USB 网络 + 串口
+CONFIG_PACKAGE_kmod-usb-net=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y
+CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=y
+CONFIG_PACKAGE_kmod-usb-net-rndis=y
+CONFIG_PACKAGE_kmod-usb-serial-option=y
+
+# 6. 底层分区支持 (保护 PARTITION_ADVANCED)
+CONFIG_PACKAGE_kmod-block2mtd=y
+"
+
+awk -v targets="$TARGETS" '
+BEGIN {
+    n = split(targets, arr, "\n");
+    for (i = 1; i <= n; i++) {
+        if (arr[i] == "") continue;
+        split(arr[i], kv, "=");
+        keys[kv[1]] = arr[i];
+    }
+}
+{
+    matched = 0;
+    for (k in keys) {
+        if ($0 ~ "^#? ?" k "(=| is not set|$)") {
+            print keys[k];
+            handled[k] = 1;
+            matched = 1;
+            break;
+        }
+    }
+    if (!matched) print $0;
+}
+END {
+    for (k in keys) {
+        if (!(k in handled)) {
+            print keys[k];
+        }
+    }
+}
+' "$OPENWRT_CONFIG" > "${OPENWRT_CONFIG}.tmp" && mv -f "${OPENWRT_CONFIG}.tmp" "$OPENWRT_CONFIG"
+
+echo "✅ 外层依赖锁已物理粉碎，内核种子配置已获绝对防御！"
 
 # ======================== 【3. 屏幕驱动与核心系统组件注入】 ========================
 mkdir -p files/etc
