@@ -451,7 +451,7 @@ mkdir -p "$(dirname "$DST_FONT")"
 
 if [ -f "$SRC_FONT" ]; then
     cp -f "$SRC_FONT" "$DST_FONT"
-    MAGIC=$(head -c 4 "$DST_FONT" 2>/dev/null | od -t x1 -An | tr -d ' \n')
+    MAGIC=$(head -c 4 "$DST_FONT" 2>/dev/null | od -t x1 -An | tr -d ' \n' || true)
     if [[ "$MAGIC" != "00010000" ]] && [[ "$MAGIC" != "4f54544f" ]]; then
         echo "❌ 错误：字体魔数校验未通过！" && exit 1
     fi
@@ -603,43 +603,42 @@ EOF
 chmod +x files/usr/bin/h29k_screen.sh
 
 # ======================== 【4. 系统初始化与 UCI 策略】 ========================
+# 👇 【已纠错】必须放在 uci-defaults 目录下，否则开机不会自动执行！
 mkdir -p files/etc/uci-defaults
-cat > files/etc/10-h29k <<'EOF'
+cat > files/etc/uci-defaults/10-h29k <<'EOF'
 #!/bin/sh
 
 # === 基础系统设置：LuCI中文、主机名、时区 ===
 uci -q set luci.main.lang=zh_cn
 uci -q set system.@system[0].zonename=Asia/Shanghai
 uci -q set system.@system[0].timezone=CST-8
-# 仅当system节点存在时设置主机名，防止新固件空配置报错
 uci -q get system.@system >/dev/null && uci -q set system.@system[0].hostname=H29K
 uci -q commit system
+uci -q commit luci
 
 # === WiFi AP 配置：SSID=H29K，开放无密码 ===
-# 无线设备名称（通用wlan0）
-uci -q set wireless.radio0.type=mac80211
-uci -q set wireless.radio0.channel=6
-uci -q set wireless.radio0.htmode=HT40
-uci -q set wireless.default_radio0=ap
-uci -q set wireless.ap.mode=ap
-uci -q set wireless.ap.ssid=H29K
-# 开放网络，无加密
-uci -q set wireless.ap.encryption=none
-# 广播SSID不隐藏
-uci -q set wireless.ap.disabled=0
-# 绑定LAN网段
-uci -q set wireless.ap.network=lan
+# 👇 【已纠错】修复了 UCI 语法错误，确保无线配置能正确生成
+uci -q delete wireless.default_radio0
+uci -q set wireless.default_radio0=wifi-iface
+uci -q set wireless.default_radio0.device=radio0
+uci -q set wireless.default_radio0.mode=ap
+uci -q set wireless.default_radio0.ssid=H29K
+uci -q set wireless.default_radio0.encryption=none
+uci -q set wireless.default_radio0.disabled=0
+uci -q set wireless.default_radio0.network=lan
+
+uci -q set wireless.radio0.disabled=0
 uci -q commit wireless
 
-# === 中断均衡：仅设置开机自启，不即时启动
+# === 中断均衡：仅设置开机自启 ===
 /etc/init.d/irqbalance enable
 
-# === SPI屏幕自定义服务：仅设置开机自启，不即时启动
+# === SPI屏幕自定义服务：仅设置开机自启 ===
 /etc/init.d/h29k-screen enable
 
 exit 0
 EOF
-chmod +x files/etc/10-h29k
+chmod +x files/etc/uci-defaults/10-h29k
 
 # =================================================================================
 # 🚨 针对 aic8800 本地 Makefile 的终极补丁（支持 set -e 严格模式）
@@ -649,15 +648,22 @@ REAL_AIC_MAKEFILE="package/kernel/aic8800/Makefile"
 if [ -f "$REAL_AIC_MAKEFILE" ]; then
     echo "📥 侦测到目标组件，正在从自定义仓库强制下载覆盖 aic8800 Makefile..."
     
-    # 下载文件
-    curl -sSL --connect-timeout 8 --retry 3 \
-      "https://raw.githubusercontent.com/I-agree/H29K/main/package/kernel/aic8800/Makefile" > "$REAL_AIC_MAKEFILE" || true
-    
-    # 核心校验：判断是否包含 PKG_BUILD_DEPENDS:=mac80211
-    if grep -q "PKG_BUILD_DEPENDS:=mac80211" "$REAL_AIC_MAKEFILE"; then
-        echo "✅ aic8800 Makefile 覆盖成功，令牌锁死与 GCC14 报错已物理粉碎！"
+    # 👇 【已加固】先下载到临时文件，校验成功后再覆盖，防止 pipefail 和空文件导致 grep 崩溃
+    TMP_AIC_MAKEFILE=$(mktemp)
+    if curl -sSL --connect-timeout 8 --retry 3 \
+      "https://raw.githubusercontent.com/I-agree/H29K/main/package/kernel/aic8800/Makefile" > "$TMP_AIC_MAKEFILE"; then
+      
+        if [ -s "$TMP_AIC_MAKEFILE" ] && grep -q "PKG_BUILD_DEPENDS:=mac80211" "$TMP_AIC_MAKEFILE"; then
+            mv -f "$TMP_AIC_MAKEFILE" "$REAL_AIC_MAKEFILE"
+            echo "✅ aic8800 Makefile 覆盖成功，令牌锁死与 GCC14 报错已物理粉碎！"
+        else
+            echo "❌ 校验失败：Makefile 中缺失 PKG_BUILD_DEPENDS:=mac80211 或文件为空，编译将终止！"
+            rm -f "$TMP_AIC_MAKEFILE"
+            exit 1
+        fi
     else
-        echo "❌ 校验失败：Makefile 中缺失 PKG_BUILD_DEPENDS:=mac80211，编译将终止！"
+        echo "❌ 下载失败：无法获取 aic8800 Makefile，编译将终止！"
+        rm -f "$TMP_AIC_MAKEFILE"
         exit 1
     fi
 else
