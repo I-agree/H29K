@@ -274,9 +274,33 @@ CONFIG_GPIO_KEYS=y
 # =====================================================================
 # 解决kmod-fs-netfs核心内核依赖链
 # =====================================================================
-CONFIG_CIFS=m
+# SMB/CIFS 客户端 + FSCACHE 文件缓存 防弹窗完整配置
 CONFIG_NETFS_SUPPORT=m
 CONFIG_FSCACHE=y
+# CONFIG_FSCACHE_STATS is not set
+
+# 关闭cachefiles缓存后端，避免新增NEW交互项
+# CONFIG_CACHEFILES is not set
+# CONFIG_CACHEFILES_DEBUG is not set
+# CONFIG_CACHEFILES_ERROR_INJECTION is not set
+# CONFIG_CACHEFILES_ONDEMAND is not set
+
+CONFIG_CIFS=m
+# CONFIG_CIFS_STATS2 is not set
+CONFIG_CIFS_ALLOW_INSECURE_LEGACY=y
+# CONFIG_CIFS_UPCALL is not set
+CONFIG_CIFS_XATTR=y
+CONFIG_CIFS_POSIX=y
+# CONFIG_CIFS_DEBUG is not set
+# CONFIG_CIFS_DEBUG2 is not set
+# CONFIG_CIFS_DEBUG_DUMP_KEYS is not set
+# CONFIG_CIFS_DFS_UPCALL is not set
+# CONFIG_CIFS_SWN_UPCALL is not set
+# CONFIG_CIFS_NFSD_EXPORT is not set
+# CONFIG_CIFS_SMB_DIRECT is not set
+# CONFIG_CIFS_FSCACHE is not set
+# CONFIG_CIFS_ROOT is not set
+# CONFIG_CIFS_COMPRESSION is not set
 
 # =====================================================================
 
