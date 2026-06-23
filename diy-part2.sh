@@ -35,41 +35,70 @@ else
 fi
 
 # =================================================================================
-# 2. 🚨 终极补丁：打通 OpenWrt 外层依赖锁（保护 diy-part1.sh 的内核种子配置）
+# 🚨 终极补丁 V2：内核级 KCONFIG 强制注入（彻底粉碎降维打击）
 # =================================================================================
-echo "🔓 正在注入外层包依赖，防止内核 Kconfig 降维打击..."
+echo "🔓 正在注入内核级强制配置，绕过 OpenWrt 包推导清洗..."
 
 OPENWRT_CONFIG=".config"
 touch "$OPENWRT_CONFIG"
 
-# 必须与 diy-part1.sh 中的内核配置严格对齐！
+# 核心策略：放弃 CONFIG_PACKAGE_ 推导，直接使用 CONFIG_KERNEL_ 强制锁定内核参数！
 TARGETS="
-# 1. 网络高并发：BBR + FQ
+# ================= 1. 网络高并发：BBR + FQ (强制锁定内核网络栈) =================
 CONFIG_KERNEL_TCP_CONG_ADVANCED=y
-CONFIG_PACKAGE_kmod-tcp-bbr=y
+CONFIG_KERNEL_TCP_CONG_BBR=y
+CONFIG_KERNEL_DEFAULT_BBR=y
+CONFIG_KERNEL_NET_SCH_FQ=y
+CONFIG_KERNEL_DEFAULT_FQ=y
+# 确保底层网络支持
+CONFIG_KERNEL_NET_CLS_ACT=y
+CONFIG_KERNEL_NET_EMATCH=y
 
-# 2. 文件系统：CIFS + NetFS
-CONFIG_PACKAGE_kmod-fs-cifs=y
-CONFIG_PACKAGE_kmod-fs-netfs=y
+# ================= 2. 文件系统：CIFS + NetFS (补齐 Crypto 和 NLS 依赖) =================
+CONFIG_KERNEL_CIFS=m
+CONFIG_KERNEL_NETFS_SUPPORT=m
+CONFIG_KERNEL_FSCACHE=y
+# CIFS 强依赖的加密和字符集
+CONFIG_KERNEL_CRYPTO_AES=y
+CONFIG_KERNEL_CRYPTO_SHA256=y
+CONFIG_KERNEL_CRYPTO_ARC4=y
+CONFIG_KERNEL_NLS_UTF8=y
+CONFIG_KERNEL_NLS_CODEPAGE_437=y
 
-# 3. 显示架构：DRM 核心 + 简单帧缓冲
-CONFIG_PACKAGE_kmod-drm=y
+# ================= 3. 显示架构：DRM 核心 (补齐 KMS 和 FBDEV 依赖) =================
+CONFIG_KERNEL_DRM=y
+CONFIG_KERNEL_DRM_KMS_HELPER=y
+CONFIG_KERNEL_DRM_FBDEV_EMULATION=y
+CONFIG_KERNEL_DRM_MIPI_DBI=y
+CONFIG_KERNEL_DRM_PANEL_SITRONIX_ST7789V=y
+CONFIG_KERNEL_DRM_SIMPLEDRM=y
+# 确保 I2C 和 SPI 支持 (屏幕通信必需)
+CONFIG_KERNEL_I2C=y
+CONFIG_KERNEL_SPI=y
 
-# 4. 多媒体与摄像头：V4L2 核心 + UVC
-CONFIG_PACKAGE_kmod-video-core=y
-CONFIG_PACKAGE_kmod-video-uvc=y
+# ================= 4. 多媒体与摄像头：V4L2 (补齐 Media Controller) =================
+CONFIG_KERNEL_MEDIA_SUPPORT=y
+CONFIG_KERNEL_MEDIA_CONTROLLER=y
+CONFIG_KERNEL_VIDEO_DEV=y
+CONFIG_KERNEL_VIDEO_V4L2_SUBDEV_API=y
+CONFIG_KERNEL_USB_VIDEO_CLASS=y
+CONFIG_KERNEL_VIDEO_HANTRO=y
+CONFIG_KERNEL_VIDEO_ROCKCHIP_RGA=y
 
-# 5. 5G 模块：USB 网络 + 串口
-CONFIG_PACKAGE_kmod-usb-net=y
-CONFIG_PACKAGE_kmod-usb-net-cdc-ether=y
-CONFIG_PACKAGE_kmod-usb-net-cdc-ncm=y
-CONFIG_PACKAGE_kmod-usb-net-rndis=y
-CONFIG_PACKAGE_kmod-usb-serial-option=y
+# ================= 5. 5G 模块：USB 网络 + 串口 =================
+CONFIG_KERNEL_USB_USBNET=y
+CONFIG_KERNEL_USB_NET_CDCETHER=y
+CONFIG_KERNEL_USB_NET_CDC_NCM=y
+CONFIG_KERNEL_USB_NET_RNDIS_HOST=y
+CONFIG_KERNEL_USB_SERIAL=y
+CONFIG_KERNEL_USB_SERIAL_OPTION=y
 
-# 6. 底层分区支持 (保护 PARTITION_ADVANCED)
-CONFIG_PACKAGE_kmod-block2mtd=y
+# ================= 6. 底层分区与块设备 =================
+CONFIG_KERNEL_PARTITION_ADVANCED=y
+CONFIG_KERNEL_BLOCK=y
 "
 
+# (此处保留您原有的 awk 注入逻辑，无需修改)
 awk -v targets="$TARGETS" '
 BEGIN {
     n = split(targets, arr, "\n");
@@ -100,7 +129,7 @@ END {
 }
 ' "$OPENWRT_CONFIG" > "${OPENWRT_CONFIG}.tmp" && mv -f "${OPENWRT_CONFIG}.tmp" "$OPENWRT_CONFIG"
 
-echo "✅ 外层依赖锁已物理粉碎，内核种子配置已获绝对防御！"
+echo "✅ 内核级 KCONFIG 强制注入完成，依赖链已彻底焊死！"
 
 # ======================== 【3. 屏幕驱动与核心系统组件注入】 ========================
 mkdir -p files/etc
