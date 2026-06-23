@@ -671,18 +671,70 @@ chmod +x files/usr/bin/h29k_screen.sh
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-h29k <<'EOF'
 #!/bin/sh
+
+# === 基础系统设置 ===
 uci set luci.main.lang=zh_cn
 uci set system.@system[0].hostname=H29K
 uci set system.@system[0].zonename=Asia/Shanghai
 uci set system.@system[0].timezone=CST-8
 uci commit system
+
+# === 服务启停 ===
 /etc/init.d/irqbalance enable
+
 # 安全禁用 ModemManager，防止其与 5G 模组的 USB 串口/MBIM 驱动抢占控制权
 uci set modemmanager.@modemmanager[0].disabled='1' 2>/dev/null || true
 uci commit modemmanager 2>/dev/null || true
 # 兜底：如果 init.d 脚本存在，则执行 disable
 [ -x /etc/init.d/modemmanager ] && /etc/init.d/modemmanager disable
+
 /etc/init.d/h29k-screen enable
+
+# ======================== 【MediaMTX 流媒体端口放行 (firewall4/nftables)】 ========================
+# RTSP (TCP+UDP)
+uci add firewall rule
+uci set firewall.@rule[-1].name='MediaMTX-RTSP-8554'
+uci set firewall.@rule[-1].src='lan'
+uci set firewall.@rule[-1].dest_port='8554'
+uci set firewall.@rule[-1].proto='tcp udp'
+uci set firewall.@rule[-1].target='ACCEPT'
+
+# RTMP (TCP)
+uci add firewall rule
+uci set firewall.@rule[-1].name='MediaMTX-RTMP-1935'
+uci set firewall.@rule[-1].src='lan'
+uci set firewall.@rule[-1].dest_port='1935'
+uci set firewall.@rule[-1].proto='tcp'
+uci set firewall.@rule[-1].target='ACCEPT'
+
+# HLS (TCP)
+uci add firewall rule
+uci set firewall.@rule[-1].name='MediaMTX-HLS-8888'
+uci set firewall.@rule[-1].src='lan'
+uci set firewall.@rule[-1].dest_port='8888'
+uci set firewall.@rule[-1].proto='tcp'
+uci set firewall.@rule[-1].target='ACCEPT'
+
+# WebRTC TCP (TCP+UDP)
+uci add firewall rule
+uci set firewall.@rule[-1].name='MediaMTX-WebRTC-8889'
+uci set firewall.@rule[-1].src='lan'
+uci set firewall.@rule[-1].dest_port='8889'
+uci set firewall.@rule[-1].proto='tcp udp'
+uci set firewall.@rule[-1].target='ACCEPT'
+
+# WebRTC UDP ICE 候选端口
+uci add firewall rule
+uci set firewall.@rule[-1].name='MediaMTX-WebRTC-UDP-8189'
+uci set firewall.@rule[-1].src='lan'
+uci set firewall.@rule[-1].dest_port='8189'
+uci set firewall.@rule[-1].proto='udp'
+uci set firewall.@rule[-1].target='ACCEPT'
+
+# 提交防火墙配置并重新加载使规则立即生效
+uci commit firewall
+/etc/init.d/firewall restart
+
 exit 0
 EOF
 chmod +x files/etc/uci-defaults/99-h29k
