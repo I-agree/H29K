@@ -604,29 +604,26 @@ chmod +x files/usr/bin/h29k_screen.sh
 
 # ======================== 【4. 系统初始化与 UCI 策略】 ========================
 mkdir -p files/etc/uci-defaults
-cat > files/etc/uci-defaults/99-h29k <<'EOF'
+cat > files/etc/10-h29k <<'EOF'
 #!/bin/sh
 
-# === 基础系统设置 ===
-uci set luci.main.lang=zh_cn
-uci set system.@system[0].hostname=H29K
-uci set system.@system[0].zonename=Asia/Shanghai
-uci set system.@system[0].timezone=CST-8
-uci commit system
+# === 基础系统设置：LuCI中文、主机名、时区 ===
+uci -q set luci.main.lang=zh_cn
+uci -q set system.@system[0].hostname=H29K
+uci -q set system.@system[0].zonename=Asia/Shanghai
+uci -q set system.@system[0].timezone=CST-8
+uci -q commit system
 
-# === 服务启停 ===
+# === 中断均衡：开机启用并立即启动（修复路径错误）
 /etc/init.d/irqbalance enable
+/etc/init.d/irqbalance start 2>/dev/null || true
 
-# 安全禁用 ModemManager，防止其与 5G 模组的 USB 串口/MBIM 驱动抢占控制权
-uci set modemmanager.@modemmanager[0].disabled='1' 2>/dev/null || true
-uci commit modemmanager 2>/dev/null || true
-# 兜底：如果 init.d 脚本存在，则执行 disable
-[ -x /etc/init.d/modemmanager ] && /etc/init.d/modemmanager disable
+# === SPI屏幕自定义服务开机自启
 /etc/init.d/h29k-screen enable
 
 exit 0
 EOF
-chmod +x files/etc/uci-defaults/99-h29k
+chmod +x files/etc/10-h29k
 
 # =================================================================================
 # 🚨 针对 aic8800 本地 Makefile 的终极补丁（支持 set -e 严格模式）
