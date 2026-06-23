@@ -3,6 +3,8 @@
 # File name: diy-part1.sh
 # Description: OpenWrt DIY script part 1 (Before Update feeds)
 
+set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终止
+
 # === 1. 软件源配置 ===
 # 添加 QModem 软件源
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
