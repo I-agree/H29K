@@ -116,15 +116,7 @@ sed -i 's/^CONFIG_SPI_ROCKCHIP_SFC=y$/# CONFIG_SPI_ROCKCHIP_SFC is not set/' "$C
 cat >> "$CONFIG_FILE" << 'EOF'
 
 # === RK3528 主线核心与平台级别底座驱动（对齐 Linux 6.12）===
-
-CONFIG_ARM64_PA_BITS_48=y
-CONFIG_COMMON_CLK_ROCKCHIP=y
-CONFIG_PWM_ROCKCHIP=y
-
 CONFIG_NF_TABLES_BRIDGE=y
-
-# TSADC 温度传感器
-CONFIG_ROCKCHIP_THERMAL=y
 
 # === 8250 串口驱动（RK3528 控制台 uart0 依赖）===
 CONFIG_SERIAL_8250=y
@@ -160,29 +152,11 @@ CONFIG_PTP_1588_CLOCK_OPTIONAL=y
 # =================================================================
 # 🔌 MDIO 总线与 PHY 框架 (RTL8211F 依赖)
 # =================================================================
-CONFIG_PHYLIB=y
-CONFIG_MDIO_DEVICE=y
-CONFIG_MDIO_BUS=y
-CONFIG_MDIO_DEVRES=y
-CONFIG_OF_MDIO=y
-CONFIG_FIXED_PHY=y
-
-CONFIG_REALTEK_PHY=y
-CONFIG_MOTORCOMM_PHY=y
 CONFIG_MICREL_PHY=y
 
 # =================================================================
 # 💾 MMC/SDIO 总线核心 (AIC8800-SDIO 物理层依赖)
 # =================================================================
-CONFIG_MMC_BLOCK=y
-CONFIG_MMC_SDHCI=y
-CONFIG_MMC_SDHCI_PLTFM=y
-CONFIG_MMC_SDHCI_OF_DWCMSHC=y
-CONFIG_MMC_DW=y
-CONFIG_MMC_DW_PLTFM=y
-CONFIG_MMC_DW_ROCKCHIP=y
-CONFIG_MMC_CQHCI=y
-
 # 📶 SDIO WiFi 基础依赖 (电源序列)
 CONFIG_MMC_PWRSEQ_SIMPLE=y
 CONFIG_MMC_PWRSEQ_EMMC=y
@@ -190,12 +164,8 @@ CONFIG_MMC_PWRSEQ_EMMC=y
 # =================================================================
 # 🔌 USB 核心与物理层 (5G 模块底层依赖)
 # =================================================================
-CONFIG_USB_SUPPORT=y
-CONFIG_USB_XHCI_HCD=y
-CONFIG_USB_EHCI_HCD=y
 CONFIG_USB_ACM=y
 CONFIG_USB_WDM=y
-CONFIG_USB_STORAGE=y
 
 # =================================================================
 # 📡 5G 模块数据通道：USB 网络框架与 RNDIS/NCM 驱动
@@ -228,12 +198,6 @@ CONFIG_PPP_SYNC_TTY=y
 # ===================== 完整文件系统总配置=====================
 # 分区UUID/PARTUUID 挂载支持
 CONFIG_LIB_UUID=y
-CONFIG_PARTITION_UUIDS=y
-CONFIG_BLK_DEV_PARTUUID=y
-CONFIG_BLK_DEV_UUID=y
-CONFIG_PARTITION_ADVANCED=y
-CONFIG_EFI_PARTITION=y
-CONFIG_MSDOS_PARTITION=y
 
 # 只读根分区 SquashFS
 CONFIG_SQUASHFS=y
@@ -241,11 +205,6 @@ CONFIG_SQUASHFS_XATTR=y
 CONFIG_SQUASHFS_ZSTD=y
 
 # 可写Overlay EXT4分区
-CONFIG_EXT4_FS=y
-CONFIG_EXT4_USE_FOR_EXT2=y
-CONFIG_EXT4_FS_POSIX_ACL=y
-
-# 叠加层核心
 CONFIG_OVERLAY_FS=y
 CONFIG_OVERLAY_FS_POSIX_ACL=y
 
@@ -261,15 +220,11 @@ CONFIG_EXFAT_FS=y
 CONFIG_EXFAT_DEFAULT_IOCHARSET="utf8"
 
 # 字符集NLS（中文文件名依赖）
-CONFIG_NLS=y
 CONFIG_NLS_UTF8=y
 CONFIG_NLS_CODEPAGE_936=y
-CONFIG_NLS_ISO8859_1=y
 
-CONFIG_LEDS_GPIO=y
 CONFIG_LEDS_TRIGGER_HEARTBEAT=y
 CONFIG_KEYBOARD_GPIO=y
-CONFIG_GPIO_KEYS=y
 
 # =====================================================================
 # 解决kmod-fs-netfs核心内核依赖链
@@ -307,30 +262,22 @@ CONFIG_CIFS_POSIX=y
 # --- 针对 A53 架构彻底关闭不支持的 SVE 扩展，全力确保 ASIMD(NEON) 跑满 ---
 # CONFIG_ARM64_SVE is not set
 
-# --- 禁用低效且冲突的板载硬件加密，全力释放更强的 ARMv8 CPU 内置加密扩展性能 ---
-CONFIG_CRYPTO_HW=y
-# CONFIG_CRYPTO_DEV_ROCKCHIP is not set
-
 # --- 触摸驱动内嵌
 CONFIG_TOUCHSCREEN_FT6236=y
 
 # =================================================================
 # 🛡️ 显示架构核心底座与防弹窗屏蔽词（对齐第一层 drivers/gpu/drm/Kconfig）
 # =================================================================
-CONFIG_DRM=y
 # ⚠️由于下方封杀了所有 VOP/VOP2/HDMI 后端，开启 DRM_ROCKCHIP 会导致
 # Kconfig 依赖树崩溃或被自动降级为 n。使用 SimpleDRM + MIPI DBI 不需要此平台驱动。
 # CONFIG_DRM_ROCKCHIP is not set
 CONFIG_DRM_MIPI_DBI=y
-CONFIG_DRM_KMS_HELPER=y
 # CONFIG_DRM_DEBUG_MM is not set
 # CONFIG_DRM_USE_DYNAMIC_DEBUG is not set
 # CONFIG_DRM_KUNIT_TEST is not set
 # CONFIG_DRM_PANIC is not set
 # CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS is not set
 # CONFIG_DRM_DEBUG_MODESET_LOCK is not set
-CONFIG_DRM_FBDEV_EMULATION=y
-CONFIG_DRM_FBDEV_OVERALLOC=100
 # CONFIG_DRM_LOAD_EDID_FIRMWARE is not set
 # CONFIG_DRM_VGEM is not set
 # CONFIG_DRM_HYPERV is not set
@@ -347,8 +294,6 @@ CONFIG_DRM_FBDEV_OVERALLOC=100
 # =================================================================
 # 🚀 瑞芯微核心显示驱动（对齐第二层 drm/rockchip/Kconfig）
 # =================================================================
-# CONFIG_ROCKCHIP_IOMMU is not set
-
 # 核心 VOP 视频输出控制器
 # CONFIG_ROCKCHIP_VOP is not set
 # CONFIG_ROCKCHIP_VOP2 is not set
@@ -369,8 +314,6 @@ CONFIG_DRM_FBDEV_OVERALLOC=100
 # =================================================================
 # 🛡️ 彻底封杀显示桥接芯片及其子套娃（drivers/gpu/drm/bridge/Kconfig官方 Kconfig 闭环校准）
 # =================================================================
-CONFIG_DRM_BRIDGE=y
-
 # 主 Kconfig 文件中直接暴露的显式交互选项
 # CONFIG_DRM_CHIPONE_ICN6211 is not set
 # CONFIG_DRM_CHRONTEL_CH7033 is not set
@@ -424,28 +367,10 @@ CONFIG_DRM_BRIDGE=y
 # =================================================================
 # 📺 核心闭环：HDMI SimpleDRM 路线 + ST7789 SPI屏 双显示兼容
 # =================================================================
-
-# 1. HDMI简易帧缓冲底层（uboot framebuffer复用）
 CONFIG_DRM_SIMPLEDRM=y
-CONFIG_FB_CORE=y
-CONFIG_FB_DEVICE=y
-
-# 2. ST7789V SPI屏幕全套总线依赖
-CONFIG_SPI=y
-CONFIG_SPI_MASTER=y
-CONFIG_SPI_ROCKCHIP=y
-# CONFIG_SPI_ROCKCHIP_SFC is not set
-
-# DRM面板基础框架+屏幕旋转支持
-CONFIG_DRM_PANEL=y
-CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y
 
 # Linux v6.12 官方ST7789V面板驱动（匹配sitronix,st7789v DTS兼容串）
 CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
-
-# 3. ST7789驱动强制背光依赖
-CONFIG_BACKLIGHT_CLASS_DEVICE=y
-CONFIG_BACKLIGHT_PWM=y
 
 # ==============================================================================
 # 🎥 补全核心：VPU视频硬解、RGA硬件转换加速与 USB 摄像头支持（全面防御 NEW 弹窗）
@@ -487,12 +412,6 @@ CONFIG_VIDEO_HANTRO_ROCKCHIP=y
 # CONFIG_VIDEO_HANTRO_STM32MP25 is not set
 
 # ==============================================================================
-
-# --- 主线标准平台级外设与预留电压分配器 ---
-CONFIG_REGULATOR_FIXED_VOLTAGE=y
-
-# --- CMA 连续物理内存调优 ---
-CONFIG_DMA_SHARED_BUFFER=y
 
 # --- 网络高并发 TCP BBR + FQ 底层内建 ---
 CONFIG_TCP_CONG_ADVANCED=y
@@ -566,6 +485,14 @@ CONFIG_BT_HCIUART_H4=y
 # CONFIG_BT_VIRTIO is not set
 # CONFIG_BT_NXPUART is not set
 # CONFIG_BT_INTEL_PCIE is not set
+
+# 适配DTS：GPIO红外接收器
+CONFIG_IR_CORE=y
+CONFIG_IR_GPIO=y
+
+# 适配DTS：4G/5G模块GPIO射频电源开关
+CONFIG_RFKILL=y
+CONFIG_RFKILL_GPIO=y
 
 EOF
 echo "✅ 已向 $CONFIG_FILE 注入目标内核参数"
