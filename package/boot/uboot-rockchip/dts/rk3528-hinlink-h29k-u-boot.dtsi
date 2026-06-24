@@ -5,13 +5,7 @@
  * Place additional U-Boot specific overrides here.
  */
 
-/* 如果主线 rk3528-u-boot.dtsi 已包含 bootph-all，
- * 此处仅需补充板级特有覆盖 */
-
-&gpio0 {
-	bootph-all;
-};
-
+/* 仅启用硬件实际用到的GPIO组 */
 &gpio1 {
 	bootph-all;
 };
@@ -20,7 +14,12 @@
 	bootph-all;
 };
 
-/* 确保 eMMC 供电 regulator 在 SPL 阶段可见 */
+/* IOC引脚复用寄存器，SPL必须早期初始化 */
+&ioc_grf {
+	bootph-all;
+};
+
+/* SPL阶段预初始化核心供电，保证存储、DDR稳定上电 */
 &vcc5v0_sys {
 	bootph-all;
 };
