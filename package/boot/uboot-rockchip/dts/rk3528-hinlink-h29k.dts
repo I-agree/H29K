@@ -156,6 +156,21 @@
 		power-off-delay-us = <5000000>;
 		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
 	};
+
+	/* SFC SPI Flash Controller - 硬编码版本 (与 Linux DTS 保持一致，添加 bootph-all) */
+	sfc: spi@ffc00000 {
+		bootph-all;
+		compatible = "rockchip,sfc";
+		reg = <0x0 0xffc00000 0x0 0x4000>;
+		interrupts = <0 135 4>;
+		clocks = <&cru 161>, <&cru 160>;
+		clock-names = "clk_sfc", "hclk_sfc";
+		assigned-clocks = <&cru 161>;
+		assigned-clock-rates = <100000000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "disabled";
+	};
 };
 
 /* ====== 核心系统 (bootph-all 标记) ====== */
