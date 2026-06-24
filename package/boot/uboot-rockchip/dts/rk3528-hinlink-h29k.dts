@@ -1,6 +1,15 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * Copyright (c) 2024 Rockchip Electronics Co., Ltd.
+ *
+ * U-Boot DTS for HINLINK H29K (RK3528)
+ * Target: U-Boot 2025.10
+ * Location: arch/arm/dts/rk3528-hinlink-h29k.dts
+ */
+
 /dts-v1/;
+
 #include <dt-bindings/input/input.h>
-#include <dt-bindings/leds/common.h>
 #include <dt-bindings/pwm/pwm.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/gpio/gpio.h>
@@ -18,59 +27,14 @@
 		serial0 = &uart0;
 		serial1 = &uart1;
 		serial2 = &uart2;
-		led-boot = &led_work;
-		led-failsafe = &led_work;
-		led-running = &led_work;
-		led-upgrade = &led_work;
+		spi0 = &sfc;
 	};
 
 	chosen {
 		stdout-path = "serial0:1500000n8";
 	};
 
-	gpio-keys {
-		compatible = "gpio-keys";
-		pinctrl-names = "default";
-		pinctrl-0 = <&key_reset_pin>;
-
-		key-reset {
-			label = "reset";
-			gpios = <&gpio4 RK_PC1 GPIO_ACTIVE_LOW>;
-			linux,code = <KEY_RESTART>;
-			debounce-interval = <20>;
-		};
-	};
-
-	leds {
-		compatible = "gpio-leds";
-		pinctrl-names = "default";
-		pinctrl-0 = <&led_4g_en>, <&led_5g_en>, <&led_work_en>;
-
-		led_4g: led-4g {
-			label = "red:4g";
-			gpios = <&gpio4 RK_PC0 GPIO_ACTIVE_LOW>;
-		};
-
-		led_5g: led-5g {
-			label = "blue:5g";
-			gpios = <&gpio4 RK_PC3 GPIO_ACTIVE_LOW>;
-		};
-
-		led_work: led-work {
-			label = "green:work";
-			gpios = <&gpio4 RK_PB7 GPIO_ACTIVE_LOW>;
-			default-state = "off";
-		};
-	};
-
-	sdio_pwrseq: sdio-pwrseq {
-		compatible = "mmc-pwrseq-simple";
-		pinctrl-names = "default";
-		pinctrl-0 = <&wifi_reg_on>;
-		post-power-on-delay-ms = <100>;
-		power-off-delay-us = <5000000>;
-		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
-	};
+	/* ====== 电源树 (仅保留启动链必需) ====== */
 
 	vdd_0v9: regulator-0v9-vdd {
 		compatible = "regulator-fixed";
@@ -182,9 +146,60 @@
 		regulator-settling-time-up-us = <250>;
 		regulator-pwm-continuous;
 	};
+
+	/* WiFi 电源时序控制 —— SDIO 初始化需要 */
+	sdio_pwrseq: sdio-pwrseq {
+		compatible = "mmc-pwrseq-simple";
+		pinctrl-names = "default";
+		pinctrl-0 = <&wifi_reg_on>;
+		post-power-on-delay-ms = <100>;
+		power-off-delay-us = <5000000>;
+		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
+	};
 };
 
+/* ====== 核心系统 (bootph-all 标记) ====== */
+
+&cru {
+	bootph-all;
+};
+
+&grf {
+	bootph-all;
+};
+
+&pinctrl {
+	bootph-all;
+
+	gmac {
+		gmac1_rstn_l: gmac1-rstn-l {
+			rockchip,pins = <4 RK_PC2 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	sdmmc {
+		sdmmc_pwren_l: sdmmc-pwren-l {
+			rockchip,pins = <4 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		sdmmc_vol_ctrl_h: sdmmc-vol-ctrl-h {
+			rockchip,pins = <4 RK_PB6 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
+	wifi {
+		wifi_reg_on: wifi-reg-on {
+			rockchip,pins = <1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		wl_wake_host: wl-wake-host {
+			rockchip,pins = <1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_down>;
+		};
+	};
+};
+
+/* ====== CPU (bootph-all 标记) ====== */
+
 &cpu0 {
+	bootph-all;
 	cpu-supply = <&vdd_arm>;
 };
 
@@ -199,6 +214,127 @@
 &cpu3 {
 	cpu-supply = <&vdd_arm>;
 };
+
+/* ====== UART 控制台 (bootph-all 标记) ====== */
+
+&uart0 {
+	bootph-all;
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0m0_xfer>;
+	status = "okay";
+};
+
+/* UART1/2 仅 U-Boot 主阶段使用，不需要 bootph-all */
+&uart1 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart1m0_xfer>;
+	status = "okay";
+};
+
+&uart2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart2m1_ctsn &uart2m1_xfer>;
+	status = "okay";
+};
+
+/* ====== PWM (供 regulator 使用) ====== */
+
+&pwm1 {
+	bootph-all;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm1m0_pins>;
+	status = "okay";
+};
+
+&pwm2 {
+	bootph-all;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm2m0_pins>;
+	status = "okay";
+};
+
+/* ====== eMMC (bootph-all 标记，启动设备) ====== */
+
+&sdhci {
+	bootph-all;
+	bus-width = <8>;
+	mmc-hs200-1_8v;
+	max-frequency = <200000000>;
+	non-removable;
+	vmmc-supply = <&vcc_3v3>;
+	vqmmc-supply = <&vcc_1v8>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&emmc_bus8 &emmc_clk &emmc_cmd &emmc_strb>;
+	status = "okay";
+};
+
+/* ====== SD 卡 (bootph-all 标记，备用启动设备) ====== */
+
+&sdmmc {
+	bootph-all;
+	bus-width = <4>;
+	cap-sd-highspeed;
+	disable-wp;
+	max-frequency = <150000000>;
+	rockchip,default-sample-phase = <90>;
+	sd-uhs-sdr104;
+	vmmc-supply = <&vcc3v3_sd>;
+	vqmmc-supply = <&vccio_sd>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc_bus4 &sdmmc_clk &sdmmc_cmd &sdmmc_det>;
+	status = "okay";
+};
+
+/* ====== SDIO WiFi (U-Boot 主阶段可用) ====== */
+
+&sdio0 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	bus-width = <4>;
+	cap-sd-highspeed;
+	cap-sdio-irq;
+	supports-sdio;
+	keep-power-in-suspend;
+	no-sdio-pm;
+	max-frequency = <200000000>;
+	mmc-pwrseq = <&sdio_pwrseq>;
+	non-removable;
+	sd-uhs-sdr104;
+	broken-cd;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
+	status = "okay";
+
+	wifi@1 {
+		compatible = "aic,aic8800";
+		reg = <1>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <RK_PA7 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-names = "host-wake";
+		pinctrl-names = "default";
+		pinctrl-0 = <&wl_wake_host>;
+	};
+};
+
+/* ====== SFC SPI NOR Flash (bootph-all 标记，启动设备) ====== */
+
+&sfc {
+	bootph-all;
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&fspi_pins>;
+
+	flash@0 {
+		bootph-all;
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <24000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <4>;
+	};
+};
+
+/* ====== 以太网 (U-Boot 主阶段，用于 TFTP/netinstall) ====== */
 
 &gmac1 {
 	clock_in_out = "output";
@@ -224,134 +360,36 @@
 	};
 };
 
-&pinctrl {
-	gmac {
-		gmac1_rstn_l: gmac1-rstn-l {
-			rockchip,pins = <4 RK_PC2 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
+/* ====== USB (U-Boot 主阶段，用于 USB 恢复/mass storage) ====== */
 
-	keys {
-		key_reset_pin: key-reset-pin {
-			rockchip,pins = <4 RK_PC1 RK_FUNC_GPIO &pcfg_pull_up>;
-		};
-	};
-
-	leds {
-		led_4g_en: led-4g-en {
-			rockchip,pins = <4 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		led_5g_en: led-5g-en {
-			rockchip,pins = <4 RK_PC3 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		led_work_en: led-work-en {
-			rockchip,pins = <4 RK_PB7 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-
-	sdmmc {
-		sdmmc_pwren_l: sdmmc-pwren-l {
-			rockchip,pins = <4 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		sdmmc_vol_ctrl_h: sdmmc-vol-ctrl-h {
-			rockchip,pins = <4 RK_PB6 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-
-	wifi {
-		wifi_reg_on: wifi-reg-on {
-			rockchip,pins = <1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		wl_wake_host: wl-wake-host {
-			rockchip,pins = <1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_down>;
-		};
-	};
-
-	lcd {
-		lcd_pwr_pin: lcd-pwr-pin {
-			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		lcd_bl_pin: lcd-bl-pin {
-			rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-};
-
-&pwm1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pwm1m0_pins>;
+&combphy {
 	status = "okay";
 };
 
-&pwm2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&pwm2m0_pins>;
+&usb2phy {
+	bootph-all;
 	status = "okay";
 };
 
-&sdhci {
-	bus-width = <8>;
-	mmc-hs200-1_8v;
-	max-frequency = <200000000>;
-	non-removable;
-	vmmc-supply = <&vcc_3v3>;
-	vqmmc-supply = <&vcc_1v8>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&emmc_bus8 &emmc_clk &emmc_cmd &emmc_strb>;
+&usb2phy_host {
+	phy-supply = <&vcc5v0_usb>;
 	status = "okay";
 };
 
-&sdmmc {
-	bus-width = <4>;
-	cap-sd-highspeed;
-	disable-wp;
-	max-frequency = <150000000>;
-	rockchip,default-sample-phase = <90>;
-	sd-uhs-sdr104;
-	vmmc-supply = <&vcc3v3_sd>;
-	vqmmc-supply = <&vccio_sd>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&sdmmc_bus4 &sdmmc_clk &sdmmc_cmd &sdmmc_det>;
+&usb2phy_otg {
+	phy-supply = <&vcc5v0_usb>;
 	status = "okay";
 };
 
-&sdio0 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	bus-width = <4>;
-	cap-sd-highspeed;
-	cap-sdio-irq;
-	supports-sdio;
-	keep-power-in-suspend;
-	no-sdio-pm;
-	max-frequency = <200000000>;
-	mmc-pwrseq = <&sdio_pwrseq>;
-	non-removable;
-	sd-uhs-sdr104;
-	broken-cd;
-	pinctrl-names = "default";
-	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
+&usb_host0_ehci {
 	status = "okay";
 };
 
-&uart0 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart0m0_xfer>;
+&usb_host0_ohci {
 	status = "okay";
 };
 
-&uart1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart1m0_xfer>;
-	status = "okay";
-};
-
-&uart2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart2m1_ctsn &uart2m1_xfer>;
-	status = "okay";
-};
-
-&i2c1 {
+&usb_host0_xhci {
+	dr_mode = "otg";
 	status = "okay";
 };
