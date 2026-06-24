@@ -36,28 +36,22 @@ jobs:
         
         # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
         echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
-        # 1. 停用系统可能存在的零碎、低效旧交换分区
         sudo swapoff -a || true
-        # 2. 划出 5GB 专属全量 Swap 空间
         sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
         sudo chmod 600 /swapfile
         sudo mkswap /swapfile
         sudo swapon /swapfile
-        # 3. 强行修改内核虚拟内存激进系数（从默认 60 压榨到 10）
-        # 迫使 CPU 优先榨干物理内存，不到最后一刻绝不读写硬盘，从底层物理掐断 Swap 造成的 I/O 假死
         sudo sysctl vm.swappiness=10
         echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
+        
         echo "📊 扩容系统全局 /tmp 至 10G"
-        # 扩容系统默认 /tmp 临时分区（关键修复）
         sudo umount /tmp || true
         sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
         echo "✅ /tmp 扩容至 10GB 完成"
         
         echo "📊 检查当前磁盘空间分布："
         df -h
-        # 额外检查inode，防止小文件耗尽节点
         df -i /tmp
-        # 写入环境变量以便后续步骤继承
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
 
     - name: 初始化构建环境
@@ -131,18 +125,36 @@ jobs:
         [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
         echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-    # 👇 ================= 新增：提取真实 Kernel & U-Boot 配置 ================= 👇
-    - name: 提取真实内核与 U-Boot Kconfig 配置 (真理之源)
+    # 👇 ================= 提取三位一体真实 Kconfig 配置 ================= 👇
+    - name: 提取真实 OpenWrt/Kernel/U-Boot Kconfig 配置 (真理之源)
       if: always()
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         echo "🔍 正在编译产物中搜寻最终生效的真实 Kconfig ..."
         
-        # 1. 提取 Kernel .config
+        # ========== 1. 提取 OpenWrt 主 .config (插件安装真相) ==========
+        if [ -f ".config" ]; then
+            cp -f .config real_openwrt_final.config
+            sha256sum real_openwrt_final.config | tee real_openwrt_final.config.sha256
+            echo "✅ 成功捕获真实 OpenWrt 主配置"
+            echo "================ OpenWrt 插件与核心组件真实生效统计 ================"
+            echo "📦 已选中 PACKAGE 总数: $(grep -c '^CONFIG_PACKAGE_.*=y' real_openwrt_final.config || echo 0)"
+            echo "🔌 LuCI 插件生效数: $(grep -c '^CONFIG_PACKAGE_luci-.*=y' real_openwrt_final.config || echo 0)"
+            echo "🐳 Docker 相关生效数: $(grep -c '^CONFIG_PACKAGE_docker\|^CONFIG_PACKAGE_luci-app-dockerman' real_openwrt_final.config || echo 0)"
+            echo "🌐 网络工具生效数: $(grep -c '^CONFIG_PACKAGE_curl\|^CONFIG_PACKAGE_wget\|^CONFIG_PACKAGE_iperf3' real_openwrt_final.config || echo 0)"
+            echo "⚙️ 内核模块(kmod)生效数: $(grep -c '^CONFIG_PACKAGE_kmod-.*=y' real_openwrt_final.config || echo 0)"
+            echo "=================================================="
+        else
+            echo "⚠️ 警告：未找到 OpenWrt 主 .config（make defconfig 可能未执行）"
+            echo "OpenWrt make defconfig did not complete." > real_openwrt_final.config
+        fi
+
+        # ========== 2. 提取 Kernel .config ==========
         KERNEL_CONFIG=$(find build_dir/target-*/linux-rockchip_armv8/ -maxdepth 3 -name ".config" -path "*/linux-*/.config" 2>/dev/null | head -n 1)
         if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
-            echo "✅ 成功捕获真实内核配置: $KERNEL_CONFIG"
             cp -f "$KERNEL_CONFIG" real_kernel_final.config
+            sha256sum real_kernel_final.config | tee real_kernel_final.config.sha256
+            echo "✅ 成功捕获真实内核配置: $KERNEL_CONFIG"
             echo "================ 内核核心驱动真实生效统计 ================"
             echo "📺 DRM 显示驱动生效数: $(grep -c '^CONFIG_DRM.*=y' real_kernel_final.config || echo 0)"
             echo "🔌 USB 核心与驱动生效数: $(grep -c '^CONFIG_USB.*=y' real_kernel_final.config || echo 0)"
@@ -150,20 +162,21 @@ jobs:
             echo "🌐 网络与防火墙生效数: $(grep -c '^CONFIG_NETFILTER\|^CONFIG_NF_TABLES' real_kernel_final.config || echo 0)"
             echo "=================================================="
         else
-            echo "⚠️ 警告：未找到最终内核配置（可能在内核编译阶段前就失败了）。"
+            echo "⚠️ 警告：未找到最终内核配置（可能在内核编译阶段前就失败了）"
             echo "Kernel compile did not reach final config stage." > real_kernel_final.config
         fi
 
-        # 2. 提取 U-Boot .config
+        # ========== 3. 提取 U-Boot .config ==========
         UBOOT_CONFIG=$(find build_dir/target-*/ -maxdepth 4 -name ".config" -path "*/u-boot-*/.config" 2>/dev/null | head -n 1)
         if [ -n "$UBOOT_CONFIG" ] && [ -f "$UBOOT_CONFIG" ]; then
-            echo "✅ 成功捕获真实 U-Boot 配置: $UBOOT_CONFIG"
             cp -f "$UBOOT_CONFIG" real_uboot_final.config
+            sha256sum real_uboot_final.config | tee real_uboot_final.config.sha256
+            echo "✅ 成功捕获真实 U-Boot 配置: $UBOOT_CONFIG"
             echo "================ U-Boot 核心配置真实生效统计 ================"
             echo "🚀 U-Boot 核心启动配置数: $(grep -c '^CONFIG_.*=y' real_uboot_final.config || echo 0)"
             echo "=================================================="
         else
-            echo "⚠️ 警告：未找到最终 U-Boot 配置。"
+            echo "⚠️ 警告：未找到最终 U-Boot 配置"
             echo "U-Boot compile did not reach final config stage." > real_uboot_final.config
         fi
 
@@ -171,12 +184,16 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v7.0.1
       with:
-        name: Real-Kconfig-Truth-Logs
+        name: Real-Kconfig-Truth-Logs-${{ github.run_id }}
         path: |
+          ${{ env.WORK_DIR }}/openwrt/real_openwrt_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_openwrt_final.config.sha256
           ${{ env.WORK_DIR }}/openwrt/real_kernel_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_kernel_final.config.sha256
           ${{ env.WORK_DIR }}/openwrt/real_uboot_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_uboot_final.config.sha256
         retention-days: 7
-    # 👆 ================= 新增结束 ================= 👆
+    # 👆 ================= 提取结束 ================= 👆
 
     - name: 检查磁盘空间使用情况
       if: (!cancelled())
