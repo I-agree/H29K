@@ -1,45 +1,26 @@
-// SPDX-License-Identifier: GPL-2.0+
+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * U-Boot overlay for HINLINK H29K
+ * Auto-included by U-Boot build system.
+ * Place additional U-Boot specific overrides here.
+ */
 
-/ {
+/* 如果主线 rk3528-u-boot.dtsi 已包含 bootph-all，
+ * 此处仅需补充板级特有覆盖 */
+
+&gpio0 {
 	bootph-all;
 };
 
-&chosen {
+&gpio1 {
 	bootph-all;
 };
 
-&cru {
+&gpio4 {
 	bootph-all;
 };
 
-&pinctrl {
-	bootph-all;
-};
-
-&uart0 {
-	bootph-all;
-};
-
-&uart0m0_xfer {
-	bootph-all;
-};
-
-&uart1 {
-	bootph-all;
-};
-
-&uart2 {
-	bootph-all;
-};
-
-&uart2m1_ctsn {
-	bootph-all;
-};
-
-&uart2m1_xfer {
-	bootph-all;
-};
-
+/* 确保 eMMC 供电 regulator 在 SPL 阶段可见 */
 &vcc5v0_sys {
 	bootph-all;
 };
@@ -52,184 +33,14 @@
 	bootph-all;
 };
 
-&vdd_0v9 {
-	bootph-all;
-};
-
-&vcc_ddr {
+&vcc3v3_sd {
 	bootph-all;
 };
 
 &vdd_arm {
 	bootph-all;
-	regulator-init-microvolt = <953000>;
 };
 
 &vdd_logic {
-	bootph-all;
-	regulator-init-microvolt = <900000>;
-};
-
-&pwm1 {
-	bootph-all;
-};
-
-&pwm1m0_pins {
-	bootph-all;
-};
-
-&pwm2 {
-	bootph-all;
-};
-
-&pwm2m0_pins {
-	bootph-all;
-};
-
-&vcc_3v3_lcd {
-	bootph-all;
-};
-
-&vcc3v3_sd {
-	bootph-all;
-};
-
-&vccio_sd {
-	bootph-all;
-};
-
-&sdmmc_vol_ctrl_h {
-	bootph-all;
-};
-
-&sdmmc_pwren_l {
-	bootph-all;
-};
-
-&sdio_pwrseq {
-	bootph-all;
-};
-
-&wifi_reg_on {
-	bootph-all;
-};
-
-&wl_wake_host {
-	bootph-all;
-};
-
-&sdhci {
-	bootph-pre-ram;
-};
-
-&emmc_bus8 {
-	bootph-pre-ram;
-};
-
-&emmc_clk {
-	bootph-pre-ram;
-};
-
-&emmc_cmd {
-	bootph-pre-ram;
-};
-
-&emmc_strb {
-	bootph-pre-ram;
-};
-
-&sdmmc {
-	bootph-pre-ram;
-};
-
-&sdmmc_bus4 {
-	bootph-pre-ram;
-};
-
-&sdmmc_clk {
-	bootph-pre-ram;
-};
-
-&sdmmc_cmd {
-	bootph-pre-ram;
-};
-
-&sdmmc_det {
-	bootph-pre-ram;
-};
-
-&sdio0 {
-	bootph-all;
-};
-
-&sdio0_bus4 {
-	bootph-all;
-};
-
-&sdio0_cmd {
-	bootph-all;
-};
-
-&sdio0_clk {
-	bootph-all;
-};
-
-&gmac1 {
-	bootph-all;
-};
-
-&mdio1 {
-	bootph-all;
-};
-
-&rgmii_miim {
-	bootph-all;
-};
-
-&rgmii_tx_bus2 {
-	bootph-all;
-};
-
-&rgmii_rx_bus2 {
-	bootph-all;
-};
-
-&rgmii_rgmii_clk {
-	bootph-all;
-};
-
-&rgmii_rgmii_bus {
-	bootph-all;
-};
-
-&gmac1_rstn_l {
-	bootph-all;
-};
-
-&gpio_keys {
-	bootph-all;
-};
-
-&key_reset_pin {
-	bootph-all;
-};
-
-&leds {
-	bootph-all;
-};
-
-&led_4g_en {
-	bootph-all;
-};
-
-&led_5g_en {
-	bootph-all;
-};
-
-&led_work_en {
-	bootph-all;
-};
-
-&i2c1 {
 	bootph-all;
 };
