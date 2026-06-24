@@ -111,11 +111,9 @@ CONFIG_PHYLINK=y
 CONFIG_FIXED_PHY=y
 
 # =================================================================
-# 📡 蓝牙完整协议栈 (UART H4 + RFCOMM/BNEP/HIDP)
+# 📡 蓝牙完整协议栈 (AIC8800 SDIO WiFi+BT二合一)
 # =================================================================
 CONFIG_BT=y
-CONFIG_BT_HCIUART=y
-CONFIG_BT_HCIUART_H4=y
 CONFIG_BT_BREDR=y
 CONFIG_BT_LE=y
 CONFIG_BT_RFCOMM=y
@@ -124,21 +122,16 @@ CONFIG_BT_BNEP=y
 CONFIG_BT_BNEP_MC_FILTER=y
 CONFIG_BT_BNEP_PROTO_FILTER=y
 CONFIG_BT_HIDP=y
-CONFIG_BT_HCIUART_SERDEV=y
-CONFIG_AIC8800_SDIO_BT_SUPPORT=y
-CONFIG_BT_HCIBTUSB=n
-CONFIG_BT_HCIBTSDIO=n
-# 封杀非 H4 总线
-# CONFIG_BT_HCIUART_BCSP is not set
-# CONFIG_BT_HCIUART_ATH3K is not set
-# CONFIG_BT_HCIUART_LL is not set
-# CONFIG_BT_HCIUART_3WIRE is not set
-# CONFIG_BT_HCIUART_INTEL is not set
-# CONFIG_BT_HCIUART_BCM is not set
-# CONFIG_BT_HCIUART_RTL is not set
-# CONFIG_BT_HCIUART_QCA is not set
+
+# 启用SDIO蓝牙，适配AIC8800复合模组
+CONFIG_BT_HCIBTSDIO=y
+
+# 禁用USB、UART类型蓝牙传输
 # CONFIG_BT_HCIBTUSB is not set
-# CONFIG_BT_HCIBTSDIO is not set
+# CONFIG_BT_HCIUART is not set
+
+# AIC8800 SDIO蓝牙硬件支持开关
+CONFIG_AIC8800_SDIO_BT_SUPPORT=y
 
 # =================================================================
 # 🚫 关闭 SimpleDRM (避免与 ST7789V SPI 屏抢占 fb0)
