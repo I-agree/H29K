@@ -1,45 +1,18 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * U-Boot overlay for HINLINK H29K
- * Auto-included by U-Boot build system.
- * Place additional U-Boot specific overrides here.
+ * U-Boot specific overlay for HINLINK H29K (RK3528)
+ * File: rk3528-hinlink-h29k-u-boot.dtsi
+ *
+ * All bootph-* annotations are already integrated into the main
+ * rk3528-hinlink-h29k.dts for single-file deployment convenience.
+ *
+ * This file is kept as a placeholder to satisfy U-Boot build system
+ * auto-include convention and serve as the central location for
+ * future U-Boot-only overrides such as:
+ *   - SPL memory layout / BSS base adjustments
+ *   - Environment storage offset & size overrides
+ *   - Boot-stage only peripheral enablement
+ *   - FIT image signature / verified boot nodes
  */
 
-/* 仅启用硬件实际用到的GPIO组 */
-&gpio1 {
-	bootph-all;
-};
-
-&gpio4 {
-	bootph-all;
-};
-
-/* IOC引脚复用寄存器，SPL必须早期初始化 */
-&ioc_grf {
-	bootph-all;
-};
-
-/* SPL阶段预初始化核心供电，保证存储、DDR稳定上电 */
-&vcc5v0_sys {
-	bootph-all;
-};
-
-&vcc_3v3 {
-	bootph-all;
-};
-
-&vcc_1v8 {
-	bootph-all;
-};
-
-&vcc3v3_sd {
-	bootph-all;
-};
-
-&vdd_arm {
-	bootph-all;
-};
-
-&vdd_logic {
-	bootph-all;
-};
+/* No additional overrides required at this time. */
