@@ -529,7 +529,7 @@
  */
 &spi1 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&spi1_pins>, <&lcd_rs_pin>, <&lcd_rst_pin>, <&lcd_bl_pin>;
+	pinctrl-0 = <&spi1_pins>, <&lcd_rs_pin>, <&lcd_rst_pin>;
 	spi-max-frequency = <15000000>;
 	status = "okay";
 
