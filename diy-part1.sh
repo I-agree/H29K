@@ -251,6 +251,25 @@ CONFIG_TOUCHSCREEN_FT6236=y
 # =================================================================
 # 🛡️ 显示架构核心底座与防弹窗屏蔽词（对齐第一层 drivers/gpu/drm/Kconfig）
 # =================================================================
+开启 DRM 与 FB 总开关 (缺失此根节点会导致下方所有驱动被静默丢弃)
+CONFIG_DRM=y
+CONFIG_DRM_KMS_HELPER=y
+CONFIG_DRM_PANEL=y
+CONFIG_DRM_BRIDGE=y
+CONFIG_DRM_PANEL_BRIDGE=y
+
+CONFIG_FB=y
+CONFIG_FB_SYS_FILLRECT=y
+CONFIG_FB_SYS_COPYAREA=y
+CONFIG_FB_SYS_IMAGEBLIT=y
+CONFIG_FB_SYS_FOPS=y
+CONFIG_FB_DEFERRED_IO=y
+CONFIG_FB_MODE_HELPERS=y
+CONFIG_FB_BACKLIGHT=y
+
+CONFIG_BACKLIGHT_CLASS_DEVICE=y
+CONFIG_BACKLIGHT_PWM=y
+
 # ⚠️由于下方封杀了所有 VOP/VOP2/HDMI 后端，开启 DRM_ROCKCHIP 会导致
 # Kconfig 依赖树崩溃或被自动降级为 n。使用 SimpleDRM + MIPI DBI 不需要此平台驱动。
 # CONFIG_DRM_ROCKCHIP is not set
@@ -350,8 +369,10 @@ CONFIG_DRM_MIPI_DBI=y
 # =================================================================
 # 📺 核心闭环：HDMI SimpleDRM 路线 + ST7789 SPI屏 双显示兼容
 # =================================================================
+CONFIG_SPI=y
+CONFIG_SPI_ROCKCHIP=y
+CONFIG_GPIOLIB=y
 CONFIG_DRM_SIMPLEDRM=y
-
 # Linux v6.12 官方ST7789V面板驱动（匹配sitronix,st7789v DTS兼容串）
 CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 
