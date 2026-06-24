@@ -204,42 +204,6 @@ EOF
 chmod +x files/usr/bin/h29k_screen.sh
 
 # ======================== 【4. 系统初始化与 UCI 策略】 ========================
-# 👇 【已纠错】必须放在 uci-defaults 目录下，否则开机不会自动执行！
-mkdir -p files/etc/uci-defaults
-cat > files/etc/uci-defaults/10-h29k <<'EOF'
-#!/bin/sh
-
-# === 基础系统设置：LuCI中文、主机名、时区 ===
-uci -q set luci.main.lang=zh_cn
-uci -q set system.@system[0].zonename=Asia/Shanghai
-uci -q set system.@system[0].timezone=CST-8
-uci -q get system.@system >/dev/null && uci -q set system.@system[0].hostname=H29K
-uci -q commit system
-uci -q commit luci
-
-# === WiFi AP 配置：SSID=H29K，开放无密码 ===
-# 👇 【已纠错】修复了 UCI 语法错误，确保无线配置能正确生成
-uci -q delete wireless.default_radio0
-uci -q set wireless.default_radio0=wifi-iface
-uci -q set wireless.default_radio0.device=radio0
-uci -q set wireless.default_radio0.mode=ap
-uci -q set wireless.default_radio0.ssid=H29K
-uci -q set wireless.default_radio0.encryption=none
-uci -q set wireless.default_radio0.disabled=0
-uci -q set wireless.default_radio0.network=lan
-
-uci -q set wireless.radio0.disabled=0
-uci -q commit wireless
-
-# === 中断均衡：仅设置开机自启 ===
-/etc/init.d/irqbalance enable
-
-# === SPI屏幕自定义服务：仅设置开机自启 ===
-/etc/init.d/h29k-screen enable
-
-exit 0
-EOF
-chmod +x files/etc/uci-defaults/10-h29k
 
 # =================================================================================
 # 🚨 针对 aic8800 本地 Makefile 的终极补丁（支持 set -e 严格模式）
