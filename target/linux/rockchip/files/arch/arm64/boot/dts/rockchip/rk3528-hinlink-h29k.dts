@@ -32,6 +32,7 @@
 		#size-cells = <2>;
 		ranges;
 
+		/* HDMI 专用 early framebuffer (1080p)，与 SPI 小屏无关 */
 		framebuffer: framebuffer@90000000 {
 			compatible = "simple-framebuffer";
 			reg = <0x0 0x90000000 0x0 0x00800000>;
@@ -85,10 +86,19 @@
 		};
 	};
 
+	/* PWM6 → SPI 小屏背光 (原厂 pwm@ffa98020) */
 	backlight_lcd: backlight-lcd {
-		compatible = "gpio-backlight";
-		gpios = <&gpio0 RK_PA1 GPIO_ACTIVE_HIGH>;
-		default-on;
+		compatible = "pwm-backlight";
+		pwms = <&pwm6 0 25000 0>;
+		brightness-levels = <
+			  0  20  40  60  80 100
+			120 140 160 180 200 220 240 255
+		>;
+		default-brightness-level = <6>;
+		power-supply = <&vcc_3v3_lcd>;
+		enable-gpios = <&gpio0 RK_PA1 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_bl_pin>;
 	};
 
 	rfkill-modem {
@@ -137,6 +147,17 @@
 		vin-supply = <&vcc_3v3>;
 	};
 
+	/* S3 休眠域 1.8V —— 供 SARADC */
+	vcc_1v8_s3: regulator-1v8-vcc-s3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_1v8_s3";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+		regulator-boot-on;
+		vin-supply = <&vcc_1v8>;
+	};
+
 	vcc_3v3: regulator-3v3-vcc {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc_3v3";
@@ -158,6 +179,17 @@
 		pinctrl-0 = <&lcd_pwr_pin>;
 		regulator-always-on;
 		vin-supply = <&vcc5v0_sys>;
+	};
+
+	/* S3 休眠域 3.3V —— 供 USB2 PHY */
+	vcc_3v3_s3: regulator-3v3-vcc-s3 {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_3v3_s3";
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+		regulator-boot-on;
+		vin-supply = <&vcc_3v3>;
 	};
 
 	vcc3v3_sd: regulator-3v3-vcc-sd {
@@ -247,21 +279,10 @@
 	status = "okay";
 };
 
-&cpu0 {
-	cpu-supply = <&vdd_arm>;
-};
-
-&cpu1 {
-	cpu-supply = <&vdd_arm>;
-};
-
-&cpu2 {
-	cpu-supply = <&vdd_arm>;
-};
-
-&cpu3 {
-	cpu-supply = <&vdd_arm>;
-};
+&cpu0 { cpu-supply = <&vdd_arm>; };
+&cpu1 { cpu-supply = <&vdd_arm>; };
+&cpu2 { cpu-supply = <&vdd_arm>; };
+&cpu3 { cpu-supply = <&vdd_arm>; };
 
 &gmac1 {
 	clock_in_out = "output";
@@ -278,6 +299,26 @@
 &gpu {
 	mali-supply = <&vdd_logic>;
 	status = "okay";
+};
+
+/* 
+ * I2C1 + 触摸屏 (AXS5106)
+ * 【关键】纯输入设备，不绑定任何 display 节点
+ * 分辨率由芯片固件上报或用户空间 UI 框架映射，DTS 不硬编码
+ */
+&i2c1 {
+	status = "okay";
+
+	touchscreen@63 {
+		compatible = "chipone,axs5106";
+		reg = <0x63>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <RK_PB0 IRQ_TYPE_LEVEL_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&tp_int_pin>, <&tp_reset_pin>;
+		reset-gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_LOW>;
+		status = "okay";
+	};
 };
 
 &mdio1 {
@@ -311,6 +352,15 @@
 		};
 	};
 
+	lcd {
+		lcd_pwr_pin: lcd-pwr-pin {
+			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+		lcd_bl_pin: lcd-bl-pin {
+			rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
 	leds {
 		led_4g_en: led-4g-en {
 			rockchip,pins = <4 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
@@ -341,6 +391,16 @@
 		};
 	};
 
+	/* 触摸屏 pinctrl —— 严格对齐原厂 DTB */
+	touchscreen {
+		tp_int_pin: tp-int-pin {
+			rockchip,pins = <1 RK_PB0 RK_FUNC_GPIO &pcfg_pull_up>;
+		};
+		tp_reset_pin: tp-reset-pin {
+			rockchip,pins = <1 RK_PB1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
 	wifi {
 		wifi_reg_on: wifi-reg-on {
 			rockchip,pins = <1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
@@ -349,26 +409,32 @@
 			rockchip,pins = <1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_down>;
 		};
 	};
-
-	lcd {
-		lcd_pwr_pin: lcd-pwr-pin {
-			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		lcd_bl_pin: lcd-bl-pin {
-			rockchip,pins = <0 RK_PA1 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
 };
 
+/* PWM1 → vdd_arm */
 &pwm1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pwm1m0_pins>;
 	status = "okay";
 };
 
+/* PWM2 → vdd_logic */
 &pwm2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pwm2m0_pins>;
+	status = "okay";
+};
+
+/* PWM6 → SPI 小屏背光 */
+&pwm6 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pwm6m0_pins>;
+	status = "okay";
+};
+
+/* SARADC，vref 绑定 vcc_1v8_s3 */
+&saradc {
+	vref-supply = <&vcc_1v8_s3>;
 	status = "okay";
 };
 
@@ -427,6 +493,26 @@
 	};
 };
 
+/* SFC SPI Flash 控制器 */
+&sfc {
+	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&fspi_pins>;
+
+	flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <24000000>;
+		spi-rx-bus-width = <4>;
+		spi-tx-bus-width = <4>;
+	};
+};
+
+/* 
+ * SPI1 多屏幕兼容配置
+ * 【关键】仅保留原厂硬件控制属性，不写 width/height/rotate
+ * 显示参数由 panel 驱动默认值或用户空间 UI 指定
+ */
 &spi1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi1_pins>, <&lcd_rs_pin>, <&lcd_rst_pin>, <&lcd_bl_pin>;
@@ -434,12 +520,33 @@
 	status = "okay";
 
 	panel@0 {
-		compatible = "sitronix,st7789v";
+		compatible = "sitronix,gc9307";
 		reg = <0>;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
 		power-supply = <&vcc_3v3_lcd>;
 		backlight = <&backlight_lcd>;
+		spi-max-frequency = <15000000>;
+	};
+
+	panel@2 {
+		compatible = "sitronix,st7789v";
+		reg = <2>;
+		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
+		power-supply = <&vcc_3v3_lcd>;
+		backlight = <&backlight_lcd>;
+		spi-max-frequency = <15000000>;
+	};
+
+	panel@3 {
+		compatible = "sitronix,st7789v";
+		reg = <3>;
+		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
+		power-supply = <&vcc_3v3_lcd>;
+		backlight = <&backlight_lcd>;
+		spi-max-frequency = <15000000>;
 	};
 };
 
@@ -465,17 +572,18 @@
 	status = "okay";
 };
 
+/* USB2 PHY 绑定 vcc_3v3_s3 (低功耗) */
 &usb2phy {
 	status = "okay";
 };
 
 &usb2phy_host {
-	phy-supply = <&vcc5v0_usb>;
+	phy-supply = <&vcc_3v3_s3>;
 	status = "okay";
 };
 
 &usb2phy_otg {
-	phy-supply = <&vcc5v0_usb>;
+	phy-supply = <&vcc_3v3_s3>;
 	status = "okay";
 };
 
@@ -488,10 +596,6 @@
 };
 
 &usb_host0_xhci {
-	dr_mode = "host";
-	status = "okay";
-};
-
-&i2c1 {
+	dr_mode = "otg";
 	status = "okay";
 };
