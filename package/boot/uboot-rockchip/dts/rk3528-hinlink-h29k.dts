@@ -1,70 +1,38 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * Copyright (c) 2024 Rockchip Electronics Co., Ltd.
- * U-Boot DTS for HINLINK H29K (RK3528)
- * Target: U-Boot 2025.10 upstream
- * Verified against: rk3528.dtsi & rk3528-pinctrl.dtsi
- * Keep original hardcode for SFC clocks/interrupt as designed
+ * U-Boot 2025.10 DTS for HINLINK H29K (RK3528)
+ * SFC hardcoded, bootph annotations centralized.
  */
 
 /dts-v1/;
 
-#include <dt-bindings/input/input.h>
-#include <dt-bindings/pwm/pwm.h>
-#include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/pinctrl/rockchip.h>
 #include "rk3528.dtsi"
 
 / {
-	#address-cells = <2>;
-	#size-cells = <2>;
 	model = "HINLINK H29K";
 	compatible = "hinlink,h29k", "rockchip,rk3528";
 
 	aliases {
-		ethernet0 = &gmac1;
 		mmc0 = &sdhci;
 		mmc1 = &sdmmc;
-		mmc2 = &sdio0;
+		spi0 = &sfc;
 		serial0 = &uart0;
-		serial1 = &uart1;
-		serial2 = &uart2;
 	};
 
 	chosen {
 		stdout-path = "serial0:1500000n8";
 	};
 
-	/* 电源树：与Linux DTS完全一致，仅保留启动必需电源 */
-	vdd_0v9: regulator-0v9-vdd {
+	vcc5v0_sys: regulator-5v0-vcc-sys {
 		compatible = "regulator-fixed";
-		regulator-name = "vdd_0v9";
-		regulator-min-microvolt = <900000>;
-		regulator-max-microvolt = <900000>;
+		regulator-name = "vcc5v0_sys";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
 		regulator-always-on;
 		regulator-boot-on;
-		vin-supply = <&vcc5v0_sys>;
-	};
-
-	vcc_ddr: regulator-1v1-vcc-ddr {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc_ddr";
-		regulator-min-microvolt = <1100000>;
-		regulator-max-microvolt = <1100000>;
-		regulator-always-on;
-		regulator-boot-on;
-		vin-supply = <&vcc5v0_sys>;
-	};
-
-	vcc_1v8: regulator-1v8-vcc {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc_1v8";
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-		regulator-always-on;
-		regulator-boot-on;
-		vin-supply = <&vcc_3v3>;
+		bootph-all;
 	};
 
 	vcc_3v3: regulator-3v3-vcc {
@@ -75,6 +43,18 @@
 		regulator-always-on;
 		regulator-boot-on;
 		vin-supply = <&vcc5v0_sys>;
+		bootph-all;
+	};
+
+	vcc_1v8: regulator-1v8-vcc {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_1v8";
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+		regulator-always-on;
+		regulator-boot-on;
+		vin-supply = <&vcc_3v3>;
+		bootph-all;
 	};
 
 	vcc3v3_sd: regulator-3v3-vcc-sd {
@@ -83,30 +63,12 @@
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		gpio = <&gpio4 RK_PA1 GPIO_ACTIVE_LOW>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&sdmmc_pwren_l>;
 		regulator-always-on;
 		regulator-boot-on;
 		vin-supply = <&vcc_3v3>;
-	};
-
-	vcc5v0_sys: regulator-5v0-vcc-sys {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc5v0_sys";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		regulator-always-on;
-		regulator-boot-on;
-	};
-
-	vcc5v0_usb: regulator-5v0-vcc-usb {
-		compatible = "regulator-fixed";
-		regulator-name = "vcc5v0_usb";
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
-		regulator-always-on;
-		regulator-boot-on;
-		vin-supply = <&vcc5v0_sys>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sdmmc_pwren_l>;
+		bootph-all;
 	};
 
 	vccio_sd: regulator-vccio-sd {
@@ -115,52 +77,15 @@
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <3300000>;
 		gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
+		states = <1800000 0x0>, <3300000 0x1>;
+		startup-delay-us = <2000>;
+		vin-supply = <&vcc5v0_sys>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&sdmmc_vol_ctrl_h>;
-		startup-delay-us = <2000>;
-		states = <1800000 0x0>, <3300000 0x1>;
-		vin-supply = <&vcc5v0_sys>;
-	};
-
-	vdd_arm: regulator-vdd-arm {
-		compatible = "pwm-regulator";
-		regulator-name = "vdd_arm";
-		regulator-min-microvolt = <746000>;
-		regulator-max-microvolt = <1201000>;
-		pwms = <&pwm1 0 5000 1>;
-		pwm-supply = <&vcc5v0_sys>;
-		regulator-always-on;
-		regulator-boot-on;
-		regulator-settling-time-up-us = <250>;
-		regulator-pwm-continuous;
-	};
-
-	vdd_logic: regulator-vdd-logic {
-		compatible = "pwm-regulator";
-		regulator-name = "vdd_logic";
-		regulator-min-microvolt = <705000>;
-		regulator-max-microvolt = <1006000>;
-		pwms = <&pwm2 0 5000 1>;
-		pwm-supply = <&vcc5v0_sys>;
-		regulator-always-on;
-		regulator-boot-on;
-		regulator-settling-time-up-us = <250>;
-		regulator-pwm-continuous;
-	};
-
-	/* WiFi SDIO 电源时序 */
-	sdio_pwrseq: sdio-pwrseq {
-		compatible = "mmc-pwrseq-simple";
-		pinctrl-names = "default";
-		pinctrl-0 = <&wifi_reg_on>;
-		post-power-on-delay-ms = <100>;
-		power-off-delay-us = <5000000>;
-		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
-	};
-
-	/* SFC 保留用户原始硬编码配置，不做宏替换修改 */
-	sfc: spi@ffc00000 {
 		bootph-all;
+	};
+
+	sfc: spi@ffc00000 {
 		compatible = "rockchip,sfc";
 		reg = <0x0 0xffc00000 0x0 0x4000>;
 		interrupts = <0 135 4>;
@@ -168,19 +93,90 @@
 		clock-names = "clk_sfc", "hclk_sfc";
 		assigned-clocks = <&cru 161>;
 		assigned-clock-rates = <100000000>;
+		power-domains = <&power 5>;
 		#address-cells = <1>;
 		#size-cells = <0>;
-		status = "disabled";
+		status = "okay";
+		pinctrl-names = "default";
+		pinctrl-0 = <&fspi_pins>;
+		bootph-all;
+
+		sfc_flash0: flash@0 {
+			compatible = "jedec,spi-nor";
+			reg = <0>;
+			spi-max-frequency = <24000000>;
+			spi-rx-bus-width = <4>;
+			spi-tx-bus-width = <4>;
+			bootph-all;
+		};
 	};
 };
 
-/* 核心寄存器模块：预启动必须初始化 */
-&cru {
+&sdhci {
+	bus-width = <8>;
+	mmc-hs200-1_8v;
+	max-frequency = <200000000>;
+	non-removable;
+	vmmc-supply = <&vcc_3v3>;
+	vqmmc-supply = <&vcc_1v8>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&emmc_bus8 &emmc_clk &emmc_cmd &emmc_strb>;
+	status = "okay";
 	bootph-all;
 };
 
-&ioc_grf {
+&sdmmc {
+	bus-width = <4>;
+	cap-sd-highspeed;
+	disable-wp;
+	max-frequency = <150000000>;
+	rockchip,default-sample-phase = <90>;
+	sd-uhs-sdr104;
+	vmmc-supply = <&vcc3v3_sd>;
+	vqmmc-supply = <&vccio_sd>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&sdmmc_bus4 &sdmmc_clk &sdmmc_cmd &sdmmc_det>;
+	status = "okay";
 	bootph-all;
+};
+
+&uart0 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart0m0_xfer>;
+	status = "okay";
+	bootph-all;
+};
+
+&gmac1 {
+	clock_in_out = "output";
+	phy-handle = <&rgmii_phy>;
+	phy-mode = "rgmii-id";
+	tx_delay = <0x3>;
+	rx_delay = <0x6>;
+	phy-supply = <&vcc_3v3>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&rgmii_miim &rgmii_tx_bus2 &rgmii_rx_bus2
+		     &rgmii_rgmii_clk &rgmii_rgmii_bus>;
+	status = "okay";
+	bootph-pre-ram;
+};
+
+&mdio1 {
+	rgmii_phy: ethernet-phy@1 {
+		compatible = "ethernet-phy-ieee802.3-c22";
+		reg = <0x1>;
+		reset-assert-us = <20000>;
+		reset-deassert-us = <100000>;
+		reset-gpios = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&gmac1_rstn_l>;
+		bootph-pre-ram;
+	};
+};
+
+&combphy {
+	status = "okay";
+	bootph-pre-ram;
 };
 
 &pinctrl {
@@ -200,180 +196,4 @@
 			rockchip,pins = <4 RK_PB6 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
-
-	wifi {
-		wifi_reg_on: wifi-reg-on {
-			rockchip,pins = <1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		wl_wake_host: wl-wake-host {
-			rockchip,pins = <1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_down>;
-		};
-	};
-};
-
-/* CPU 核心供电 */
-&cpu0 {
-	bootph-all;
-	cpu-supply = <&vdd_arm>;
-};
-&cpu1 { cpu-supply = <&vdd_arm>; };
-&cpu2 { cpu-supply = <&vdd_arm>; };
-&cpu3 { cpu-supply = <&vdd_arm>; };
-
-/* 调试串口 */
-&uart0 {
-	bootph-all;
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart0m0_xfer>;
-	status = "okay";
-};
-&uart1 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart1m0_xfer>;
-	status = "okay";
-};
-&uart2 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart2m1_ctsn &uart2m1_xfer>;
-	status = "okay";
-};
-
-/* PWM 核心电压调节 */
-&pwm1 {
-	bootph-all;
-	pinctrl-names = "default";
-	pinctrl-0 = <&pwm1m0_pins>;
-	status = "okay";
-};
-&pwm2 {
-	bootph-all;
-	pinctrl-names = "default";
-	pinctrl-0 = <&pwm2m0_pins>;
-	status = "okay";
-};
-
-/* eMMC 主启动介质 */
-&sdhci {
-	bootph-all;
-	bus-width = <8>;
-	mmc-hs200-1_8v;
-	max-frequency = <200000000>;
-	non-removable;
-	vmmc-supply = <&vcc_3v3>;
-	vqmmc-supply = <&vcc_1v8>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&emmc_bus8 &emmc_clk &emmc_cmd &emmc_strb>;
-	status = "okay";
-};
-
-/* SD 卡备用启动介质 */
-&sdmmc {
-	bootph-all;
-	bus-width = <4>;
-	cap-sd-highspeed;
-	disable-wp;
-	max-frequency = <150000000>;
-	rockchip,default-sample-phase = <90>;
-	sd-uhs-sdr104;
-	vmmc-supply = <&vcc3v3_sd>;
-	vqmmc-supply = <&vccio_sd>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&sdmmc_bus4 &sdmmc_clk &sdmmc_cmd &sdmmc_det>;
-	status = "okay";
-};
-
-/* SDIO WiFi */
-&sdio0 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	bus-width = <4>;
-	cap-sd-highspeed;
-	cap-sdio-irq;
-	supports-sdio;
-	keep-power-in-suspend;
-	no-sdio-pm;
-	max-frequency = <200000000>;
-	mmc-pwrseq = <&sdio_pwrseq>;
-	non-removable;
-	sd-uhs-sdr104;
-	broken-cd;
-	pinctrl-names = "default";
-	pinctrl-0 = <&sdio0_bus4 &sdio0_cmd &sdio0_clk>;
-	status = "okay";
-
-	wifi@1 {
-		compatible = "aic,aic8800";
-		reg = <1>;
-		interrupt-parent = <&gpio1>;
-		interrupts = <GIC_SPI RK_PA7 IRQ_TYPE_LEVEL_HIGH>;
-		interrupt-names = "host-wake";
-		pinctrl-names = "default";
-		pinctrl-0 = <&wl_wake_host>;
-	};
-};
-
-/* SPI NOR 启动介质 */
-&sfc {
-	bootph-all;
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&fspi_pins>;
-
-	flash@0 {
-		bootph-all;
-		compatible = "jedec,spi-nor";
-		reg = <0>;
-		spi-max-frequency = <24000000>;
-		spi-rx-bus-width = <4>;
-		spi-tx-bus-width = <4>;
-	};
-};
-
-/* 千兆以太网 TFTP 网络烧录 */
-&gmac1 {
-	clock_in_out = "output";
-	phy-handle = <&rgmii_phy>;
-	phy-mode = "rgmii-id";
-	tx_delay = <0x3>;
-	rx_delay = <0x6>;
-	phy-supply = <&vcc_3v3>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&rgmii_miim &rgmii_tx_bus2 &rgmii_rx_bus2 &rgmii_rgmii_clk &rgmii_rgmii_bus>;
-	status = "okay";
-};
-
-&mdio1 {
-	rgmii_phy: ethernet-phy@1 {
-		compatible = "ethernet-phy-ieee802.3-c22";
-		reg = <0x1>;
-		reset-assert-us = <20000>;
-		reset-deassert-us = <100000>;
-		reset-gpios = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&gmac1_rstn_l>;
-	};
-};
-
-/* USB 官方标准节点（仅修正错误节点名称，无多余修改） */
-&combphy {
-	status = "okay";
-};
-
-&usb2phy {
-	bootph-all;
-	phy-supply = <&vcc5v0_usb>;
-	status = "okay";
-};
-
-&ehci0 {
-	status = "okay";
-};
-
-&ohci0 {
-	status = "okay";
-};
-
-&usb3 {
-	dr_mode = "otg";
-	status = "okay";
 };
