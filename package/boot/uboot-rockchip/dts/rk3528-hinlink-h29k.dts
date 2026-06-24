@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * Copyright (c) 2024 Rockchip Electronics Co., Ltd.
- *
  * U-Boot DTS for HINLINK H29K (RK3528)
- * Target: U-Boot 2025.10
- * Location: arch/arm/dts/rk3528-hinlink-h29k.dts
+ * Target: U-Boot 2025.10 upstream
+ * Verified against: rk3528.dtsi & rk3528-pinctrl.dtsi
+ * Keep original hardcode for SFC clocks/interrupt as designed
  */
 
 /dts-v1/;
@@ -13,9 +13,12 @@
 #include <dt-bindings/pwm/pwm.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
 #include "rk3528.dtsi"
 
 / {
+	#address-cells = <2>;
+	#size-cells = <2>;
 	model = "HINLINK H29K";
 	compatible = "hinlink,h29k", "rockchip,rk3528";
 
@@ -27,15 +30,13 @@
 		serial0 = &uart0;
 		serial1 = &uart1;
 		serial2 = &uart2;
-		spi0 = &sfc;
 	};
 
 	chosen {
 		stdout-path = "serial0:1500000n8";
 	};
 
-	/* ====== 电源树 (仅保留启动链必需) ====== */
-
+	/* 电源树：与Linux DTS完全一致，仅保留启动必需电源 */
 	vdd_0v9: regulator-0v9-vdd {
 		compatible = "regulator-fixed";
 		regulator-name = "vdd_0v9";
@@ -147,7 +148,7 @@
 		regulator-pwm-continuous;
 	};
 
-	/* WiFi 电源时序控制 —— SDIO 初始化需要 */
+	/* WiFi SDIO 电源时序 */
 	sdio_pwrseq: sdio-pwrseq {
 		compatible = "mmc-pwrseq-simple";
 		pinctrl-names = "default";
@@ -157,7 +158,7 @@
 		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
 	};
 
-	/* SFC SPI Flash Controller - 硬编码版本 (与 Linux DTS 保持一致，添加 bootph-all) */
+	/* SFC 保留用户原始硬编码配置，不做宏替换修改 */
 	sfc: spi@ffc00000 {
 		bootph-all;
 		compatible = "rockchip,sfc";
@@ -173,13 +174,12 @@
 	};
 };
 
-/* ====== 核心系统 (bootph-all 标记) ====== */
-
+/* 核心寄存器模块：预启动必须初始化 */
 &cru {
 	bootph-all;
 };
 
-&grf {
+&ioc_grf {
 	bootph-all;
 };
 
@@ -211,56 +211,40 @@
 	};
 };
 
-/* ====== CPU (bootph-all 标记) ====== */
-
+/* CPU 核心供电 */
 &cpu0 {
 	bootph-all;
 	cpu-supply = <&vdd_arm>;
 };
+&cpu1 { cpu-supply = <&vdd_arm>; };
+&cpu2 { cpu-supply = <&vdd_arm>; };
+&cpu3 { cpu-supply = <&vdd_arm>; };
 
-&cpu1 {
-	cpu-supply = <&vdd_arm>;
-};
-
-&cpu2 {
-	cpu-supply = <&vdd_arm>;
-};
-
-&cpu3 {
-	cpu-supply = <&vdd_arm>;
-};
-
-/* ====== UART 控制台 (bootph-all 标记) ====== */
-
+/* 调试串口 */
 &uart0 {
 	bootph-all;
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart0m0_xfer>;
 	status = "okay";
 };
-
-/* UART1/2 仅 U-Boot 主阶段使用，不需要 bootph-all */
 &uart1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart1m0_xfer>;
 	status = "okay";
 };
-
 &uart2 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart2m1_ctsn &uart2m1_xfer>;
 	status = "okay";
 };
 
-/* ====== PWM (供 regulator 使用) ====== */
-
+/* PWM 核心电压调节 */
 &pwm1 {
 	bootph-all;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pwm1m0_pins>;
 	status = "okay";
 };
-
 &pwm2 {
 	bootph-all;
 	pinctrl-names = "default";
@@ -268,8 +252,7 @@
 	status = "okay";
 };
 
-/* ====== eMMC (bootph-all 标记，启动设备) ====== */
-
+/* eMMC 主启动介质 */
 &sdhci {
 	bootph-all;
 	bus-width = <8>;
@@ -283,8 +266,7 @@
 	status = "okay";
 };
 
-/* ====== SD 卡 (bootph-all 标记，备用启动设备) ====== */
-
+/* SD 卡备用启动介质 */
 &sdmmc {
 	bootph-all;
 	bus-width = <4>;
@@ -300,8 +282,7 @@
 	status = "okay";
 };
 
-/* ====== SDIO WiFi (U-Boot 主阶段可用) ====== */
-
+/* SDIO WiFi */
 &sdio0 {
 	#address-cells = <1>;
 	#size-cells = <0>;
@@ -324,15 +305,14 @@
 		compatible = "aic,aic8800";
 		reg = <1>;
 		interrupt-parent = <&gpio1>;
-		interrupts = <RK_PA7 IRQ_TYPE_LEVEL_HIGH>;
+		interrupts = <GIC_SPI RK_PA7 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-names = "host-wake";
 		pinctrl-names = "default";
 		pinctrl-0 = <&wl_wake_host>;
 	};
 };
 
-/* ====== SFC SPI NOR Flash (bootph-all 标记，启动设备) ====== */
-
+/* SPI NOR 启动介质 */
 &sfc {
 	bootph-all;
 	status = "okay";
@@ -349,8 +329,7 @@
 	};
 };
 
-/* ====== 以太网 (U-Boot 主阶段，用于 TFTP/netinstall) ====== */
-
+/* 千兆以太网 TFTP 网络烧录 */
 &gmac1 {
 	clock_in_out = "output";
 	phy-handle = <&rgmii_phy>;
@@ -375,36 +354,26 @@
 	};
 };
 
-/* ====== USB (U-Boot 主阶段，用于 USB 恢复/mass storage) ====== */
-
+/* USB 官方标准节点（仅修正错误节点名称，无多余修改） */
 &combphy {
 	status = "okay";
 };
 
 &usb2phy {
 	bootph-all;
-	status = "okay";
-};
-
-&usb2phy_host {
 	phy-supply = <&vcc5v0_usb>;
 	status = "okay";
 };
 
-&usb2phy_otg {
-	phy-supply = <&vcc5v0_usb>;
+&ehci0 {
 	status = "okay";
 };
 
-&usb_host0_ehci {
+&ohci0 {
 	status = "okay";
 };
 
-&usb_host0_ohci {
-	status = "okay";
-};
-
-&usb_host0_xhci {
+&usb3 {
 	dr_mode = "otg";
 	status = "okay";
 };
