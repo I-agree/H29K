@@ -1,0 +1,126 @@
+name: RK3528 Kconfig Audit (Full Pre-build)
+
+on:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: openwrt-25.12
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
+
+jobs:
+  kconfig-audit:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+    - name: 检出源码与配置脚本
+      uses: actions/checkout@v6.0.3
+
+    - name: 调整磁盘空间
+      run: |
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
+        sudo swapoff -a || true
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        sudo sysctl vm.swappiness=10
+        sudo umount /tmp || true
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+
+    - name: 初始化构建环境
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+
+    - name: 克隆 OpenWrt 源码到磁盘
+      run: |
+        cd $WORK_DIR
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 加载自定义软件源
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: 更新软件源索引
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
+
+    - name: 安装软件源组件
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
+
+    - name: 加载自定义配置文件与 DIY-P2
+      run: |
+        if [ -d files ]; then
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+          cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
+        fi
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: 下载依赖软件
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make defconfig
+        for i in {1..3}; do make download -j8 && break || sleep 5; done
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    # 🔥 以下为新增 Kconfig 审计步骤，替代原编译固件流程
+    - name: 🔍 生成 Kconfig 诊断文件
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo "=== 1. 重新展开完整 .config（确保 feeds/diy 注入生效）==="
+        make defconfig
+        
+        echo "=== 2. 生成最小化 defconfig ==="
+        ./scripts/diffconfig.sh > audit_defconfig.txt 2>&1 || make savedefconfig
+        
+        echo "=== 3. 检查未满足的依赖 ==="
+        ./scripts/kconfig/conf --alldefconfig Kconfig 2> audit_unmet_deps.txt || true
+        
+        echo "=== 4. 导出当前 target/device 信息 ==="
+        grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
+        
+        echo "=== 5. 统计 config 规模 ==="
+        wc -l .config audit_defconfig.txt >> audit_summary.txt 2>&1
+
+    - name: 📦 打包诊断文件
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        tar czf $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz \
+          .config \
+          audit_defconfig.txt \
+          audit_unmet_deps.txt \
+          audit_target_info.txt \
+          audit_summary.txt \
+          logs/ 2>/dev/null || true
+        ls -lh $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz
+
+    - name: 上传 Kconfig 诊断包
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: kconfig-audit-rk3528-${{ github.run_number }}
+        path: kconfig-audit-rk3528.tar.gz
+        retention-days: 7
