@@ -212,3 +212,5 @@
 		};
 	};
 };
+
+&pcie { status = "disabled"; };
