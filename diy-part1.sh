@@ -96,6 +96,56 @@ sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/'
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
+# ====================== 批量关闭无用大类（不影响WiFi/USB/网口/屏幕/媒体） ======================
+# 无音频硬件，关闭整套声卡
+# CONFIG_SOUND is not set
+# 无工业传感器ADC/陀螺仪
+# CONFIG_IIO is not set
+# 无外置硬件RTC时钟芯片
+# CONFIG_RTC is not set
+# RK3528无PCI总线外设
+# CONFIG_PCI is not set
+# 无虚拟化加速、virtio虚拟机
+# CONFIG_VIRTUALIZATION is not set
+# 无FPGA可编程逻辑
+# CONFIG_FPGA is not set
+# 工业总线全部无用
+# CONFIG_CAN is not set
+# CONFIG_PECI is not set
+# CONFIG_HTE is not set
+# CONFIG_CDX_BUS is not set
+# 关闭用户态加密，仅内核内置解压保留
+# CONFIG_CRYPTO_USER is not set
+CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
+# 内核调试/单元测试/性能监控全部关闭
+# CONFIG_DEBUG_KERNEL is not set
+# CONFIG_KUNIT is not set
+# CONFIG_PERF_EVENTS is not set
+# GPS、远程处理器、NVMEM离线存储无用
+# CONFIG_NVMEM is not set
+# CONFIG_REMOTEPROC is not set
+# CONFIG_RPMSG is not set
+# CONFIG_GNSS is not set
+# SATA/NVME硬盘无硬件
+# CONFIG_SCSI is not set
+# CONFIG_NVME is not set
+# CONFIG_ATA is not set
+# 杂项小众外设驱动
+# CONFIG_MISC_DEVICES is not set
+# 看门狗、内存硬件纠错
+# CONFIG_WATCHDOG is not set
+# CONFIG_EDAC is not set
+# 服务器高速IB网卡
+# CONFIG_INFINIBAND is not set
+# 老式PS2、并口
+# CONFIG_SERIO is not set
+# CONFIG_PARPORT is not set
+# 多电池充电PMIC、电量计
+# CONFIG_POWER_SUPPLY is not set
+# 交换机、二层网桥无用
+# CONFIG_NET_DSA is not set
+# CONFIG_BRIDGE is not set
+
 # =================================================================
 # 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
 # =================================================================
