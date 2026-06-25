@@ -615,5 +615,14 @@
 };
 
 &usb_host0_xhci {
-	status = "disabled";
+	dr_mode = "otg";
+	phys = <&usb2phy_otg>, <&combphy PHY_TYPE_USB3>;
+	phy-names = "usb2-phy", "usb3-phy";
+	phy_type = "utmi_wide";
+	snps,dis_del_phy_power_chg_quirk;
+	snps,dis_tx_ipgap_linecheck_quirk;
+	snps,dis_u2_freeclk_exists_quirk;
+	snps,dis_enblslpm_quirk;
+	snps,dis_u2_susphy_quirk;
+	status = "okay";
 };
