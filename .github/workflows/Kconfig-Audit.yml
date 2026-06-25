@@ -79,32 +79,66 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 下载依赖软件
+    - name: 下载依赖并准备内核源码
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         make defconfig
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
+        echo "=== 准备内核源码树（动态适配当前仓库内核版本）==="
+        make target/linux/prepare V=s 2>&1 | tail -50
 
-    # 🔥 以下为新增 Kconfig 审计步骤，替代原编译固件流程
-    - name: 🔍 生成 Kconfig 诊断文件
+    - name: 🔍 生成 Kconfig 诊断文件（OpenWrt层+内核层）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        echo "=== 1. 重新展开完整 .config（确保 feeds/diy 注入生效）==="
+        
+        echo "=== 1. 重新展开完整 .config ==="
         make defconfig
         
-        echo "=== 2. 生成最小化 defconfig ==="
-        ./scripts/diffconfig.sh > audit_defconfig.txt 2>&1 || make savedefconfig
+        echo "=== 2. OpenWrt 最小化 defconfig ==="
+        ./scripts/diffconfig.sh > audit_defconfig.txt 2>&1
         
-        echo "=== 3. 检查未满足的依赖 ==="
+        echo "=== 3. OpenWrt 未满足依赖 ==="
         ./scripts/kconfig/conf --alldefconfig Kconfig 2> audit_unmet_deps.txt || true
         
-        echo "=== 4. 导出当前 target/device 信息 ==="
+        echo "=== 4. Target/Device 信息 ==="
         grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
         
-        echo "=== 5. 统计 config 规模 ==="
-        wc -l .config audit_defconfig.txt >> audit_summary.txt 2>&1
+        echo "=== 5. 动态定位并导出真实内核 .config ==="
+        KERNEL_BUILD_DIR=$(find build_dir/target-* -maxdepth 1 -type d -name "linux-rockchip_armv8" 2>/dev/null | head -1)
+        if [ -n "$KERNEL_BUILD_DIR" ]; then
+          KERNEL_CONFIG=$(find "$KERNEL_BUILD_DIR" -maxdepth 2 -name ".config" -path "*/linux-*" 2>/dev/null | head -1)
+          if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
+            cp "$KERNEL_CONFIG" audit_kernel_full_config.txt
+            echo "✅ 内核 .config 已导出: $KERNEL_CONFIG"
+            
+            echo "=== 6. 内核级未满足依赖检查 ==="
+            KERNEL_SRC=$(dirname "$KERNEL_CONFIG")
+            make -C "$KERNEL_SRC" olddefconfig 2>/dev/null || true
+            ./scripts/kconfig/conf --alldefconfig "$KERNEL_SRC/Kconfig" 2> audit_kernel_unmet_deps.txt || true
+          else
+            echo "⚠️ 内核 .config 文件不存在" > audit_kernel_full_config.txt
+            echo "⚠️ 跳过内核依赖检查" > audit_kernel_unmet_deps.txt
+          fi
+        else
+          echo "⚠️ 未找到内核构建目录，target/linux/prepare 可能失败" > audit_kernel_full_config.txt
+          echo "⚠️ 跳过内核依赖检查" > audit_kernel_unmet_deps.txt
+        fi
+        
+        echo "=== 7. 导出 target 内核配置片段（动态匹配）==="
+        TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" 2>/dev/null | sort -V | tail -1)
+        if [ -n "$TARGET_FRAGMENT" ] && [ -f "$TARGET_FRAGMENT" ]; then
+          cp "$TARGET_FRAGMENT" audit_target_kernel_fragment.txt
+          echo "✅ Target fragment: $TARGET_FRAGMENT"
+        else
+          echo "⚠️ 未找到 target kernel fragment" > audit_target_kernel_fragment.txt
+        fi
+        
+        echo "=== 8. 统计所有 config 规模 ==="
+        wc -l .config audit_defconfig.txt \
+          audit_kernel_full_config.txt audit_target_kernel_fragment.txt \
+          >> audit_summary.txt 2>&1
 
     - name: 📦 打包诊断文件
       run: |
@@ -114,6 +148,9 @@ jobs:
           audit_defconfig.txt \
           audit_unmet_deps.txt \
           audit_target_info.txt \
+          audit_kernel_full_config.txt \
+          audit_kernel_unmet_deps.txt \
+          audit_target_kernel_fragment.txt \
           audit_summary.txt \
           logs/ 2>/dev/null || true
         ls -lh $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz
