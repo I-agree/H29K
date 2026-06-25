@@ -75,12 +75,12 @@
 		pinctrl-0 = <&led_4g_en>, <&led_5g_en>, <&led_work_en>;
 
 		led_4g: led-4g {
-			label = "red:4g";
+			label = "red:modem_4g";
 			gpios = <&gpio4 RK_PC0 GPIO_ACTIVE_LOW>;
 		};
 
 		led_5g: led-5g {
-			label = "blue:5g";
+			label = "blue:modem_5g";
 			gpios = <&gpio4 RK_PC3 GPIO_ACTIVE_LOW>;
 		};
 
