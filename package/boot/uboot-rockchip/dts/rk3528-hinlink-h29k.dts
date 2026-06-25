@@ -174,7 +174,11 @@
 	};
 };
 
-&combphy {
+/* 
+ * 修复：U-Boot 2025.10 的 rk3528.dtsi 中该节点没有 &combphy 标签
+ * 使用绝对路径引用 {/phy@ffdc0000} 来修正编译错误 
+ */
+&{/phy@ffdc0000} {
 	status = "okay";
 	bootph-pre-ram;
 };
