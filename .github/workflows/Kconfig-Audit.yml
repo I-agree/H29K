@@ -153,9 +153,9 @@ jobs:
         cp "${KERNEL_DIR}/.config" audit_kernel_original.config
         echo "✅ 原始内核配置行数：$(wc -l < audit_kernel_original.config)"
         
-        echo "=== 7. 内核配置自动补全 olddefconfig（仅临时校验，不回写仓库配置）==="
+        echo "=== 7. 内核配置自动补全（使用 make defconfig，仅补齐默认值，不展开全量驱动）==="
         cd "${KERNEL_DIR}"
-        make ARCH=arm64 olddefconfig V=s
+        make ARCH=arm64 defconfig V=s
         cd - > /dev/null
         # 备份补全后配置
         cp "${KERNEL_DIR}/.config" audit_kernel_final.config
