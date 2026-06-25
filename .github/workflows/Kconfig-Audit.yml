@@ -96,7 +96,7 @@ jobs:
         echo "=== 诊断：列出 build_dir 顶层目录结构 ==="
         ls -la build_dir/target-*/ 2>/dev/null || echo "⚠️ build_dir/target-* 不存在"
 
-    - name: 🔍 生成 Kconfig 诊断文件（OpenWrt层+内核层）
+    - name: 🔍 生成 Kconfig 诊断文件（含完整弹窗检测）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         
@@ -112,8 +112,7 @@ jobs:
         echo "=== 4. Target/Device 信息 ==="
         grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
         
-        echo "=== 5. 动态定位并导出真实内核 .config ==="
-        # 优先精确匹配，回退到宽泛匹配
+        echo "=== 5. 动态定位内核 .config ==="
         KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 3 -name ".config" -path "*/linux-rockchip*" 2>/dev/null | head -1)
         if [ -z "$KERNEL_CONFIG" ]; then
           KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 4 -name ".config" 2>/dev/null | grep -i linux | head -1)
@@ -121,12 +120,16 @@ jobs:
         
         if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
           cp "$KERNEL_CONFIG" audit_kernel_full_config.txt
-          echo "✅ 内核 .config 已导出: $KERNEL_CONFIG ($(wc -l < "$KERNEL_CONFIG") 行)"
-          
-          echo "=== 6. 内核级未满足依赖检查 ==="
           KERNEL_SRC=$(dirname "$KERNEL_CONFIG")
+          echo "✅ 内核 .config: $KERNEL_CONFIG ($(wc -l < "$KERNEL_CONFIG") 行)"
+          
+          echo "=== 6. 🔥 列出所有会触发弹窗的新增配置项 ==="
+          make -C "$KERNEL_SRC" listnewconfig > audit_kernel_new_options.txt 2>&1 || true
+          NEW_COUNT=$(grep -c "^CONFIG_\|^# CONFIG_" audit_kernel_new_options.txt 2>/dev/null || echo 0)
+          echo "📊 共发现 $NEW_COUNT 个新增/缺失配置项（即等效弹窗数）"
+          
+          echo "=== 7. 内核级未满足依赖检查 ==="
           if [ -f "$KERNEL_SRC/Kconfig" ]; then
-            make -C "$KERNEL_SRC" olddefconfig 2>/dev/null || true
             ./scripts/kconfig/conf --alldefconfig "$KERNEL_SRC/Kconfig" 2> audit_kernel_unmet_deps.txt || true
             echo "✅ 内核依赖检查完成"
           else
@@ -134,10 +137,11 @@ jobs:
           fi
         else
           echo "⚠️ 未找到内核 .config，请参考上方诊断输出确认实际路径" > audit_kernel_full_config.txt
-          echo "⚠️ 跳过内核依赖检查" > audit_kernel_unmet_deps.txt
+          echo "⚠️ 跳过内核审计" > audit_kernel_new_options.txt
+          echo "⚠️ 跳过依赖检查" > audit_kernel_unmet_deps.txt
         fi
         
-        echo "=== 7. 导出 target 内核配置片段（动态匹配）==="
+        echo "=== 8. Target fragment ==="
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" 2>/dev/null | sort -V | tail -1)
         if [ -n "$TARGET_FRAGMENT" ] && [ -f "$TARGET_FRAGMENT" ]; then
           cp "$TARGET_FRAGMENT" audit_target_kernel_fragment.txt
@@ -146,9 +150,9 @@ jobs:
           echo "⚠️ 未找到 target kernel fragment" > audit_target_kernel_fragment.txt
         fi
         
-        echo "=== 8. 统计所有 config 规模 ==="
-        wc -l .config audit_defconfig.txt \
-          audit_kernel_full_config.txt audit_target_kernel_fragment.txt \
+        echo "=== 9. 汇总统计 ==="
+        wc -l .config audit_defconfig.txt audit_kernel_full_config.txt \
+          audit_kernel_new_options.txt audit_target_kernel_fragment.txt \
           >> audit_summary.txt 2>&1
 
     - name: 📦 打包诊断文件
@@ -160,6 +164,7 @@ jobs:
           audit_unmet_deps.txt \
           audit_target_info.txt \
           audit_kernel_full_config.txt \
+          audit_kernel_new_options.txt \
           audit_kernel_unmet_deps.txt \
           audit_target_kernel_fragment.txt \
           audit_summary.txt \
