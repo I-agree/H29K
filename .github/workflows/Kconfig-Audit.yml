@@ -158,8 +158,12 @@ jobs:
           echo "⚠️ 仅使用 target fragment 作为内核 .config"
         fi
         
-        echo "=== 6. 回到OpenWrt根目录执行内核oldconfig补全配置 ==="
-        make target/linux/oldconfig V=s 2>&1 | tail -30
+        echo "=== 6. 内核配置自动补全（替代废弃 target/linux/oldconfig）==="
+        cd "${KERNEL_SRC}"
+        make ARCH=arm64 olddefconfig V=s
+        # 把补全后的内核配置回写到OpenWrt内核片段固化
+        cp .config ../../../../${TARGET_FRAGMENT}
+        cd ../../../../
         echo "✅ 内核 .config 最终行数: $(wc -l < "${KERNEL_SRC}/.config")"
 
     - name: 🔍 生成 Kconfig 诊断文件（含内核弹窗检测）
