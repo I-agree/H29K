@@ -79,68 +79,72 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 🔄 彻底解决 OpenWrt 层依赖并下载源码
+    - name: 🔄 解决依赖、准备内核并生成内核配置
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         
-        echo "=== 循环 defconfig 直到配置稳定 ==="
-        # 最多循环5次，确保所有隐式依赖都被展开
+        echo "=== 1. 循环 defconfig 收敛 OpenWrt 层依赖 ==="
         for i in {1..5}; do
           make defconfig
-          # 检查是否有未满足的依赖（conf 返回非0表示有未解决项）
           if ./scripts/kconfig/conf --silentoldconfig Kconfig > /dev/null 2>&1; then
-            echo "✅ 第 $i 轮后 OpenWrt 配置已稳定，无未满足依赖"
+            echo "✅ 第 $i 轮后 OpenWrt 配置已稳定"
             break
           else
             echo "⚠️ 第 $i 轮仍有未满足依赖，继续收敛..."
           fi
         done
         
-        echo "=== 最终依赖状态确认 ==="
+        echo "=== 2. 最终 OpenWrt 依赖状态 ==="
         if ./scripts/kconfig/conf --silentoldconfig Kconfig 2> openwrt_unmet_deps_final.txt; then
-          echo "✅ OpenWrt 层无任何未满足依赖"
-          > openwrt_unmet_deps_final.txt  # 清空文件表示无问题
+          echo "✅ OpenWrt 层无未满足依赖"
+          > openwrt_unmet_deps_final.txt
         else
-          echo "❌ 经过5轮收敛仍存在未满足依赖："
+          echo "❌ 仍存在未满足依赖："
           cat openwrt_unmet_deps_final.txt
         fi
         
-        echo "=== 下载依赖包 ==="
+        echo "=== 3. 下载依赖包 ==="
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
         
-        echo "=== 准备内核源码树 ==="
-        make target/linux/prepare V=s 2>&1 | tail -100
+        echo "=== 4. 准备内核源码树 ==="
+        make target/linux/prepare V=s 2>&1 | tail -50
         
-        echo "=== 🔍 全量扫描 build_dir 内核配置 ==="
-        ALL_KERNEL_CONFIGS=$(find build_dir/target-* -name ".config" 2>/dev/null)
-        if [ -n "$ALL_KERNEL_CONFIGS" ]; then
-          echo "$ALL_KERNEL_CONFIGS"
-          echo "---"
-          echo "$ALL_KERNEL_CONFIGS" | while read f; do
-            echo "$(wc -l < "$f") 行: $f"
-          done
+        echo "=== 5. 🔑 生成内核 .config（关键步骤）==="
+        # target/linux/config 会将 target fragment + 用户配置合并生成 build_dir 中的内核 .config
+        # 使用 V=s 便于排查问题；该步骤不会编译内核，仅生成配置
+        make target/linux/config V=s 2>&1 | tail -80
+        
+        echo "=== 6. 验证内核 .config 是否生成 ==="
+        KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 3 -name ".config" -path "*linux-rockchip*" 2>/dev/null | head -1)
+        if [ -z "$KERNEL_CONFIG" ]; then
+          KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 4 -name ".config" 2>/dev/null | while read f; do
+            echo "$(wc -l < "$f") $f"
+          done | sort -rn | head -1 | awk '{print $2}')
+        fi
+        
+        if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
+          echo "✅ 内核 .config 已生成: $KERNEL_CONFIG ($(wc -l < "$KERNEL_CONFIG") 行)"
         else
-          echo "⚠️ build_dir 中未找到任何 .config 文件"
-          ls -la build_dir/target-*/ 2>/dev/null || echo "❌ build_dir/target-* 目录不存在"
-          find build_dir -maxdepth 4 -type d -name "*linux*rockchip*" 2>/dev/null || echo "❌ 未找到 linux-rockchip 目录"
+          echo "❌ 内核 .config 未生成！请检查上方 target/linux/config 输出"
+          find build_dir/target-* -name ".config" 2>/dev/null || echo "build_dir 中无任何 .config"
         fi
 
-    - name: 🔍 生成 Kconfig 诊断文件（仅验证+内核弹窗检测）
+    - name: 🔍 生成 Kconfig 诊断文件（含内核弹窗检测）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         
-        echo "=== 1. OpenWrt 最小化 defconfig（仅用于审计对比）==="
+        echo "=== 1. OpenWrt 最小化 defconfig ==="
         ./scripts/diffconfig.sh > audit_defconfig.txt 2>&1
         
         echo "=== 2. Target/Device 信息 ==="
         grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
         
-        echo "=== 3. 自适应定位内核 .config ==="
-        KERNEL_CONFIG=$(find build_dir/target-* -name ".config" -path "*linux-rockchip*" 2>/dev/null | head -1)
+        echo "=== 3. 定位内核 .config ==="
+        KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 3 -name ".config" -path "*linux-rockchip*" 2>/dev/null | head -1)
         if [ -z "$KERNEL_CONFIG" ]; then
-          KERNEL_CONFIG=$(find build_dir/target-* -name ".config" 2>/dev/null | while read f; do
+          KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 4 -name ".config" 2>/dev/null | while read f; do
             echo "$(wc -l < "$f") $f"
           done | sort -rn | head -1 | awk '{print $2}')
         fi
@@ -158,12 +162,11 @@ jobs:
           echo "=== 5. 内核级未满足依赖检查 ==="
           if [ -f "$KERNEL_SRC/Kconfig" ]; then
             ./scripts/kconfig/conf --alldefconfig "$KERNEL_SRC/Kconfig" 2> audit_kernel_unmet_deps.txt || true
-            echo "✅ 内核依赖检查完成"
           else
-            echo "⚠️ 内核源码目录缺少 Kconfig，跳过依赖检查" > audit_kernel_unmet_deps.txt
+            echo "⚠️ 内核源码目录缺少 Kconfig" > audit_kernel_unmet_deps.txt
           fi
         else
-          echo "⚠️ 未找到内核 .config，请查看上方'全量扫描'输出确认实际路径" > audit_kernel_full_config.txt
+          echo "⚠️ 未找到内核 .config" > audit_kernel_full_config.txt
           echo "⚠️ 跳过弹窗检测" > audit_kernel_new_options.txt
           echo "⚠️ 跳过依赖检查" > audit_kernel_unmet_deps.txt
         fi
@@ -172,7 +175,6 @@ jobs:
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" 2>/dev/null | sort -V | tail -1)
         if [ -n "$TARGET_FRAGMENT" ] && [ -f "$TARGET_FRAGMENT" ]; then
           cp "$TARGET_FRAGMENT" audit_target_kernel_fragment.txt
-          echo "✅ Target fragment: $TARGET_FRAGMENT ($(wc -l < "$TARGET_FRAGMENT") 行)"
         else
           echo "⚠️ 未找到 target kernel fragment" > audit_target_kernel_fragment.txt
         fi
