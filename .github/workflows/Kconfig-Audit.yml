@@ -57,26 +57,32 @@ jobs:
 
     - name: 加载自定义软件源
       run: |
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+        OPENWRT_DIR=${{ env.WORK_DIR }}/openwrt
+        [ -f $FEEDS_CONF ] && cp -f $FEEDS_CONF ${OPENWRT_DIR}/feeds.conf.default
         chmod +x $DIY_P1_SH
-        cd ${{ env.WORK_DIR }}/openwrt
+        cd ${OPENWRT_DIR}
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: 更新软件源索引
-      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        ./scripts/feeds update -a
 
     - name: 安装软件源组件
-      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        ./scripts/feeds install -a
 
     - name: 加载自定义配置文件与 DIY-P2
       run: |
+        OPENWRT_DIR=${{ env.WORK_DIR }}/openwrt
         if [ -d files ]; then
-          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
-          cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
+          mkdir -p ${OPENWRT_DIR}/files
+          cp -r files/* ${OPENWRT_DIR}/files/
         fi
-        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+        [ -f $CONFIG_FILE ] && cp -f $CONFIG_FILE ${OPENWRT_DIR}/.config
         chmod +x $DIY_P2_SH
-        cd ${{ env.WORK_DIR }}/openwrt
+        cd ${OPENWRT_DIR}
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: 🔄 解决依赖、准备内核并手动生成内核 .config
@@ -84,11 +90,18 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         
         echo "=== 1. 循环 defconfig 收敛 OpenWrt 层依赖 ==="
+        CONF_BIN=""
         for i in {1..5}; do
           make defconfig
-          # 使用 make 调用 conf，避免直接引用二进制路径
-          if make -C scripts/config conf 2>/dev/null && \
-             ./staging_dir/host/bin/conf --silentoldconfig Kconfig > /dev/null 2>&1; then
+          # 每次循环重新编译获取conf二进制
+          make -C scripts/config conf 2>/dev/null
+          if [ -x ./staging_dir/host/bin/conf ]; then
+            CONF_BIN=./staging_dir/host/bin/conf
+          elif [ -x ./scripts/config/conf ]; then
+            CONF_BIN=./scripts/config/conf
+          fi
+
+          if [ -n "${CONF_BIN}" ] && ${CONF_BIN} --silentoldconfig Kconfig > /dev/null 2>&1; then
             echo "✅ 第 $i 轮后 OpenWrt 配置已稳定"
             break
           else
@@ -97,17 +110,18 @@ jobs:
         done
         
         echo "=== 2. 最终 OpenWrt 依赖状态 ==="
+        # 重新获取conf二进制
+        make -C scripts/config conf 2>/dev/null
         if [ -x ./staging_dir/host/bin/conf ]; then
           CONF_BIN=./staging_dir/host/bin/conf
         elif [ -x ./scripts/config/conf ]; then
           CONF_BIN=./scripts/config/conf
         else
-          # 回退：通过 make 触发编译 conf
-          make -C scripts/config conf 2>/dev/null
-          CONF_BIN=./scripts/config/conf
+          echo "❌ 无法编译获取conf工具，终止配置依赖检查"
+          exit 1
         fi
         
-        if $CONF_BIN --silentoldconfig Kconfig 2> openwrt_unmet_deps_final.txt; then
+        if ${CONF_BIN} --silentoldconfig Kconfig 2> openwrt_unmet_deps_final.txt; then
           echo "✅ OpenWrt 层无未满足依赖"
           > openwrt_unmet_deps_final.txt
         else
@@ -124,42 +138,42 @@ jobs:
         make target/linux/prepare V=s 2>&1 | tail -50
         
         echo "=== 5. 🔑 手动生成内核 .config（核心步骤）==="
-        # 定位内核源码目录
         KERNEL_SRC=$(find build_dir/target-* -maxdepth 2 -type d -name "linux-*" 2>/dev/null | head -1)
-        if [ -z "$KERNEL_SRC" ]; then
+        if [ -z "${KERNEL_SRC}" ]; then
           echo "❌ 未找到内核源码目录"
           find build_dir/target-* -maxdepth 3 -type d 2>/dev/null | head -20
           exit 1
         fi
-        echo "📁 内核源码目录: $KERNEL_SRC"
+        echo "📁 内核源码目录: ${KERNEL_SRC}"
         
-        # 定位 target kernel fragment
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" 2>/dev/null | sort -V | tail -1)
-        echo "📄 Target fragment: $TARGET_FRAGMENT"
+        echo "📄 Target fragment: ${TARGET_FRAGMENT}"
         
-        # 使用 OpenWrt 的 kconfig.pl 合并 fragment + 用户 .config 中的内核选项
-        # 这正是 OpenWrt 在 compile 阶段内部做的事情
-        if [ -f scripts/kconfig.pl ] && [ -f "$TARGET_FRAGMENT" ]; then
-          # 提取用户 .config 中所有 CONFIG_ 开头的内核相关选项
-          grep -E '^CONFIG_' .config | grep -v '^CONFIG_TARGET_' > /tmp/user_kernel_opts.txt || true
-          
-          # 合并：target fragment + 用户选项 → 内核 .config
-          perl scripts/kconfig.pl '+' "$TARGET_FRAGMENT" /tmp/user_kernel_opts.txt > "$KERNEL_SRC/.config"
-          echo "✅ 已合并生成内核 .config ($(wc -l < "$KERNEL_SRC/.config") 行)"
+        if [ -f scripts/kconfig.pl ] && [ -f "${TARGET_FRAGMENT}" ]; then
+          grep -E '^CONFIG_' .config | grep -v '^CONFIG_TARGET_' > /tmp/user_kernel_opts.txt
+          perl scripts/kconfig.pl '+' "${TARGET_FRAGMENT}" /tmp/user_kernel_opts.txt > "${KERNEL_SRC}/.config"
+          echo "✅ 已合并生成内核 .config ($(wc -l < "${KERNEL_SRC}/.config") 行)"
         else
-          # 回退：直接用 target fragment
-          cp "$TARGET_FRAGMENT" "$KERNEL_SRC/.config"
+          cp "${TARGET_FRAGMENT}" "${KERNEL_SRC}/.config"
           echo "⚠️ 仅使用 target fragment 作为内核 .config"
         fi
         
-        # 在内核源码目录中运行 oldconfig 使配置完整
         echo "=== 6. 运行内核 oldconfig 补全配置 ==="
-        make -C "$KERNEL_SRC" olddefconfig ARCH=arm64 2>&1 | tail -30
-        echo "✅ 内核 .config 最终行数: $(wc -l < "$KERNEL_SRC/.config")"
+        make -C "${KERNEL_SRC}" olddefconfig ARCH=arm64 2>&1 | tail -30
+        echo "✅ 内核 .config 最终行数: $(wc -l < "${KERNEL_SRC}/.config")"
 
     - name: 🔍 生成 Kconfig 诊断文件（含内核弹窗检测）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
+        # 重新加载conf二进制
+        make -C scripts/config conf 2>/dev/null
+        if [ -x ./staging_dir/host/bin/conf ]; then
+          CONF_BIN=./staging_dir/host/bin/conf
+        elif [ -x ./scripts/config/conf ]; then
+          CONF_BIN=./scripts/config/conf
+        else
+          CONF_BIN=""
+        fi
         
         echo "=== 1. OpenWrt 最小化 defconfig ==="
         ./scripts/diffconfig.sh > audit_defconfig.txt 2>&1
@@ -169,22 +183,22 @@ jobs:
         
         echo "=== 3. 定位内核源码与 .config ==="
         KERNEL_SRC=$(find build_dir/target-* -maxdepth 2 -type d -name "linux-*" 2>/dev/null | head -1)
-        KERNEL_CONFIG="$KERNEL_SRC/.config"
+        KERNEL_CONFIG="${KERNEL_SRC}/.config"
         
-        if [ -n "$KERNEL_SRC" ] && [ -f "$KERNEL_CONFIG" ]; then
-          cp "$KERNEL_CONFIG" audit_kernel_full_config.txt
-          echo "✅ 内核 .config: $KERNEL_CONFIG ($(wc -l < "$KERNEL_CONFIG") 行)"
+        if [ -n "${KERNEL_SRC}" ] && [ -f "${KERNEL_CONFIG}" ]; then
+          cp "${KERNEL_CONFIG}" audit_kernel_full_config.txt
+          echo "✅ 内核 .config: ${KERNEL_CONFIG} ($(wc -l < "${KERNEL_CONFIG}") 行)"
           
           echo "=== 4. 🔥 列出所有会触发弹窗的新增配置项 ==="
-          make -C "$KERNEL_SRC" listnewconfig ARCH=arm64 > audit_kernel_new_options.txt 2>&1 || true
+          make -C "${KERNEL_SRC}" listnewconfig ARCH=arm64 > audit_kernel_new_options.txt 2>&1 || true
           NEW_COUNT=$(grep -cE "^CONFIG_|^# CONFIG_" audit_kernel_new_options.txt 2>/dev/null || echo 0)
-          echo "📊 共发现 $NEW_COUNT 个新增/缺失配置项（即等效弹窗数）"
+          echo "📊 共发现 ${NEW_COUNT} 个新增/缺失配置项（即等效弹窗数）"
           
           echo "=== 5. 内核级未满足依赖检查 ==="
-          if [ -f "$KERNEL_SRC/Kconfig" ]; then
-            $CONF_BIN --alldefconfig "$KERNEL_SRC/Kconfig" 2> audit_kernel_unmet_deps.txt || true
+          if [ -n "${CONF_BIN}" ] && [ -f "${KERNEL_SRC}/Kconfig" ]; then
+            ${CONF_BIN} --alldefconfig "${KERNEL_SRC}/Kconfig" 2> audit_kernel_unmet_deps.txt || true
           else
-            echo "⚠️ 内核源码目录缺少 Kconfig" > audit_kernel_unmet_deps.txt
+            echo "⚠️ 未获取conf工具或内核Kconfig不存在" > audit_kernel_unmet_deps.txt
           fi
         else
           echo "⚠️ 未找到内核 .config" > audit_kernel_full_config.txt
@@ -194,8 +208,8 @@ jobs:
         
         echo "=== 6. Target fragment ==="
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" 2>/dev/null | sort -V | tail -1)
-        if [ -n "$TARGET_FRAGMENT" ] && [ -f "$TARGET_FRAGMENT" ]; then
-          cp "$TARGET_FRAGMENT" audit_target_kernel_fragment.txt
+        if [ -n "${TARGET_FRAGMENT}" ] && [ -f "${TARGET_FRAGMENT}" ]; then
+          cp "${TARGET_FRAGMENT}" audit_target_kernel_fragment.txt
         else
           echo "⚠️ 未找到 target kernel fragment" > audit_target_kernel_fragment.txt
         fi
@@ -209,17 +223,23 @@ jobs:
     - name: 📦 打包诊断文件
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        tar czf $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz \
-          .config \
-          audit_defconfig.txt \
-          audit_target_info.txt \
-          audit_kernel_full_config.txt \
-          audit_kernel_new_options.txt \
-          audit_kernel_unmet_deps.txt \
-          audit_target_kernel_fragment.txt \
-          openwrt_unmet_deps_final.txt \
-          audit_summary.txt \
-          logs/ 2>/dev/null || true
+        FILE_LIST=(
+          .config
+          audit_defconfig.txt
+          audit_target_info.txt
+          audit_kernel_full_config.txt
+          audit_kernel_new_options.txt
+          audit_kernel_unmet_deps.txt
+          audit_target_kernel_fragment.txt
+          openwrt_unmet_deps_final.txt
+          audit_summary.txt
+        )
+        # 过滤存在的文件再打包，避免警告
+        EXIST_FILES=()
+        for f in "${FILE_LIST[@]}"; do
+          [ -f "$f" ] && EXIST_FILES+=("$f")
+        done
+        tar czf $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz "${EXIST_FILES[@]}" logs/ 2>/dev/null || true
         ls -lh $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz
 
     - name: 上传 Kconfig 诊断包
