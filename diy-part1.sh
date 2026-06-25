@@ -247,6 +247,12 @@ CONFIG_WLAN=y
 # CONFIG_WLAN_VENDOR_ZYDAS is not set
 # CONFIG_WLAN_VENDOR_QUANTENNA is not set
 
+# 关闭mac80211无线硬件仿真测试工具
+# CONFIG_MAC80211_HWSIM is not set
+
+# 关闭以太网转WiFi虚拟封装驱动
+# CONFIG_VIRT_WIFI is not set
+
 # gpio-keys 驱动修正 (替代错误的 KEYBOARD_GPIO)
 # CONFIG_KEYBOARD_GPIO is not set
 CONFIG_INPUT_GPIO_KEYS=y
