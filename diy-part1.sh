@@ -96,20 +96,6 @@ sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/'
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
-# ======================== 【H29K 主线内核配置合并注入】 ========================
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
-echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
-
-# ⚠️ 使用 sed 原位替换，防止 Kconfig 忽略 EOF 末尾追加的重复项
-sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_CMA_SIZE_MBYTES=16$/CONFIG_CMA_SIZE_MBYTES=128/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_CMA_AREAS=7$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
-sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
-
-cat >> "$CONFIG_FILE" << 'EOF'
-
 # =================================================================
 # 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
 # =================================================================
@@ -162,13 +148,16 @@ CONFIG_MTD_OF_PARTS=y
 # WiFi 协议栈 (AIC8800 SDIO 必需)
 CONFIG_CFG80211=y
 CONFIG_NL80211=y
-CONFIG_NL80211_TESTMODE=n
+# 禁用nl80211工厂测试命令，消除NEW交互式弹窗
+# CONFIG_NL80211_TESTMODE is not set
 CONFIG_CFG80211_WEXT=y
 CONFIG_CFG80211_CRDA_SUPPORT=y
 CONFIG_CFG80211_USE_KERNEL_REGDB_KEYS=y
 CONFIG_CFG80211_DEFAULT_REGDOM=y
-CONFIG_CFG80211_DEVELOPER_WARNINGS=n
-CONFIG_CFG80211_DEBUGFS=n
+# 关闭无线开发调试警告
+# CONFIG_CFG80211_DEVELOPER_WARNINGS is not set
+# 关闭cfg80211调试文件系统节点
+# CONFIG_CFG80211_DEBUGFS is not set
 CONFIG_MAC80211=y
 CONFIG_WLAN=y
 CONFIG_FW_LOADER_COMPRESS=y
@@ -355,4 +344,4 @@ CONFIG_MODVERSIONS=y
 CONFIG_MODULE_UNLOAD=y
 
 EOF
-echo "✅ H29K 内核参数注入完成（已修复NL80211_TESTMODE交互报错+USB内核DTS一致性）"
+echo "✅ H29K 内核参数注入完成（已遵循规范使用# CONFIG_XXX is not set格式，修复WiFi交互报错+USB配置对齐DTS）"
