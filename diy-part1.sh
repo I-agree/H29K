@@ -96,20 +96,6 @@ sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/'
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
-# ======================== 【H29K 主线内核配置合并注入】 ========================
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
-echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
-
-# ⚠️ 使用 sed 原位替换，防止 Kconfig 忽略 EOF 末尾追加的重复项
-sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_CMA_SIZE_MBYTES=16$/CONFIG_CMA_SIZE_MBYTES=128/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_CMA_AREAS=7$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
-sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
-
-cat >> "$CONFIG_FILE" << 'EOF'
-
 # =================================================================
 # 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
 # =================================================================
@@ -153,6 +139,29 @@ CONFIG_AIC8800_SDIO_BT_SUPPORT=y
 # CONFIG_DRM_SIMPLEDRM is not set
 
 # =================================================================
+# 固件加载配置（彻底规避NEW交互式报错）
+# =================================================================
+CONFIG_FW_LOADER=y
+CONFIG_FW_LOADER_USER_HELPER=y
+CONFIG_FW_LOADER_USER_HELPER_FALLBACK=y
+CONFIG_FW_LOADER_COMPRESS=y
+
+# 锁定自动选中依赖项
+# CONFIG_FW_LOADER_PAGED_BUF is not set
+# CONFIG_FW_LOADER_SYSFS is not set
+
+# 锁定压缩子模块
+# CONFIG_FW_LOADER_COMPRESS_XZ is not set
+# CONFIG_FW_LOADER_COMPRESS_ZSTD is not set
+
+# 关闭无用固件相关功能
+# CONFIG_FW_LOADER_DEBUG is not set
+# CONFIG_RUST_FW_LOADER_ABSTRACTIONS is not set
+# CONFIG_FW_CACHE is not set
+# CONFIG_FW_UPLOAD is not set
+# CONFIG_EXTRA_FIRMWARE is not set
+
+# =================================================================
 # 🔧 前次分析缺失项修复 + 【关键修复：全部cfg80211+mac80211配置固化防交互弹窗】
 # =================================================================
 # SFC MTD 分区解析
@@ -188,7 +197,6 @@ CONFIG_MAC80211_RC_DEFAULT_MINSTREL=y
 # CONFIG_MAC80211_MESSAGE_TRACING is not set
 # CONFIG_MAC80211_DEBUG_MENU is not set
 CONFIG_WLAN=y
-CONFIG_FW_LOADER_COMPRESS=y
 
 # gpio-keys 驱动修正 (替代错误的 KEYBOARD_GPIO)
 # CONFIG_KEYBOARD_GPIO is not set
@@ -386,4 +394,4 @@ CONFIG_IR_GPIO_CIR=y
 # CONFIG_USB_HID is not set
 
 EOF
-echo "✅ H29K 内核参数注入完成"
+echo "✅ H29K 内核参数注入完成（已固化固件全部子配置，彻底消除NEW交互式编译报错）"
