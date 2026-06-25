@@ -25,6 +25,18 @@
 		stdout-path = "serial0:1500000n8";
 	};
 
+	/*
+	 * 修复：显式定义 Combo PHY 节点并打上 combphy 标签
+	 * 解决 U-Boot 2025.10 上游 dtsi 中缺失标签或路径不匹配导致的编译报错
+	 */
+	combphy: phy@ffdc0000 {
+		compatible = "rockchip,rk3528-naneng-combphy";
+		reg = <0x0 0xffdc0000 0x0 0x100>;
+		#phy-cells = <1>;
+		status = "okay";
+		bootph-pre-ram;
+	};
+
 	vcc5v0_sys: regulator-5v0-vcc-sys {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc5v0_sys";
@@ -174,11 +186,7 @@
 	};
 };
 
-/* 
- * 修复：U-Boot 2025.10 的 rk3528.dtsi 中该节点没有 &combphy 标签
- * 使用绝对路径引用 {/phy@ffdc0000} 来修正编译错误 
- */
-&{/phy@ffdc0000} {
+&combphy {
 	status = "okay";
 	bootph-pre-ram;
 };
