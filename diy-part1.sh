@@ -96,6 +96,20 @@ sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/'
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
+# ======================== 【H29K 主线内核配置合并注入】 ========================
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
+
+# ⚠️ 使用 sed 原位替换，防止 Kconfig 忽略 EOF 末尾追加的重复项
+sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_SIZE_MBYTES=16$/CONFIG_CMA_SIZE_MBYTES=128/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_AREAS=7$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
+sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
+
+cat >> "$CONFIG_FILE" << 'EOF'
+
 # =================================================================
 # 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
 # =================================================================
@@ -139,7 +153,7 @@ CONFIG_AIC8800_SDIO_BT_SUPPORT=y
 # CONFIG_DRM_SIMPLEDRM is not set
 
 # =================================================================
-# 🔧 前次分析缺失项修复
+# 🔧 前次分析缺失项修复 + 【关键修复：NL80211_TESTMODE 固化】
 # =================================================================
 # SFC MTD 分区解析
 CONFIG_MTD_CHAR=y
@@ -147,6 +161,14 @@ CONFIG_MTD_OF_PARTS=y
 
 # WiFi 协议栈 (AIC8800 SDIO 必需)
 CONFIG_CFG80211=y
+CONFIG_NL80211=y
+CONFIG_NL80211_TESTMODE=n
+CONFIG_CFG80211_WEXT=y
+CONFIG_CFG80211_CRDA_SUPPORT=y
+CONFIG_CFG80211_USE_KERNEL_REGDB_KEYS=y
+CONFIG_CFG80211_DEFAULT_REGDOM=y
+CONFIG_CFG80211_DEVELOPER_WARNINGS=n
+CONFIG_CFG80211_DEBUGFS=n
 CONFIG_MAC80211=y
 CONFIG_WLAN=y
 CONFIG_FW_LOADER_COMPRESS=y
@@ -154,9 +176,6 @@ CONFIG_FW_LOADER_COMPRESS=y
 # gpio-keys 驱动修正 (替代错误的 KEYBOARD_GPIO)
 # CONFIG_KEYBOARD_GPIO is not set
 CONFIG_INPUT_GPIO_KEYS=y
-
-# USB DWC3 Host 模式恢复
-CONFIG_USB_DWC3_HOST=y
 
 # =================================================================
 # 🌐 网络核心与 IPv6
@@ -177,7 +196,6 @@ CONFIG_NF_TABLES_BRIDGE=y
 CONFIG_NET_VENDOR_STMICRO=y
 CONFIG_STMMAC_PLATFORM=y
 CONFIG_DWMAC_ROCKCHIP=y
-# CONFIG_DWMAC_DWC_QOS_ETH is not set
 CONFIG_PTP_1588_CLOCK_OPTIONAL=y
 
 # =================================================================
@@ -187,7 +205,7 @@ CONFIG_MMC_PWRSEQ_SIMPLE=y
 CONFIG_MMC_PWRSEQ_EMMC=y
 
 # =================================================================
-# 🔌 USB 5G 模块全量支持
+# 🔌 USB 5G 模块全量支持（匹配DTS关闭XHCI，仅保留USB2）
 # =================================================================
 CONFIG_USB_ACM=y
 CONFIG_USB_WDM=y
@@ -313,20 +331,16 @@ CONFIG_NET_SCH_FQ=y
 CONFIG_DEFAULT_QDISC=fq
 
 # =================================================================
-# 🔌 USB OTG/Dual Role
+# 🔌 USB OTG/Dual Role（匹配DTS关闭XHCI，仅USB2控制器）
 # =================================================================
 CONFIG_USB_SUPPORT=y
 CONFIG_USB=y
 CONFIG_USB_GADGET=y
 CONFIG_USB_OTG=y
 CONFIG_USB_ROLE_SWITCH=y
-CONFIG_USB_DWC3=y
-CONFIG_USB_DWC3_HOST=y
-CONFIG_USB_DWC3_DUAL_ROLE=y
-CONFIG_USB_DWC3_ULPI=y
-CONFIG_USB_ULPI_BUS=y
-CONFIG_USB_XHCI_HCD=y
-CONFIG_USB_XHCI_PLATFORM=y
+# 关闭DWC3/XHCI，和DTS usb_host0_xhci=disabled保持一致
+# CONFIG_USB_DWC3 is not set
+# CONFIG_USB_XHCI_HCD is not set
 CONFIG_USB_EHCI_HCD=y
 CONFIG_USB_EHCI_HCD_PLATFORM=y
 CONFIG_USB_OHCI_HCD=y
@@ -341,4 +355,4 @@ CONFIG_MODVERSIONS=y
 CONFIG_MODULE_UNLOAD=y
 
 EOF
-echo "✅ H29K 内核参数注入完成"
+echo "✅ H29K 内核参数注入完成（已修复NL80211_TESTMODE交互报错+USB内核DTS一致性）"
