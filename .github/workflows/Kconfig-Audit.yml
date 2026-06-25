@@ -86,8 +86,15 @@ jobs:
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-        echo "=== 准备内核源码树（动态适配当前仓库内核版本）==="
-        make target/linux/prepare V=s 2>&1 | tail -50
+        
+        echo "=== 准备内核源码树（保留完整构建状态）==="
+        make target/linux/prepare V=s 2>&1 | tail -80
+        
+        echo "=== 诊断：列出 build_dir 下所有内核相关 .config ==="
+        find build_dir/target-* -name ".config" 2>/dev/null | grep -i linux || echo "⚠️ build_dir 中未找到任何内核 .config"
+        
+        echo "=== 诊断：列出 build_dir 顶层目录结构 ==="
+        ls -la build_dir/target-*/ 2>/dev/null || echo "⚠️ build_dir/target-* 不存在"
 
     - name: 🔍 生成 Kconfig 诊断文件（OpenWrt层+内核层）
       run: |
@@ -106,23 +113,27 @@ jobs:
         grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
         
         echo "=== 5. 动态定位并导出真实内核 .config ==="
-        KERNEL_BUILD_DIR=$(find build_dir/target-* -maxdepth 1 -type d -name "linux-rockchip_armv8" 2>/dev/null | head -1)
-        if [ -n "$KERNEL_BUILD_DIR" ]; then
-          KERNEL_CONFIG=$(find "$KERNEL_BUILD_DIR" -maxdepth 2 -name ".config" -path "*/linux-*" 2>/dev/null | head -1)
-          if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
-            cp "$KERNEL_CONFIG" audit_kernel_full_config.txt
-            echo "✅ 内核 .config 已导出: $KERNEL_CONFIG"
-            
-            echo "=== 6. 内核级未满足依赖检查 ==="
-            KERNEL_SRC=$(dirname "$KERNEL_CONFIG")
+        # 优先精确匹配，回退到宽泛匹配
+        KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 3 -name ".config" -path "*/linux-rockchip*" 2>/dev/null | head -1)
+        if [ -z "$KERNEL_CONFIG" ]; then
+          KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 4 -name ".config" 2>/dev/null | grep -i linux | head -1)
+        fi
+        
+        if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
+          cp "$KERNEL_CONFIG" audit_kernel_full_config.txt
+          echo "✅ 内核 .config 已导出: $KERNEL_CONFIG ($(wc -l < "$KERNEL_CONFIG") 行)"
+          
+          echo "=== 6. 内核级未满足依赖检查 ==="
+          KERNEL_SRC=$(dirname "$KERNEL_CONFIG")
+          if [ -f "$KERNEL_SRC/Kconfig" ]; then
             make -C "$KERNEL_SRC" olddefconfig 2>/dev/null || true
             ./scripts/kconfig/conf --alldefconfig "$KERNEL_SRC/Kconfig" 2> audit_kernel_unmet_deps.txt || true
+            echo "✅ 内核依赖检查完成"
           else
-            echo "⚠️ 内核 .config 文件不存在" > audit_kernel_full_config.txt
-            echo "⚠️ 跳过内核依赖检查" > audit_kernel_unmet_deps.txt
+            echo "⚠️ 内核源码目录缺少 Kconfig，跳过依赖检查" > audit_kernel_unmet_deps.txt
           fi
         else
-          echo "⚠️ 未找到内核构建目录，target/linux/prepare 可能失败" > audit_kernel_full_config.txt
+          echo "⚠️ 未找到内核 .config，请参考上方诊断输出确认实际路径" > audit_kernel_full_config.txt
           echo "⚠️ 跳过内核依赖检查" > audit_kernel_unmet_deps.txt
         fi
         
@@ -130,7 +141,7 @@ jobs:
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" 2>/dev/null | sort -V | tail -1)
         if [ -n "$TARGET_FRAGMENT" ] && [ -f "$TARGET_FRAGMENT" ]; then
           cp "$TARGET_FRAGMENT" audit_target_kernel_fragment.txt
-          echo "✅ Target fragment: $TARGET_FRAGMENT"
+          echo "✅ Target fragment: $TARGET_FRAGMENT ($(wc -l < "$TARGET_FRAGMENT") 行)"
         else
           echo "⚠️ 未找到 target kernel fragment" > audit_target_kernel_fragment.txt
         fi
