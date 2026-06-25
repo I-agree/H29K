@@ -290,7 +290,6 @@
 		power-domains = <&power RK3528_PD_VPU>;
 		#address-cells = <1>;
 		#size-cells = <0>;
-		status = "disabled";
 	};
 };
 
@@ -615,6 +614,5 @@
 };
 
 &usb_host0_xhci {
-	dr_mode = "otg";
-	status = "okay";
+    status = "disabled";
 };
