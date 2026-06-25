@@ -146,6 +146,28 @@ CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
 # CONFIG_NET_DSA is not set
 # CONFIG_BRIDGE is not set
 
+# ========== 顶层子系统全局裁剪开关 ==========
+# 硬件总线大类
+# CONFIG_PCI is not set
+# CONFIG_SOUND is not set
+# CONFIG_IIO is not set
+# CONFIG_RTC_CLASS is not set
+# CONFIG_STAGING is not set
+
+# 全局内核调试总开关
+# CONFIG_DEBUG_KERNEL is not set
+
+# 整套存储子系统（嵌入式单eMMC无本地硬盘/阵列）
+# CONFIG_SCSI is not set
+# CONFIG_ATA is not set
+# CONFIG_NVME_HOST is not set
+# CONFIG_NVME_TARGET is not set
+# CONFIG_MD is not set
+# CONFIG_BLK_DEV is not set
+
+# 重要：CONFIG_BLOCK 底层块核心必须保留，不能关闭
+# CONFIG_BLOCK=y
+
 # =================================================================
 # 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
 # =================================================================
