@@ -101,12 +101,11 @@ cat >> "$CONFIG_FILE" << 'EOF'
 # CONFIG_SOUND is not set
 # 无工业传感器ADC/陀螺仪
 # CONFIG_IIO is not set
-# 无外置硬件RTC时钟芯片
-# CONFIG_RTC is not set
+# 无外置硬件RTC时钟芯片（修正：内核标准开关RTC_CLASS，删除无效CONFIG_RTC）
+# CONFIG_RTC_CLASS is not set
 # RK3528无PCI总线外设
 # CONFIG_PCI is not set
-# 无虚拟化加速、virtio虚拟机
-# CONFIG_VIRTUALIZATION is not set
+# 【删除】CONFIG_VIRTUALIZATION（无该顶层总开关，配置无效）
 # 无FPGA可编程逻辑
 # CONFIG_FPGA is not set
 # 工业总线全部无用
@@ -117,21 +116,35 @@ cat >> "$CONFIG_FILE" << 'EOF'
 # 关闭用户态加密，仅内核内置解压保留
 # CONFIG_CRYPTO_USER is not set
 CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
-# 内核调试/单元测试/性能监控全部关闭
+
+# 内核调试/单元测试/性能监控/追踪全套关闭（消灭menuconfig NEW弹窗）
 # CONFIG_DEBUG_KERNEL is not set
 # CONFIG_KUNIT is not set
 # CONFIG_PERF_EVENTS is not set
+# CONFIG_TRACEPOINTS is not set
+# CONFIG_FTRACE is not set
+# CONFIG_FUNCTION_TRACER is not set
+# CONFIG_COREDUMP is not set
+# CONFIG_STACKTRACE is not set
+# CONFIG_FRAME_POINTER is not set
+# CONFIG_KALLSYMS is not set
+# CONFIG_FAULT_INJECTION is not set
+# CONFIG_DYNAMIC_DEBUG is not set
+
 # GPS、远程处理器、NVMEM离线存储无用
 # CONFIG_NVMEM is not set
 # CONFIG_REMOTEPROC is not set
 # CONFIG_RPMSG is not set
 # CONFIG_GNSS is not set
-# SATA/NVME硬盘无硬件
+
+# SATA/NVME/IDE本地硬盘整套关闭（修正：删除无效CONFIG_NV，替换标准host/target）
 # CONFIG_SCSI is not set
-# CONFIG_NVME is not set
 # CONFIG_ATA is not set
-# 杂项小众外设驱动
-# CONFIG_MISC_DEVICES is not set
+# CONFIG_NVME_HOST is not set
+# CONFIG_NVME_TARGET is not set
+
+# 【移除风险项】# CONFIG_MISC_DEVICES is not set （drivers/misc包含RK平台基础杂设备，关闭会外设失效）
+
 # 看门狗、内存硬件纠错
 # CONFIG_WATCHDOG is not set
 # CONFIG_EDAC is not set
@@ -145,28 +158,15 @@ CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
 # 交换机、二层网桥无用
 # CONFIG_NET_DSA is not set
 # CONFIG_BRIDGE is not set
-
-# ========== 顶层子系统全局裁剪开关 ==========
-# 硬件总线大类
-# CONFIG_PCI is not set
-# CONFIG_SOUND is not set
-# CONFIG_IIO is not set
-# CONFIG_RTC_CLASS is not set
+# 废弃/测试驱动合集
 # CONFIG_STAGING is not set
 
-# 全局内核调试总开关
-# CONFIG_DEBUG_KERNEL is not set
-
-# 整套存储子系统（嵌入式单eMMC无本地硬盘/阵列）
-# CONFIG_SCSI is not set
-# CONFIG_ATA is not set
-# CONFIG_NVME_HOST is not set
-# CONFIG_NVME_TARGET is not set
+# 软件RAID/LVM/dm加密、虚拟块驱动全套关闭
 # CONFIG_MD is not set
 # CONFIG_BLK_DEV is not set
 
-# 重要：CONFIG_BLOCK 底层块核心必须保留，不能关闭
-# CONFIG_BLOCK=y
+# 重要：底层块设备核心必须保留，不可关闭
+CONFIG_BLOCK=y
 
 # =================================================================
 # 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
