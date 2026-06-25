@@ -138,13 +138,14 @@ jobs:
         make target/linux/prepare V=s 2>&1 | tail -50
         
         echo "=== 5. 🔑 手动生成内核 .config（核心步骤）==="
-        KERNEL_SRC=$(find build_dir/target-* -maxdepth 2 -type d -name "linux-*" 2>/dev/null | head -1)
+        KERNEL_SRC_BASE=$(find build_dir/target-* -maxdepth 2 -type d -name "linux-rockchip_armv8" 2>/dev/null | head -1)
+        KERNEL_SRC=$(find "${KERNEL_SRC_BASE}" -maxdepth 1 -type d -name "linux-*" 2>/dev/null | head -1)
         if [ -z "${KERNEL_SRC}" ]; then
           echo "❌ 未找到内核源码目录"
           find build_dir/target-* -maxdepth 3 -type d 2>/dev/null | head -20
           exit 1
         fi
-        echo "📁 内核源码目录: ${KERNEL_SRC}"
+        echo "📁 内核源码根目录: ${KERNEL_SRC}"
         
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" 2>/dev/null | sort -V | tail -1)
         echo "📄 Target fragment: ${TARGET_FRAGMENT}"
@@ -158,10 +159,9 @@ jobs:
           echo "⚠️ 仅使用 target fragment 作为内核 .config"
         fi
         
-        echo "=== 6. 内核配置自动补全（替代废弃 target/linux/oldconfig）==="
+        echo "=== 6. 内核配置自动补全（修正内核目录层级）==="
         cd "${KERNEL_SRC}"
         make ARCH=arm64 olddefconfig V=s
-        # 把补全后的内核配置回写到OpenWrt内核片段固化
         cp .config ../../../../${TARGET_FRAGMENT}
         cd ../../../../
         echo "✅ 内核 .config 最终行数: $(wc -l < "${KERNEL_SRC}/.config")"
@@ -186,7 +186,8 @@ jobs:
         grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
         
         echo "=== 3. 定位内核源码与 .config ==="
-        KERNEL_SRC=$(find build_dir/target-* -maxdepth 2 -type d -name "linux-*" 2>/dev/null | head -1)
+        KERNEL_SRC_BASE=$(find build_dir/target-* -maxdepth 2 -type d -name "linux-rockchip_armv8" 2>/dev/null | head -1)
+        KERNEL_SRC=$(find "${KERNEL_SRC_BASE}" -maxdepth 1 -type d -name "linux-*" 2>/dev/null | head -1)
         KERNEL_CONFIG="${KERNEL_SRC}/.config"
         
         if [ -n "${KERNEL_SRC}" ] && [ -f "${KERNEL_CONFIG}" ]; then
