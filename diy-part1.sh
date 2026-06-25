@@ -349,4 +349,4 @@ CONFIG_MODVERSIONS=y
 CONFIG_MODULE_UNLOAD=y
 
 EOF
-echo "✅ H29K 内核参数注入完成（已补齐全部cfg80211相关配置，彻底消除交互式弹窗，严格遵循# CONFIG_XXX is not set规范）"
+echo "✅ H29K 内核参数注入完成"
