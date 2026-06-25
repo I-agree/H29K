@@ -172,19 +172,26 @@ jobs:
         grep -E "u-boot-rockchip\.bin|Writing.*u-boot-rockchip" uboot-rockchip-full.log || echo "未找到一体化BIN生成记录"
       continue-on-error: true
 
-    # 新增：binman 自动解析固件所有分段，输出清单+十六进制头部
+    # 新增：binman 自动解析固件所有分段，输出清单+十六进制头部（仅当前步骤临时追加PATH）
     - name: Binman 解析一体化固件分段
       if: env.UBOOT_BIN_PATH != ''
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        BIN_PATH=${{ env.UBOOT_BIN_PATH }}
-        BINMAN_TOOL=staging_dir/host/bin/bin
-        BINMAN_TOOL=staging_dir/host/bin/binman
-        
+        BIN_PATH="${{ env.UBOOT_BIN_PATH }}"
+        # 仅当前shell临时将host工具目录加入PATH，不全局生效
+        export PATH="$PWD/staging_dir/host/bin:$PATH"
+
+        # 先校验binman是否存在
+        if ! command -v binman &> /dev/null; then
+          echo "❌ 错误：未找到 binman 工具，请确认 uboot-rockchip 编译成功"
+          ls -lh staging_dir/host/bin/ || true
+          exit 1
+        fi
+
         echo "=================================================="
         echo "binman ls 完整分段清单 | 固件: $BIN_PATH"
         echo "=================================================="
-        $BINMAN_TOOL ls "$BIN_PATH" 2>&1 | tee binman-segments.log
+        binman ls "$BIN_PATH" 2>&1 | tee binman-segments.log
         
         echo -e "\n=================================================="
         echo 十六进制头部预览(前1024字节魔数校验)
