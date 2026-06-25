@@ -79,43 +79,70 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 下载依赖并准备内核源码
+    - name: 🔄 彻底解决 OpenWrt 层依赖并下载源码
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        make defconfig
+        
+        echo "=== 循环 defconfig 直到配置稳定 ==="
+        # 最多循环5次，确保所有隐式依赖都被展开
+        for i in {1..5}; do
+          make defconfig
+          # 检查是否有未满足的依赖（conf 返回非0表示有未解决项）
+          if ./scripts/kconfig/conf --silentoldconfig Kconfig > /dev/null 2>&1; then
+            echo "✅ 第 $i 轮后 OpenWrt 配置已稳定，无未满足依赖"
+            break
+          else
+            echo "⚠️ 第 $i 轮仍有未满足依赖，继续收敛..."
+          fi
+        done
+        
+        echo "=== 最终依赖状态确认 ==="
+        if ./scripts/kconfig/conf --silentoldconfig Kconfig 2> openwrt_unmet_deps_final.txt; then
+          echo "✅ OpenWrt 层无任何未满足依赖"
+          > openwrt_unmet_deps_final.txt  # 清空文件表示无问题
+        else
+          echo "❌ 经过5轮收敛仍存在未满足依赖："
+          cat openwrt_unmet_deps_final.txt
+        fi
+        
+        echo "=== 下载依赖包 ==="
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
         
-        echo "=== 准备内核源码树（保留完整构建状态）==="
-        make target/linux/prepare V=s 2>&1 | tail -80
+        echo "=== 准备内核源码树 ==="
+        make target/linux/prepare V=s 2>&1 | tail -100
         
-        echo "=== 诊断：列出 build_dir 下所有内核相关 .config ==="
-        find build_dir/target-* -name ".config" 2>/dev/null | grep -i linux || echo "⚠️ build_dir 中未找到任何内核 .config"
-        
-        echo "=== 诊断：列出 build_dir 顶层目录结构 ==="
-        ls -la build_dir/target-*/ 2>/dev/null || echo "⚠️ build_dir/target-* 不存在"
+        echo "=== 🔍 全量扫描 build_dir 内核配置 ==="
+        ALL_KERNEL_CONFIGS=$(find build_dir/target-* -name ".config" 2>/dev/null)
+        if [ -n "$ALL_KERNEL_CONFIGS" ]; then
+          echo "$ALL_KERNEL_CONFIGS"
+          echo "---"
+          echo "$ALL_KERNEL_CONFIGS" | while read f; do
+            echo "$(wc -l < "$f") 行: $f"
+          done
+        else
+          echo "⚠️ build_dir 中未找到任何 .config 文件"
+          ls -la build_dir/target-*/ 2>/dev/null || echo "❌ build_dir/target-* 目录不存在"
+          find build_dir -maxdepth 4 -type d -name "*linux*rockchip*" 2>/dev/null || echo "❌ 未找到 linux-rockchip 目录"
+        fi
 
-    - name: 🔍 生成 Kconfig 诊断文件（含完整弹窗检测）
+    - name: 🔍 生成 Kconfig 诊断文件（仅验证+内核弹窗检测）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         
-        echo "=== 1. 重新展开完整 .config ==="
-        make defconfig
-        
-        echo "=== 2. OpenWrt 最小化 defconfig ==="
+        echo "=== 1. OpenWrt 最小化 defconfig（仅用于审计对比）==="
         ./scripts/diffconfig.sh > audit_defconfig.txt 2>&1
         
-        echo "=== 3. OpenWrt 未满足依赖 ==="
-        ./scripts/kconfig/conf --alldefconfig Kconfig 2> audit_unmet_deps.txt || true
-        
-        echo "=== 4. Target/Device 信息 ==="
+        echo "=== 2. Target/Device 信息 ==="
         grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
         
-        echo "=== 5. 动态定位内核 .config ==="
-        KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 3 -name ".config" -path "*/linux-rockchip*" 2>/dev/null | head -1)
+        echo "=== 3. 自适应定位内核 .config ==="
+        KERNEL_CONFIG=$(find build_dir/target-* -name ".config" -path "*linux-rockchip*" 2>/dev/null | head -1)
         if [ -z "$KERNEL_CONFIG" ]; then
-          KERNEL_CONFIG=$(find build_dir/target-* -maxdepth 4 -name ".config" 2>/dev/null | grep -i linux | head -1)
+          KERNEL_CONFIG=$(find build_dir/target-* -name ".config" 2>/dev/null | while read f; do
+            echo "$(wc -l < "$f") $f"
+          done | sort -rn | head -1 | awk '{print $2}')
         fi
         
         if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
@@ -123,12 +150,12 @@ jobs:
           KERNEL_SRC=$(dirname "$KERNEL_CONFIG")
           echo "✅ 内核 .config: $KERNEL_CONFIG ($(wc -l < "$KERNEL_CONFIG") 行)"
           
-          echo "=== 6. 🔥 列出所有会触发弹窗的新增配置项 ==="
+          echo "=== 4. 🔥 列出所有会触发弹窗的新增配置项 ==="
           make -C "$KERNEL_SRC" listnewconfig > audit_kernel_new_options.txt 2>&1 || true
-          NEW_COUNT=$(grep -c "^CONFIG_\|^# CONFIG_" audit_kernel_new_options.txt 2>/dev/null || echo 0)
+          NEW_COUNT=$(grep -cE "^CONFIG_|^# CONFIG_" audit_kernel_new_options.txt 2>/dev/null || echo 0)
           echo "📊 共发现 $NEW_COUNT 个新增/缺失配置项（即等效弹窗数）"
           
-          echo "=== 7. 内核级未满足依赖检查 ==="
+          echo "=== 5. 内核级未满足依赖检查 ==="
           if [ -f "$KERNEL_SRC/Kconfig" ]; then
             ./scripts/kconfig/conf --alldefconfig "$KERNEL_SRC/Kconfig" 2> audit_kernel_unmet_deps.txt || true
             echo "✅ 内核依赖检查完成"
@@ -136,12 +163,12 @@ jobs:
             echo "⚠️ 内核源码目录缺少 Kconfig，跳过依赖检查" > audit_kernel_unmet_deps.txt
           fi
         else
-          echo "⚠️ 未找到内核 .config，请参考上方诊断输出确认实际路径" > audit_kernel_full_config.txt
-          echo "⚠️ 跳过内核审计" > audit_kernel_new_options.txt
+          echo "⚠️ 未找到内核 .config，请查看上方'全量扫描'输出确认实际路径" > audit_kernel_full_config.txt
+          echo "⚠️ 跳过弹窗检测" > audit_kernel_new_options.txt
           echo "⚠️ 跳过依赖检查" > audit_kernel_unmet_deps.txt
         fi
         
-        echo "=== 8. Target fragment ==="
+        echo "=== 6. Target fragment ==="
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" 2>/dev/null | sort -V | tail -1)
         if [ -n "$TARGET_FRAGMENT" ] && [ -f "$TARGET_FRAGMENT" ]; then
           cp "$TARGET_FRAGMENT" audit_target_kernel_fragment.txt
@@ -150,9 +177,10 @@ jobs:
           echo "⚠️ 未找到 target kernel fragment" > audit_target_kernel_fragment.txt
         fi
         
-        echo "=== 9. 汇总统计 ==="
+        echo "=== 7. 汇总统计 ==="
         wc -l .config audit_defconfig.txt audit_kernel_full_config.txt \
           audit_kernel_new_options.txt audit_target_kernel_fragment.txt \
+          openwrt_unmet_deps_final.txt \
           >> audit_summary.txt 2>&1
 
     - name: 📦 打包诊断文件
@@ -161,12 +189,12 @@ jobs:
         tar czf $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz \
           .config \
           audit_defconfig.txt \
-          audit_unmet_deps.txt \
           audit_target_info.txt \
           audit_kernel_full_config.txt \
           audit_kernel_new_options.txt \
           audit_kernel_unmet_deps.txt \
           audit_target_kernel_fragment.txt \
+          openwrt_unmet_deps_final.txt \
           audit_summary.txt \
           logs/ 2>/dev/null || true
         ls -lh $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz
