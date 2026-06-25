@@ -96,6 +96,20 @@ sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/'
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
+# ======================== 【H29K 主线内核配置合并注入】 ========================
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+echo "📝 正在精准注入官方 OpenWrt 25.12 专属内核配置文件: $CONFIG_FILE"
+
+# ⚠️ 使用 sed 原位替换，防止 Kconfig 忽略 EOF 末尾追加的重复项
+sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_SIZE_MBYTES=16$/CONFIG_CMA_SIZE_MBYTES=128/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_AREAS=7$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
+sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
+
+cat >> "$CONFIG_FILE" << 'EOF'
+
 # =================================================================
 # 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
 # =================================================================
@@ -208,28 +222,6 @@ CONFIG_MMC_PWRSEQ_SIMPLE=y
 CONFIG_MMC_PWRSEQ_EMMC=y
 
 # =================================================================
-# 🔌 USB 5G 模块全量支持（匹配DTS关闭XHCI，仅保留USB2）
-# =================================================================
-CONFIG_USB_ACM=y
-CONFIG_USB_WDM=y
-CONFIG_USB_USBNET=y
-CONFIG_USB_NET_CDCETHER=y
-CONFIG_USB_NET_RNDIS_HOST=y
-CONFIG_USB_NET_CDC_NCM=y
-CONFIG_USB_SERIAL=y
-CONFIG_USB_SERIAL_CONSOLE=y
-CONFIG_USB_SERIAL_GENERIC=y
-CONFIG_USB_SERIAL_OPTION=y
-CONFIG_PPP=y
-CONFIG_PPP_BSDCOMP=y
-CONFIG_PPP_DEFLATE=y
-CONFIG_PPP_FILTER=y
-CONFIG_PPP_MPPE=y
-CONFIG_PPP_MULTILINK=y
-CONFIG_PPP_ASYNC=y
-CONFIG_PPP_SYNC_TTY=y
-
-# =================================================================
 # 📂 文件系统
 # =================================================================
 CONFIG_LIB_UUID=y
@@ -334,7 +326,7 @@ CONFIG_NET_SCH_FQ=y
 CONFIG_DEFAULT_QDISC=fq
 
 # =================================================================
-# 🔌 USB OTG/Dual Role（内核使用DWC3 XHCI，兼容性最优；RK3528仅跑USB2速率）
+# 🔌 USB OTG/Dual Role（内核DWC3 XHCI 官方最优方案，匹配DTS usb_host0_xhci节点，RK3528自动降级USB2）
 # =================================================================
 CONFIG_USB_SUPPORT=y
 CONFIG_USB=y
@@ -342,18 +334,18 @@ CONFIG_USB_GADGET=y
 CONFIG_USB_OTG=y
 CONFIG_USB_ROLE_SWITCH=y
 
-# 启用DWC3 XHCI控制器（匹配内核DTS xhci节点，兼容性最佳）
+# 启用瑞芯微DWC3 XHCI驱动，和内核定稿DTS完全匹配，OTG、复合USB设备兼容性最佳
 CONFIG_USB_DWC3=y
 CONFIG_USB_DWC3_ROCKCHIP=y
 CONFIG_USB_XHCI_HCD=y
 CONFIG_USB_XHCI_DWC3=y
 CONFIG_USB_XHCI_PLATFORM=y
 
-# 关闭老式EHCI/OHCI（避免双USB主机驱动冲突）
+# 禁用老式EHCI/OHCI，避免双USB主机驱动冲突、设备枚举异常
 # CONFIG_USB_EHCI_HCD is not set
 # CONFIG_USB_OHCI_HCD is not set
 
-# USB存储、4G/5G模组协议驱动保持不变
+# 4G/5G模组、USB串口、网卡、存储全套协议驱动
 CONFIG_USB_STORAGE=y
 CONFIG_USB_ACM=y
 CONFIG_USB_WDM=y
@@ -381,5 +373,17 @@ CONFIG_MODULES=y
 CONFIG_MODVERSIONS=y
 CONFIG_MODULE_UNLOAD=y
 
+# 适配内核定稿三路串口
+CONFIG_SERIAL_8250_NR_UARTS=8
+CONFIG_SERIAL_8250_EXTENDED=y
+
+# 红外接收器硬件驱动
+CONFIG_IR_GPIO_CIR=y
+
+# 关闭无用USB HID外设节省内核体积
+# CONFIG_USB_KEYBOARD is not set
+# CONFIG_USB_MOUSE is not set
+# CONFIG_USB_HID is not set
+
 EOF
-echo "✅ H29K 内核参数注入完成（已补齐mac80211速率控制配置，彻底解决所有WiFi交互式编译报错，严格遵循# CONFIG_XXX is not set规范）"
+echo "✅ H29K 内核参数注入完成"
