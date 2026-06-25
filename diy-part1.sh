@@ -139,7 +139,7 @@ CONFIG_AIC8800_SDIO_BT_SUPPORT=y
 # CONFIG_DRM_SIMPLEDRM is not set
 
 # =================================================================
-# 🔧 前次分析缺失项修复 + 【关键修复：NL80211_TESTMODE 固化】
+# 🔧 前次分析缺失项修复 + 【关键修复：全部cfg80211配置固化防交互弹窗】
 # =================================================================
 # SFC MTD 分区解析
 CONFIG_MTD_CHAR=y
@@ -148,14 +148,19 @@ CONFIG_MTD_OF_PARTS=y
 # WiFi 协议栈 (AIC8800 SDIO 必需)
 CONFIG_CFG80211=y
 CONFIG_NL80211=y
+CONFIG_CFG80211_HEADERS=y
 # 禁用nl80211工厂测试命令，消除NEW交互式弹窗
 # CONFIG_NL80211_TESTMODE is not set
 CONFIG_CFG80211_WEXT=y
 CONFIG_CFG80211_CRDA_SUPPORT=y
 CONFIG_CFG80211_USE_KERNEL_REGDB_KEYS=y
 CONFIG_CFG80211_DEFAULT_REGDOM=y
+# 无线默认省电模式，规避NEW弹窗
+CONFIG_CFG80211_DEFAULT_PS=y
 # 关闭无线开发调试警告
 # CONFIG_CFG80211_DEVELOPER_WARNINGS is not set
+# 关闭无线认证高级选项
+# CONFIG_CFG80211_CERTIFICATION_ONUS is not set
 # 关闭cfg80211调试文件系统节点
 # CONFIG_CFG80211_DEBUGFS is not set
 CONFIG_MAC80211=y
@@ -344,4 +349,4 @@ CONFIG_MODVERSIONS=y
 CONFIG_MODULE_UNLOAD=y
 
 EOF
-echo "✅ H29K 内核参数注入完成（已遵循规范使用# CONFIG_XXX is not set格式，修复WiFi交互报错+USB配置对齐DTS）"
+echo "✅ H29K 内核参数注入完成（已补齐全部cfg80211相关配置，彻底消除交互式弹窗，严格遵循# CONFIG_XXX is not set规范）"
