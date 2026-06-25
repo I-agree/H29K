@@ -1,4 +1,4 @@
-name: RK3528 Kconfig Audit (Full Pre-build)
+name: Kconfig审核（完整预构建）
 
 on:
   workflow_dispatch:
