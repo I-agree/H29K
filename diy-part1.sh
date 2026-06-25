@@ -165,6 +165,19 @@ CONFIG_EXTRA_FIRMWARE_DIR="/lib/firmware"
 # CONFIG_FW_UPLOAD is not set
 
 # =================================================================
+# 通用驱动基础配置 提前规避drivers/base模块NEW弹窗
+# =================================================================
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+# CONFIG_DEVTMPFS_SAFE is not set
+CONFIG_STANDALONE=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
+# CONFIG_UEVENT_HELPER is not set
+# CONFIG_ALLOW_DEV_COREDUMP is not set
+# CONFIG_DEBUG_DRIVER is not set
+# CONFIG_DMA_SHARED_BUFFER is not set
+
+# =================================================================
 # 🔧 前次分析缺失项修复 + 【关键修复：全部cfg80211+mac80211配置固化防交互弹窗】
 # =================================================================
 # SFC MTD 分区解析
@@ -397,4 +410,4 @@ CONFIG_IR_GPIO_CIR=y
 # CONFIG_USB_HID is not set
 
 EOF
-echo "✅ H29K 内核参数注入完成"
+echo "✅ H29K 内核参数注入完成（已修复固件string类型配置+预固化通用驱动配置，彻底杜绝NEW交互式编译报错）"
