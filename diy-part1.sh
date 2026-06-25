@@ -146,6 +146,10 @@ CONFIG_FW_LOADER_USER_HELPER=y
 CONFIG_FW_LOADER_USER_HELPER_FALLBACK=y
 CONFIG_FW_LOADER_COMPRESS=y
 
+# 字符串类型必须显式赋值，不能用#注释禁用
+CONFIG_EXTRA_FIRMWARE=""
+CONFIG_EXTRA_FIRMWARE_DIR="/lib/firmware"
+
 # 锁定自动选中依赖项
 # CONFIG_FW_LOADER_PAGED_BUF is not set
 # CONFIG_FW_LOADER_SYSFS is not set
@@ -159,7 +163,6 @@ CONFIG_FW_LOADER_COMPRESS=y
 # CONFIG_RUST_FW_LOADER_ABSTRACTIONS is not set
 # CONFIG_FW_CACHE is not set
 # CONFIG_FW_UPLOAD is not set
-# CONFIG_EXTRA_FIRMWARE is not set
 
 # =================================================================
 # 🔧 前次分析缺失项修复 + 【关键修复：全部cfg80211+mac80211配置固化防交互弹窗】
@@ -394,4 +397,4 @@ CONFIG_IR_GPIO_CIR=y
 # CONFIG_USB_HID is not set
 
 EOF
-echo "✅ H29K 内核参数注入完成（已固化固件全部子配置，彻底消除NEW交互式编译报错）"
+echo "✅ H29K 内核参数注入完成"
