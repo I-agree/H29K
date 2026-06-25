@@ -168,6 +168,94 @@ CONFIG_CRYPTO_MANAGER_DISABLE_TESTS=y
 # 重要：底层块设备核心必须保留，不可关闭
 CONFIG_BLOCK=y
 
+# ======================
+# CONFIG_VIRTUALIZATION is not set
+# CONFIG_XEN is not set
+# CONFIG_VIRT_DRIVERS is not set
+# CONFIG_VHOST_MENU is not set
+# CONFIG_VHOST_NET is not set
+# CONFIG_VDPA is not set
+# CONFIG_VIRTIO_CONSOLE is not set
+# CONFIG_DEBUG_KERNEL is not set
+# CONFIG_FTRACE is not set
+# CONFIG_TRACEPOINTS is not set
+# CONFIG_KUNIT is not set
+# CONFIG_PERF_EVENTS is not set
+# CONFIG_KALLSYMS is not set
+# CONFIG_STACKTRACE is not set
+# CONFIG_FRAME_POINTER is not set
+# CONFIG_DYNAMIC_DEBUG is not set
+# CONFIG_DEBUG_FS is not set
+# CONFIG_UBSAN is not set
+# CONFIG_KASAN is not set
+# CONFIG_KFENCE is not set
+# CONFIG_PROFILING is not set
+# CONFIG_RELAY is not set
+# CONFIG_BOOT_CONFIG is not set
+# CONFIG_AUDIT is not set
+# CONFIG_CGROUPS is not set
+# CONFIG_USER_NS is not set
+# CONFIG_SYSVIPC is not set
+# CONFIG_POSIX_MQUEUE is not set
+# CONFIG_WATCH_QUEUE is not set
+# CONFIG_CHECKPOINT_RESTORE is not set
+# CONFIG_TASKSTATS is not set
+# CONFIG_PSI is not set
+# CONFIG_SECCOMP_CACHE_DEBUG is not set
+# CONFIG_NO_HZ is not set
+# CONFIG_NO_HZ_FULL is not set
+# CONFIG_HIGH_RES_TIMERS is not set
+# CONFIG_PM_AUTOSLEEP is not set
+# CONFIG_PM_USERSPACE_AUTOSLEEP is not set
+# CONFIG_PM_WAKELOCKS is not set
+# CONFIG_PM_DEBUG is not set
+# CONFIG_WQ_POWER_EFFICIENT_DEFAULT is not set
+# CONFIG_CPU_IDLE_GOV_LADDER is not set
+# CONFIG_CPU_IDLE_GOV_TEO is not set
+# CONFIG_PCI is not set
+# CONFIG_CAN is not set
+# CONFIG_PECI is not set
+# CONFIG_HTE is not set
+# CONFIG_CDX_BUS is not set
+# CONFIG_SERIO is not set
+# CONFIG_PARPORT is not set
+# CONFIG_SSB is not set
+# CONFIG_BCMA is not set
+# CONFIG_COMEDI is not set
+# CONFIG_GREYBUS is not set
+# CONFIG_MCB is not set
+# CONFIG_IPACK is not set
+# CONFIG_SIOX is not set
+# CONFIG_SLIMBUS is not set
+# CONFIG_INTERCONNECT is not set
+# CONFIG_MOST is not set
+# CONFIG_SCSI is not set
+# CONFIG_ATA is not set
+# CONFIG_NVME_HOST is not set
+# CONFIG_NVME_TARGET is not set
+# CONFIG_MD is not set
+# CONFIG_BLK_DEV is not set
+# CONFIG_TARGET_CORE is not set
+# CONFIG_DAX is not set
+# CONFIG_NVMEM is not set
+# CONFIG_FTL is not set
+# CONFIG_NFTL is not set
+# CONFIG_INFTL
+# CONFIG_IIO is not set
+# CONFIG_HWMON is not set
+# CONFIG_WATCHDOG is not set
+# CONFIG_EDAC is not set
+# CONFIG_INFINIBAND is not set
+# CONFIG_POWER_SUPPLY is not set
+# CONFIG_RPMSG is not set
+# CONFIG_REMOTEPROC is not set
+# CONFIG_GNSS is not set
+# CONFIG_STAGING is not set
+# CONFIG_FPGA is not set
+# CONFIG_SOUND is not set
+# CONFIG_CRYPTO_USER is not set
+# CONFIG_CRYPTO_TEST is not set
+
 # =================================================================
 # 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
 # =================================================================
