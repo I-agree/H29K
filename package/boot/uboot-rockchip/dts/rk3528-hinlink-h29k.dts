@@ -111,9 +111,9 @@
 		compatible = "rockchip,sfc";
 		reg = <0x0 0xffc00000 0x0 0x4000>;
 		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&cru SCLK_SFC>, <&cru HCLK_SFC>;
+		clocks = <&cru CLK_SFC>, <&cru HCLK_SFC>;
 		clock-names = "clk_sfc", "hclk_sfc";
-		assigned-clocks = <&cru SCLK_SFC>;
+		assigned-clocks = <&cru CLK_SFC>;
 		assigned-clock-rates = <100000000>;
 		#address-cells = <1>;
 		#size-cells = <0>;
