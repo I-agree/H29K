@@ -89,23 +89,23 @@ jobs:
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         
-        echo "=== 1. OpenWrt顶层配置初始化 ==="
+        echo "=== 1. OpenWrt顶层配置初始化（加载用户.config全局内核参数）==="
         make defconfig
 
-        echo "===  预编译Host工具链与kconfig依赖（必须前置，解决工具缺失崩溃）==="
+        echo "=== 2. 预编译Host工具链与kconfig依赖（必须前置，解决工具缺失崩溃）==="
         make -j$(nproc) prereq V=s
 
         echo "=== 3. 预下载源码包并清理无效文件 ==="
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec rm -f {} \;
         
-        echo "=== 4. 解压内核、应用平台补丁 ==="
+        echo "=== 4. prepare：解压内核+通用generic配置+平台config-6.12+应用所有内核补丁 ==="
         make target/linux/prepare V=s 2>&1 | tail -50
 
-        echo "=== 4. OpenWrt原生流程生成平台内核配置 ==="
-        make target/linux/compile -q V=s
+        echo "=== 5. oldconfig：三层配置合并生成原生内核.config ==="
+        make -C target/linux oldconfig V=s
         
-        echo "=== 5. 自动定位真实内核源码目录 ==="
+        echo "=== 6. 自动定位真实内核源码目录 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
         if [ -z "${KERNEL_DIR}" ] || [ ! -f "${KERNEL_DIR}/Makefile" ]; then
           echo "❌ 未找到合法内核源码目录"
@@ -114,11 +114,11 @@ jobs:
         fi
         echo "📁 内核源码目录：${KERNEL_DIR}"
         
-        echo "=== 6. 备份原生平台内核配置作为【原始未补全】配置 ==="
+        echo "=== 7. 备份三层配置合并后的【原始未补全】内核配置 ==="
         cp "${KERNEL_DIR}/.config" audit_kernel_original.config
         echo "✅ 原始内核配置行数：$(wc -l < audit_kernel_original.config)"
         
-        echo "=== 7. 内核配置自动补全（olddefconfig收敛依赖）==="
+        echo "=== 8. 内核配置自动补全（olddefconfig收敛依赖）==="
         cd "${KERNEL_DIR}"
         make olddefconfig V=s
         cd - > /dev/null
