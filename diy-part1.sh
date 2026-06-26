@@ -104,39 +104,38 @@ echo "✅ sed 原位替换完成"
 # ========== 第二阶段：scripts/config 注入（替代 cat >> EOF）==========
 # scripts/config 直接操作 Kconfig 语法树，自动处理依赖关系
 # 在 make defconfig 之前执行，确保所有条目被正确纳入依赖解析
-cd "$GITHUB_WORKSPACE/openwrt"  # 确保在 openwrt 根目录
-
-# ======================== 【H29K 主线内核配置合并注入】 ========================
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
-
-echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
-
-# ========== 第一阶段：sed 原位替换（处理已知确切值的条目）==========
-sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_CMA_SIZE_MBYTES=.*$/CONFIG_CMA_SIZE_MBYTES=128/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_CMA_AREAS=.*$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
-sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_USB_EHCI_HCD=.*$/# CONFIG_USB_EHCI_HCD is not set/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_USB_OHCI_HCD=.*$/# CONFIG_USB_OHCI_HCD is not set/' "$CONFIG_FILE"
-
-echo "✅ sed 原位替换完成"
-
-# ========== 第二阶段：scripts/config 注入（替代 cat >> EOF）==========
-cd "$GITHUB_WORKSPACE/openwrt"
+# 确保在 openwrt 根目录
+cd "$GITHUB_WORKSPACE/openwrt" || exit 1
 
 ./scripts/config --file "$CONFIG_FILE" \
+    \
+    # ===== 🔒 第一阶段 sed 兜底（双保险核心）=====
+    --undefine ARM64_SVE \
+    --set-val CMA_SIZE_MBYTES 128 \
+    --set-val CMA_AREAS 8 \
+    --undefine DWMAC_DWC_QOS_ETH \
+    --enable PARTITION_ADVANCED \
+    --undefine USB_EHCI_HCD \
+    --undefine USB_OHCI_HCD \
+    \
+    # ===== 原来真正的第二阶段 =====
     --enable DEVTMPFS \
     --enable DEVTMPFS_MOUNT \
-    --disable DEVTMPFS_SAFE \
-    --disable ARM64_SVE \
-    --disable DWMAC_DWC_QOS_ETH \
+    --enable DEVTMPFS_SAFE \
+    --undefine UEVENT_HELPER \
+    --enable STANDALONE \
+    --enable TMPFS \
+    --enable PREVENT_FIRMWARE_BUILD \
+    --undefine ALLOW_DEV_COREDUMP \
+    --undefine DEBUG_DRIVER \
+    --undefine ARM64_SVE \
+    --undefine DWMAC_DWC_QOS_ETH \
     --enable PARTITION_ADVANCED \
     --set-val CMA_SIZE_MBYTES 128 \
     --set-val CMA_AREAS 8 \
-    --disable USB_EHCI_HCD \
-    --disable USB_OHCI_HCD \
-    --disable DRM_SIMPLEDRM \
+    --undefine USB_EHCI_HCD \
+    --undefine USB_OHCI_HCD \
+    --undefine DRM_SIMPLEDRM \
     --enable BT \
     --enable BT_BREDR \
     --enable BT_LE \
@@ -147,14 +146,18 @@ cd "$GITHUB_WORKSPACE/openwrt"
     --enable BT_BNEP_PROTO_FILTER \
     --enable BT_HIDP \
     --module BT_HCIBTSDIO \
-    --disable BT_HCIBTUSB \
-    --disable BT_HCIUART \
+    --undefine BT_HCIBTUSB \
+    --undefine BT_HCIUART \
     --module CFG80211 \
-    --disable NL80211_TESTMODE \
-    --disable CFG80211_DEVELOPER_WARNINGS \
-    --disable CFG80211_CERTIFICATION_ONUS \
-    --disable CFG80211_DEBUGFS \
-    --disable CFG80211_REQUIRE_SIGNED_REGDB \
+    --undefine NL80211_TESTMODE \
+    --undefine CFG80211_DEVELOPER_WARNINGS \
+    --undefine CFG80211_CERTIFICATION_ONUS \
+    --undefine CFG80211_DEBUGFS \
+    --undefine CFG80211_REQUIRE_SIGNED_REGDB \
+    --undefine CFG80211_REG_CELLULAR_HINTS \
+    --undefine CFG80211_REG_RELAX_NO_IR \
+    --undefine CFG80211_KUNIT_TEST \
+    --undefine LIB80211_DEBUG \
     --enable CFG80211_DEFAULT_PS \
     --enable CFG80211_CRDA_SUPPORT \
     --enable CFG80211_WEXT \
@@ -164,59 +167,70 @@ cd "$GITHUB_WORKSPACE/openwrt"
     --module MAC80211 \
     --enable MAC80211_RC_MINSTREL \
     --enable MAC80211_RC_DEFAULT_MINSTREL \
-    --disable MAC80211_MESH \
-    --disable MAC80211_LEDS \
-    --disable MAC80211_DEBUGFS \
-    --disable MAC80211_MESSAGE_TRACING \
-    --disable MAC80211_DEBUG_MENU \
-    --disable MAC80211_HWSIM \
+    --enable MAC80211_RC_DEFAULT_MINSTREL_HT \
+    --undefine MAC80211_MESH \
+    --undefine MAC80211_LEDS \
+    --undefine MAC80211_DEBUGFS \
+    --undefine MAC80211_MESSAGE_TRACING \
+    --undefine MAC80211_DEBUG_MENU \
+    --undefine MAC80211_HWSIM \
     --enable WLAN \
-    --disable WLAN_VENDOR_ADMTEK \
-    --disable WLAN_VENDOR_ATH \
-    --disable WLAN_VENDOR_ATMEL \
-    --disable WLAN_VENDOR_BROADCOM \
-    --disable WLAN_VENDOR_INTEL \
-    --disable WLAN_VENDOR_INTERSIL \
-    --disable WLAN_VENDOR_MARVELL \
-    --disable WLAN_VENDOR_MEDIATEK \
-    --disable WLAN_VENDOR_MICROCHIP \
-    --disable WLAN_VENDOR_PURELIFI \
-    --disable WLAN_VENDOR_RALINK \
-    --disable WLAN_VENDOR_REALTEK \
-    --disable WLAN_VENDOR_RSI \
-    --disable WLAN_VENDOR_SILABS \
-    --disable WLAN_VENDOR_ST \
-    --disable WLAN_VENDOR_TI \
-    --disable WLAN_VENDOR_ZYDAS \
-    --disable WLAN_VENDOR_QUANTENNA \
-    --disable VIRT_WIFI \
-    --disable MEDIATEK_GE_PHY \
-    --disable MICREL_PHY \
-    --disable REALTEK_PHY \
-    --disable MOTORCOMM_PHY \
+    --undefine WLAN_VENDOR_ADMTEK \
+    --undefine WLAN_VENDOR_ATH \
+    --undefine WLAN_VENDOR_ATMEL \
+    --undefine WLAN_VENDOR_BROADCOM \
+    --undefine WLAN_VENDOR_INTEL \
+    --undefine WLAN_VENDOR_INTERSIL \
+    --undefine WLAN_VENDOR_MARVELL \
+    --undefine WLAN_VENDOR_MEDIATEK \
+    --undefine WLAN_VENDOR_MICROCHIP \
+    --undefine WLAN_VENDOR_PURELIFI \
+    --undefine WLAN_VENDOR_RALINK \
+    --undefine WLAN_VENDOR_REALTEK \
+    --undefine WLAN_VENDOR_RSI \
+    --undefine WLAN_VENDOR_SILABS \
+    --undefine WLAN_VENDOR_ST \
+    --undefine WLAN_VENDOR_TI \
+    --undefine WLAN_VENDOR_ZYDAS \
+    --undefine WLAN_VENDOR_QUANTENNA \
+    --undefine VIRT_WIFI \
+    --undefine MEDIATEK_GE_PHY \
+    --undefine MICREL_PHY \
+    --undefine REALTEK_PHY \
+    --undefine MOTORCOMM_PHY \
     --enable INPUT \
     --enable INPUT_EVDEV \
     --enable INPUT_KEYBOARD \
     --enable KEYBOARD_GPIO \
     --enable FW_LOADER \
     --enable FW_LOADER_COMPRESS \
-    --disable FW_LOADER_PAGED_BUF \
-    --disable FW_LOADER_SYSFS \
-    --disable FW_LOADER_COMPRESS_XZ \
-    --disable FW_LOADER_COMPRESS_ZSTD \
-    --disable FW_LOADER_DEBUG \
-    --disable RUST_FW_LOADER_ABSTRACTIONS \
-    --disable FW_CACHE \
-    --disable FW_UPLOAD \
+    --undefine FW_LOADER_PAGED_BUF \
+    --undefine FW_LOADER_SYSFS \
+    --undefine FW_LOADER_COMPRESS_XZ \
+    --undefine FW_LOADER_COMPRESS_ZSTD \
+    --undefine FW_LOADER_DEBUG \
+    --undefine RUST_FW_LOADER_ABSTRACTIONS \
+    --undefine FW_CACHE \
+    --undefine FW_UPLOAD \
     --set-str EXTRA_FIRMWARE "" \
     --set-str EXTRA_FIRMWARE_DIR "/lib/firmware" \
     --enable MTD_OF_PARTS \
+    --enable NET \
+    --enable NETDEVICES \
+    --enable INET \
+    --enable IPV6 \
+    --enable IPV6_ROUTER_PREF \
+    --enable IPV6_ROUTE_INFO \
+    --enable IPV6_SIT \
+    --enable IPV6_NDISC_NODETYPE \
+    --enable NF_TABLES_BRIDGE \
     --enable NET_VENDOR_STMICRO \
     --enable STMMAC_PLATFORM \
     --enable DWMAC_ROCKCHIP \
     --enable PTP_1588_CLOCK_OPTIONAL \
     --enable MMC_PWRSEQ_SIMPLE \
     --enable MMC_PWRSEQ_EMMC \
+    --enable LIB_UUID \
     --enable SQUASHFS \
     --enable SQUASHFS_XATTR \
     --enable SQUASHFS_ZSTD \
@@ -266,7 +280,7 @@ cd "$GITHUB_WORKSPACE/openwrt"
     --enable V4L_MEM2MEM_DRIVERS \
     --enable VIDEO_HANTRO \
     --enable VIDEO_HANTRO_ROCKCHIP \
-    --disable VIDEO_HANTRO_HEVC_RFC \
+    --undefine VIDEO_HANTRO_HEVC_RFC \
     --enable THERMAL \
     --enable THERMAL_OF \
     --enable THERMAL_HWMON \
@@ -293,10 +307,10 @@ cd "$GITHUB_WORKSPACE/openwrt"
     --enable TCP_CONG_ADVANCED \
     --enable TCP_CONG_BBR \
     --enable DEFAULT_BBR \
-    --set-str DEFAULT_NET_CONG "bbr" \
     --enable NET_SCHED \
+    --enable NET_SCH_DEFAULT \
     --enable NET_SCH_FQ \
-    --set-str DEFAULT_QDISC "fq" \
+    --enable DEFAULT_FQ \
     --enable USB_SUPPORT \
     --enable USB \
     --enable USB_GADGET \
@@ -306,48 +320,76 @@ cd "$GITHUB_WORKSPACE/openwrt"
     --enable USB_DEFAULT_PERSIST \
     --set-val USB_AUTOSUSPEND_DELAY 2 \
     --set-val USB_DEFAULT_AUTHORIZATION_MODE 1 \
+    --undefine USB_LED_TRIG \
+    --undefine USB_CONN_GPIO \
+    --undefine USB_PCI \
+    --undefine USB_PCI_AMD \
+    --undefine USB_ANNOUNCE_NEW_DEVICES \
+    --undefine USB_FEW_INIT_RETRIES \
+    --undefine USB_DYNAMIC_MINORS \
+    --undefine USB_OTG_PRODUCTLIST \
+    --undefine USB_OTG_DISABLE_EXTERNAL_HUB \
+    --undefine USB_OTG_FSM \
+    --undefine USB_LEDS_TRIGGER_USBPORT \
+    --undefine USB_MON \
     --enable USB_DWC3 \
     --enable USB_DWC3_DUAL_ROLE \
-    --disable USB_DWC3_HOST \
-    --disable USB_DWC3_GADGET \
-    --disable USB_DWC3_ULPI \
-    --disable USB_DWC3_OMAP \
-    --disable USB_DWC3_EXYNOS \
-    --disable USB_DWC3_PCI \
-    --disable USB_DWC3_HAPS \
-    --disable USB_DWC3_KEYSTONE \
-    --disable USB_DWC3_MESON_G12A \
-    --disable USB_DWC3_OF_SIMPLE \
-    --disable USB_DWC3_ST \
-    --disable USB_DWC3_QCOM \
-    --disable USB_DWC3_IMX8MP \
-    --disable USB_DWC3_XILINX \
-    --disable USB_DWC3_AM62 \
-    --disable USB_DWC3_OCTEON \
-    --disable USB_DWC3_RTK \
+    --undefine USB_DWC3_HOST \
+    --undefine USB_DWC3_GADGET \
+    --undefine USB_DWC3_ULPI \
+    --undefine USB_DWC3_OMAP \
+    --undefine USB_DWC3_EXYNOS \
+    --undefine USB_DWC3_PCI \
+    --undefine USB_DWC3_HAPS \
+    --undefine USB_DWC3_KEYSTONE \
+    --undefine USB_DWC3_MESON_G12A \
+    --undefine USB_DWC3_OF_SIMPLE \
+    --undefine USB_DWC3_ST \
+    --undefine USB_DWC3_QCOM \
+    --undefine USB_DWC3_IMX8MP \
+    --undefine USB_DWC3_XILINX \
+    --undefine USB_DWC3_AM62 \
+    --undefine USB_DWC3_OCTEON \
+    --undefine USB_DWC3_RTK \
     --enable USB_DWC3_ROCKCHIP \
     --enable USB_XHCI_HCD \
     --enable USB_XHCI_DWC3 \
     --enable USB_XHCI_PLATFORM \
-    --disable USB_C67X00_HCD \
-    --disable USB_OXU210HP_HCD \
-    --disable USB_ISP116X_HCD \
-    --disable USB_MAX3421_HCD \
-    --disable USB_UHCI_HCD \
-    --disable USB_SL811_HCD \
-    --disable USB_R8A66597_HCD \
-    --disable USB_HCD_TEST_MODE \
+    --undefine USB_XHCI_DBGCAP \
+    --undefine USB_XHCI_PCI_RENESAS \
+    --undefine USB_C67X00_HCD \
+    --undefine USB_OXU210HP_HCD \
+    --undefine USB_ISP116X_HCD \
+    --undefine USB_MAX3421_HCD \
+    --undefine USB_UHCI_HCD \
+    --undefine USB_SL811_HCD \
+    --undefine USB_R8A66597_HCD \
+    --undefine USB_HCD_TEST_MODE \
     --enable USB_STORAGE \
-    --disable USB_UAS \
+    --undefine USB_STORAGE_DEBUG \
+    --undefine USB_STORAGE_REALTEK \
+    --undefine USB_STORAGE_DATAFAB \
+    --undefine USB_STORAGE_FREECOM \
+    --undefine USB_STORAGE_ISD200 \
+    --undefine USB_STORAGE_USBAT \
+    --undefine USB_STORAGE_SDDR09 \
+    --undefine USB_STORAGE_SDDR55 \
+    --undefine USB_STORAGE_JUMPSHOT \
+    --undefine USB_STORAGE_ALAUDA \
+    --undefine USB_STORAGE_ONETOUCH \
+    --undefine USB_STORAGE_KARMA \
+    --undefine USB_STORAGE_CYPRESS_ATACB \
+    --undefine USB_STORAGE_ENE_UB6250 \
+    --undefine USB_UAS \
     --enable USB_ACM \
     --enable USB_WDM \
-    --disable USB_PRINTER \
-    --disable USB_TMC \
-    --disable USB_MDC800 \
-    --disable USB_MICROTEK \
-    --disable USBIP_CORE \
-    --disable USB_CDNS_SUPPORT \
-    --disable USB_MUSB_HDRC \
+    --undefine USB_PRINTER \
+    --undefine USB_TMC \
+    --undefine USB_MDC800 \
+    --undefine USB_MICROTEK \
+    --undefine USBIP_CORE \
+    --undefine USB_CDNS_SUPPORT \
+    --undefine USB_MUSB_HDRC \
     --enable USB_USBNET \
     --enable USB_NET_CDCETHER \
     --enable USB_NET_RNDIS_HOST \
@@ -367,39 +409,41 @@ cd "$GITHUB_WORKSPACE/openwrt"
     --enable MODULES \
     --enable MODVERSIONS \
     --enable MODULE_UNLOAD \
-    --disable USB_KEYBOARD \
-    --disable USB_MOUSE \
-    --disable USB_HID \
+    --undefine USB_KEYBOARD \
+    --undefine USB_MOUSE \
+    --undefine USB_HID \
     --enable KEYS \
-    --disable KEYS_REQUEST_CACHE \
-    --disable PERSISTENT_KEYRINGS \
-    --disable BIG_KEYS \
-    --disable TRUSTED_KEYS \
-    --disable ENCRYPTED_KEYS \
-    --disable USER_DECRYPTED_DATA \
-    --disable KEY_DH_OPERATIONS \
-    --disable KEY_NOTIFICATIONS \
+    --undefine KEYS_REQUEST_CACHE \
+    --undefine PERSISTENT_KEYRINGS \
+    --undefine BIG_KEYS \
+    --undefine TRUSTED_KEYS \
+    --undefine ENCRYPTED_KEYS \
+    --undefine USER_DECRYPTED_DATA \
+    --undefine KEY_DH_OPERATIONS \
+    --undefine KEY_NOTIFICATIONS \
     --enable ASYMMETRIC_KEY_TYPE \
     --enable ASYMMETRIC_PUBLIC_KEY_SUBTYPE \
     --enable X509_CERTIFICATE_PARSER \
-    --disable PKCS8_PRIVATE_KEY_PARSER \
-    --disable PKCS7_MESSAGE_PARSER \
-    --disable SIGNED_PE_FILE_VERIFICATION \
-    --disable PKCS7_TEST_KEY \
-    --disable FIPS_SIGNATURE_SELFTEST \
+    --undefine PKCS8_PRIVATE_KEY_PARSER \
+    --undefine PKCS7_MESSAGE_PARSER \
+    --undefine SIGNED_PE_FILE_VERIFICATION \
+    --undefine PKCS7_TEST_KEY \
+    --undefine FIPS_SIGNATURE_SELFTEST \
     --enable SYSTEM_TRUSTED_KEYRING \
     --set-str SYSTEM_TRUSTED_KEYS "" \
-    --disable SYSTEM_EXTRA_CERTIFICATE \
-    --disable SECONDARY_TRUSTED_KEYRING \
-    --disable SECONDARY_TRUSTED_KEYRING_SIGNED_BY_BUILTIN \
-    --disable SYSTEM_BLACKLIST_KEYRING \
-    --disable SYSTEM_BLACKLIST_HASH_LIST \
-    --disable SYSTEM_REVOCATION_LIST \
-    --disable SYSTEM_REVOCATION_KEYS \
-    --disable SYSTEM_BLACKLIST_AUTH_UPDATE \
-    --disable MODULE_SIG_KEY \
-    --disable MODULE_SIG \
-    --disable MODULE_SIG_ALL \
-    --disable STAGING
+    --undefine SYSTEM_EXTRA_CERTIFICATE \
+    --undefine SECONDARY_TRUSTED_KEYRING \
+    --undefine SECONDARY_TRUSTED_KEYRING_SIGNED_BY_BUILTIN \
+    --undefine SYSTEM_BLACKLIST_KEYRING \
+    --undefine SYSTEM_BLACKLIST_HASH_LIST \
+    --undefine SYSTEM_REVOCATION_LIST \
+    --undefine SYSTEM_REVOCATION_KEYS \
+    --undefine SYSTEM_BLACKLIST_AUTH_UPDATE \
+    --undefine MODULE_SIG_KEY \
+    --undefine MODULE_SIG \
+    --undefine MODULE_SIG_ALL \
+    --undefine MODULE_SIG_SHA1 \
+    --undefine MODULE_SIG_SHA256 \
+    --undefine STAGING
 
 echo "✅ H29K 内核参数通过 scripts/config 注入完成"
