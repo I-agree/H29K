@@ -99,339 +99,483 @@ sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/'
 sed -i 's/^CONFIG_USB_EHCI_HCD=.*$/# CONFIG_USB_EHCI_HCD is not set/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_USB_OHCI_HCD=.*$/# CONFIG_USB_OHCI_HCD is not set/' "$CONFIG_FILE"
 
-echo "✅ sed 原位替换完成"
+cat >> "$CONFIG_FILE" << 'EOF'
 
-# ========== 第二阶段：scripts/config 注入（含第一阶段sed原位替换，双保险）==========
-# scripts/config 直接操作 Kconfig 语法树，自动处理依赖关系
-# 在 make defconfig 之前执行，确保所有条目被正确纳入依赖解析
-# 确保在 openwrt 根目录
+# =================================================================
+# 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
+# =================================================================
+# ❌ 移除所有外置 PHY 驱动 (H29K 无独立 RTL8211/Micrel/KSZ PHY)
+# CONFIG_MICREL_PHY is not set
+# CONFIG_REALTEK_PHY is not set
+# CONFIG_MOTORCOMM_PHY is not set
+# CONFIG_MEDIATEK_GE_PHY is not set
 
-./scripts/config --file "$CONFIG_FILE" \
-    --undefine ARM64_SVE \
-    --set-val CMA_SIZE_MBYTES 128 \
-    --set-val CMA_AREAS 8 \
-    --undefine DWMAC_DWC_QOS_ETH \
-    --enable PARTITION_ADVANCED \
-    --undefine USB_EHCI_HCD \
-    --undefine USB_OHCI_HCD \
-    --enable DEVTMPFS \
-    --enable DEVTMPFS_MOUNT \
-    --enable DEVTMPFS_SAFE \
-    --undefine UEVENT_HELPER \
-    --enable STANDALONE \
-    --enable TMPFS \
-    --enable PREVENT_FIRMWARE_BUILD \
-    --undefine ALLOW_DEV_COREDUMP \
-    --undefine DEBUG_DRIVER \
-    --undefine DRM_SIMPLEDRM \
-    --enable BT \
-    --enable BT_BREDR \
-    --enable BT_LE \
-    --enable BT_RFCOMM \
-    --enable BT_RFCOMM_TTY \
-    --enable BT_BNEP \
-    --enable BT_BNEP_MC_FILTER \
-    --enable BT_BNEP_PROTO_FILTER \
-    --enable BT_HIDP \
-    --module BT_HCIBTSDIO \
-    --undefine BT_HCIBTUSB \
-    --undefine BT_HCIUART \
-    --module CFG80211 \
-    --undefine NL80211_TESTMODE \
-    --undefine CFG80211_DEVELOPER_WARNINGS \
-    --undefine CFG80211_CERTIFICATION_ONUS \
-    --undefine CFG80211_DEBUGFS \
-    --undefine CFG80211_REQUIRE_SIGNED_REGDB \
-    --undefine CFG80211_REG_CELLULAR_HINTS \
-    --undefine CFG80211_REG_RELAX_NO_IR \
-    --undefine CFG80211_KUNIT_TEST \
-    --undefine LIB80211_DEBUG \
-    --enable CFG80211_DEFAULT_PS \
-    --enable CFG80211_CRDA_SUPPORT \
-    --enable CFG80211_WEXT \
-    --enable CFG80211_USE_KERNEL_REGDB_KEYS \
-    --enable CFG80211_DEFAULT_REGDOM \
-    --set-str CFG80211_EXTRA_REGDB_KEYDIR "" \
-    --module MAC80211 \
-    --enable MAC80211_RC_MINSTREL \
-    --enable MAC80211_RC_DEFAULT_MINSTREL \
-    --enable MAC80211_RC_DEFAULT_MINSTREL_HT \
-    --undefine MAC80211_MESH \
-    --undefine MAC80211_LEDS \
-    --undefine MAC80211_DEBUGFS \
-    --undefine MAC80211_MESSAGE_TRACING \
-    --undefine MAC80211_DEBUG_MENU \
-    --undefine MAC80211_HWSIM \
-    --enable WLAN \
-    --undefine WLAN_VENDOR_ADMTEK \
-    --undefine WLAN_VENDOR_ATH \
-    --undefine WLAN_VENDOR_ATMEL \
-    --undefine WLAN_VENDOR_BROADCOM \
-    --undefine WLAN_VENDOR_INTEL \
-    --undefine WLAN_VENDOR_INTERSIL \
-    --undefine WLAN_VENDOR_MARVELL \
-    --undefine WLAN_VENDOR_MEDIATEK \
-    --undefine WLAN_VENDOR_MICROCHIP \
-    --undefine WLAN_VENDOR_PURELIFI \
-    --undefine WLAN_VENDOR_RALINK \
-    --undefine WLAN_VENDOR_REALTEK \
-    --undefine WLAN_VENDOR_RSI \
-    --undefine WLAN_VENDOR_SILABS \
-    --undefine WLAN_VENDOR_ST \
-    --undefine WLAN_VENDOR_TI \
-    --undefine WLAN_VENDOR_ZYDAS \
-    --undefine WLAN_VENDOR_QUANTENNA \
-    --undefine VIRT_WIFI \
-    --undefine MEDIATEK_GE_PHY \
-    --undefine MICREL_PHY \
-    --undefine REALTEK_PHY \
-    --undefine MOTORCOMM_PHY \
-    --enable INPUT \
-    --enable INPUT_EVDEV \
-    --enable INPUT_KEYBOARD \
-    --enable KEYBOARD_GPIO \
-    --enable FW_LOADER \
-    --enable FW_LOADER_COMPRESS \
-    --undefine FW_LOADER_PAGED_BUF \
-    --undefine FW_LOADER_SYSFS \
-    --undefine FW_LOADER_COMPRESS_XZ \
-    --undefine FW_LOADER_COMPRESS_ZSTD \
-    --undefine FW_LOADER_DEBUG \
-    --undefine RUST_FW_LOADER_ABSTRACTIONS \
-    --undefine FW_CACHE \
-    --undefine FW_UPLOAD \
-    --set-str EXTRA_FIRMWARE "" \
-    --set-str EXTRA_FIRMWARE_DIR "/lib/firmware" \
-    --enable MTD_OF_PARTS \
-    --enable NET \
-    --enable NETDEVICES \
-    --enable INET \
-    --enable IPV6 \
-    --enable IPV6_ROUTER_PREF \
-    --enable IPV6_ROUTE_INFO \
-    --enable IPV6_SIT \
-    --enable IPV6_NDISC_NODETYPE \
-    --enable NF_TABLES_BRIDGE \
-    --enable NET_VENDOR_STMICRO \
-    --enable STMMAC_PLATFORM \
-    --enable DWMAC_ROCKCHIP \
-    --enable PTP_1588_CLOCK_OPTIONAL \
-    --enable MMC_PWRSEQ_SIMPLE \
-    --enable MMC_PWRSEQ_EMMC \
-    --enable LIB_UUID \
-    --enable SQUASHFS \
-    --enable SQUASHFS_XATTR \
-    --enable SQUASHFS_ZSTD \
-    --enable OVERLAY_FS \
-    --enable OVERLAY_FS_POSIX_ACL \
-    --enable FAT_FS \
-    --enable VFAT_FS \
-    --set-val FAT_DEFAULT_CODEPAGE 936 \
-    --set-str FAT_DEFAULT_IOCHARSET "utf8" \
-    --enable FAT_DEFAULT_UTF8 \
-    --enable EXFAT_FS \
-    --set-str EXFAT_DEFAULT_IOCHARSET "utf8" \
-    --enable NLS_UTF8 \
-    --enable NLS_CODEPAGE_936 \
-    --enable SPI \
-    --enable SPI_ROCKCHIP \
-    --enable SPI_ROCKCHIP_SFC \
-    --enable MTD \
-    --enable MTD_BLOCK \
-    --enable MTD_SPI_NOR \
-    --enable GPIOLIB \
-    --enable DRM \
-    --enable DRM_KMS_HELPER \
-    --enable DRM_PANEL \
-    --enable DRM_BRIDGE \
-    --enable DRM_PANEL_BRIDGE \
-    --enable FB \
-    --enable FB_SYS_FILLRECT \
-    --enable FB_SYS_COPYAREA \
-    --enable FB_SYS_IMAGEBLIT \
-    --enable FB_SYS_FOPS \
-    --enable FB_DEFERRED_IO \
-    --enable FB_MODE_HELPERS \
-    --enable FB_BACKLIGHT \
-    --enable BACKLIGHT_CLASS_DEVICE \
-    --enable BACKLIGHT_PWM \
-    --enable DRM_PANEL_SITRONIX_ST7789V \
-    --enable MEDIA_SUPPORT \
-    --enable MEDIA_CONTROLLER \
-    --enable VIDEO_DEV \
-    --enable VIDEO_V4L2_SUBDEV_API \
-    --enable MEDIA_CAMERA_SUPPORT \
-    --enable MEDIA_PLATFORM_SUPPORT \
-    --enable USB_VIDEO_CLASS \
-    --enable USB_VIDEO_CLASS_INPUT_EVDEV \
-    --enable VIDEO_ROCKCHIP_RGA \
-    --enable V4L_MEM2MEM_DRIVERS \
-    --enable VIDEO_HANTRO \
-    --enable VIDEO_HANTRO_ROCKCHIP \
-    --undefine VIDEO_HANTRO_HEVC_RFC \
-    --enable THERMAL \
-    --enable THERMAL_OF \
-    --enable THERMAL_HWMON \
-    --enable ROCKCHIP_THERMAL \
-    --enable HW_RANDOM \
-    --enable HW_RANDOM_ROCKCHIP \
-    --enable IR_CORE \
-    --enable IR_GPIO \
-    --enable IR_GPIO_CIR \
-    --enable RFKILL \
-    --enable RFKILL_GPIO \
-    --enable LEDS_TRIGGER_HEARTBEAT \
-    --enable SERIAL_8250 \
-    --enable SERIAL_8250_CONSOLE \
-    --enable SERIAL_8250_DW \
-    --enable SERIAL_8250_DWLIB \
-    --enable SERIAL_OF_PLATFORM \
-    --module NETFS_SUPPORT \
-    --enable FSCACHE \
-    --module CIFS \
-    --enable CIFS_ALLOW_INSECURE_LEGACY \
-    --enable CIFS_XATTR \
-    --enable CIFS_POSIX \
-    --enable TCP_CONG_ADVANCED \
-    --enable TCP_CONG_BBR \
-    --enable DEFAULT_BBR \
-    --enable NET_SCHED \
-    --enable NET_SCH_DEFAULT \
-    --enable NET_SCH_FQ \
-    --enable DEFAULT_FQ \
-    --enable USB_SUPPORT \
-    --enable USB \
-    --enable USB_GADGET \
-    --enable USB_OTG \
-    --enable USB_ROLE_SWITCH \
-    --enable USB_ULPI_BUS \
-    --enable USB_DEFAULT_PERSIST \
-    --set-val USB_AUTOSUSPEND_DELAY 2 \
-    --set-val USB_DEFAULT_AUTHORIZATION_MODE 1 \
-    --undefine USB_LED_TRIG \
-    --undefine USB_CONN_GPIO \
-    --undefine USB_PCI \
-    --undefine USB_PCI_AMD \
-    --undefine USB_ANNOUNCE_NEW_DEVICES \
-    --undefine USB_FEW_INIT_RETRIES \
-    --undefine USB_DYNAMIC_MINORS \
-    --undefine USB_OTG_PRODUCTLIST \
-    --undefine USB_OTG_DISABLE_EXTERNAL_HUB \
-    --undefine USB_OTG_FSM \
-    --undefine USB_LEDS_TRIGGER_USBPORT \
-    --undefine USB_MON \
-    --enable USB_DWC3 \
-    --enable USB_DWC3_DUAL_ROLE \
-    --undefine USB_DWC3_HOST \
-    --undefine USB_DWC3_GADGET \
-    --undefine USB_DWC3_ULPI \
-    --undefine USB_DWC3_OMAP \
-    --undefine USB_DWC3_EXYNOS \
-    --undefine USB_DWC3_PCI \
-    --undefine USB_DWC3_HAPS \
-    --undefine USB_DWC3_KEYSTONE \
-    --undefine USB_DWC3_MESON_G12A \
-    --undefine USB_DWC3_OF_SIMPLE \
-    --undefine USB_DWC3_ST \
-    --undefine USB_DWC3_QCOM \
-    --undefine USB_DWC3_IMX8MP \
-    --undefine USB_DWC3_XILINX \
-    --undefine USB_DWC3_AM62 \
-    --undefine USB_DWC3_OCTEON \
-    --undefine USB_DWC3_RTK \
-    --enable USB_DWC3_ROCKCHIP \
-    --enable USB_XHCI_HCD \
-    --enable USB_XHCI_DWC3 \
-    --enable USB_XHCI_PLATFORM \
-    --undefine USB_XHCI_DBGCAP \
-    --undefine USB_XHCI_PCI_RENESAS \
-    --undefine USB_C67X00_HCD \
-    --undefine USB_OXU210HP_HCD \
-    --undefine USB_ISP116X_HCD \
-    --undefine USB_MAX3421_HCD \
-    --undefine USB_UHCI_HCD \
-    --undefine USB_SL811_HCD \
-    --undefine USB_R8A66597_HCD \
-    --undefine USB_HCD_TEST_MODE \
-    --enable USB_STORAGE \
-    --undefine USB_STORAGE_DEBUG \
-    --undefine USB_STORAGE_REALTEK \
-    --undefine USB_STORAGE_DATAFAB \
-    --undefine USB_STORAGE_FREECOM \
-    --undefine USB_STORAGE_ISD200 \
-    --undefine USB_STORAGE_USBAT \
-    --undefine USB_STORAGE_SDDR09 \
-    --undefine USB_STORAGE_SDDR55 \
-    --undefine USB_STORAGE_JUMPSHOT \
-    --undefine USB_STORAGE_ALAUDA \
-    --undefine USB_STORAGE_ONETOUCH \
-    --undefine USB_STORAGE_KARMA \
-    --undefine USB_STORAGE_CYPRESS_ATACB \
-    --undefine USB_STORAGE_ENE_UB6250 \
-    --undefine USB_UAS \
-    --enable USB_ACM \
-    --enable USB_WDM \
-    --undefine USB_PRINTER \
-    --undefine USB_TMC \
-    --undefine USB_MDC800 \
-    --undefine USB_MICROTEK \
-    --undefine USBIP_CORE \
-    --undefine USB_CDNS_SUPPORT \
-    --undefine USB_MUSB_HDRC \
-    --enable USB_USBNET \
-    --enable USB_NET_CDCETHER \
-    --enable USB_NET_RNDIS_HOST \
-    --enable USB_NET_CDC_NCM \
-    --enable USB_SERIAL \
-    --enable USB_SERIAL_CONSOLE \
-    --enable USB_SERIAL_GENERIC \
-    --enable USB_SERIAL_OPTION \
-    --enable PPP \
-    --enable PPP_BSDCOMP \
-    --enable PPP_DEFLATE \
-    --enable PPP_FILTER \
-    --enable PPP_MPPE \
-    --enable PPP_MULTILINK \
-    --enable PPP_ASYNC \
-    --enable PPP_SYNC_TTY \
-    --enable MODULES \
-    --enable MODVERSIONS \
-    --enable MODULE_UNLOAD \
-    --undefine USB_KEYBOARD \
-    --undefine USB_MOUSE \
-    --undefine USB_HID \
-    --enable KEYS \
-    --undefine KEYS_REQUEST_CACHE \
-    --undefine PERSISTENT_KEYRINGS \
-    --undefine BIG_KEYS \
-    --undefine TRUSTED_KEYS \
-    --undefine ENCRYPTED_KEYS \
-    --undefine USER_DECRYPTED_DATA \
-    --undefine KEY_DH_OPERATIONS \
-    --undefine KEY_NOTIFICATIONS \
-    --enable ASYMMETRIC_KEY_TYPE \
-    --enable ASYMMETRIC_PUBLIC_KEY_SUBTYPE \
-    --enable X509_CERTIFICATE_PARSER \
-    --undefine PKCS8_PRIVATE_KEY_PARSER \
-    --undefine PKCS7_MESSAGE_PARSER \
-    --undefine SIGNED_PE_FILE_VERIFICATION \
-    --undefine PKCS7_TEST_KEY \
-    --undefine FIPS_SIGNATURE_SELFTEST \
-    --enable SYSTEM_TRUSTED_KEYRING \
-    --set-str SYSTEM_TRUSTED_KEYS "" \
-    --undefine SYSTEM_EXTRA_CERTIFICATE \
-    --undefine SECONDARY_TRUSTED_KEYRING \
-    --undefine SECONDARY_TRUSTED_KEYRING_SIGNED_BY_BUILTIN \
-    --undefine SYSTEM_BLACKLIST_KEYRING \
-    --undefine SYSTEM_BLACKLIST_HASH_LIST \
-    --undefine SYSTEM_REVOCATION_LIST \
-    --undefine SYSTEM_REVOCATION_KEYS \
-    --undefine SYSTEM_BLACKLIST_AUTH_UPDATE \
-    --undefine MODULE_SIG_KEY \
-    --undefine MODULE_SIG \
-    --undefine MODULE_SIG_ALL \
-    --undefine MODULE_SIG_SHA1 \
-    --undefine MODULE_SIG_SHA256 \
-    --undefine STAGING
+# =================================================================
+# 📡 蓝牙完整协议栈 (AIC8800 SDIO WiFi+BT二合一)
+# =================================================================
+CONFIG_BT=y
+CONFIG_BT_BREDR=y
+CONFIG_BT_LE=y
+CONFIG_BT_RFCOMM=y
+CONFIG_BT_RFCOMM_TTY=y
+CONFIG_BT_BNEP=y
+CONFIG_BT_BNEP_MC_FILTER=y
+CONFIG_BT_BNEP_PROTO_FILTER=y
+CONFIG_BT_HIDP=y
 
-echo "✅ H29K 内核参数通过 scripts/config 注入完成"
+# 启用SDIO蓝牙，适配AIC8800复合模组
+CONFIG_BT_HCIBTSDIO=m
+
+# 禁用USB、UART类型蓝牙传输
+# CONFIG_BT_HCIBTUSB is not set
+# CONFIG_BT_HCIUART is not set
+
+# =================================================================
+# 🚫 关闭 SimpleDRM (避免与 ST7789V SPI 屏抢占 fb0)
+# =================================================================
+# CONFIG_DRM_SIMPLEDRM is not set
+
+# =================================================================
+# 固件加载配置（彻底规避NEW交互式报错）
+# =================================================================
+CONFIG_FW_LOADER=y
+CONFIG_FW_LOADER_COMPRESS=y
+
+# 字符串类型必须显式赋值，不能用#注释禁用
+CONFIG_EXTRA_FIRMWARE=""
+CONFIG_EXTRA_FIRMWARE_DIR="/lib/firmware"
+
+# 锁定自动选中依赖项
+# CONFIG_FW_LOADER_PAGED_BUF is not set
+# CONFIG_FW_LOADER_SYSFS is not set
+
+# 锁定压缩子模块
+# CONFIG_FW_LOADER_COMPRESS_XZ is not set
+# CONFIG_FW_LOADER_COMPRESS_ZSTD is not set
+
+# 关闭无用固件相关功能
+# CONFIG_FW_LOADER_DEBUG is not set
+# CONFIG_RUST_FW_LOADER_ABSTRACTIONS is not set
+# CONFIG_FW_CACHE is not set
+# CONFIG_FW_UPLOAD is not set
+
+# =================================================================
+# 通用驱动基础配置 提前规避drivers/base/staging模块NEW弹窗
+# =================================================================
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_STANDALONE=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
+# CONFIG_UEVENT_HELPER is not set
+# CONFIG_ALLOW_DEV_COREDUMP is not set
+# CONFIG_DEBUG_DRIVER is not set
+
+# 关闭废弃Staging驱动，屏蔽rtl8723bs/rtllib等老旧无线NEW弹窗
+# CONFIG_STAGING is not set
+
+# =================================================================
+# 🔧 前次分析缺失项修复 + 【关键修复：全部cfg80211+mac80211配置固化防交互弹窗】
+# =================================================================
+# SFC MTD 分区解析
+CONFIG_MTD_OF_PARTS=y
+
+# WiFi 协议栈 (AIC8800 SDIO 必需)
+CONFIG_CFG80211=m
+# 禁用nl80211工厂测试命令，消除NEW交互式弹窗
+# CONFIG_NL80211_TESTMODE is not set
+CONFIG_CFG80211_WEXT=y
+CONFIG_CFG80211_CRDA_SUPPORT=y
+CONFIG_CFG80211_USE_KERNEL_REGDB_KEYS=y
+CONFIG_CFG80211_DEFAULT_REGDOM=y
+# 无线默认省电模式，规避NEW弹窗
+CONFIG_CFG80211_DEFAULT_PS=y
+# 关闭无线开发调试警告
+# CONFIG_CFG80211_DEVELOPER_WARNINGS is not set
+# 关闭无线认证高级选项
+# CONFIG_CFG80211_CERTIFICATION_ONUS is not set
+# 关闭cfg80211调试文件系统节点
+# CONFIG_CFG80211_DEBUGFS is not set
+
+# 固化cfg80211衍生配置，防止新增交互
+# CONFIG_CFG80211_REQUIRE_SIGNED_REGDB is not set
+# CONFIG_CFG80211_REG_CELLULAR_HINTS is not set
+# CONFIG_CFG80211_REG_RELAX_NO_IR is not set
+# CONFIG_CFG80211_KUNIT_TEST is not set
+# CONFIG_LIB80211_DEBUG is not set
+# 字符串类型必须显式赋值
+CONFIG_CFG80211_EXTRA_REGDB_KEYDIR=""
+
+CONFIG_MAC80211=m
+CONFIG_MAC80211_RC_DEFAULT_MINSTREL_HT=y
+# mac80211速率自适应核心配置，解决本次MINSTREL交互报错
+CONFIG_MAC80211_RC_MINSTREL=y
+CONFIG_MAC80211_RC_DEFAULT_MINSTREL=y
+# 关闭mesh、无线LED、各类调试功能
+# CONFIG_MAC80211_MESH is not set
+# CONFIG_MAC80211_LEDS is not set
+# CONFIG_MAC80211_DEBUGFS is not set
+# CONFIG_MAC80211_MESSAGE_TRACING is not set
+# CONFIG_MAC80211_DEBUG_MENU is not set
+# 关闭无线仿真测试
+# CONFIG_MAC80211_HWSIM is not set
+
+CONFIG_WLAN=y
+
+# 全部内核WiFi厂商驱动禁用，杜绝批量交互弹窗
+# CONFIG_WLAN_VENDOR_ADMTEK is not set
+# CONFIG_WLAN_VENDOR_ATH is not set
+# CONFIG_WLAN_VENDOR_ATMEL is not set
+# CONFIG_WLAN_VENDOR_BROADCOM is not set
+# CONFIG_WLAN_VENDOR_INTEL is not set
+# CONFIG_WLAN_VENDOR_INTERSIL is not set
+# CONFIG_WLAN_VENDOR_MARVELL is not set
+# CONFIG_WLAN_VENDOR_MEDIATEK is not set
+# CONFIG_WLAN_VENDOR_MICROCHIP is not set
+# CONFIG_WLAN_VENDOR_PURELIFI is not set
+# CONFIG_WLAN_VENDOR_RALINK is not set
+# CONFIG_WLAN_VENDOR_REALTEK is not set
+# CONFIG_WLAN_VENDOR_RSI is not set
+# CONFIG_WLAN_VENDOR_SILABS is not set
+# CONFIG_WLAN_VENDOR_ST is not set
+# CONFIG_WLAN_VENDOR_TI is not set
+# CONFIG_WLAN_VENDOR_ZYDAS is not set
+# CONFIG_WLAN_VENDOR_QUANTENNA is not set
+
+# 关闭mac80211无线硬件仿真测试工具
+# CONFIG_MAC80211_HWSIM is not set
+
+# 关闭以太网转WiFi虚拟封装驱动
+# CONFIG_VIRT_WIFI is not set
+
+# gpio-keys 驱动修正
+# 输入子系统基础
+CONFIG_INPUT=y
+CONFIG_INPUT_EVDEV=y
+# 键盘子菜单总开关
+CONFIG_INPUT_KEYBOARD=y
+# GPIO按键官方标准宏（OpenWrt打包依赖这个）
+CONFIG_KEYBOARD_GPIO=y
+
+# =================================================================
+# 🌐 网络核心与 IPv6
+# =================================================================
+CONFIG_NET=y
+CONFIG_NETDEVICES=y
+CONFIG_INET=y
+CONFIG_IPV6=y
+CONFIG_IPV6_ROUTER_PREF=y
+CONFIG_IPV6_ROUTE_INFO=y
+CONFIG_IPV6_SIT=y
+CONFIG_IPV6_NDISC_NODETYPE=y
+CONFIG_NF_TABLES_BRIDGE=y
+
+# =================================================================
+# 🚀 RK3528 GMAC (Synopsys DWMAC 4.20a)
+# =================================================================
+CONFIG_NET_VENDOR_STMICRO=y
+CONFIG_STMMAC_PLATFORM=y
+CONFIG_DWMAC_ROCKCHIP=y
+CONFIG_PTP_1588_CLOCK_OPTIONAL=y
+
+# =================================================================
+# 💾 MMC/SDIO (AIC8800 WiFi)
+# =================================================================
+CONFIG_MMC_PWRSEQ_SIMPLE=y
+CONFIG_MMC_PWRSEQ_EMMC=y
+
+# =================================================================
+# 📂 文件系统
+# =================================================================
+CONFIG_LIB_UUID=y
+CONFIG_SQUASHFS=y
+CONFIG_SQUASHFS_XATTR=y
+CONFIG_SQUASHFS_ZSTD=y
+CONFIG_OVERLAY_FS=y
+CONFIG_OVERLAY_FS_POSIX_ACL=y
+CONFIG_FAT_FS=y
+CONFIG_VFAT_FS=y
+CONFIG_FAT_DEFAULT_CODEPAGE=936
+CONFIG_FAT_DEFAULT_IOCHARSET="utf8"
+CONFIG_FAT_DEFAULT_UTF8=y
+CONFIG_EXFAT_FS=y
+CONFIG_EXFAT_DEFAULT_IOCHARSET="utf8"
+CONFIG_NLS_UTF8=y
+CONFIG_NLS_CODEPAGE_936=y
+
+# =================================================================
+# 🖥️ 显示: ST7789V SPI 屏 (无 HDMI/SimpleDRM)
+# =================================================================
+CONFIG_SPI=y
+CONFIG_SPI_ROCKCHIP=y
+CONFIG_SPI_ROCKCHIP_SFC=y
+CONFIG_MTD=y
+CONFIG_MTD_BLOCK=y
+CONFIG_MTD_SPI_NOR=y
+CONFIG_GPIOLIB=y
+CONFIG_DRM=y
+CONFIG_DRM_KMS_HELPER=y
+CONFIG_DRM_PANEL=y
+CONFIG_DRM_BRIDGE=y
+CONFIG_DRM_PANEL_BRIDGE=y
+CONFIG_FB=y
+CONFIG_FB_SYS_FILLRECT=y
+CONFIG_FB_SYS_COPYAREA=y
+CONFIG_FB_SYS_IMAGEBLIT=y
+CONFIG_FB_SYS_FOPS=y
+CONFIG_FB_DEFERRED_IO=y
+CONFIG_FB_MODE_HELPERS=y
+CONFIG_FB_BACKLIGHT=y
+CONFIG_BACKLIGHT_CLASS_DEVICE=y
+CONFIG_BACKLIGHT_PWM=y
+CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
+
+# =================================================================
+# 🎥 VPU/RGA/UVC
+# =================================================================
+CONFIG_MEDIA_SUPPORT=y
+CONFIG_MEDIA_CONTROLLER=y
+CONFIG_VIDEO_DEV=y
+CONFIG_VIDEO_V4L2_SUBDEV_API=y
+CONFIG_MEDIA_CAMERA_SUPPORT=y
+CONFIG_MEDIA_PLATFORM_SUPPORT=y
+CONFIG_USB_VIDEO_CLASS=y
+CONFIG_USB_VIDEO_CLASS_INPUT_EVDEV=y
+CONFIG_VIDEO_ROCKCHIP_RGA=y
+CONFIG_V4L_MEM2MEM_DRIVERS=y
+CONFIG_VIDEO_HANTRO=y
+CONFIG_VIDEO_HANTRO_ROCKCHIP=y
+# CONFIG_VIDEO_HANTRO_HEVC_RFC is not set
+
+# =================================================================
+# 🛡️ 温控/RNG/IR/RFKill/LEDs/串口
+# =================================================================
+CONFIG_THERMAL=y
+CONFIG_THERMAL_OF=y
+CONFIG_THERMAL_HWMON=y
+CONFIG_ROCKCHIP_THERMAL=y
+CONFIG_HW_RANDOM=y
+CONFIG_HW_RANDOM_ROCKCHIP=y
+CONFIG_IR_CORE=y
+CONFIG_IR_GPIO=y
+CONFIG_RFKILL=y
+CONFIG_RFKILL_GPIO=y
+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+CONFIG_SERIAL_8250=y
+CONFIG_SERIAL_8250_CONSOLE=y
+CONFIG_SERIAL_8250_DW=y
+CONFIG_SERIAL_8250_DWLIB=y
+CONFIG_SERIAL_OF_PLATFORM=y
+
+# =================================================================
+# 📦 CIFS/NetFS 模块
+# =================================================================
+CONFIG_NETFS_SUPPORT=m
+CONFIG_FSCACHE=y
+CONFIG_CIFS=m
+CONFIG_CIFS_ALLOW_INSECURE_LEGACY=y
+CONFIG_CIFS_XATTR=y
+CONFIG_CIFS_POSIX=y
+
+# =================================================================
+# 🔄 TCP BBR + FQ
+# =================================================================
+CONFIG_NET_SCHED=y
+CONFIG_NET_SCH_DEFAULT=y
+CONFIG_NET_SCH_FQ=y
+CONFIG_DEFAULT_FQ=y
+CONFIG_TCP_CONG_ADVANCED=y
+CONFIG_TCP_CONG_BBR=y
+CONFIG_DEFAULT_BBR=y
+
+# =================================================================
+# 🔌 USB OTG/Dual Role（内核DWC3 XHCI 官方最优方案，匹配DTS usb_host0_xhci节点，RK3528自动降级USB2）
+# =================================================================
+CONFIG_USB_SUPPORT=y
+CONFIG_USB=y
+CONFIG_USB_GADGET=y
+CONFIG_USB_OTG=y
+CONFIG_USB_ROLE_SWITCH=y
+
+# USB通用基础配置 防弹窗
+# CONFIG_USB_LED_TRIG is not set
+CONFIG_USB_ULPI_BUS=y
+# CONFIG_USB_CONN_GPIO is not set
+# CONFIG_USB_PCI is not set
+# CONFIG_USB_PCI_AMD is not set
+# CONFIG_USB_ANNOUNCE_NEW_DEVICES is not set
+CONFIG_USB_DEFAULT_PERSIST=y
+# CONFIG_USB_FEW_INIT_RETRIES is not set
+# CONFIG_USB_DYNAMIC_MINORS is not set
+# CONFIG_USB_OTG_PRODUCTLIST is not set
+# CONFIG_USB_OTG_DISABLE_EXTERNAL_HUB is not set
+# CONFIG_USB_OTG_FSM is not set
+# CONFIG_USB_LEDS_TRIGGER_USBPORT is not set
+# 整型参数必须显式赋值
+CONFIG_USB_AUTOSUSPEND_DELAY=2
+CONFIG_USB_DEFAULT_AUTHORIZATION_MODE=1
+# CONFIG_USB_MON is not set
+
+# DWC3控制器核心配置
+CONFIG_USB_DWC3=y
+# CONFIG_USB_DWC3_ULPI is not set
+# DWC3互斥三模式：仅启用双角色OTG
+# CONFIG_USB_DWC3_HOST is not set
+# CONFIG_USB_DWC3_GADGET is not set
+CONFIG_USB_DWC3_DUAL_ROLE=y
+
+# 仅保留瑞芯微DWC3平台驱动，关闭所有其他厂商胶水驱动
+CONFIG_USB_DWC3_ROCKCHIP=y
+# CONFIG_USB_DWC3_OMAP is not set
+# CONFIG_USB_DWC3_EXYNOS is not set
+# CONFIG_USB_DWC3_PCI is not set
+# CONFIG_USB_DWC3_HAPS is not set
+# CONFIG_USB_DWC3_KEYSTONE is not set
+# CONFIG_USB_DWC3_MESON_G12A is not set
+# CONFIG_USB_DWC3_OF_SIMPLE is not set
+# CONFIG_USB_DWC3_ST is not set
+# CONFIG_USB_DWC3_QCOM is not set
+# CONFIG_USB_DWC3_IMX8MP is not set
+# CONFIG_USB_DWC3_XILINX is not set
+# CONFIG_USB_DWC3_AM62 is not set
+# CONFIG_USB_DWC3_OCTEON is not set
+# CONFIG_USB_DWC3_RTK is not set
+
+# XHCI主机控制器
+CONFIG_USB_XHCI_HCD=y
+# CONFIG_USB_XHCI_DBGCAP is not set
+# CONFIG_USB_XHCI_PCI_RENESAS is not set
+CONFIG_USB_XHCI_DWC3=y
+CONFIG_USB_XHCI_PLATFORM=y
+
+# 禁用所有老旧及第三方USB主机控制器
+# CONFIG_USB_EHCI_HCD is not set
+# CONFIG_USB_OHCI_HCD is not set
+# CONFIG_USB_C67X00_HCD is not set
+# CONFIG_USB_OXU210HP_HCD is not set
+# CONFIG_USB_ISP116X_HCD is not set
+# CONFIG_USB_MAX3421_HCD is not set
+# CONFIG_USB_UHCI_HCD is not set
+# CONFIG_USB_SL811_HCD is not set
+# CONFIG_USB_R8A66597_HCD is not set
+# CONFIG_USB_HCD_TEST_MODE is not set
+
+# USB设备类驱动
+CONFIG_USB_STORAGE=y
+# CONFIG_USB_STORAGE_DEBUG is not set
+# CONFIG_USB_STORAGE_REALTEK is not set
+# CONFIG_USB_STORAGE_DATAFAB is not set
+# CONFIG_USB_STORAGE_FREECOM is not set
+# CONFIG_USB_STORAGE_ISD200 is not set
+# CONFIG_USB_STORAGE_USBAT is not set
+# CONFIG_USB_STORAGE_SDDR09 is not set
+# CONFIG_USB_STORAGE_SDDR55 is not set
+# CONFIG_USB_STORAGE_JUMPSHOT is not set
+# CONFIG_USB_STORAGE_ALAUDA is not set
+# CONFIG_USB_STORAGE_ONETOUCH is not set
+# CONFIG_USB_STORAGE_KARMA is not set
+# CONFIG_USB_STORAGE_CYPRESS_ATACB is not set
+# CONFIG_USB_STORAGE_ENE_UB6250 is not set
+# CONFIG_USB_UAS is not set
+
+CONFIG_USB_ACM=y
+# CONFIG_USB_PRINTER is not set
+CONFIG_USB_WDM=y
+# CONFIG_USB_TMC is not set
+
+# 无用USB外设、USBIP、其他双控制器全部关闭
+# CONFIG_USB_MDC800 is not set
+# CONFIG_USB_MICROTEK is not set
+# CONFIG_USBIP_CORE is not set
+# CONFIG_USB_CDNS_SUPPORT is not set
+# CONFIG_USB_MUSB_HDRC is not set
+
+# USB网络、串口、PPP协议
+CONFIG_USB_USBNET=y
+CONFIG_USB_NET_CDCETHER=y
+CONFIG_USB_NET_RNDIS_HOST=y
+CONFIG_USB_NET_CDC_NCM=y
+CONFIG_USB_SERIAL=y
+CONFIG_USB_SERIAL_CONSOLE=y
+CONFIG_USB_SERIAL_GENERIC=y
+CONFIG_USB_SERIAL_OPTION=y
+CONFIG_PPP=y
+CONFIG_PPP_BSDCOMP=y
+CONFIG_PPP_DEFLATE=y
+CONFIG_PPP_FILTER=y
+CONFIG_PPP_MPPE=y
+CONFIG_PPP_MULTILINK=y
+CONFIG_PPP_ASYNC=y
+CONFIG_PPP_SYNC_TTY=y
+
+# =================================================================
+# 📦 模块支持
+# =================================================================
+CONFIG_MODULES=y
+CONFIG_MODVERSIONS=y
+CONFIG_MODULE_UNLOAD=y
+
+# 红外接收器硬件驱动
+CONFIG_IR_GPIO_CIR=y
+
+# 关闭无用USB HID外设节省内核体积
+# CONFIG_USB_KEYBOARD is not set
+# CONFIG_USB_MOUSE is not set
+# CONFIG_USB_HID is not set
+
+# =================================================================
+# 🔐 密钥子系统总开关（非对称密钥前置依赖）
+# =================================================================
+CONFIG_KEYS=y
+# 精简关闭密钥子系统无用扩展功能
+# CONFIG_KEYS_REQUEST_CACHE is not set
+# CONFIG_PERSISTENT_KEYRINGS is not set
+# CONFIG_BIG_KEYS is not set
+# CONFIG_TRUSTED_KEYS is not set
+# CONFIG_ENCRYPTED_KEYS is not set
+# CONFIG_USER_DECRYPTED_DATA is not set
+# CONFIG_KEY_DH_OPERATIONS is not set
+# CONFIG_KEY_NOTIFICATIONS is not set
+
+# =================================================================
+# 🔐 非对称密钥模块 固化PKCS8私钥解析配置，彻底消除NEW交互式编译报错
+# =================================================================
+CONFIG_ASYMMETRIC_KEY_TYPE=y
+CONFIG_ASYMMETRIC_PUBLIC_KEY_SUBTYPE=y
+CONFIG_X509_CERTIFICATE_PARSER=y
+# 固化新增PKCS8私钥解析配置，规避syncconfig交互式等待
+# CONFIG_PKCS8_PRIVATE_KEY_PARSER is not set
+# CONFIG_PKCS7_MESSAGE_PARSER is not set
+# CONFIG_SIGNED_PE_FILE_VERIFICATION is not set
+# CONFIG_PKCS7_TEST_KEY is not set
+# CONFIG_FIPS_SIGNATURE_SELFTEST is not set
+
+# =================================================================
+# 🔐 系统证书密钥环 固化配置 消除certs/Kconfig交互式弹窗
+# =================================================================
+CONFIG_SYSTEM_TRUSTED_KEYRING=y
+# 字符串类型必须显式空赋值，禁止注释关闭
+CONFIG_SYSTEM_TRUSTED_KEYS=""
+# 关闭内核新增证书预留配置，解决NEW交互报错
+# CONFIG_SYSTEM_EXTRA_CERTIFICATE is not set
+# CONFIG_SECONDARY_TRUSTED_KEYRING is not set
+# CONFIG_SECONDARY_TRUSTED_KEYRING_SIGNED_BY_BUILTIN is not set
+# CONFIG_SYSTEM_BLACKLIST_KEYRING is not set
+# CONFIG_SYSTEM_BLACKLIST_HASH_LIST is not set
+# CONFIG_SYSTEM_REVOCATION_LIST is not set
+# CONFIG_SYSTEM_REVOCATION_KEYS is not set
+# CONFIG_SYSTEM_BLACKLIST_AUTH_UPDATE is not set
+# CONFIG_MODULE_SIG_KEY is not set
+# CONFIG_MODULE_SIG is not set
+# CONFIG_MODULE_SIG_ALL is not set
+# CONFIG_MODULE_SIG_SHA1 is not set
+# CONFIG_MODULE_SIG_SHA256 is not set
+
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_DEVTMPFS_SAFE=y
+# CONFIG_UEVENT_HELPER is not set
+CONFIG_STANDALONE=y
+CONFIG_TMPFS=y
+
+EOF
+echo "✅ H29K 内核参数注入完成"
