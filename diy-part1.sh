@@ -530,5 +530,7 @@ CONFIG_IR_GPIO_CIR=y
 # CONFIG_USB_MOUSE is not set
 # CONFIG_USB_HID is not set
 
+# CONFIG_PKCS8_PRIVATE_KEY_PARSER is not set
+
 EOF
 echo "✅ H29K 内核参数注入完成（已修复固件string类型配置+预固化通用驱动配置，彻底杜绝NEW交互式编译报错）"
