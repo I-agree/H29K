@@ -530,7 +530,18 @@ CONFIG_IR_GPIO_CIR=y
 # CONFIG_USB_MOUSE is not set
 # CONFIG_USB_HID is not set
 
+# =================================================================
+# 🔐 非对称密钥模块 固化PKCS8私钥解析配置，彻底消除NEW交互式编译报错
+# =================================================================
+CONFIG_ASYMMETRIC_KEY_TYPE=y
+CONFIG_ASYMMETRIC_PUBLIC_KEY_SUBTYPE=y
+CONFIG_X509_CERTIFICATE_PARSER=y
+# 固化新增PKCS8私钥解析配置，规避syncconfig交互式等待
 # CONFIG_PKCS8_PRIVATE_KEY_PARSER is not set
+# CONFIG_PKCS7_MESSAGE_PARSER is not set
+# CONFIG_SIGNED_PE_FILE_VERIFICATION is not set
+# CONFIG_PKCS7_TEST_KEY is not set
+# CONFIG_FIPS_SIGNATURE_SELFTEST is not set
 
 EOF
-echo "✅ H29K 内核参数注入完成（已修复固件string类型配置+预固化通用驱动配置，彻底杜绝NEW交互式编译报错）"
+echo "✅ H29K 内核参数注入完成"
