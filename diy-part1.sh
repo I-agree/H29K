@@ -108,8 +108,6 @@ echo "✅ sed 原位替换完成"
 cd "$GITHUB_WORKSPACE/openwrt" || exit 1
 
 ./scripts/config --file "$CONFIG_FILE" \
-    \
-    # ===== 🔒 第一阶段 sed 兜底（双保险核心）=====
     --undefine ARM64_SVE \
     --set-val CMA_SIZE_MBYTES 128 \
     --set-val CMA_AREAS 8 \
@@ -117,8 +115,6 @@ cd "$GITHUB_WORKSPACE/openwrt" || exit 1
     --enable PARTITION_ADVANCED \
     --undefine USB_EHCI_HCD \
     --undefine USB_OHCI_HCD \
-    \
-    # ===== 原来真正的第二阶段 =====
     --enable DEVTMPFS \
     --enable DEVTMPFS_MOUNT \
     --enable DEVTMPFS_SAFE \
