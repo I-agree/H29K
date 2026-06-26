@@ -98,8 +98,11 @@ jobs:
         
         echo "=== 3. 解压内核、应用补丁 ==="
         make target/linux/prepare V=s 2>&1 | tail -50
+
+        echo "=== 4. OpenWrt原生流程生成平台内核配置 ==="
+        make target/linux/configure V=s
         
-        echo "=== 4. 自动定位真实内核源码目录 ==="
+        echo "=== 5. 自动定位真实内核源码目录 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
         if [ -z "${KERNEL_DIR}" ] || [ ! -f "${KERNEL_DIR}/Makefile" ]; then
           echo "❌ 未找到合法内核源码目录"
@@ -107,19 +110,12 @@ jobs:
           exit 1
         fi
         echo "📁 内核源码目录：${KERNEL_DIR}"
-
-        TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" | sort -V | tail -1)
-        echo "📄 已注入自定义配置的内核基准配置片段：${TARGET_FRAGMENT}"
         
-        echo "=== 5. 基于平台config-6.12生成原生内核基准配置（原始未补全）==="
-        cd "${KERNEL_DIR}"
-        make defconfig V=s
-        cd - > /dev/null
-
+        echo "=== 6. 备份原生平台内核配置作为【原始未补全】配置 ==="
         cp "${KERNEL_DIR}/.config" audit_kernel_original.config
         echo "✅ 原始内核配置行数：$(wc -l < audit_kernel_original.config)"
         
-        echo "=== 6. 内核配置自动补全（olddefconfig，收敛依赖生成真实最终配置）==="
+        echo "=== 7. 内核配置自动补全（olddefconfig收敛依赖）==="
         cd "${KERNEL_DIR}"
         make olddefconfig V=s
         cd - > /dev/null
@@ -157,13 +153,9 @@ jobs:
           echo "⚠️ 内核目录异常，跳过弹窗与依赖检测" > audit_kernel_new_options.txt audit_kernel_unmet_deps.txt
         fi
 
-        echo "=== 4. 备份目标原始内核配置片段 ==="
-        TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" | sort -V | tail -1)
-        [ -f "${TARGET_FRAGMENT}" ] && cp "${TARGET_FRAGMENT}" audit_target_kernel_fragment.txt
-
-        echo "=== 5. 配置行数汇总统计 ==="
+        echo "=== 4. 配置行数汇总统计 ==="
         wc -l .config audit_defconfig.txt audit_kernel_original.config audit_kernel_final.config \
-          audit_kernel_new_options.txt audit_target_kernel_fragment.txt > audit_summary.txt
+          audit_kernel_new_options.txt > audit_summary.txt
 
     - name: 📦 打包全部审计诊断文件
       run: |
@@ -176,7 +168,6 @@ jobs:
           audit_kernel_final.config
           audit_kernel_new_options.txt
           audit_kernel_unmet_deps.txt
-          audit_target_kernel_fragment.txt
           audit_summary.txt
         )
         EXIST_FILES=()
