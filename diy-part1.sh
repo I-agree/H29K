@@ -105,7 +105,27 @@ echo "✅ sed 原位替换完成"
 # scripts/config 直接操作 Kconfig 语法树，自动处理依赖关系
 # 在 make defconfig 之前执行，确保所有条目被正确纳入依赖解析
 # 确保在 openwrt 根目录
-cd "$GITHUB_WORKSPACE/openwrt" || exit 1
+# 自动定位 OpenWrt 源码根目录（兼容任意仓库名）
+if [ -f "./scripts/config" ]; then
+    OPENWRT_ROOT="$(pwd)"
+elif [ -n "${GITHUB_WORKSPACE:-}" ] && [ -f "${GITHUB_WORKSPACE}/scripts/config" ]; then
+    OPENWRT_ROOT="${GITHUB_WORKSPACE}"
+else
+    echo "❌ 错误: 无法定位 OpenWrt 源码根目录，scripts/config 不存在！"
+    echo "   当前目录: $(pwd)"
+    echo "   GITHUB_WORKSPACE: ${GITHUB_WORKSPACE:-未设置}"
+    ls -la "$(pwd)" 2>/dev/null || true
+    exit 1
+fi
+
+echo "📂 OpenWrt 源码根目录: $OPENWRT_ROOT"
+cd "$OPENWRT_ROOT"
+
+if [ ! -x "./scripts/config" ]; then
+    chmod +x ./scripts/config
+fi
+
+echo "🔧 执行 scripts/config 注入（含 sed 兜底 + 全量 H29K 配置）..."
 
 ./scripts/config --file "$CONFIG_FILE" \
     --undefine ARM64_SVE \
