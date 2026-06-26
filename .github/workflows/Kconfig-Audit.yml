@@ -102,8 +102,8 @@ jobs:
         echo "=== 4. prepare：解压内核+通用generic配置+平台config-6.12+应用所有内核补丁 ==="
         make target/linux/prepare V=s 2>&1 | tail -50
 
-        echo "=== 5. oldconfig：三层配置合并生成原生内核.config ==="
-        make -C target/linux oldconfig V=s
+        echo "=== 5. oldconfig：原生顶层调用，三层配置合并生成内核.config ==="
+        make target/linux/oldconfig V=s
         
         echo "=== 6. 自动定位真实内核源码目录 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
