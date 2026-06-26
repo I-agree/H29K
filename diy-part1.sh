@@ -531,6 +531,20 @@ CONFIG_IR_GPIO_CIR=y
 # CONFIG_USB_HID is not set
 
 # =================================================================
+# 🔐 密钥子系统总开关（非对称密钥前置依赖）
+# =================================================================
+CONFIG_KEYS=y
+# 精简关闭密钥子系统无用扩展功能
+# CONFIG_KEYS_REQUEST_CACHE is not set
+# CONFIG_PERSISTENT_KEYRINGS is not set
+# CONFIG_BIG_KEYS is not set
+# CONFIG_TRUSTED_KEYS is not set
+# CONFIG_ENCRYPTED_KEYS is not set
+# CONFIG_USER_DECRYPTED_DATA is not set
+# CONFIG_KEY_DH_OPERATIONS is not set
+# CONFIG_KEY_NOTIFICATIONS is not set
+
+# =================================================================
 # 🔐 非对称密钥模块 固化PKCS8私钥解析配置，彻底消除NEW交互式编译报错
 # =================================================================
 CONFIG_ASYMMETRIC_KEY_TYPE=y
@@ -542,6 +556,27 @@ CONFIG_X509_CERTIFICATE_PARSER=y
 # CONFIG_SIGNED_PE_FILE_VERIFICATION is not set
 # CONFIG_PKCS7_TEST_KEY is not set
 # CONFIG_FIPS_SIGNATURE_SELFTEST is not set
+
+# =================================================================
+# 🔐 系统证书密钥环 固化配置 消除certs/Kconfig交互式弹窗
+# =================================================================
+CONFIG_SYSTEM_TRUSTED_KEYRING=y
+# 字符串类型必须显式空赋值，禁止注释关闭
+CONFIG_SYSTEM_TRUSTED_KEYS=""
+# 关闭内核新增证书预留配置，解决NEW交互报错
+# CONFIG_SYSTEM_EXTRA_CERTIFICATE is not set
+# CONFIG_SECONDARY_TRUSTED_KEYRING is not set
+# CONFIG_SECONDARY_TRUSTED_KEYRING_SIGNED_BY_BUILTIN is not set
+# CONFIG_SYSTEM_BLACKLIST_KEYRING is not set
+# CONFIG_SYSTEM_BLACKLIST_HASH_LIST is not set
+# CONFIG_SYSTEM_REVOCATION_LIST is not set
+# CONFIG_SYSTEM_REVOCATION_KEYS is not set
+# CONFIG_SYSTEM_BLACKLIST_AUTH_UPDATE is not set
+# CONFIG_MODULE_SIG_KEY is not set
+# CONFIG_MODULE_SIG is not set
+# CONFIG_MODULE_SIG_ALL is not set
+# CONFIG_MODULE_SIG_SHA1 is not set
+# CONFIG_MODULE_SIG_SHA256 is not set
 
 EOF
 echo "✅ H29K 内核参数注入完成"
