@@ -103,7 +103,7 @@ jobs:
         make target/linux/prepare V=s 2>&1 | tail -50
 
         echo "=== 5. 原生非交互式内核配置收敛，合并顶层.config内核参数 ==="
-        yes "" | make kernel_menuconfig CONFIG_TARGET=subtarget V=s
+        make kernel_oldconfig V=s
         
         echo "=== 6. 自动定位真实内核源码目录 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
