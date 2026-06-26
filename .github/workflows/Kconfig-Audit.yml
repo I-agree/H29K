@@ -100,7 +100,7 @@ jobs:
         make target/linux/prepare V=s 2>&1 | tail -50
 
         echo "=== 4. OpenWrt原生流程生成平台内核配置 ==="
-        make target/linux/configure V=s
+        make target/linux/compile -q V=s
         
         echo "=== 5. 自动定位真实内核源码目录 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
