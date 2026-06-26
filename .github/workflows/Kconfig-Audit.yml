@@ -85,27 +85,30 @@ jobs:
         cd ${OPENWRT_DIR}
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 🔄 初始化配置、内核准备、生成初始内核配置（只读审计）
+    - name: 🔄 预下载源码→预编译工具链→内核配置审计（严格官方构建顺序）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        
-        echo "=== 1. OpenWrt顶层配置初始化（加载用户.config全局内核参数）==="
-        make defconfig
 
-        echo "=== 2. 预编译Host工具链与kconfig依赖 ==="
-        make -j$(nproc) prereq V=s
-
-        echo "=== 3. 预下载源码包并清理无效文件 ==="
+        echo "=== 1. 全局预下载所有源码包（tools/toolchain/内核/软件包）==="
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec rm -f {} \;
-        
-        echo "=== 4. prepare：解压内核+通用generic配置+平台config-6.12+应用所有内核补丁 ==="
+
+        echo "=== 2. 预编译主机端全部工具 tools/compile ==="
+        make -j$(nproc) tools/compile V=s
+
+        echo "=== 3. 预编译平台交叉工具链 toolchain/compile ==="
+        make -j$(nproc) toolchain/compile V=s
+
+        echo "=== 4. OpenWrt顶层配置初始化 ==="
+        make defconfig
+
+        echo "=== 5. prepare：解压内核+通用generic配置+平台config-6.12+应用所有内核补丁 ==="
         make target/linux/prepare V=s 2>&1 | tail -50
 
-        echo "=== 5. 原生非交互式内核配置收敛，合并顶层.config内核参数 ==="
+        echo "=== 6. 原生静默收敛内核配置（自动合并三层配置，无图形界面不编译内核）==="
         make kernel_oldconfig V=s
-        
-        echo "=== 6. 自动定位真实内核源码目录 ==="
+
+        echo "=== 7. 定位内核源码目录 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
         if [ -z "${KERNEL_DIR}" ] || [ ! -f "${KERNEL_DIR}/Makefile" ]; then
           echo "❌ 未找到合法内核源码目录"
@@ -113,12 +116,12 @@ jobs:
           exit 1
         fi
         echo "📁 内核源码目录：${KERNEL_DIR}"
-        
-        echo "=== 7. 备份三层配置合并后的【原始未补全】内核配置 ==="
+
+        echo "=== 8. 备份原始未补全内核配置 ==="
         cp "${KERNEL_DIR}/.config" audit_kernel_original.config
         echo "✅ 原始内核配置行数：$(wc -l < audit_kernel_original.config)"
-        
-        echo "=== 8. 内核配置自动补全（olddefconfig收敛依赖）==="
+
+        echo "=== 9. 内核依赖自动补齐收敛 ==="
         cd "${KERNEL_DIR}"
         make olddefconfig V=s
         cd - > /dev/null
@@ -143,7 +146,7 @@ jobs:
         echo "=== 2. 导出目标平台设备配置 ==="
         grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
 
-        echo "=== 3. 定位内核目录并检测新增配置弹窗 ==="
+        echo "=== 3. 检测新增内核交互式配置项 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
         if [ -n "${KERNEL_DIR}" ] && [ -f "${KERNEL_DIR}/Kconfig" ]; then
           cp audit_kernel_original.config "${KERNEL_DIR}/.config"
