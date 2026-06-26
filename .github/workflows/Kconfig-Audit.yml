@@ -91,12 +91,15 @@ jobs:
         
         echo "=== 1. OpenWrt顶层配置初始化 ==="
         make defconfig
-        
-        echo "=== 2. 预下载源码包并清理无效文件 ==="
+
+        echo "===  预编译Host工具链与kconfig依赖（必须前置，解决工具缺失崩溃）==="
+        make -j$(nproc) prereq V=s
+
+        echo "=== 3. 预下载源码包并清理无效文件 ==="
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec rm -f {} \;
         
-        echo "=== 3. 解压内核、应用补丁 ==="
+        echo "=== 4. 解压内核、应用平台补丁 ==="
         make target/linux/prepare V=s 2>&1 | tail -50
 
         echo "=== 4. OpenWrt原生流程生成平台内核配置 ==="
