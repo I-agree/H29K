@@ -113,7 +113,7 @@ jobs:
         
         echo "=== 5. 基于平台config-6.12生成原生内核基准配置（原始未补全）==="
         cd "${KERNEL_DIR}"
-        make ARCH=arm64 defconfig V=s
+        make defconfig V=s
         cd - > /dev/null
 
         cp "${KERNEL_DIR}/.config" audit_kernel_original.config
