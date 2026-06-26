@@ -131,7 +131,7 @@ jobs:
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec rm -f {} \;
         
-        echo "=== 4. 解压内核、应用补丁 ==="
+        echo "=== 4. 解压内核、应用补丁，自动加载已修改的平台config-6.12生成原生内核配置 ==="
         make target/linux/prepare V=s 2>&1 | tail -50
         
         echo "=== 5. 自动定位真实内核源码目录 ==="
@@ -144,20 +144,16 @@ jobs:
         echo "📁 内核源码目录：${KERNEL_DIR}"
 
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" | sort -V | tail -1)
-        echo "📄 内核基准配置片段：${TARGET_FRAGMENT}"
+        echo "📄 已注入自定义配置的内核基准配置片段：${TARGET_FRAGMENT}"
         
-        echo "=== 6. 合并生成【原始未补全】内核配置（用于统计原生弹窗）==="
-        grep '^CONFIG_' .config | grep -v '^CONFIG_TARGET_' > /tmp/user_kernel_opts.txt
-        perl scripts/kconfig.pl '+' "${TARGET_FRAGMENT}" /tmp/user_kernel_opts.txt > "${KERNEL_DIR}/.config"
-        # 备份原始配置
+        echo "=== 6. 直接备份prepare生成的原生内核配置作为【原始未补全】配置（无手动拼接失真）==="
         cp "${KERNEL_DIR}/.config" audit_kernel_original.config
         echo "✅ 原始内核配置行数：$(wc -l < audit_kernel_original.config)"
         
-        echo "=== 7. 内核配置自动补全（olddefconfig，保留自定义参数，新增配置自动填充默认值避免编译报错）==="
+        echo "=== 7. 内核配置自动补全（olddefconfig，收敛依赖生成真实最终配置）==="
         cd "${KERNEL_DIR}"
         make ARCH=arm64 olddefconfig V=s
         cd - > /dev/null
-        # 备份补全后配置
         cp "${KERNEL_DIR}/.config" audit_kernel_final.config
         echo "✅ 补全后内核配置行数：$(wc -l < audit_kernel_final.config)"
 
@@ -182,13 +178,11 @@ jobs:
         echo "=== 3. 定位内核目录并检测新增配置弹窗 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
         if [ -n "${KERNEL_DIR}" ] && [ -f "${KERNEL_DIR}/Kconfig" ]; then
-          # 基于原始配置统计真实弹窗数量
           cp audit_kernel_original.config "${KERNEL_DIR}/.config"
           make -C "${KERNEL_DIR}" listnewconfig ARCH=arm64 > audit_kernel_new_options.txt 2>&1
           NEW_CNT=$(grep -cE "^CONFIG_|^# CONFIG_" audit_kernel_new_options.txt || echo 0)
           echo "📊 原生待弹窗配置项数量：${NEW_CNT}"
 
-          # 内核依赖检测
           ${CONF_BIN} --alldefconfig "${KERNEL_DIR}/Kconfig" 2> audit_kernel_unmet_deps.txt || true
         else
           echo "⚠️ 内核目录异常，跳过弹窗与依赖检测" > audit_kernel_new_options.txt audit_kernel_unmet_deps.txt
