@@ -85,56 +85,21 @@ jobs:
         cd ${OPENWRT_DIR}
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 🔄 依赖收敛、内核准备、生成初始内核配置（只读审计）
+    - name: 🔄 初始化配置、内核准备、生成初始内核配置（只读审计）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         
-        echo "=== 1. 循环 defconfig 收敛 OpenWrt 层依赖 ==="
-        CONF_BIN=""
-        for i in {1..5}; do
-          make defconfig
-          make -C scripts/config conf 2>/dev/null
-          if [ -x ./staging_dir/host/bin/conf ]; then
-            CONF_BIN=./staging_dir/host/bin/conf
-          elif [ -x ./scripts/config/conf ]; then
-            CONF_BIN=./scripts/config/conf
-          fi
-
-          if [ -n "${CONF_BIN}" ] && ${CONF_BIN} --silentoldconfig Kconfig > /dev/null 2>&1; then
-            echo "✅ 第 $i 轮后 OpenWrt 配置已稳定"
-            break
-          else
-            echo "⚠️ 第 $i 轮仍有未满足依赖，继续收敛..."
-          fi
-        done
+        echo "=== 1. OpenWrt顶层配置初始化 ==="
+        make defconfig
         
-        echo "=== 2. 导出OpenWrt未满足依赖日志 ==="
-        make -C scripts/config conf 2>/dev/null
-        if [ -x ./staging_dir/host/bin/conf ]; then
-          CONF_BIN=./staging_dir/host/bin/conf
-        elif [ -x ./scripts/config/conf ]; then
-          CONF_BIN=./scripts/config/conf
-        else
-          echo "❌ 无法编译conf工具，终止"
-          exit 1
-        fi
-        
-        if ${CONF_BIN} --silentoldconfig Kconfig 2> openwrt_unmet_deps_final.txt; then
-          echo "✅ OpenWrt 无未满足依赖"
-          > openwrt_unmet_deps_final.txt
-        else
-          echo "❌ OpenWrt存在未满足依赖"
-          cat openwrt_unmet_deps_final.txt
-        fi
-        
-        echo "=== 3. 预下载源码包并清理无效文件 ==="
+        echo "=== 2. 预下载源码包并清理无效文件 ==="
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec rm -f {} \;
         
-        echo "=== 4. 解压内核、应用补丁，自动加载已修改的平台config-6.12生成原生内核配置 ==="
+        echo "=== 3. 解压内核、应用补丁 ==="
         make target/linux/prepare V=s 2>&1 | tail -50
         
-        echo "=== 5. 自动定位真实内核源码目录 ==="
+        echo "=== 4. 自动定位真实内核源码目录 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
         if [ -z "${KERNEL_DIR}" ] || [ ! -f "${KERNEL_DIR}/Makefile" ]; then
           echo "❌ 未找到合法内核源码目录"
@@ -146,11 +111,15 @@ jobs:
         TARGET_FRAGMENT=$(find target/linux/rockchip -name "config-*" | sort -V | tail -1)
         echo "📄 已注入自定义配置的内核基准配置片段：${TARGET_FRAGMENT}"
         
-        echo "=== 6. 直接备份prepare生成的原生内核配置作为【原始未补全】配置（无手动拼接失真）==="
+        echo "=== 5. 基于平台config-6.12生成原生内核基准配置（原始未补全）==="
+        cd "${KERNEL_DIR}"
+        make ARCH=arm64 defconfig V=s
+        cd - > /dev/null
+
         cp "${KERNEL_DIR}/.config" audit_kernel_original.config
         echo "✅ 原始内核配置行数：$(wc -l < audit_kernel_original.config)"
         
-        echo "=== 7. 内核配置自动补全（olddefconfig，收敛依赖生成真实最终配置）==="
+        echo "=== 6. 内核配置自动补全（olddefconfig，收敛依赖生成真实最终配置）==="
         cd "${KERNEL_DIR}"
         make ARCH=arm64 olddefconfig V=s
         cd - > /dev/null
@@ -194,8 +163,7 @@ jobs:
 
         echo "=== 5. 配置行数汇总统计 ==="
         wc -l .config audit_defconfig.txt audit_kernel_original.config audit_kernel_final.config \
-          audit_kernel_new_options.txt audit_target_kernel_fragment.txt \
-          openwrt_unmet_deps_final.txt > audit_summary.txt
+          audit_kernel_new_options.txt audit_target_kernel_fragment.txt > audit_summary.txt
 
     - name: 📦 打包全部审计诊断文件
       run: |
@@ -209,7 +177,6 @@ jobs:
           audit_kernel_new_options.txt
           audit_kernel_unmet_deps.txt
           audit_target_kernel_fragment.txt
-          openwrt_unmet_deps_final.txt
           audit_summary.txt
         )
         EXIST_FILES=()
