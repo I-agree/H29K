@@ -106,6 +106,25 @@ echo "✅ sed 原位替换完成"
 # 在 make defconfig 之前执行，确保所有条目被正确纳入依赖解析
 cd "$GITHUB_WORKSPACE/openwrt"  # 确保在 openwrt 根目录
 
+# ======================== 【H29K 主线内核配置合并注入】 ========================
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+
+echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
+
+# ========== 第一阶段：sed 原位替换（处理已知确切值的条目）==========
+sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_SIZE_MBYTES=.*$/CONFIG_CMA_SIZE_MBYTES=128/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_AREAS=.*$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
+sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_USB_EHCI_HCD=.*$/# CONFIG_USB_EHCI_HCD is not set/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_USB_OHCI_HCD=.*$/# CONFIG_USB_OHCI_HCD is not set/' "$CONFIG_FILE"
+
+echo "✅ sed 原位替换完成"
+
+# ========== 第二阶段：scripts/config 注入（替代 cat >> EOF）==========
+cd "$GITHUB_WORKSPACE/openwrt"
+
 ./scripts/config --file "$CONFIG_FILE" \
     --enable DEVTMPFS \
     --enable DEVTMPFS_MOUNT \
@@ -175,8 +194,10 @@ cd "$GITHUB_WORKSPACE/openwrt"  # 确保在 openwrt 根目录
     --disable MICREL_PHY \
     --disable REALTEK_PHY \
     --disable MOTORCOMM_PHY \
-    --enable INPUT_GPIO_KEYS \
-    --disable KEYBOARD_GPIO \
+    --enable INPUT \
+    --enable INPUT_EVDEV \
+    --enable INPUT_KEYBOARD \
+    --enable KEYBOARD_GPIO \
     --enable FW_LOADER \
     --enable FW_LOADER_COMPRESS \
     --disable FW_LOADER_PAGED_BUF \
