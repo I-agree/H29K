@@ -127,9 +127,6 @@ CONFIG_BT_HCIBTSDIO=y
 # CONFIG_BT_HCIBTUSB is not set
 # CONFIG_BT_HCIUART is not set
 
-# AIC8800 SDIO蓝牙硬件支持开关
-CONFIG_AIC8800_SDIO_BT_SUPPORT=y
-
 # =================================================================
 # 🚫 关闭 SimpleDRM (避免与 ST7789V SPI 屏抢占 fb0)
 # =================================================================
