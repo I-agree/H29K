@@ -1,6 +1,7 @@
-name: Kconfig审核（完整预构建·只读审计版）
+name: OpenWrt 固件生成脚本
 
 on:
+  repository_dispatch:
   workflow_dispatch:
 
 env:
@@ -10,31 +11,53 @@ env:
   CONFIG_FILE: rk3528-hinlink-h29k.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
 
 jobs:
-  kconfig-audit:
+  build:
     runs-on: ubuntu-22.04
+    # 🔥 【强力注入】显式声明工作流 Token 核心权限，踏平所有 403 权限暗礁
     permissions:
-      contents: read
+      contents: write   # 允许创建、修改、删除 GitHub Release 固件
+      actions: write    # 允许清理和删除历史工作流运行记录
 
     steps:
-    - name: 检出源码与配置脚本
+    - name: 检出源码
       uses: actions/checkout@v6.0.3
 
     - name: 调整磁盘空间
       run: |
         sudo mkdir -p $WORK_DIR
         sudo chown -R $USER:$USER $WORK_DIR
+        
+        # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
+        echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
+        # 1. 停用系统可能存在的零碎、低效旧交换分区
         sudo swapoff -a || true
+        # 2. 划出 5GB 专属全量 Swap 空间
         sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
         sudo chmod 600 /swapfile
         sudo mkswap /swapfile
         sudo swapon /swapfile
+        # 3. 强行修改内核虚拟内存激进系数（从默认 60 压榨到 10）
+        # 迫使 CPU 优先榨干物理内存，不到最后一刻绝不读写硬盘，从底层物理掐断 Swap 造成的 I/O 假死
         sudo sysctl vm.swappiness=10
+        echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
+        echo "📊 扩容系统全局 /tmp 至 10G"
+        # 扩容系统默认 /tmp 临时分区（关键修复）
         sudo umount /tmp || true
         sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "✅ /tmp 扩容至 10GB 完成"
+        
+        echo "📊 检查当前磁盘空间分布："
+        df -h
+        # 额外检查inode，防止小文件耗尽节点
+        df -i /tmp
+        # 写入环境变量以便后续步骤继承
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
 
     - name: 初始化构建环境
@@ -49,66 +72,74 @@ jobs:
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
 
+    - name: 查看编译环境硬件规格 (CPU/内存)
+      run: |
+        echo "==================== CPU 核心数 ===================="
+        echo "逻辑核心数: $(nproc)"
+        cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+        echo -e "\n==================== 内存大小 ===================="
+        free -h
+
     - name: 克隆 OpenWrt 源码到磁盘
       run: |
         cd $WORK_DIR
+        df -hT $PWD
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
 
     - name: 加载自定义软件源
       run: |
-        OPENWRT_DIR=${{ env.WORK_DIR }}/openwrt
-        [ -f $FEEDS_CONF ] && cp -f $FEEDS_CONF ${OPENWRT_DIR}/feeds.conf.default
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
-        cd ${OPENWRT_DIR}
+        cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: 更新软件源索引
-      run: |
-        cd ${{ env.WORK_DIR }}/openwrt
-        ./scripts/feeds update -a
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
 
     - name: 安装软件源组件
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
+
+    - name: 加载自定义配置文件
+      run: |
+        if [ -d files ]; then
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+          cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
+        fi
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: 下载依赖软件
+      id: package
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        ./scripts/feeds install -a
-
-    - name: 加载自定义配置文件与 DIY-P2
-      run: |
-        OPENWRT_DIR=${{ env.WORK_DIR }}/openwrt
-        if [ -d files ]; then
-          mkdir -p ${OPENWRT_DIR}/files
-          cp -r files/* ${OPENWRT_DIR}/files/
-        fi
-        [ -f $CONFIG_FILE ] && cp -f $CONFIG_FILE ${OPENWRT_DIR}/.config
-        chmod +x $DIY_P2_SH
-        cd ${OPENWRT_DIR}
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+        make defconfig
+        for i in {1..3}; do make download -j8 && break || sleep 5; done
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
 
     - name: 🔄 预下载源码→预编译工具链→内核配置审计（严格官方构建顺序）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
 
-        echo "=== 1. 全局预下载所有源码包（tools/toolchain/内核/软件包）==="
-        for i in {1..3}; do make download -j8 && break || sleep 5; done
-        find dl -size -1024c -exec rm -f {} \;
-
-        echo "=== 2. 预编译主机端全部工具 tools/compile ==="
+        echo "=== 1. 预编译主机端全部工具 tools/compile ==="
         make -j$(nproc) tools/compile V=s
 
-        echo "=== 3. 预编译平台交叉工具链 toolchain/compile ==="
+        echo "=== 2. 预编译平台交叉工具链 toolchain/compile ==="
         make -j$(nproc) toolchain/compile V=s
 
-        echo "=== 4. OpenWrt顶层配置初始化 ==="
+        echo "=== 3. OpenWrt顶层配置初始化 ==="
         make defconfig
 
-        echo "=== 5. prepare：解压内核+通用generic配置+平台config-6.12+应用所有内核补丁 ==="
+        echo "=== 4. prepare：解压内核+通用generic配置+平台config-6.12+应用所有内核补丁 ==="
         make target/linux/prepare V=s 2>&1 | tail -50
 
-        echo "=== 6. 原生静默收敛内核配置（自动合并三层配置，无图形界面不编译内核）==="
+        echo "=== 5. 原生静默收敛内核配置（自动合并三层配置，无图形界面不编译内核）==="
         make kernel_oldconfig V=s
 
-        echo "=== 7. 定位内核源码目录 ==="
+        echo "=== 6. 定位内核源码目录 ==="
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
         if [ -z "${KERNEL_DIR}" ] || [ ! -f "${KERNEL_DIR}/Makefile" ]; then
           echo "❌ 未找到合法内核源码目录"
@@ -117,11 +148,11 @@ jobs:
         fi
         echo "📁 内核源码目录：${KERNEL_DIR}"
 
-        echo "=== 8. 备份原始未补全内核配置 ==="
+        echo "=== 7. 备份原始未补全内核配置 ==="
         cp "${KERNEL_DIR}/.config" audit_kernel_original.config
         echo "✅ 原始内核配置行数：$(wc -l < audit_kernel_original.config)"
 
-        echo "=== 9. 内核依赖自动补齐收敛 ==="
+        echo "=== 8. 内核依赖自动补齐收敛 ==="
         cd "${KERNEL_DIR}"
         make olddefconfig V=s
         cd - > /dev/null
