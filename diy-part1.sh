@@ -107,11 +107,6 @@ cat >> "$CONFIG_FILE" << 'EOF'
 # CONFIG_MOTORCOMM_PHY is not set
 # CONFIG_MEDIATEK_GE_PHY is not set
 
-# ✅ RK3528 内置千兆 RGMII PHY (Naneng CombPHY)
-CONFIG_PHY_ROCKCHIP_NANENG_COMBO_PHY=y
-CONFIG_PHYLINK=y
-CONFIG_FIXED_PHY=y
-
 # =================================================================
 # 📡 蓝牙完整协议栈 (AIC8800 SDIO WiFi+BT二合一)
 # =================================================================
@@ -518,9 +513,6 @@ CONFIG_PPP_SYNC_TTY=y
 CONFIG_MODULES=y
 CONFIG_MODVERSIONS=y
 CONFIG_MODULE_UNLOAD=y
-
-# 适配内核定稿三路串口
-CONFIG_SERIAL_8250_EXTENDED=y
 
 # 红外接收器硬件驱动
 CONFIG_IR_GPIO_CIR=y
