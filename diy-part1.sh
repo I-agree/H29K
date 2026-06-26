@@ -175,7 +175,6 @@ CONFIG_PREVENT_FIRMWARE_BUILD=y
 # CONFIG_UEVENT_HELPER is not set
 # CONFIG_ALLOW_DEV_COREDUMP is not set
 # CONFIG_DEBUG_DRIVER is not set
-# CONFIG_DMA_SHARED_BUFFER is not set
 
 # 关闭废弃Staging驱动，屏蔽rtl8723bs/rtllib等老旧无线NEW弹窗
 # CONFIG_STAGING is not set
