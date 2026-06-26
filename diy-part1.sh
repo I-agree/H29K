@@ -101,7 +101,7 @@ sed -i 's/^CONFIG_USB_OHCI_HCD=.*$/# CONFIG_USB_OHCI_HCD is not set/' "$CONFIG_F
 
 echo "✅ sed 原位替换完成"
 
-# ========== 第二阶段：scripts/config 注入（替代 cat >> EOF）==========
+# ========== 第二阶段：scripts/config 注入（含第一阶段sed原位替换，双保险）==========
 # scripts/config 直接操作 Kconfig 语法树，自动处理依赖关系
 # 在 make defconfig 之前执行，确保所有条目被正确纳入依赖解析
 # 确保在 openwrt 根目录
