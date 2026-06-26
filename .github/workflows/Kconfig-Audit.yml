@@ -121,7 +121,7 @@ jobs:
         
         echo "=== 6. 内核配置自动补全（olddefconfig，收敛依赖生成真实最终配置）==="
         cd "${KERNEL_DIR}"
-        make ARCH=arm64 olddefconfig V=s
+        make olddefconfig V=s
         cd - > /dev/null
         cp "${KERNEL_DIR}/.config" audit_kernel_final.config
         echo "✅ 补全后内核配置行数：$(wc -l < audit_kernel_final.config)"
@@ -148,7 +148,7 @@ jobs:
         KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
         if [ -n "${KERNEL_DIR}" ] && [ -f "${KERNEL_DIR}/Kconfig" ]; then
           cp audit_kernel_original.config "${KERNEL_DIR}/.config"
-          make -C "${KERNEL_DIR}" listnewconfig ARCH=arm64 > audit_kernel_new_options.txt 2>&1
+          make -C "${KERNEL_DIR}" listnewconfig > audit_kernel_new_options.txt 2>&1
           NEW_CNT=$(grep -cE "^CONFIG_|^# CONFIG_" audit_kernel_new_options.txt || echo 0)
           echo "📊 原生待弹窗配置项数量：${NEW_CNT}"
 
