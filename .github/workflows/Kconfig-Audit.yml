@@ -1,7 +1,6 @@
-name: OpenWrt 固件生成脚本
+name: Kconfig审核（完整预构建·只读审计版）
 
 on:
-  repository_dispatch:
   workflow_dispatch:
 
 env:
@@ -11,53 +10,31 @@ env:
   CONFIG_FILE: rk3528-hinlink-h29k.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
-  UPLOAD_BIN_DIR: false
-  UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
 
 jobs:
-  build:
+  kconfig-audit:
     runs-on: ubuntu-22.04
-    # 🔥 【强力注入】显式声明工作流 Token 核心权限，踏平所有 403 权限暗礁
     permissions:
-      contents: write   # 允许创建、修改、删除 GitHub Release 固件
-      actions: write    # 允许清理和删除历史工作流运行记录
+      contents: read
 
     steps:
-    - name: 检出源码
+    - name: 检出源码与配置脚本
       uses: actions/checkout@v6.0.3
 
     - name: 调整磁盘空间
       run: |
         sudo mkdir -p $WORK_DIR
         sudo chown -R $USER:$USER $WORK_DIR
-        
-        # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
-        echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
-        # 1. 停用系统可能存在的零碎、低效旧交换分区
         sudo swapoff -a || true
-        # 2. 划出 5GB 专属全量 Swap 空间
         sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
         sudo chmod 600 /swapfile
         sudo mkswap /swapfile
         sudo swapon /swapfile
-        # 3. 强行修改内核虚拟内存激进系数（从默认 60 压榨到 10）
-        # 迫使 CPU 优先榨干物理内存，不到最后一刻绝不读写硬盘，从底层物理掐断 Swap 造成的 I/O 假死
         sudo sysctl vm.swappiness=10
-        echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
-        echo "📊 扩容系统全局 /tmp 至 10G"
-        # 扩容系统默认 /tmp 临时分区（关键修复）
         sudo umount /tmp || true
         sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
-        echo "✅ /tmp 扩容至 10GB 完成"
-        
-        echo "📊 检查当前磁盘空间分布："
-        df -h
-        # 额外检查inode，防止小文件耗尽节点
-        df -i /tmp
-        # 写入环境变量以便后续步骤继承
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
 
     - name: 初始化构建环境
@@ -72,18 +49,9 @@ jobs:
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
 
-    - name: 查看编译环境硬件规格 (CPU/内存)
-      run: |
-        echo "==================== CPU 核心数 ===================="
-        echo "逻辑核心数: $(nproc)"
-        cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
-        echo -e "\n==================== 内存大小 ===================="
-        free -h
-
     - name: 克隆 OpenWrt 源码到磁盘
       run: |
         cd $WORK_DIR
-        df -hT $PWD
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
 
