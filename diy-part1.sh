@@ -595,17 +595,6 @@ CONFIG_SYSTEM_TRUSTED_KEYS=""
 # CONFIG_PCS_MTK_LYNXI is not set
 
 # =================================================================
-# DEVTMPFS 全局唯一启用（放在脚本最末尾，优先级最高，彻底解决被前置配置覆盖问题）
-# =================================================================
-CONFIG_DEVTMPFS=y
-CONFIG_DEVTMPFS_MOUNT=y
-CONFIG_DEVTMPFS_SAFE=y
-# CONFIG_UEVENT_HELPER is not set
-CONFIG_STANDALONE=y
-CONFIG_PREVENT_FIRMWARE_BUILD=y
-CONFIG_TMPFS=y
-
-# =================================================================
 # SARADC 模数转换
 # =================================================================
 CONFIG_IIO=y
@@ -625,10 +614,76 @@ CONFIG_IIO_CHARDEV=y
 CONFIG_RESET_CONTROLLER=y
 
 # =================================================================
-# 总开关：启用initrd/initramfs底层解析（必须开启，防止VFS panic）
+# ========== 4G内存专用MM内存管理全套（新增段，4G64G高配） ==========
+# =================================================================
+CONFIG_SWAP=y
+CONFIG_ZSWAP=y
+CONFIG_ZSWAP_DEFAULT_ON=y
+CONFIG_ZSWAP_SHRINKER_DEFAULT_ON=y
+CONFIG_ZSWAP_COMPRESSOR_DEFAULT_ZSTD=y
+CONFIG_ZSWAP_ZPOOL_DEFAULT_ZSMALLOC=y
+CONFIG_ZSMALLOC=y
+CONFIG_ZSMALLOC_CHAIN_SIZE=8
+CONFIG_ZSMALLOC_STAT=y
+# CONFIG_Z3FOLD_DEPRECATED is not set
+
+CONFIG_SLUB=y
+# CONFIG_SLUB_TINY is not set
+CONFIG_SLAB_MERGE_DEFAULT=y
+CONFIG_SLAB_FREELIST_RANDOM=y
+CONFIG_SLAB_FREELIST_HARDENED=y
+CONFIG_SLUB_STATS=y
+CONFIG_SLUB_CPU_PARTIAL=y
+CONFIG_RANDOM_KMALLOC_CACHES=y
+CONFIG_SLUB_BUCKETS=y
+
+CONFIG_TRANSPARENT_HUGEPAGE=y
+CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS=y
+# CONFIG_TRANSPARENT_HUGEPAGE_MADVISE is not set
+# CONFIG_TRANSPARENT_HUGEPAGE_NEVER is not set
+CONFIG_THP_SWAP=y
+CONFIG_READ_ONLY_THP_FOR_FS=y
+
+CONFIG_CMA=y
+CONFIG_CMA_DEBUGFS=y
+CONFIG_CMA_SYSFS=y
+CONFIG_CMA_AREAS=20
+CONFIG_MIGRATION=y
+CONFIG_COMPACTION=y
+
+CONFIG_LRU_GEN=y
+CONFIG_LRU_GEN_ENABLED=y
+CONFIG_LRU_GEN_STATS=y
+CONFIG_KSM=y
+CONFIG_IDLE_PAGE_TRACKING=y
+CONFIG_MEM_SOFT_DIRTY=y
+CONFIG_DEFAULT_MMAP_MIN_ADDR=4096
+CONFIG_USERFAULTFD=y
+CONFIG_PTE_MARKER_UFFD_WP=y
+
+# CONFIG_MEMORY_FAILURE is not set
+# CONFIG_MEMORY_HOTPLUG is not set
+# CONFIG_NUMA is not set
+
+# =================================================================
+# ========== 核心故障修复1：DEVTMPFS / TMPFS 强制置顶末尾 ==========
+# =================================================================
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_DEVTMPFS_SAFE=y
+# CONFIG_UEVENT_HELPER is not set
+CONFIG_STANDALONE=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
+CONFIG_TMPFS=y
+CONFIG_TMPFS_POSIX_ACL=y
+CONFIG_TMPFS_XATTR=y
+CONFIG_TMPFS_QUOTA=y
+CONFIG_TMPFS_INODE64=y
+
+# =================================================================
+# ========== 核心故障修复2：BLK_DEV_INITRD initramfs底层解析 ==========
 # =================================================================
 CONFIG_BLK_DEV_INITRD=y
-# 外部initrd支持的解压算法（OpenWrt通用全套，重点ZSTD）
 CONFIG_RD_GZIP=y
 CONFIG_RD_BZIP2=y
 CONFIG_RD_LZMA=y
@@ -637,14 +692,11 @@ CONFIG_RD_LZO=y
 CONFIG_RD_LZ4=y
 CONFIG_RD_ZSTD=y
 
-# 不编译内置initramfs到kernel镜像
 CONFIG_INITRAMFS_SOURCE=""
-# 忽略bootloader传入initrd不需要，关闭
 # CONFIG_INITRAMFS_FORCE is not set
 CONFIG_INITRAMFS_ROOT_UID=0
 CONFIG_INITRAMFS_ROOT_GID=0
 
-# 不使用内核内置initramfs，压缩选项全部关闭
 # CONFIG_INITRAMFS_COMPRESSION_GZIP is not set
 # CONFIG_INITRAMFS_COMPRESSION_BZIP2 is not set
 # CONFIG_INITRAMFS_COMPRESSION_LZMA is not set
