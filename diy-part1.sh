@@ -614,5 +614,24 @@ CONFIG_TMPFS=y
 # CONFIG_USB_ISP116X_HCD is not set
 # CONFIG_USB_C67X00_HCD is not set
 
+# =================================================================
+# SARADC 模数转换
+# =================================================================
+CONFIG_IIO=y
+CONFIG_IIO_BUFFER=y
+CONFIG_IIO_TRIGGER=y
+CONFIG_IIO_TRIGGERED_BUFFER=y
+CONFIG_IIO_CONSUMERS_PER_TRIGGER=2
+# CONFIG_IIO_CONFIGFS is not set
+# CONFIG_IIO_SW_DEVICE is not set
+# CONFIG_IIO_SW_TRIGGER is not set
+# CONFIG_IIO_TRIGGERED_EVENT is not set
+# CONFIG_IIO_BACKEND is not set
+
+CONFIG_ROCKCHIP_SARADC=y
+# CONFIG_ROCKCHIP_SARADC_MODULE is not set
+CONFIG_IIO_CHARDEV=y
+CONFIG_RESET_CONTROLLER=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
