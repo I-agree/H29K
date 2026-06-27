@@ -624,5 +624,35 @@ CONFIG_ROCKCHIP_SARADC=y
 CONFIG_IIO_CHARDEV=y
 CONFIG_RESET_CONTROLLER=y
 
+# =================================================================
+# 总开关：启用initrd/initramfs底层解析（必须开启，防止VFS panic）
+# =================================================================
+CONFIG_BLK_DEV_INITRD=y
+# 外部initrd支持的解压算法（OpenWrt通用全套，重点ZSTD）
+CONFIG_RD_GZIP=y
+CONFIG_RD_BZIP2=y
+CONFIG_RD_LZMA=y
+CONFIG_RD_XZ=y
+CONFIG_RD_LZO=y
+CONFIG_RD_LZ4=y
+CONFIG_RD_ZSTD=y
+
+# 不编译内置initramfs到kernel镜像
+CONFIG_INITRAMFS_SOURCE=""
+# 忽略bootloader传入initrd不需要，关闭
+# CONFIG_INITRAMFS_FORCE is not set
+CONFIG_INITRAMFS_ROOT_UID=0
+CONFIG_INITRAMFS_ROOT_GID=0
+
+# 不使用内核内置initramfs，压缩选项全部关闭
+# CONFIG_INITRAMFS_COMPRESSION_GZIP is not set
+# CONFIG_INITRAMFS_COMPRESSION_BZIP2 is not set
+# CONFIG_INITRAMFS_COMPRESSION_LZMA is not set
+# CONFIG_INITRAMFS_COMPRESSION_XZ is not set
+# CONFIG_INITRAMFS_COMPRESSION_LZO is not set
+# CONFIG_INITRAMFS_COMPRESSION_LZ4 is not set
+# CONFIG_INITRAMFS_COMPRESSION_ZSTD is not set
+CONFIG_INITRAMFS_COMPRESSION_NONE=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
