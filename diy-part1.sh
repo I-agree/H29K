@@ -161,17 +161,8 @@ CONFIG_EXTRA_FIRMWARE_DIR="/lib/firmware"
 # CONFIG_FW_UPLOAD is not set
 
 # =================================================================
-# 通用驱动基础配置 提前规避drivers/base/staging模块NEW弹窗
-# =================================================================
-CONFIG_DEVTMPFS=y
-CONFIG_DEVTMPFS_MOUNT=y
-CONFIG_STANDALONE=y
-CONFIG_PREVENT_FIRMWARE_BUILD=y
-# CONFIG_UEVENT_HELPER is not set
-# CONFIG_ALLOW_DEV_COREDUMP is not set
-# CONFIG_DEBUG_DRIVER is not set
-
 # 关闭废弃Staging驱动，屏蔽rtl8723bs/rtllib等老旧无线NEW弹窗
+# =================================================================
 # CONFIG_STAGING is not set
 
 # =================================================================
@@ -577,6 +568,7 @@ CONFIG_DEVTMPFS_MOUNT=y
 CONFIG_DEVTMPFS_SAFE=y
 # CONFIG_UEVENT_HELPER is not set
 CONFIG_STANDALONE=y
+CONFIG_PREVENT_FIRMWARE_BUILD=y
 CONFIG_TMPFS=y
 
 # 兜底彻底禁用EHCI全部衍生子配置，防止依赖自动启用
