@@ -165,7 +165,7 @@ CONFIG_FIT_SIGNATURE=y
 CONFIG_LEGACY_IMAGE_FORMAT=y
 CONFIG_BOOTDELAY=2
 CONFIG_USE_BOOTCOMMAND=y
-CONFIG_BOOTCOMMAND="bootflow scan -lb; echo 'Bootstd fallback: loading boot.scr...'; load mmc 0:1 0x00500000 boot.scr && source 0x00500000"
+CONFIG_BOOTCOMMAND="bootflow scan -lb; echo 'Bootstd fallback: loading boot.scr...'; load mmc 0:0 0x00500000 boot.scr && source 0x00500000"
 CONFIG_USE_PREBOOT=y
 CONFIG_PREBOOT="setenv devtype mmc; setenv devnum 0; setenv kernel_addr_r 0x02080000; setenv fdt_addr_r 0x0a100000; setenv ramdisk_addr_r 0x0a200000; setenv soc rk3528"
 
