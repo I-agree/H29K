@@ -617,10 +617,9 @@ CONFIG_IIO_CHARDEV=y
 CONFIG_RESET_CONTROLLER=y
 
 # =================================================================
-# ========== 4G内存专用MM内存管理全套（新增段，4G64G高配） ==========
+# ========== 4G内存专用MM内存管理全套 ==========
 # =================================================================
 CONFIG_CRYPTO=y
-CONFIG_CRYPTO_ALGORITHMS=y
 CONFIG_SWAP=y
 CONFIG_ZSWAP=y
 CONFIG_ZSWAP_DEFAULT_ON=y
@@ -631,10 +630,12 @@ CONFIG_ZSMALLOC=y
 CONFIG_ZSMALLOC_CHAIN_SIZE=8
 CONFIG_ZSMALLOC_STAT=y
 # CONFIG_Z3FOLD_DEPRECATED is not set
+
+# 关键：CRYPTO_ZSTD只能设为m，不能=y
 CONFIG_ZSTD=y
 CONFIG_ZSTD_COMPRESS=y
 CONFIG_ZSTD_DECOMPRESS=y
-CONFIG_CRYPTO_ZSTD=y
+CONFIG_CRYPTO_ZSTD=m
 
 CONFIG_SLUB=y
 # CONFIG_SLUB_TINY is not set
