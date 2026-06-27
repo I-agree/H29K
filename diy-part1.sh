@@ -125,6 +125,11 @@ sed -i '/^CONFIG_ZSTD_COMPRESS/d' "$CONFIG_FILE"
 sed -i '/^CONFIG_ZSTD_DECOMPRESS/d' "$CONFIG_FILE"
 sed -i '/^CONFIG_ZSTD=y/d' "$CONFIG_FILE"
 
+# 新增：清理LZ4历史配置，防止NEW未定义触发弹窗
+sed -i '/^CONFIG_ZSWAP_COMPRESSOR_DEFAULT_LZ4/d' "$CONFIG_FILE"
+sed -i '/^CONFIG_CRYPTO_LZ4/d' "$CONFIG_FILE"
+sed -i '/^CONFIG_CRYPTO_LZ4HC/d' "$CONFIG_FILE"
+
 cat >> "$CONFIG_FILE" << 'EOF'
 
 # =================================================================
@@ -631,6 +636,7 @@ CONFIG_SWAP=y
 CONFIG_ZSWAP=y
 CONFIG_ZSWAP_DEFAULT_ON=y
 CONFIG_ZSWAP_SHRINKER_DEFAULT_ON=y
+CONFIG_CRYPTO_LZ4=m
 # 锁定LZ4，内核内置，无tristate类型冲突，choice不再弹窗
 # CONFIG_ZSWAP_COMPRESSOR_DEFAULT_ZSTD is not set
 CONFIG_ZSWAP_COMPRESSOR_DEFAULT_LZ4=y
