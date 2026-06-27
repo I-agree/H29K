@@ -151,7 +151,7 @@ CONFIG_TFTP_BLOCKSIZE=1468
 CONFIG_SERVERIP="192.168.1.1"
 CONFIG_IPADDR="192.168.1.2"
 
-# ===== U-Boot Modern Bootstd (标准现代化引导框架) =====
+# ===== U-Boot Modern Bootstd (标准现代化引导框架 + 传统boot.scr兜底) =====
 CONFIG_BOOTSTD=y
 CONFIG_BOOTSTD_FULL=y
 CONFIG_BOOTSTD_DEFAULTS=y
@@ -161,10 +161,13 @@ CONFIG_CMDLINE=y
 CONFIG_HUSH_PARSER=y
 CONFIG_FIT=y
 CONFIG_FIT_VERBOSE=y
+CONFIG_FIT_SIGNATURE=y
 CONFIG_LEGACY_IMAGE_FORMAT=y
 CONFIG_BOOTDELAY=2
 CONFIG_USE_BOOTCOMMAND=y
-CONFIG_BOOTCOMMAND="bootflow scan -lb"
+CONFIG_BOOTCOMMAND="bootflow scan -lb; echo 'Bootstd fallback: loading boot.scr...'; load mmc 0:1 0x00500000 boot.scr && source 0x00500000"
+CONFIG_USE_PREBOOT=y
+CONFIG_PREBOOT="setenv devtype mmc; setenv devnum 0; setenv kernel_addr_r 0x02080000; setenv fdt_addr_r 0x0a100000; setenv ramdisk_addr_r 0x0a200000; setenv soc rk3528"
 
 # ===== 正式阶段所需的控制命令与通用文件系统读取 =====
 CONFIG_CMD_MMC=y
@@ -178,6 +181,7 @@ CONFIG_CMD_MEMINFO_MAP=y
 CONFIG_CMD_MISC=y
 CONFIG_CMD_GPT=y
 CONFIG_CMD_RNG=y
+CONFIG_CMD_SOURCE=y
 
 # ===== 正式阶段支持的文件系统驱动 =====
 CONFIG_FS_FAT=y
