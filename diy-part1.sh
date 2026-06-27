@@ -619,6 +619,8 @@ CONFIG_RESET_CONTROLLER=y
 # =================================================================
 # ========== 4G内存专用MM内存管理全套（新增段，4G64G高配） ==========
 # =================================================================
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_ALGORITHMS=y
 CONFIG_SWAP=y
 CONFIG_ZSWAP=y
 CONFIG_ZSWAP_DEFAULT_ON=y
