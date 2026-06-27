@@ -385,6 +385,7 @@ CONFIG_NET_SCH_FQ=y
 CONFIG_DEFAULT_FQ=y
 CONFIG_TCP_CONG_ADVANCED=y
 CONFIG_TCP_CONG_BBR=y
+# CONFIG_DEFAULT_CUBIC is not set
 CONFIG_DEFAULT_BBR=y
 
 # =================================================================
