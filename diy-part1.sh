@@ -95,10 +95,6 @@ sed -i 's/^CONFIG_CMA_AREAS=.*$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
 sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
 
-# 彻底清理所有EHCI、OHCI历史配置行，避免重复行导致olddefconfig恢复默认
-sed -i '/^[#]*CONFIG_USB_EHCI_HCD/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_USB_OHCI_HCD/d' "$CONFIG_FILE"
-
 # 前置清理四款外置PHY所有历史行，防止默认恢复
 sed -i '/^[#]*CONFIG_MICREL_PHY/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_REALTEK_PHY/d' "$CONFIG_FILE"
@@ -110,10 +106,6 @@ sed -i '/^[#]*CONFIG_DEVTMPFS/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_UEVENT_HELPER/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_STANDALONE/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_TMPFS/d' "$CONFIG_FILE"
-
-# 完整清理所有EHCI/OHCI相关子配置
-sed -i '/^[#]*CONFIG_USB_EHCI_/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_USB_OHCI_/d' "$CONFIG_FILE"
 
 # 清理：MT7530 DSA全套清理
 sed -i '/^[#]*CONFIG_NET_DSA/d' "$CONFIG_FILE"
@@ -465,9 +457,13 @@ CONFIG_USB_XHCI_HCD=y
 CONFIG_USB_XHCI_DWC3=y
 CONFIG_USB_XHCI_PLATFORM=y
 
-# 禁用所有老旧及第三方USB主机控制器
-# CONFIG_USB_EHCI_HCD is not set
-# CONFIG_USB_OHCI_HCD is not set
+# ========== 关键修正：DTS已启用EHCI/OHCI，必须开启驱动 ==========
+CONFIG_USB_EHCI_HCD=y
+CONFIG_USB_EHCI_HCD_PLATFORM=y
+CONFIG_USB_OHCI_HCD=y
+CONFIG_USB_OHCI_HCD_PLATFORM=y
+
+# 仅禁用其余老旧第三方USB主机控制器
 # CONFIG_USB_C67X00_HCD is not set
 # CONFIG_USB_OXU210HP_HCD is not set
 # CONFIG_USB_ISP116X_HCD is not set
@@ -609,17 +605,7 @@ CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
 CONFIG_TMPFS=y
 
-# 兜底彻底禁用EHCI全部衍生子配置，防止依赖自动启用
-# CONFIG_USB_EHCI_HCD is not set
-# CONFIG_USB_EHCI_PCI is not set
-# CONFIG_USB_EHCI_HCD_PLATFORM is not set
-# CONFIG_USB_EHCI_ROOT_HUB_TT is not set
-# CONFIG_USB_EHCI_BIG_ENDIAN_MMIO is not set
-# CONFIG_USB_EHCI_BIG_ENDIAN_DESC is not set
-# CONFIG_USB_EHCI_TT_NEWSCHED is not set
-# CONFIG_USB_OHCI_HCD is not set
-# CONFIG_USB_OHCI_HCD_PCI is not set
-# CONFIG_USB_OHCI_HCD_PLATFORM is not set
+# 其余老旧USB控制器禁用，EHCI/OHCI保留开启
 # CONFIG_USB_UHCI_HCD is not set
 # CONFIG_USB_SL811_HCD is not set
 # CONFIG_USB_MAX3421_HCD is not set
