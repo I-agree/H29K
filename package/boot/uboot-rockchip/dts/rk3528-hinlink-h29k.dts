@@ -171,7 +171,7 @@
 &gmac1 {
 	clock_in_out = "output";
 	phy-handle = <&rgmii_phy>;
-	local-mac-address = [D0 92 FC 25 AC C8];
+	phy-mode = "rgmii-id";
 	tx_delay = <0x3>;
 	rx_delay = <0x6>;
 	phy-supply = <&vcc_3v3>;
