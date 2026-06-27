@@ -115,6 +115,9 @@ sed -i '/^[#]*CONFIG_NET_DSA_MT7530_MMIO/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_NET_DSA_TAG_MTK/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_PCS_MTK_LYNXI/d' "$CONFIG_FILE"
 
+# 移除原始默认关闭的BLK_DEV_INITRD行，后续末尾重新强制开启
+sed -i '/^# CONFIG_BLK_DEV_INITRD is not set/d' "$CONFIG_FILE"
+
 cat >> "$CONFIG_FILE" << 'EOF'
 
 # =================================================================
