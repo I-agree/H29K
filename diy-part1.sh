@@ -118,6 +118,13 @@ sed -i '/^[#]*CONFIG_PCS_MTK_LYNXI/d' "$CONFIG_FILE"
 # 移除原始默认关闭的BLK_DEV_INITRD行，后续末尾重新强制开启
 sed -i '/^# CONFIG_BLK_DEV_INITRD is not set/d' "$CONFIG_FILE"
 
+# 2. 清理所有ZSTD相关冲突配置
+sed -i '/^CONFIG_ZSWAP_COMPRESSOR_DEFAULT_ZSTD/d' target/linux/rockchip/armv8/config-6.12
+sed -i '/^CONFIG_CRYPTO_ZSTD/d' target/linux/rockchip/armv8/config-6.12
+sed -i '/^CONFIG_ZSTD_COMPRESS/d' target/linux/rockchip/armv8/config-6.12
+sed -i '/^CONFIG_ZSTD_DECOMPRESS/d' target/linux/rockchip/armv8/config-6.12
+sed -i '/^CONFIG_ZSTD=y/d' target/linux/rockchip/armv8/config-6.12
+
 cat >> "$CONFIG_FILE" << 'EOF'
 
 # =================================================================
