@@ -99,6 +99,21 @@ sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/'
 sed -i '/^[#]*CONFIG_USB_EHCI_HCD/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_USB_OHCI_HCD/d' "$CONFIG_FILE"
 
+# 前置清理四款外置PHY所有历史行，防止默认恢复
+sed -i '/^[#]*CONFIG_MICREL_PHY/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_REALTEK_PHY/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_MOTORCOMM_PHY/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_MEDIATEK_GE_PHY/d' "$CONFIG_FILE"
+
+# 前置清理DEVTMPFS相关所有历史配置，避免前后冲突
+sed -i '/^[#]*CONFIG_DEVTMPFS/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_UEVENT_HELPER/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_STANDALONE/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_TMPFS/d' "$CONFIG_FILE"
+
+# 完整清理所有EHCI/OHCI相关子配置
+sed -i '/^[#]*CONFIG_USB_EHCI_/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_USB_OHCI_/d' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -137,7 +152,7 @@ CONFIG_BT_HCIBTSDIO=m
 # CONFIG_DRM_SIMPLEDRM is not set
 
 # =================================================================
-# 固件加载配置（彻底规避NEW交互式报错）
+# 固件加载配置（彻底规避NEW交互式报错 + 修复PAGED_BUF/SYSFS强制选中问题）
 # =================================================================
 CONFIG_FW_LOADER=y
 CONFIG_FW_LOADER_COMPRESS=y
@@ -146,19 +161,21 @@ CONFIG_FW_LOADER_COMPRESS=y
 CONFIG_EXTRA_FIRMWARE=""
 CONFIG_EXTRA_FIRMWARE_DIR="/lib/firmware"
 
-# 锁定自动选中依赖项
-# CONFIG_FW_LOADER_PAGED_BUF is not set
-# CONFIG_FW_LOADER_SYSFS is not set
-
-# 锁定压缩子模块
+# 【关键修复】关闭会强制select两个子项的上游配置
+# CONFIG_FW_LOADER_USER_HELPER is not set
+# CONFIG_FW_LOADER_USER_HELPER_FALLBACK is not set
 # CONFIG_FW_LOADER_COMPRESS_XZ is not set
 # CONFIG_FW_LOADER_COMPRESS_ZSTD is not set
+# CONFIG_FW_UPLOAD is not set
+
+# 现在可稳定锁定这两项，不会被依赖强制恢复
+# CONFIG_FW_LOADER_PAGED_BUF is not set
+# CONFIG_FW_LOADER_SYSFS is not set
 
 # 关闭无用固件相关功能
 # CONFIG_FW_LOADER_DEBUG is not set
 # CONFIG_RUST_FW_LOADER_ABSTRACTIONS is not set
 # CONFIG_FW_CACHE is not set
-# CONFIG_FW_UPLOAD is not set
 
 # =================================================================
 # 关闭废弃Staging驱动，屏蔽rtl8723bs/rtllib等老旧无线NEW弹窗
@@ -563,6 +580,9 @@ CONFIG_SYSTEM_TRUSTED_KEYS=""
 # CONFIG_MODULE_SIG_SHA1 is not set
 # CONFIG_MODULE_SIG_SHA256 is not set
 
+# =================================================================
+# DEVTMPFS 全局唯一启用（放在脚本最末尾，优先级最高，彻底解决被前置配置覆盖问题）
+# =================================================================
 CONFIG_DEVTMPFS=y
 CONFIG_DEVTMPFS_MOUNT=y
 CONFIG_DEVTMPFS_SAFE=y
