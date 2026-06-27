@@ -605,15 +605,6 @@ CONFIG_STANDALONE=y
 CONFIG_PREVENT_FIRMWARE_BUILD=y
 CONFIG_TMPFS=y
 
-# 其余老旧USB控制器禁用，EHCI/OHCI保留开启
-# CONFIG_USB_UHCI_HCD is not set
-# CONFIG_USB_SL811_HCD is not set
-# CONFIG_USB_MAX3421_HCD is not set
-# CONFIG_USB_R8A66597_HCD is not set
-# CONFIG_USB_OXU210HP_HCD is not set
-# CONFIG_USB_ISP116X_HCD is not set
-# CONFIG_USB_C67X00_HCD is not set
-
 # =================================================================
 # SARADC 模数转换
 # =================================================================
