@@ -7,8 +7,8 @@
 #include "rk3528.dtsi"
 
 / {
-	model = "HINLINK OPC-H29K Board";
-	compatible = "hinlink,opc-h29k", "rockchip,rk3528";
+	model = "HINLINK H29K";
+	compatible = "hinlink,h29k", "rockchip,rk3528";
 
 	aliases {
 		mmc0 = &sdhci;
