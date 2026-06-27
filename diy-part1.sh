@@ -91,7 +91,7 @@ echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
 # 这些条目在原始 config-6.12 中有确定值，sed 可直接精确匹配
 sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_CMA_SIZE_MBYTES=.*$/CONFIG_CMA_SIZE_MBYTES=128/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_CMA_AREAS=.*$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_CMA_AREAS=.*$/CONFIG_CMA_AREAS=20/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
 sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
 
