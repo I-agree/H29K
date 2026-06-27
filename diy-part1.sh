@@ -95,9 +95,10 @@ sed -i 's/^CONFIG_CMA_AREAS=.*$/CONFIG_CMA_AREAS=8/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
 sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
 
-# ⚠️ 修复：原 sed 只匹配 =y，但实际可能是 =m，改为通配
-sed -i 's/^CONFIG_USB_EHCI_HCD=.*$/# CONFIG_USB_EHCI_HCD is not set/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_USB_OHCI_HCD=.*$/# CONFIG_USB_OHCI_HCD is not set/' "$CONFIG_FILE"
+# 彻底清理所有EHCI、OHCI历史配置行，避免重复行导致olddefconfig恢复默认
+sed -i '/^[#]*CONFIG_USB_EHCI_HCD/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_USB_OHCI_HCD/d' "$CONFIG_FILE"
+
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
