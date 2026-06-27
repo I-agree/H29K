@@ -115,6 +115,12 @@ sed -i '/^[#]*CONFIG_TMPFS/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_USB_EHCI_/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_USB_OHCI_/d' "$CONFIG_FILE"
 
+# 彻底清理MT7530 DSA相关所有历史配置，杜绝依赖自动拉起MEDIATEK_GE_PHY
+sed -i '/^[#]*CONFIG_NET_DSA/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_NET_DSA_MT7530/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_NET_DSA_MT7530_MDIO/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_NET_DSA_MT7530_MMIO/d' "$CONFIG_FILE"
+
 cat >> "$CONFIG_FILE" << 'EOF'
 
 # =================================================================
@@ -609,6 +615,14 @@ CONFIG_TMPFS=y
 # CONFIG_USB_OXU210HP_HCD is not set
 # CONFIG_USB_ISP116X_HCD is not set
 # CONFIG_USB_C67X00_HCD is not set
+
+# =================================================================
+# 🚫 关闭DSA交换机框架及MT7530联发科交换机（本机无外置多口交换机，防止强制拉起MEDIATEK_GE_PHY）
+# =================================================================
+# CONFIG_NET_DSA is not set
+# CONFIG_NET_DSA_MT7530 is not set
+# CONFIG_NET_DSA_MT7530_MDIO is not set
+# CONFIG_NET_DSA_MT7530_MMIO is not set
 
 EOF
 echo "✅ H29K 内核参数注入完成"
