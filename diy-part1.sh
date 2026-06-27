@@ -115,11 +115,13 @@ sed -i '/^[#]*CONFIG_TMPFS/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_USB_EHCI_/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_USB_OHCI_/d' "$CONFIG_FILE"
 
-# 彻底清理MT7530 DSA相关所有历史配置，杜绝依赖自动拉起MEDIATEK_GE_PHY
+# 清理：MT7530 DSA全套清理
 sed -i '/^[#]*CONFIG_NET_DSA/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_NET_DSA_MT7530/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_NET_DSA_MT7530_MDIO/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_NET_DSA_MT7530_MMIO/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_NET_DSA_TAG_MTK/d' "$CONFIG_FILE"
+sed -i '/^[#]*CONFIG_PCS_MTK_LYNXI/d' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -587,6 +589,16 @@ CONFIG_SYSTEM_TRUSTED_KEYS=""
 # CONFIG_MODULE_SIG_SHA256 is not set
 
 # =================================================================
+# 🚫 彻底关闭DSA交换机框架及MT7530驱动（解决MEDIATEK_GE_PHY反复自动开启根源）
+# =================================================================
+# CONFIG_NET_DSA is not set
+# CONFIG_NET_DSA_MT7530 is not set
+# CONFIG_NET_DSA_MT7530_MDIO is not set
+# CONFIG_NET_DSA_MT7530_MMIO is not set
+# CONFIG_NET_DSA_TAG_MTK is not set
+# CONFIG_PCS_MTK_LYNXI is not set
+
+# =================================================================
 # DEVTMPFS 全局唯一启用（放在脚本最末尾，优先级最高，彻底解决被前置配置覆盖问题）
 # =================================================================
 CONFIG_DEVTMPFS=y
@@ -615,14 +627,6 @@ CONFIG_TMPFS=y
 # CONFIG_USB_OXU210HP_HCD is not set
 # CONFIG_USB_ISP116X_HCD is not set
 # CONFIG_USB_C67X00_HCD is not set
-
-# =================================================================
-# 🚫 关闭DSA交换机框架及MT7530联发科交换机（本机无外置多口交换机，防止强制拉起MEDIATEK_GE_PHY）
-# =================================================================
-# CONFIG_NET_DSA is not set
-# CONFIG_NET_DSA_MT7530 is not set
-# CONFIG_NET_DSA_MT7530_MDIO is not set
-# CONFIG_NET_DSA_MT7530_MMIO is not set
 
 EOF
 echo "✅ H29K 内核参数注入完成"
