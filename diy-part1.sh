@@ -149,5 +149,46 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
 # ST7789V屏幕驱动
 CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
 
+# =================================================================
+# TSADC温度 (Rockchip 平台温控核心配置)
+# =================================================================
+# 基础架构
+CONFIG_ARCH_ROCKCHIP=y
+CONFIG_HAS_IOMEM=y
+CONFIG_RESET_CONTROLLER=y
+
+# 温控框架
+CONFIG_THERMAL=y
+CONFIG_THERMAL_OF=y
+CONFIG_THERMAL_HWMON=y
+CONFIG_THERMAL_NETLINK=y
+
+# RK TSADC驱动
+CONFIG_ROCKCHIP_THERMAL=y
+
+# 温控冷却
+CONFIG_CPU_THERMAL=y
+CONFIG_CPU_FREQ_THERMAL=y
+CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=y
+CONFIG_THERMAL_GOV_STEP_WISE=y
+
+# =================================================================
+# 硬件真随机数 TRNG
+# =================================================================
+# 基础依赖
+CONFIG_ARCH_ROCKCHIP=y
+CONFIG_HAS_IOMEM=y
+CONFIG_OF=y
+
+# 硬件随机数框架
+CONFIG_HW_RANDOM=y
+# RK硬件TRNG驱动（DTS rng节点依赖此项）
+CONFIG_HW_RANDOM_ROCKCHIP=y
+
+# 推荐配套熵池相关（保证硬件随机数注入系统随机池）
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_RNG=y
+CONFIG_CRYPTO_DRBG=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
