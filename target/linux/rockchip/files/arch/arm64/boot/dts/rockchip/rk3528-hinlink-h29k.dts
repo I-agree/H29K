@@ -1605,6 +1605,9 @@
 			bt-enable-h: bt-enable-h { 
 				rockchip,pins = <1 17 0 &pcfg_pull_down>; 
 			};
+			uart2m1-gpios {
+				rockchip,pins = <1 10 0 &pcfg_pull_none>;
+			};
 			uart2m1_xfer: uart2m1-xfer {
 				rockchip,pins = <1 10 2 &pcfg_pull_up_drv_level_2
 						 1 11 2 &pcfg_pull_none>;
