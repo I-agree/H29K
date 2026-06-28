@@ -245,11 +245,16 @@
 	touchscreen@63 {
 		compatible = "chipone,axs5106";
 		reg = <0x63>;
-		interrupt-parent = <&gpio0>;
-		interrupts = <RK_PB5 IRQ_TYPE_LEVEL_LOW>;
-		reset-gpios = <&gpio0 RK_PB6 GPIO_ACTIVE_LOW>;
-		touchscreen-size-x = <800>;
-		touchscreen-size-y = <1280>;
+		interrupt-parent = <&gpio4>;
+		interrupts = <RK_PB2 IRQ_TYPE_LEVEL_LOW>;
+		interrupt-names = "touchscreen";
+		irq-gpios = <&gpio4 RK_PB2 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio4 RK_PB3 GPIO_ACTIVE_HIGH>;
+		touchscreen-size-x = <172>;
+		touchscreen-size-y = <320>;
+		touchscreen-inverted-x;
+		touchscreen-inverted-y;
+		status = "okay";
 	};
 };
 
