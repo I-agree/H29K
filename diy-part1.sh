@@ -190,5 +190,51 @@ CONFIG_CRYPTO=y
 CONFIG_CRYPTO_RNG=y
 CONFIG_CRYPTO_DRBG=y
 
+# =================================================================
+# rfkill-modem射频
+# =================================================================
+# 基础依赖
+CONFIG_GPIOLIB=y
+CONFIG_OF=y
+
+# RFKILL总开关
+CONFIG_RFKILL=y
+# GPIO射频开关驱动（rfkill-modem DTS节点核心）
+CONFIG_RFKILL_GPIO=y
+
+# 推荐配套（默认开启）
+CONFIG_RFKILL_LEDS=y
+CONFIG_RFKILL_INPUT=y
+
+# =================================================================
+# PWM sysfs 相关配置
+# =================================================================
+# 全局基础
+CONFIG_SYSFS=y
+CONFIG_OF=y
+CONFIG_HAS_IOMEM=y
+CONFIG_ARCH_ROCKCHIP=y
+
+# PWM总开关（开启后自动启用PWM sysfs导出）
+CONFIG_PWM=y
+
+# RK硬件PWM驱动，匹配DTS pwm节点
+CONFIG_PWM_ROCKCHIP=y
+
+# 可选：PWM调试日志
+# CONFIG_PWM_DEBUG is not set
+
+# =================================================================
+# SPI+MTD+spi-nor 整套相关配置
+# =================================================================
+# 设备树解析
+CONFIG_OF=y
+# 寄存器内存映射访问
+CONFIG_HAS_IOMEM=y
+# RK平台架构
+CONFIG_ARCH_ROCKCHIP=y
+# sysfs 文件系统，导出MTD设备节点
+CONFIG_SYSFS=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
