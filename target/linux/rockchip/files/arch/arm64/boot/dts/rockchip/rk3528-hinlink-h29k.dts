@@ -283,7 +283,7 @@
 		interrupts = <0 152 4>;
 		clocks = <&cru 0x106  &cru 0x107  &cru 0x105>;
 		clock-names = "ref_clk", "suspend_clk", "bus_clk";
-		dr_mode = "host";
+		dr_mode = "otg";
 		phys = <&usb2phy0_otg>, <&combphy 4>;
 		phy-names = "usb2-phy", "usb3-phy";
 		phy_type = "utmi_wide";
