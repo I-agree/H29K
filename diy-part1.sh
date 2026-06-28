@@ -133,5 +133,21 @@ CONFIG_INPUT_KEYBOARD=y
 # GPIO按键官方标准宏（OpenWrt打包依赖这个）
 CONFIG_KEYBOARD_GPIO=y
 
+# =================================================================
+# 小屏幕 (ST7789V开启的全套配置)
+# =================================================================
+# 顶层DRM总开关
+CONFIG_DRM=y
+# DRM面板框架
+CONFIG_DRM_PANEL=y
+# 设备树
+CONFIG_OF=y
+# SPI总线
+CONFIG_SPI=y
+# 背光驱动
+CONFIG_BACKLIGHT_CLASS_DEVICE=y
+# ST7789V屏幕驱动
+CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
