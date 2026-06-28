@@ -236,5 +236,26 @@ CONFIG_ARCH_ROCKCHIP=y
 # sysfs 文件系统，导出MTD设备节点
 CONFIG_SYSFS=y
 
+# =================================================================
+# SDIO 整套相关配置
+# =================================================================
+# MMC总开关+SDIO协议
+CONFIG_MMC=y
+CONFIG_MMC_SDIO=y
+CONFIG_MMC_SDIO_IRQ=y
+
+# SDIO模组GPIO上电复位
+CONFIG_PWRSEQ_SIMPLE=y
+
+# RK DW MMC控制器
+CONFIG_MMC_DW=y
+CONFIG_MMC_DW_PLTFM=y
+CONFIG_MMC_DW_ROCKCHIP=y
+
+# 全局基础依赖
+CONFIG_OF=y
+CONFIG_HAS_IOMEM=y
+CONFIG_HAS_DMA=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
