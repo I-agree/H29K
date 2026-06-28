@@ -704,13 +704,11 @@
 		dmas = <&dmac 0x0d  &dmac 0x0c>;
 		status = "okay";
 		pinctrl-names = "default";
-		pinctrl-0 = <&uart2m1_xfer>; /* 使用 m1 组引脚作为 TX/RX */
+		pinctrl-0 = <&uart2m1_xfer>;
 
 		bluetooth {
 			compatible = "aic,aic8800-bt";
-			/* 对应原厂的 bt-enable-h (GPIO1_C1)，高电平使能 */
 			enable-gpios = <&gpio1 17 GPIO_ACTIVE_HIGH>;
-			/* 对应原厂的 uart2m1-gpios (GPIO1_B2)，作为设备唤醒引脚 */
 			device-wake-gpios = <&gpio1 10 GPIO_ACTIVE_HIGH>;
 		};
 	};
@@ -1607,11 +1605,7 @@
 			bt-enable-h: bt-enable-h { 
 				rockchip,pins = <1 17 0 &pcfg_pull_down>; 
 			};
-			bt-wake-gpios: bt-wake-gpios { 
-				rockchip,pins = <1 10 0 &pcfg_pull_none>; 
-			};
 			uart2m1_xfer: uart2m1-xfer {
-				/* GPIO1_B2 (TX) 和 GPIO1_B3 (RX) 复用为 UART2 */
 				rockchip,pins = <1 10 2 &pcfg_pull_up_drv_level_2
 						 1 11 2 &pcfg_pull_none>;
 			};
