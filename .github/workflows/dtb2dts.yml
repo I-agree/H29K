@@ -1,0 +1,41 @@
+name: Download and Decompile DTB
+
+on:
+  workflow_dispatch: # 允许在网页端手动点击运行
+
+jobs:
+  decompile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 1. 安装 DTC 反编译工具
+        run: sudo apt-get update && sudo apt-get install -y device-tree-compiler
+
+      - name: 2. 从 URL 下载 DTB 文件
+        run: |
+          echo "⬇️ 正在从指定网址下载 rockchip.dtb ..."
+          # 使用 curl 下载文件，-L 表示跟随重定向，-o 指定保存的文件名
+          curl -L -o rockchip.dtb "https://raw.githubusercontent.com/I-agree/H29K/main/DTB/rockchip.dtb"
+          
+          # 检查文件是否下载成功并打印大小
+          if [ -f "rockchip.dtb" ]; then
+            ls -lh rockchip.dtb
+            echo "✅ 下载完成！"
+          else
+            echo "❌ 下载失败，请检查网址是否正确！"
+            exit 1
+          fi
+
+      - name: 3. 执行反编译 (DTB -> DTS)
+        run: |
+          echo "☁️ 正在云端反编译 rockchip.dtb ..."
+          # 执行 dtc 反编译命令，忽略警告输出
+          dtc -I dtb -O dts -o rockchip_reversed.dts rockchip.dtb 2>/dev/null || true
+          ls -lh rockchip_reversed.dts
+          echo "✅ 反编译完成！"
+
+      - name: 4. 上传 DTS 文件供您下载
+        uses: actions/upload-artifact@v4
+        with:
+          name: Decompiled-H29K-DTS
+          path: rockchip_reversed.dts
+          retention-days: 7
