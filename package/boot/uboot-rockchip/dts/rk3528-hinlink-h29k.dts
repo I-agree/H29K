@@ -65,15 +65,15 @@
 		vin-supply = <&vcc_3v3>;
 	};
 
-	vcc3v3_sd: vcc3v3-sd {
-		compatible = "regulator-fixed";
-		gpio = <&gpio4 RK_PA1 GPIO_ACTIVE_LOW>;
-		regulator-name = "vcc3v3_sd";
-		regulator-always-on;
-		regulator-boot-on;
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		vin-supply = <&vcc_3v3>;
+	rng: rng@ffc50000 {
+		compatible = "rockchip,rk3528-rng", "rockchip,rk3588-rng";
+		reg = <0x0 0xffc50000 0x0 0x200>;
+		interrupts = <0 23 4>;
+		clocks = <&scmi_clk 32>;
+		clock-names = "hclk_trng";
+		resets = <&cru 0xa3>;
+		reset-names = "reset";
+		status = "okay";
 	};
 
 	vccio_sd: vccio-sd {
