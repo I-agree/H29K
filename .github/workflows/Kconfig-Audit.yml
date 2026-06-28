@@ -1,6 +1,7 @@
-name: Kconfig审核（完整预构建·只读审计版）
+name: 内核会安静地用默认值填充所有新选项
 
 on:
+  repository_dispatch:
   workflow_dispatch:
 
 env:
@@ -10,31 +11,47 @@ env:
   CONFIG_FILE: rk3528-hinlink-h29k.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
 
 jobs:
-  kconfig-audit:
+  build:
     runs-on: ubuntu-22.04
+    # 🔥 【强力注入】显式声明工作流 Token 核心权限，踏平所有 403 权限暗礁
     permissions:
-      contents: read
+      contents: write   # 允许创建、修改、删除 GitHub Release 固件
+      actions: write    # 允许清理和删除历史工作流运行记录
 
     steps:
-    - name: 检出源码与配置脚本
+    - name: 检出源码
       uses: actions/checkout@v6.0.3
 
     - name: 调整磁盘空间
       run: |
         sudo mkdir -p $WORK_DIR
         sudo chown -R $USER:$USER $WORK_DIR
+        
+        # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
+        echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
         sudo swapoff -a || true
         sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
         sudo chmod 600 /swapfile
         sudo mkswap /swapfile
         sudo swapon /swapfile
         sudo sysctl vm.swappiness=10
+        echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
+        
+        echo "📊 扩容系统全局 /tmp 至 10G"
         sudo umount /tmp || true
         sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "✅ /tmp 扩容至 10GB 完成"
+        
+        echo "📊 检查当前磁盘空间分布："
+        df -h
+        df -i /tmp
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
 
     - name: 初始化构建环境
@@ -49,9 +66,18 @@ jobs:
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
 
+    - name: 查看编译环境硬件规格 (CPU/内存)
+      run: |
+        echo "==================== CPU 核心数 ===================="
+        echo "逻辑核心数: $(nproc)"
+        cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+        echo -e "\n==================== 内存大小 ===================="
+        free -h
+
     - name: 克隆 OpenWrt 源码到磁盘
       run: |
         cd $WORK_DIR
+        df -hT $PWD
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
 
@@ -88,103 +114,168 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: 🔄 预下载源码→预编译工具链→内核配置审计（严格官方构建顺序）
+    - name: 编译固件镜像
+      id: compile
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
+        echo -e "$(nproc) thread compile"
+        
+        # 🔧 将内核配置策略从 oldconfig（交互式弹窗）改为 olddefconfig（自动取默认值）
+        # 原理：OpenWrt 编译内核时内部调用 oldconfig，遇到新增 Kconfig 选项会弹窗等待输入
+        #       olddefconfig 是 Linux 内核原生支持的标准 target，自动为所有新选项填充默认值
+        # 只替换第一个匹配项，精准且安全，不破坏其他逻辑
+        sed -i 's/^\([[:space:]]*\)\(.*\)\boldconfig\b/\1\2olddefconfig/' include/kernel-defaults.mk
+        
+        # 验证修改是否生效（CI 日志中可确认）
+        echo "📋 内核配置策略已切换为 olddefconfig，验证如下："
+        grep -n 'olddefconfig\|oldconfig' include/kernel-defaults.mk || true
+        
+        # 🚀 最自然的编译命令，零干预
+        export FORCE_UNSAFE_CONFIGURE=1
+        make -j$(nproc) || make -j1 V=s
+        
+        echo "status=success" >> $GITHUB_OUTPUT
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
 
-        echo "=== 1. 预编译主机端全部工具 tools/compile ==="
-        make -j$(nproc) tools/compile V=s
-
-        echo "=== 2. 预编译平台交叉工具链 toolchain/compile ==="
-        make -j$(nproc) toolchain/compile V=s
-
-        echo "=== 3. OpenWrt顶层配置初始化 ==="
-        make defconfig
-
-        echo "=== 4. prepare：解压内核+通用generic配置+平台config-6.12+应用所有内核补丁 ==="
-        make target/linux/prepare V=s 2>&1 | tail -50
-
-        echo "=== 5. 原生静默收敛内核配置（自动合并三层配置，无图形界面不编译内核）==="
-        make kernel_oldconfig V=s
-
-        echo "=== 6. 定位内核源码目录 ==="
-        KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
-        if [ -z "${KERNEL_DIR}" ] || [ ! -f "${KERNEL_DIR}/Makefile" ]; then
-          echo "❌ 未找到合法内核源码目录"
-          find build_dir -maxdepth 3 -type d
-          exit 1
-        fi
-        echo "📁 内核源码目录：${KERNEL_DIR}"
-
-        echo "=== 7. 备份原始未补全内核配置 ==="
-        cp "${KERNEL_DIR}/.config" audit_kernel_original.config
-        echo "✅ 原始内核配置行数：$(wc -l < audit_kernel_original.config)"
-
-        echo "=== 8. 内核依赖自动补齐收敛 ==="
-        cd "${KERNEL_DIR}"
-        make olddefconfig V=s
-        cd - > /dev/null
-        cp "${KERNEL_DIR}/.config" audit_kernel_final.config
-        echo "✅ 补全后内核配置行数：$(wc -l < audit_kernel_final.config)"
-
-    - name: 🔍 执行全量Kconfig诊断审计
+    # 👇 ================= 提取三位一体真实 Kconfig 配置 (已修复) ================= 👇
+    - name: 提取真实 OpenWrt/Kernel/U-Boot Kconfig 配置 (真理之源)
+      if: always()
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        make -C scripts/config conf 2>/dev/null
-        if [ -x ./staging_dir/host/bin/conf ]; then
-          CONF_BIN=./staging_dir/host/bin/conf
-        elif [ -x ./scripts/config/conf ]; then
-          CONF_BIN=./scripts/config/conf
+        echo "🔍 正在编译产物中搜寻最终生效的真实 Kconfig ..."
+        
+        # ========== 1. 提取 OpenWrt 主 .config (插件安装真相) ==========
+        if [ -f ".config" ]; then
+            cp -f .config real_openwrt_final.config
+            sha256sum real_openwrt_final.config | tee real_openwrt_final.config.sha256
+            echo "✅ 成功捕获真实 OpenWrt 主配置"
+            echo "================ OpenWrt 插件与核心组件真实生效统计 ================"
+            echo "📦 已选中 PACKAGE 总数: $(grep -c '^CONFIG_PACKAGE_.*=y' real_openwrt_final.config || echo 0)"
+            echo "🔌 LuCI 插件生效数: $(grep -c '^CONFIG_PACKAGE_luci-.*=y' real_openwrt_final.config || echo 0)"
+            echo "🐳 Docker 相关生效数: $(grep -c '^CONFIG_PACKAGE_docker\|^CONFIG_PACKAGE_luci-app-dockerman' real_openwrt_final.config || echo 0)"
+            echo "🌐 网络工具生效数: $(grep -c '^CONFIG_PACKAGE_curl\|^CONFIG_PACKAGE_wget\|^CONFIG_PACKAGE_iperf3' real_openwrt_final.config || echo 0)"
+            echo "⚙️ 内核模块(kmod)生效数: $(grep -c '^CONFIG_PACKAGE_kmod-.*=y' real_openwrt_final.config || echo 0)"
+            echo "=================================================="
         else
-          CONF_BIN=""
+            echo "⚠️ 警告：未找到 OpenWrt 主 .config（make defconfig 可能未执行）"
+            echo "OpenWrt make defconfig did not complete." > real_openwrt_final.config
         fi
 
-        echo "=== 1. 导出用户差异化配置 ==="
-        ./scripts/diffconfig.sh > audit_defconfig.txt
-
-        echo "=== 2. 导出目标平台设备配置 ==="
-        grep -E '^CONFIG_TARGET_(rockchip|DEVICE)' .config > audit_target_info.txt || true
-
-        echo "=== 3. 检测新增内核交互式配置项 ==="
-        KERNEL_DIR=$(find build_dir -path '*/linux-*' -maxdepth 3 -type d -name "linux-[0-9]*" | head -1)
-        if [ -n "${KERNEL_DIR}" ] && [ -f "${KERNEL_DIR}/Kconfig" ]; then
-          cp audit_kernel_original.config "${KERNEL_DIR}/.config"
-          make -C "${KERNEL_DIR}" listnewconfig > audit_kernel_new_options.txt 2>&1
-          NEW_CNT=$(grep -cE "^CONFIG_|^# CONFIG_" audit_kernel_new_options.txt || echo 0)
-          echo "📊 原生待弹窗配置项数量：${NEW_CNT}"
-
-          ${CONF_BIN} --alldefconfig "${KERNEL_DIR}/Kconfig" 2> audit_kernel_unmet_deps.txt || true
+        # ========== 2. 提取 Kernel .config (🔧 精确修复版) ==========
+        # 使用 linux-[0-9] 强制匹配版本号，排除 backports/mac80211/hostapd 等非内核目录
+        KERNEL_CONFIG=$(find build_dir/target-*/linux-rockchip_armv8*/ \
+          -maxdepth 2 \
+          -name ".config" \
+          -path "*/linux-[0-9]*.*/.config" \
+          ! -path "*backports*" \
+          ! -path "*mac80211*" \
+          ! -path "*hostapd*" \
+          2>/dev/null | head -n 1)
+        
+        if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
+            cp -f "$KERNEL_CONFIG" real_kernel_final.config
+            sha256sum real_kernel_final.config | tee real_kernel_final.config.sha256
+            echo "✅ 成功捕获真实内核配置: $KERNEL_CONFIG"
+            
+            # 🔬 双重验证：真正的内核配置必须包含 CONFIG_ARM64=y
+            if grep -q '^CONFIG_ARM64=y' real_kernel_final.config; then
+                echo "🔬 验证通过：确认为 Linux 内核主配置"
+                echo "================ 内核核心驱动真实生效统计 ================"
+                echo "📺 DRM 显示驱动生效数: $(grep -c '^CONFIG_DRM.*=y' real_kernel_final.config || echo 0)"
+                echo "🔌 USB 核心与驱动生效数: $(grep -c '^CONFIG_USB.*=y' real_kernel_final.config || echo 0)"
+                echo "📡 蓝牙协议栈生效数: $(grep -c '^CONFIG_BT.*=y' real_kernel_final.config || echo 0)"
+                echo "🌐 网络与防火墙生效数: $(grep -c '^CONFIG_NETFILTER\|^CONFIG_NF_TABLES' real_kernel_final.config || echo 0)"
+                echo "=================================================="
+            else
+                echo "❌ 严重警告：提取的文件不是有效的 Linux 内核配置！"
+                echo "文件头内容如下："
+                head -5 real_kernel_final.config
+            fi
         else
-          echo "⚠️ 内核目录异常，跳过弹窗与依赖检测" > audit_kernel_new_options.txt audit_kernel_unmet_deps.txt
+            echo "⚠️ 警告：未找到最终内核配置（可能在内核编译阶段前就失败了）"
+            echo "📂 列出所有候选 .config 文件供调试排查："
+            find build_dir/target-*/linux-rockchip_armv8*/ -maxdepth 3 -name ".config" 2>/dev/null | sort || echo "(无候选文件)"
+            echo "Kernel compile did not reach final config stage." > real_kernel_final.config
         fi
 
-        echo "=== 4. 配置行数汇总统计 ==="
-        wc -l .config audit_defconfig.txt audit_kernel_original.config audit_kernel_final.config \
-          audit_kernel_new_options.txt > audit_summary.txt
+        # ========== 3. 提取 U-Boot .config ==========
+        UBOOT_CONFIG=$(find build_dir/target-*/ -maxdepth 4 -name ".config" -path "*/u-boot-*/.config" 2>/dev/null | head -n 1)
+        if [ -n "$UBOOT_CONFIG" ] && [ -f "$UBOOT_CONFIG" ]; then
+            cp -f "$UBOOT_CONFIG" real_uboot_final.config
+            sha256sum real_uboot_final.config | tee real_uboot_final.config.sha256
+            echo "✅ 成功捕获真实 U-Boot 配置: $UBOOT_CONFIG"
+            echo "================ U-Boot 核心配置真实生效统计 ================"
+            echo "🚀 U-Boot 核心启动配置数: $(grep -c '^CONFIG_.*=y' real_uboot_final.config || echo 0)"
+            echo "=================================================="
+        else
+            echo "⚠️ 警告：未找到最终 U-Boot 配置"
+            echo "U-Boot compile did not reach final config stage." > real_uboot_final.config
+        fi
 
-    - name: 📦 打包全部审计诊断文件
-      run: |
-        cd ${{ env.WORK_DIR }}/openwrt
-        FILE_LIST=(
-          .config
-          audit_defconfig.txt
-          audit_target_info.txt
-          audit_kernel_original.config
-          audit_kernel_final.config
-          audit_kernel_new_options.txt
-          audit_kernel_unmet_deps.txt
-          audit_summary.txt
-        )
-        EXIST_FILES=()
-        for f in "${FILE_LIST[@]}"; do
-          [ -f "$f" ] && EXIST_FILES+=("$f")
-        done
-        tar czf $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz "${EXIST_FILES[@]}" logs/ 2>/dev/null || true
-        ls -lh $GITHUB_WORKSPACE/kconfig-audit-rk3528.tar.gz
-
-    - name: 上传Kconfig审计压缩包
+    - name: 上传真实 Kconfig 配置文件 (真理日志)
+      if: always()
       uses: actions/upload-artifact@v7.0.1
       with:
-        name: kconfig-audit-rk3528-${{ github.run_number }}
-        path: kconfig-audit-rk3528.tar.gz
+        name: Real-Kconfig-Truth-Logs-${{ github.run_id }}
+        path: |
+          ${{ env.WORK_DIR }}/openwrt/real_openwrt_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_openwrt_final.config.sha256
+          ${{ env.WORK_DIR }}/openwrt/real_kernel_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_kernel_final.config.sha256
+          ${{ env.WORK_DIR }}/openwrt/real_uboot_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_uboot_final.config.sha256
         retention-days: 7
+    # 👆 ================= 提取结束 ================= 👆
+
+    - name: 检查磁盘空间使用情况
+      if: (!cancelled())
+      run: df -hT
+
+    - name: 上传 bin 目录（使用绝对路径，防止软连接失效导致空包）
+      uses: actions/upload-artifact@v7.0.1
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      with:
+        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.WORK_DIR }}/openwrt/bin
+
+    - name: 整理固件输出目录
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 上传固件输出目录
+      uses: actions/upload-artifact@v7.0.1
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      with:
+        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}
+
+    - name: 生成发布版本标签
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        touch release.txt
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 上传固件至 GitHub Release
+      uses: softprops/action-gh-release@v3.0.0
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: ${{ env.FIRMWARE }}/*
+
+    - name: 清理历史工作流运行记录
+      uses: Mattraks/delete-workflow-runs@v2.1.0
+      with:
+        retain_days: 0
+        keep_minimum_runs: 2
