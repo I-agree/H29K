@@ -277,5 +277,36 @@ CONFIG_LEDS_TRIG_MMC=y
 CONFIG_GPIOLIB=y
 CONFIG_OF=y
 
+# =================================================================
+# RGA 2D 硬件加速
+# =================================================================
+# media顶层
+CONFIG_MEDIA_SUPPORT=y
+CONFIG_MEDIA_SUPPORT_FILTER=y
+CONFIG_MEDIA_SUBDRV_AUTOSELECT=y
+CONFIG_MEDIA_PLATFORM_SUPPORT=y
+# 关闭其余多媒体类型
+# CONFIG_MEDIA_CAMERA_SUPPORT is not set
+# CONFIG_MEDIA_ANALOG_TV_SUPPORT is not set
+# CONFIG_MEDIA_DIGITAL_TV_SUPPORT is not set
+# CONFIG_MEDIA_RADIO_SUPPORT is not set
+# CONFIG_MEDIA_SDR_SUPPORT is not set
+# CONFIG_MEDIA_TEST_SUPPORT is not set
+
+# V4L2核心
+CONFIG_VIDEO_DEV=y
+# CONFIG_MEDIA_CONTROLLER is not set
+CONFIG_V4L_MEM2MEM_DRIVERS=y
+
+# v4l2-core 缓冲依赖
+CONFIG_VIDEOBUF2_CORE=y
+
+# RGA驱动
+CONFIG_VIDEO_ROCKCHIP_RGA=y
+
+# DMA内存必备
+CONFIG_DMA_CMA=y
+CONFIG_DMA_SHARED_BUFFER=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
