@@ -257,5 +257,25 @@ CONFIG_OF=y
 CONFIG_HAS_IOMEM=y
 CONFIG_HAS_DMA=y
 
+# =================================================================
+# RK 平台 GPIO LED
+# =================================================================
+# LED总开关
+CONFIG_NEW_LEDS=y
+# LED sysfs类核心
+CONFIG_LEDS_CLASS=y
+# GPIO指示灯驱动（DTS gpio-leds）
+CONFIG_LEDS_GPIO=y
+# LED触发器总开关
+CONFIG_LEDS_TRIGGERS=y
+# 常用触发器
+CONFIG_LEDS_TRIG_HEARTBEAT=y
+CONFIG_LEDS_TRIG_NETDEV=y
+CONFIG_LEDS_TRIG_MMC=y
+
+# 全局前置依赖
+CONFIG_GPIOLIB=y
+CONFIG_OF=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
