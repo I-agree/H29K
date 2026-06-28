@@ -226,7 +226,7 @@
 		interrupts = <1 13 0xf08  1 14 0xf08  1 11 0xf08  1 10 0xf08>;
 	};
 
-	xin24m: clock-xin24m {
+	xin24m {
 		bootph-all;
 		compatible = "fixed-clock";
 		clock-frequency = <24000000>;
