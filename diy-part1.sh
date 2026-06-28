@@ -308,5 +308,25 @@ CONFIG_VIDEO_ROCKCHIP_RGA=y
 CONFIG_DMA_CMA=y
 CONFIG_DMA_SHARED_BUFFER=y
 
+# =================================================================
+# Mali-450 GPU 2D/3D 图形硬件加速  RK3528 开源 Lima
+# =================================================================
+# DRM 核心
+CONFIG_DRM=y
+CONFIG_DRM_KMS_HELPER=y
+CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_DRM_LOAD_EDID_FIRMWARE=y
+CONFIG_DRM_GEM_DMA_HELPER=y
+CONFIG_DRM_ROCKCHIP=y
+
+# RK3528 Mali450 开源LIMA
+CONFIG_DRM_LIMA=y
+# CONFIG_DRM_PANFROST is not set
+
+# 内存与IOMMU
+CONFIG_DMA_SHARED_BUFFER=y
+CONFIG_DMA_CMA=y
+CONFIG_ROCKCHIP_IOMMU=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
