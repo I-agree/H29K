@@ -123,11 +123,9 @@ sed -i '/^CONFIG_CRYPTO_LZ4HC/d' "$CONFIG_FILE"
 cat >> "$CONFIG_FILE" << 'EOF'
 
 # =================================================================
-# 🔧 H29K 硬件对齐修正 (RK3528 内置 Naneng CombPHY)
+# 🔧 H29K硬件PHY（板载RTL8211F，启用REALTEK_PHY，其余外置PHY禁用）
 # =================================================================
-# ❌ 移除所有外置 PHY 驱动 (H29K 无独立 RTL8211/Micrel/KSZ PHY)
 # CONFIG_MICREL_PHY is not set
-# CONFIG_REALTEK_PHY is not set
 # CONFIG_MOTORCOMM_PHY is not set
 # CONFIG_MEDIATEK_GE_PHY is not set
 
