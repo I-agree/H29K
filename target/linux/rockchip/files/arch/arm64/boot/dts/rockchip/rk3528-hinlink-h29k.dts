@@ -33,7 +33,7 @@
 		spi1 = &spi1;
 		spi2 = &sfc;
 		mmc0 = &sdhci;
-		mmc1 = &sdmmc3;
+		mmc1 = &sdmmc;
 		mmc2 = &sdmmc2;
 		ethernet0 = &gmac1;
 		led-boot = &led_work;
@@ -1231,7 +1231,7 @@
 		};
 	};
 
-	sdmmc3: mmc@ffc30000 {
+	sdmmc: mmc@ffc30000 {
 		compatible = "rockchip,rk3528-dw-mshc", "rockchip,rk3288-dw-mshc";
 		reg = <0x00 0xffc30000 0x00 0x4000>;
 		interrupts = <0 133 4>;
