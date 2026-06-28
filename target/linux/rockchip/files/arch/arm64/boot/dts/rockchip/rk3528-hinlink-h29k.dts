@@ -240,17 +240,17 @@
 };
 
 &i2c1 {
-    status = "okay";
+	status = "okay";
 
-    touchscreen@63 {
-        compatible = "chipone,axs5106";
-        reg = <0x63>;
-        interrupt-parent = <&gpio0>;
-        interrupts = <RK_PB5 IRQ_TYPE_LEVEL_LOW>;
-        reset-gpios = <&gpio0 RK_PB6 GPIO_ACTIVE_LOW>;
-        touchscreen-size-x = <800>;
-        touchscreen-size-y = <1280>;
-    };
+	touchscreen@63 {
+		compatible = "chipone,axs5106";
+		reg = <0x63>;
+		interrupt-parent = <&gpio0>;
+		interrupts = <RK_PB5 IRQ_TYPE_LEVEL_LOW>;
+		reset-gpios = <&gpio0 RK_PB6 GPIO_ACTIVE_LOW>;
+		touchscreen-size-x = <800>;
+		touchscreen-size-y = <1280>;
+	};
 };
 
 &mdio1 {
