@@ -311,21 +311,36 @@ CONFIG_DMA_SHARED_BUFFER=y
 # =================================================================
 # Mali-450 GPU 2D/3D 图形硬件加速  RK3528 开源 Lima
 # =================================================================
-# DRM 核心
+# DRM总开关
 CONFIG_DRM=y
-CONFIG_DRM_KMS_HELPER=y
+# 自动依赖：DRM_KMS_HELPER、DMA_SHARED_BUFFER、I2C、HDMI等
+
+# 关闭调试类DRM配置
+# CONFIG_DRM_DEBUG_MM is not set
+# CONFIG_DRM_PANIC is not set
+# CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS is not set
+# CONFIG_DRM_DEBUG_MODESET_LOCK is not set
+
+# 传统fb0兼容 + 固化缓冲比例，杜绝交互弹窗
 CONFIG_DRM_FBDEV_EMULATION=y
+CONFIG_DRM_FBDEV_OVERALLOC=100
+
+# 允许从固件加载显示器EDID
 CONFIG_DRM_LOAD_EDID_FIRMWARE=y
+# DRM GEM DMA内存管理
 CONFIG_DRM_GEM_DMA_HELPER=y
+
+# 瑞芯VOP/HDMI/MIPI显示驱动
 CONFIG_DRM_ROCKCHIP=y
 
-# RK3528 Mali450 开源LIMA
+# RK3528 Mali-450 专用开源LIMA驱动
 CONFIG_DRM_LIMA=y
+# 禁用G52/T860的Panfrost，避免冲突
 # CONFIG_DRM_PANFROST is not set
 
-# 内存与IOMMU
-CONFIG_DMA_SHARED_BUFFER=y
+# 基础内存与IOMMU
 CONFIG_DMA_CMA=y
+CONFIG_DMA_SHARED_BUFFER=y
 CONFIG_ROCKCHIP_IOMMU=y
 
 EOF
