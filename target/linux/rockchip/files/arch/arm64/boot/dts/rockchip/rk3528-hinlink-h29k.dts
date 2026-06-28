@@ -235,7 +235,7 @@
 
 	backlight: backlight {
 		compatible = "pwm-backlight";
-		pwms = <&pwm6 0 25000 PWM_POLARITY_INVERTED>;
+		pwms = <&pwm6 0 25000 1>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&panel_pwm_pin>;
 		brightness-levels = <
