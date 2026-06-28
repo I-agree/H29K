@@ -166,7 +166,7 @@
 	bootph-all;
 };
 
-&soc {
+&{/soc} {
 	grf: syscon@ff300000 {
 		compatible = "rockchip,rk3528-grf", "syscon", "simple-mfd";
 		reg = <0x0 0xff300000 0x0 0x90000>;
