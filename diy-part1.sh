@@ -313,9 +313,7 @@ CONFIG_DMA_SHARED_BUFFER=y
 # =================================================================
 # DRM总开关
 CONFIG_DRM=y
-# 自动依赖：DRM_KMS_HELPER、DMA_SHARED_BUFFER、I2C、HDMI等
-
-# 关闭调试类DRM配置
+# 关闭调试类DRM配置，避免交互式NEW弹窗
 # CONFIG_DRM_DEBUG_MM is not set
 # CONFIG_DRM_PANIC is not set
 # CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS is not set
@@ -324,14 +322,26 @@ CONFIG_DRM=y
 # 传统fb0兼容 + 固化缓冲比例，杜绝交互弹窗
 CONFIG_DRM_FBDEV_EMULATION=y
 CONFIG_DRM_FBDEV_OVERALLOC=100
+# 禁用物理地址泄露（避免新增配置弹窗）
+# CONFIG_DRM_FBDEV_LEAK_PHYS_SMEM is not set
 
-# 允许从固件加载显示器EDID
 CONFIG_DRM_LOAD_EDID_FIRMWARE=y
 # DRM GEM DMA内存管理
 CONFIG_DRM_GEM_DMA_HELPER=y
 
-# 瑞芯VOP/HDMI/MIPI显示驱动
+# 瑞芯VOP+HDMI显示驱动
 CONFIG_DRM_ROCKCHIP=y
+CONFIG_ROCKCHIP_VOP=y
+# CONFIG_ROCKCHIP_VOP2 is not set
+CONFIG_ROCKCHIP_DW_HDMI=y
+# 关闭未使用显示接口
+# CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
+# CONFIG_ROCKCHIP_LVDS is not set
+# CONFIG_ROCKCHIP_RGB is not set
+# CONFIG_ROCKCHIP_ANALOGIX_DP is not set
+# CONFIG_ROCKCHIP_CDN_DP is not set
+# CONFIG_ROCKCHIP_INNO_HDMI is not set
+# CONFIG_ROCKCHIP_RK3066_HDMI is not set
 
 # RK3528 Mali-450 专用开源LIMA驱动
 CONFIG_DRM_LIMA=y
