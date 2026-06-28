@@ -1,31 +1,444 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
  * U-Boot 2025.10 DTS for HINLINK H29K (RK3528)
- * Fully aligned with upstream rk3528.dtsi & rk3528-pinctrl.dtsi
  */
 
 /dts-v1/;
-#include <dt-bindings/gpio/gpio.h>
-#include <dt-bindings/pinctrl/rockchip.h>
-
-#include "rk3528.dtsi"
 
 / {
+	interrupt-parent = <&gic>;
+	#address-cells = <2>;
+	#size-cells = <2>;
 	model = "HINLINK H29K";
 	compatible = "hinlink,h29k", "rockchip,rk3528";
 
 	aliases {
-		mmc0 = &sdhci;
-		mmc1 = &sdmmc;
+		gpio0 = &gpio0;
+		gpio1 = &gpio1;
+		gpio2 = &gpio2;
+		gpio3 = &gpio3;
+		gpio4 = &gpio4;
 		serial0 = &uart0;
+		spi2 = &sfc;
+		mmc0 = &sdhci;
+		mmc1 = &sdmmc3;
+	};
+
+	cpus {
+		#address-cells = <2>;
+		#size-cells = <0>;
+
+		cpu-map {
+			cluster0 {
+				core0 { cpu = <&cpu0>; };
+				core1 { cpu = <&cpu1>; };
+				core2 { cpu = <&cpu2>; };
+				core3 { cpu = <&cpu3>; };
+			};
+		};
+
+		cpu0: cpu@0 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x00 0x00>;
+			clocks = <&scmi_clk 0x15>;
+			assigned-clocks = <&scmi_clk 0x15>;
+			assigned-clock-rates = <1200000000>;
+			enable-method = "psci";
+		};
+
+		cpu1: cpu@1 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x00 0x01>;
+			clocks = <&scmi_clk 0x15>;
+			enable-method = "psci";
+		};
+
+		cpu2: cpu@2 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x00 0x02>;
+			clocks = <&scmi_clk 0x15>;
+			enable-method = "psci";
+		};
+
+		cpu3: cpu@3 {
+			device_type = "cpu";
+			compatible = "arm,cortex-a53";
+			reg = <0x00 0x03>;
+			clocks = <&scmi_clk 0x15>;
+			enable-method = "psci";
+		};
+	};
+
+	firmware {
+		scmi {
+			bootph-all;
+			compatible = "arm,scmi-smc";
+			arm,smc-id = <0x82000010>;
+			shmem = <&scmi_shmem>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			scmi_clk: protocol@14 {
+				reg = <0x14>;
+				#clock-cells = <1>;
+			};
+		};
+	};
+
+	psci {
+		compatible = "arm,psci-1.0";
+		method = "smc";
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		scmi_shmem: shmem@10f000 {
+			compatible = "arm,scmi-shmem";
+			reg = <0x00 0x10f000 0x00 0x100>;
+			no-map;
+		};
+	};
+
+	timer {
+		compatible = "arm,armv8-timer";
+		interrupts = <1 13 0xf08  1 14 0xf08  1 11 0xf08  1 10 0xf08>;
+	};
+
+	xin24m {
+		bootph-all;
+		compatible = "fixed-clock";
+		#clock-cells = <0>;
+		clock-frequency = <24000000>;
+		clock-output-names = "xin24m";
+	};
+
+	/* GIC 中断控制器 */
+	gic: interrupt-controller@fed01000 {
+		compatible = "arm,gic-400";
+		#interrupt-cells = <3>;
+		#address-cells = <0>;
+		interrupt-controller;
+		reg = <0x00 0xfed01000 0x00 0x1000
+		       0x00 0xfed02000 0x00 0x2000
+		       0x00 0xfed04000 0x00 0x2000
+		       0x00 0xfed06000 0x00 0x2000>;
+		interrupts = <1 9 0xf08>;
+	};
+
+	/* GRF 通用寄存器 */
+	grf: syscon@ff300000 {
+		bootph-all;
+		compatible = "rockchip,rk3528-grf", "syscon", "simple-mfd";
+		reg = <0x00 0xff300000 0x00 0x90000>;
+
+		grf_cru: grf-clock-controller {
+			bootph-all;
+			compatible = "rockchip,rk3528-grf-cru";
+			#clock-cells = <1>;
+		};
+	};
+
+	/* CRU 时钟与复位控制器 */
+	cru: clock-controller@ff4a0000 {
+		bootph-all;
+		compatible = "rockchip,rk3528-cru";
+		reg = <0x00 0xff4a0000 0x00 0x30000>;
+		rockchip,grf = <&grf>;
+		#clock-cells = <1>;
+		#reset-cells = <1>;
+		assigned-clocks = <
+			&cru 0x1ff &cru 0x03 &cru 0x04 &cru 0x02 &cru 0x0d
+			&cru 0x11 &cru 0x09 &cru 0x0a &cru 0x0b &cru 0x0c
+			&cru 0x0e &cru 0x0f &cru 0x10 &cru 0x12 &cru 0x90
+			&cru 0x8f &cru 0x95 &cru 0x55 &cru 0x144 &cru 0x96
+			&cru 0x93
+		>;
+		assigned-clock-rates = <
+			32768 1188000000 1000000000 996000000 250000000
+			500000000 50000000 100000000 150000000 200000000
+			300000000 340000000 400000000 600000000 50000000
+			100000000 125000000 500000000 340000000 300000000
+			200000000
+		>;
+	};
+
+	/* IOC GRF 引脚配置寄存器 */
+	ioc_grf: syscon@ff540000 {
+		bootph-all;
+		compatible = "rockchip,rk3528-ioc-grf", "syscon";
+		reg = <0x00 0xff540000 0x00 0x40000>;
+	};
+
+	/* PMU 电源管理单元 */
+	pmu: power-management@ff600000 {
+		bootph-all;
+		compatible = "rockchip,rk3528-pmu", "syscon";
+		reg = <0x00 0xff600000 0x00 0x2000>;
+		#power-domain-cells = <1>;
+	};
+
+	/* 调试串口 UART0 */
+	uart0: serial@ff9f0000 {
+		bootph-all;
+		compatible = "rockchip,rk3528-uart", "snps,dw-apb-uart";
+		reg = <0x00 0xff9f0000 0x00 0x100>;
+		interrupts = <0 40 4>;
+		clocks = <&cru 0x15  &cru 0x75>;
+		clock-names = "baudclk", "apb_pclk";
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		status = "okay";
+		pinctrl-names = "default";
+		pinctrl-0 = <&uart0m0_xfer>;
+	};
+
+	/* PWM1/2 核心电压调节 */
+	pwm1: pwm@ffa90010 {
+		bootph-all;
+		compatible = "rockchip,rk3528-pwm", "rockchip,rk3328-pwm";
+		reg = <0x00 0xffa90010 0x00 0x10>;
+		clocks = <&cru 0x7f  &cru 0x7e>;
+		clock-names = "pwm", "pclk";
+		pinctrl-0 = <&pwm1m0_pins>;
+		pinctrl-names = "active";
+		#pwm-cells = <3>;
+		status = "okay";
+	};
+
+	pwm2: pwm@ffa90020 {
+		bootph-all;
+		compatible = "rockchip,rk3528-pwm", "rockchip,rk3328-pwm";
+		reg = <0x00 0xffa90020 0x00 0x10>;
+		clocks = <&cru 0x7f  &cru 0x7e>;
+		clock-names = "pwm", "pclk";
+		pinctrl-0 = <&pwm2m0_pins>;
+		pinctrl-names = "active";
+		#pwm-cells = <3>;
+		status = "okay";
+	};
+
+	/* eMMC 控制器 */
+	sdhci: mmc@ffbf0000 {
+		bootph-all;
+		compatible = "rockchip,rk3528-dwcmshc", "rockchip,rk3588-dwcmshc";
+		reg = <0x00 0xffbf0000 0x00 0x10000>;
+		interrupts = <0 136 4>;
+		assigned-clocks = <&cru 0xa6 &cru 0xa7 &cru 0xa3>;
+		assigned-clock-rates = <100000000 24000000 100000000>;
+		clocks = <&cru 0xa3 &cru 0xa4 &cru 0xa5 &cru 0xa6 &cru 0xa7>;
+		clock-names = "core", "bus", "axi", "block", "timer";
+		resets = <&cru 0x19f &cru 0x1a0 &cru 0x1a1 &cru 0x1a2 &cru 0x1a3>;
+		reset-names = "core", "bus", "axi", "block", "timer";
+		max-frequency = <100000000>;
+		status = "okay";
+		bus-width = <8>;
+		mmc-hs200-1_8v;
+		non-removable;
+		pinctrl-names = "default";
+		pinctrl-0 = <&emmc_bus8 &emmc_clk &emmc_cmd &emmc_strb>;
+		vmmc-supply = <&vcc_3v3>;
+		vqmmc-supply = <&vcc_1v8>;
+	};
+
+	/* SPI NOR/NAND Flash 控制器 */
+	sfc: spi@ffc00000 {
+		bootph-all;
+		compatible = "rockchip,sfc";
+		reg = <0x00 0xffc00000 0x00 0x4000>;
+		interrupts = <0 135 4>;
+		clocks = <&cru 0xa1 &cru 0xa0>;
+		clock-names = "clk_sfc", "hclk_sfc";
+		assigned-clocks = <&cru 0xa1>;
+		assigned-clock-rates = <100000000>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+		status = "okay";
+	};
+
+	/* SD 卡控制器 */
+	sdmmc3: mmc@ffc30000 {
+		bootph-all;
+		compatible = "rockchip,rk3528-dw-mshc", "rockchip,rk3288-dw-mshc";
+		reg = <0x00 0xffc30000 0x00 0x4000>;
+		interrupts = <0 133 4>;
+		clocks = <&cru 0x198 &cru 0x197 &grf_cru 1 &grf_cru 2>;
+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
+		fifo-depth = <256>;
+		max-frequency = <150000000>;
+		resets = <&cru 0x2a9>;
+		reset-names = "reset";
+		rockchip,use-v2-tuning;
+		status = "okay";
+		bus-width = <4>;
+		cap-sd-highspeed;
+		disable-wp;
+		pinctrl-names = "default";
+		pinctrl-0 = <&sdmmc_bus4 &sdmmc_clk &sdmmc_cmd &sdmmc_det>;
+		rockchip,default-sample-phase = <90>;
+		sd-uhs-sdr12;
+		sd-uhs-sdr25;
+		sd-uhs-sdr50;
+		sd-uhs-sdr104;
+		vmmc-supply = <&vcc3v3_sd>;
+		vqmmc-supply = <&vccio_sd>;
+	};
+
+	/* 引脚复用与 GPIO */
+	pinctrl: pinctrl {
+		bootph-all;
+		compatible = "rockchip,rk3528-pinctrl";
+		rockchip,grf = <&ioc_grf>;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		gpio0: gpio@ff610000 {
+			bootph-all;
+			compatible = "rockchip,gpio-bank";
+			reg = <0x00 0xff610000 0x00 0x200>;
+			interrupts = <0 71 4>;
+			clocks = <&cru 0x1fd &cru 0x1fe>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			gpio-ranges = <&pinctrl 0 0 32>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+		gpio1: gpio@ffaf0000 {
+			bootph-all;
+			compatible = "rockchip,gpio-bank";
+			reg = <0x00 0xffaf0000 0x00 0x200>;
+			interrupts = <0 73 4>;
+			clocks = <&cru 0xa8 &cru 0xa9>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			gpio-ranges = <&pinctrl 0 32 32>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+		gpio2: gpio@ffb00000 {
+			bootph-all;
+			compatible = "rockchip,gpio-bank";
+			reg = <0x00 0xffb00000 0x00 0x200>;
+			interrupts = <0 75 4>;
+			clocks = <&cru 0x194 &cru 0x195>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			gpio-ranges = <&pinctrl 0 64 32>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+		gpio3: gpio@ffb10000 {
+			bootph-all;
+			compatible = "rockchip,gpio-bank";
+			reg = <0x00 0xffb10000 0x00 0x200>;
+			interrupts = <0 76 4>;
+			clocks = <&cru 0xba &cru 0xbb>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			gpio-ranges = <&pinctrl 0 96 32>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+		gpio4: gpio@ffb20000 {
+			bootph-all;
+			compatible = "rockchip,gpio-bank";
+			reg = <0x00 0xffb20000 0x00 0x200>;
+			interrupts = <0 78 4>;
+			clocks = <&cru 0x12c &cru 0x12d>;
+			gpio-controller;
+			#gpio-cells = <2>;
+			gpio-ranges = <&pinctrl 0 128 32>;
+			interrupt-controller;
+			#interrupt-cells = <2>;
+		};
+
+		/* 通用引脚配置 */
+		pcfg_pull_up: pcfg-pull-up { bias-pull-up; };
+		pcfg_pull_down: pcfg-pull-down { bias-pull-down; };
+		pcfg_pull_none: pcfg-pull-none { bias-disable; };
+		pcfg_pull_none_drv_level_0: pcfg-pull-none-drv-level-0 {
+			bias-disable;
+			drive-strength = <0>;
+		};
+		pcfg_pull_none_drv_level_2: pcfg-pull-none-drv-level-2 {
+			bias-disable;
+			drive-strength = <2>;
+		};
+		pcfg_pull_up_drv_level_2: pcfg-pull-up-drv-level-2 {
+			bias-pull-up;
+			drive-strength = <2>;
+		};
+
+		/* eMMC 引脚 */
+		emmc {
+			emmc_bus8: emmc-bus8 {
+				rockchip,pins = <1 20 1 &pcfg_pull_up_drv_level_2
+						1 21 1 &pcfg_pull_up_drv_level_2
+						1 22 1 &pcfg_pull_up_drv_level_2
+						1 23 1 &pcfg_pull_up_drv_level_2
+						1 24 1 &pcfg_pull_up_drv_level_2
+						1 25 1 &pcfg_pull_up_drv_level_2
+						1 26 1 &pcfg_pull_up_drv_level_2
+						1 27 1 &pcfg_pull_up_drv_level_2>;
+			};
+			emmc_clk: emmc-clk {
+				rockchip,pins = <1 29 1 &pcfg_pull_up_drv_level_2>;
+			};
+			emmc_cmd: emmc-cmd {
+				rockchip,pins = <1 28 1 &pcfg_pull_up_drv_level_2>;
+			};
+			emmc_strb: emmc-strb {
+				rockchip,pins = <1 31 1 &pcfg_pull_none>;
+			};
+		};
+
+		/* SD 卡引脚 */
+		sdmmc {
+			sdmmc_bus4: sdmmc-bus4 {
+				rockchip,pins = <2 0 1 &pcfg_pull_up_drv_level_2
+						2 1 1 &pcfg_pull_up_drv_level_2
+						2 2 1 &pcfg_pull_up_drv_level_2
+						2 3 1 &pcfg_pull_up_drv_level_2>;
+			};
+			sdmmc_clk: sdmmc-clk {
+				rockchip,pins = <2 5 1 &pcfg_pull_up_drv_level_2>;
+			};
+			sdmmc_cmd: sdmmc-cmd {
+				rockchip,pins = <2 4 1 &pcfg_pull_up_drv_level_2>;
+			};
+			sdmmc_det: sdmmc-det {
+				rockchip,pins = <2 6 1 &pcfg_pull_up>;
+			};
+		};
+
+		/* 串口0 引脚 */
+		uart0 {
+			uart0m0_xfer: uart0m0-xfer {
+				rockchip,pins = <4 23 1 &pcfg_pull_up
+						4 24 1 &pcfg_pull_up>;
+			};
+		};
+
+		/* PWM 引脚 */
+		pwm1 { pwm1m0_pins: pwm1m0-pins { rockchip,pins = <4 20 1 &pcfg_pull_none_drv_level_0>; }; };
+		pwm2 { pwm2m0_pins: pwm2m0-pins { rockchip,pins = <4 21 1 &pcfg_pull_none_drv_level_0>; }; };
 	};
 
 	chosen {
+		bootph-all;
 		stdout-path = "serial0:1500000n8";
-		u-boot,spl-boot-order = "same-as-spl", &sdhci, &sdmmc;
 	};
 
+	/* 系统电源域 */
 	vcc5v0_sys: vcc5v0-sys {
+		bootph-all;
 		compatible = "regulator-fixed";
 		regulator-name = "vcc5v0_sys";
 		regulator-always-on;
@@ -35,6 +448,7 @@
 	};
 
 	vcc_3v3: vcc-3v3 {
+		bootph-all;
 		compatible = "regulator-fixed";
 		regulator-name = "vcc_3v3";
 		regulator-always-on;
@@ -45,6 +459,7 @@
 	};
 
 	vcc_1v8: vcc-1v8 {
+		bootph-all;
 		compatible = "regulator-fixed";
 		regulator-name = "vcc_1v8";
 		regulator-always-on;
@@ -55,8 +470,9 @@
 	};
 
 	vcc3v3_sd: vcc3v3-sd {
+		bootph-all;
 		compatible = "regulator-fixed";
-		gpio = <&gpio4 RK_PA1 GPIO_ACTIVE_LOW>;
+		gpio = <&gpio4 1 1>;
 		regulator-name = "vcc3v3_sd";
 		regulator-always-on;
 		regulator-boot-on;
@@ -65,68 +481,64 @@
 		vin-supply = <&vcc_3v3>;
 	};
 
-	rng: rng@ffc50000 {
-		compatible = "rockchip,rk3528-rng", "rockchip,rk3588-rng";
-		reg = <0x0 0xffc50000 0x0 0x200>;
-		interrupts = <0 23 4>;
-		clocks = <&scmi_clk 32>;
-		clock-names = "hclk_trng";
-		resets = <&cru 0xa3>;
-		reset-names = "reset";
-		status = "okay";
-	};
-
 	vccio_sd: vccio-sd {
+		bootph-all;
 		compatible = "regulator-gpio";
-		gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
+		gpios = <&gpio4 14 0>;
 		regulator-name = "vccio_sd";
 		regulator-min-microvolt = <1800000>;
 		regulator-max-microvolt = <3300000>;
-		states = <1800000 0x0>, <3300000 0x1>;
+		states = <1800000 0x0  3300000 0x1>;
 		vin-supply = <&vcc5v0_sys>;
 	};
-};
 
-&pinctrl {
-	bootph-all;
-};
+	vcc_ddr: vcc-ddr {
+		bootph-all;
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_ddr";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <1200000>;
+		regulator-max-microvolt = <1200000>;
+		vin-supply = <&vcc5v0_sys>;
+	};
 
-&cpu0 { /delete-property/ cpu-supply; };
-&cpu1 { /delete-property/ cpu-supply; };
-&cpu2 { /delete-property/ cpu-supply; };
-&cpu3 { /delete-property/ cpu-supply; };
+	vdd_0v9: vdd-0v9 {
+		bootph-all;
+		compatible = "regulator-fixed";
+		regulator-name = "vdd_0v9";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <900000>;
+		vin-supply = <&vcc5v0_sys>;
+	};
 
-&sdhci {
-	bus-width = <8>;
-	mmc-hs200-1_8v;
-	max-frequency = <200000000>;
-	non-removable;
-	pinctrl-names = "default";
-	pinctrl-0 = <&emmc_bus8 &emmc_clk &emmc_cmd &emmc_strb>;
-	vmmc-supply = <&vcc_3v3>;
-	vqmmc-supply = <&vcc_1v8>;
-	status = "okay";
-	bootph-all;
-};
+	/* CPU 核心电压 PWM 调节 */
+	vdd_arm: vdd-arm {
+		bootph-all;
+		compatible = "pwm-regulator";
+		pwms = <&pwm1 0 5000 1>;
+		regulator-name = "vdd_arm";
+		regulator-min-microvolt = <746000>;
+		regulator-max-microvolt = <1200000>;
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-settling-time-up-us = <250>;
+		pwm-supply = <&vcc5v0_sys>;
+	};
 
-&sdmmc {
-	bus-width = <4>;
-	cap-sd-highspeed;
-	disable-wp;
-	max-frequency = <150000000>;
-	pinctrl-names = "default";
-	pinctrl-0 = <&sdmmc_bus4 &sdmmc_clk &sdmmc_cmd &sdmmc_det>;
-	rockchip,default-sample-phase = <90>;
-	sd-uhs-sdr104;
-	vmmc-supply = <&vcc3v3_sd>;
-	vqmmc-supply = <&vccio_sd>;
-	status = "okay";
-	bootph-all;
-};
-
-&uart0 {
-	pinctrl-names = "default";
-	pinctrl-0 = <&uart0m0_xfer>;
-	status = "okay";
-	bootph-all;
+	/* 逻辑电压 PWM 调节 */
+	vdd_logic: vdd-logic {
+		bootph-all;
+		compatible = "pwm-regulator";
+		pwms = <&pwm2 0 5000 1>;
+		regulator-name = "vdd_logic";
+		regulator-min-microvolt = <705000>;
+		regulator-max-microvolt = <1005000>;
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-settling-time-up-us = <250>;
+		pwm-supply = <&vcc5v0_sys>;
+	};
 };
