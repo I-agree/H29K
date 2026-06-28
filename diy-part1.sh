@@ -91,36 +91,21 @@ echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
 # 这些条目在原始 config-6.12 中有确定值，sed 可直接精确匹配
 sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_CMA_SIZE_MBYTES=.*$/CONFIG_CMA_SIZE_MBYTES=32/' "$CONFIG_FILE"
-sed -i 's/^CONFIG_DWMAC_DWC_QOS_ETH=y$/# CONFIG_DWMAC_DWC_QOS_ETH is not set/' "$CONFIG_FILE"
-sed -i 's/^# CONFIG_PARTITION_ADVANCED is not set$/CONFIG_PARTITION_ADVANCED=y/' "$CONFIG_FILE"
-
-# 前置清理DEVTMPFS相关所有历史配置，避免前后冲突
-sed -i '/^[#]*CONFIG_DEVTMPFS/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_UEVENT_HELPER/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_STANDALONE/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_TMPFS/d' "$CONFIG_FILE"
-
-# 清理：MT7530 DSA全套清理
-sed -i '/^[#]*CONFIG_NET_DSA/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_NET_DSA_MT7530/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_NET_DSA_MT7530_MDIO/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_NET_DSA_MT7530_MMIO/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_NET_DSA_TAG_MTK/d' "$CONFIG_FILE"
-sed -i '/^[#]*CONFIG_PCS_MTK_LYNXI/d' "$CONFIG_FILE"
-
-# 前置清理旧ZSTD冲突配置，彻底杜绝choice弹窗残留
-sed -i '/^CONFIG_ZSWAP_COMPRESSOR_DEFAULT_ZSTD/d' "$CONFIG_FILE"
-sed -i '/^CONFIG_CRYPTO_ZSTD/d' "$CONFIG_FILE"
-sed -i '/^CONFIG_ZSTD_COMPRESS/d' "$CONFIG_FILE"
-sed -i '/^CONFIG_ZSTD_DECOMPRESS/d' "$CONFIG_FILE"
-sed -i '/^CONFIG_ZSTD=y/d' "$CONFIG_FILE"
-
-# 新增：清理LZ4历史配置，防止NEW未定义触发弹窗
-sed -i '/^CONFIG_ZSWAP_COMPRESSOR_DEFAULT_LZ4/d' "$CONFIG_FILE"
-sed -i '/^CONFIG_CRYPTO_LZ4/d' "$CONFIG_FILE"
-sed -i '/^CONFIG_CRYPTO_LZ4HC/d' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
+
+# =================================================================
+# 🔄 TCP BBR + FQ
+# =================================================================
+CONFIG_NET_SCHED=y
+CONFIG_NET_SCH_DEFAULT=y
+CONFIG_NET_SCH_FQ=y
+CONFIG_DEFAULT_FQ=y
+CONFIG_TCP_CONG_ADVANCED=y
+CONFIG_TCP_CONG_BBR=y
+# CONFIG_DEFAULT_CUBIC is not set
+CONFIG_DEFAULT_BBR=y
+
 
 # =================================================================
 # 🔧 H29K硬件PHY（板载RTL8211F，启用REALTEK_PHY，其余外置PHY禁用）
@@ -128,6 +113,7 @@ cat >> "$CONFIG_FILE" << 'EOF'
 # CONFIG_MICREL_PHY is not set
 # CONFIG_MOTORCOMM_PHY is not set
 # CONFIG_MEDIATEK_GE_PHY is not set
+# CONFIG_STAGING is not set
 
 # =================================================================
 # 📡 蓝牙完整协议栈 (AIC8800 SDIO WiFi+BT二合一)
@@ -174,11 +160,6 @@ CONFIG_EXTRA_FIRMWARE_DIR="/lib/firmware"
 # CONFIG_FW_LOADER_DEBUG is not set
 # CONFIG_RUST_FW_LOADER_ABSTRACTIONS is not set
 # CONFIG_FW_CACHE is not set
-
-# =================================================================
-# 关闭废弃Staging驱动，屏蔽rtl8723bs/rtllib等老旧无线NEW弹窗
-# =================================================================
-# CONFIG_STAGING is not set
 
 # =================================================================
 # 🔧 前次分析缺失项修复 + 【关键修复：全部cfg80211+mac80211配置固化防交互弹窗】
@@ -383,17 +364,6 @@ CONFIG_CIFS_ALLOW_INSECURE_LEGACY=y
 CONFIG_CIFS_XATTR=y
 CONFIG_CIFS_POSIX=y
 
-# =================================================================
-# 🔄 TCP BBR + FQ
-# =================================================================
-CONFIG_NET_SCHED=y
-CONFIG_NET_SCH_DEFAULT=y
-CONFIG_NET_SCH_FQ=y
-CONFIG_DEFAULT_FQ=y
-CONFIG_TCP_CONG_ADVANCED=y
-CONFIG_TCP_CONG_BBR=y
-# CONFIG_DEFAULT_CUBIC is not set
-CONFIG_DEFAULT_BBR=y
 
 # =================================================================
 # 🔌 USB OTG/Dual Role（内核DWC3 XHCI 官方最优方案，匹配DTS usb_host0_xhci节点，RK3528自动降级USB2）
