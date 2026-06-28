@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+/*
+ * U-Boot 2025.10 DTS for HINLINK H29K (RK3528)
+ * Fully aligned with upstream rk3528.dtsi & rk3528-pinctrl.dtsi
+ */
 
 /dts-v1/;
 #include <dt-bindings/gpio/gpio.h>
