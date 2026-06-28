@@ -108,9 +108,6 @@ sed -i '/^[#]*CONFIG_NET_DSA_MT7530_MMIO/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_NET_DSA_TAG_MTK/d' "$CONFIG_FILE"
 sed -i '/^[#]*CONFIG_PCS_MTK_LYNXI/d' "$CONFIG_FILE"
 
-# 移除原始默认关闭的BLK_DEV_INITRD行，后续末尾重新强制开启
-sed -i '/^# CONFIG_BLK_DEV_INITRD is not set/d' "$CONFIG_FILE"
-
 # 前置清理旧ZSTD冲突配置，彻底杜绝choice弹窗残留
 sed -i '/^CONFIG_ZSWAP_COMPRESSOR_DEFAULT_ZSTD/d' "$CONFIG_FILE"
 sed -i '/^CONFIG_CRYPTO_ZSTD/d' "$CONFIG_FILE"
@@ -686,9 +683,6 @@ CONFIG_TMPFS_POSIX_ACL=y
 CONFIG_TMPFS_XATTR=y
 CONFIG_TMPFS_QUOTA=y
 CONFIG_TMPFS_INODE64=y
-
-# initrd 沿用原生关闭，不开启
-# CONFIG_BLK_DEV_INITRD is not set
 
 EOF
 echo "✅ H29K 内核参数注入完成"
