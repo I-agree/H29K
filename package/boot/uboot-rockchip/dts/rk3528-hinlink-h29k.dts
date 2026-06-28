@@ -21,7 +21,7 @@
 		serial0 = &uart0;
 		spi2 = &sfc;
 		mmc0 = &sdhci;
-		mmc1 = &sdmmc3;
+		mmc1 = &sdmmc;
 	};
 
 	cpus {
@@ -262,7 +262,7 @@
 	};
 
 	/* SD 卡控制器 */
-	sdmmc3: mmc@ffc30000 {
+	sdmmc: mmc@ffc30000 {
 		bootph-all;
 		compatible = "rockchip,rk3528-dw-mshc", "rockchip,rk3288-dw-mshc";
 		reg = <0x00 0xffc30000 0x00 0x4000>;
