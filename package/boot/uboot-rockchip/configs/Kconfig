@@ -6,8 +6,4 @@ config SYS_BOARD
 config SYS_VENDOR
 	default "hinlink"
 
-config TEGRA_BOARD_STRING
-	string "Default Tegra board name"
-	default "h29k"
-
 endif
