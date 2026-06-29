@@ -654,11 +654,11 @@ CONFIG_CMD_CRC32=y
 CONFIG_CMD_UNLZ4=y
 CONFIG_CMD_UNZIP=y
 CONFIG_CMD_LZMADEC=y
+CONFIG_CMD_RNG=y
 
 # ===== 量产精简：移除冗余调试命令 =====
 # CONFIG_CMD_MEMINFO_MAP is not set
 # CONFIG_CMD_MISC is not set
-# CONFIG_CMD_RNG is not set
 # CONFIG_CMD_RANDOM is not set
 
 # ===== 控制台缓存 =====
