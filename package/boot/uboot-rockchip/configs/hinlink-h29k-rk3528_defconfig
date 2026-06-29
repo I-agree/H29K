@@ -160,7 +160,7 @@ CONFIG_CMD_FS_GENERIC=y
 CONFIG_CMD_EXT4=y
 CONFIG_CMD_BOOTM=y
 CONFIG_CMD_BOOTI=y
-CONFIG_CMD_BOOTZ=y
+# CONFIG_CMD_BOOTZ is not set
 CONFIG_CMD_FDT=y
 
 # 环境变量脚本操作
@@ -192,3 +192,45 @@ CONFIG_FS_EXT4=y
 # CONFIG_ADC is not set
 # CONFIG_DM_PWM is not set
 # CONFIG_EFI_LOADER is not set
+
+# ==================== 顶层General通用必补配置 ====================
+CONFIG_LOCALVERSION="-H29K-RK3528"
+CONFIG_LOCALVERSION_AUTO=y
+
+# 编译优化，固件体积最小
+CONFIG_CC_OPTIMIZE_FOR_SIZE=y
+# CONFIG_CC_OPTIMIZE_FOR_DEBUG is not set
+# CONFIG_CC_OPTIMIZE_FOR_SPEED is not set
+# CONFIG_WERROR is not set
+
+# DRAM与内存分配（RK3528标准配置）
+CONFIG_NR_DRAM_BANKS=1
+CONFIG_SYS_MALLOC_LEN=0x2000000
+CONFIG_SYS_MALLOC_F=y
+CONFIG_SYS_MALLOC_F_LEN=0x2000
+CONFIG_SPL_SYS_MALLOC_F=y
+CONFIG_SPL_SYS_MALLOC_F_LEN=0x2000
+CONFIG_SYS_BARGSIZE=512
+
+# 内置环境变量：自动生成 arch/cpu/soc/board
+CONFIG_ENV_VARS_UBOOT=y
+
+# 禁用虚拟化，无需求
+# CONFIG_XEN is not set
+
+# ==================== 启动自动倒计时 ====================
+CONFIG_AUTOBOOT=y
+
+# ==================== SPL分区/GPT支持（SPL读eMMC必备） ====================
+CONFIG_SPL_PARTITIONS=y
+CONFIG_SPL_GPT=y
+
+# ==================== 调试&镜像校验命令 ====================
+CONFIG_CMD_MEMORY=y
+CONFIG_CMD_CRC32=y
+
+# ==================== 环境变量操作全套命令 ====================
+CONFIG_CMD_SAVEENV=y
+CONFIG_CMD_PRINTENV=y
+CONFIG_CMD_EDITENV=y
+CONFIG_CMD_ENV_EXISTS=y
