@@ -129,16 +129,39 @@ CONFIG_NO_NET=y
 # CONFIG_USB is not set
 
 # ===== 传统脚本启动模式（匹配自定义 boot.scr） =====
+# 关闭新一代自动引导，改用传统boot.scr
 # CONFIG_BOOTSTD is not set
 # CONFIG_BOOTSTD_FULL is not set
-# CONFIG_BOOTSTD_DEFAULTS is not set
 # CONFIG_BOOTMETH_DISTRO is not set
-CONFIG_FIT=y
-CONFIG_FIT_VERBOSE=y
-CONFIG_LEGACY_IMAGE_FORMAT=y
-CONFIG_BOOTDELAY=2
+# CONFIG_CMD_BOOTFLOW is not set
+# CONFIG_CMD_BOOTDEV is not set
+# CONFIG_CMD_BOOTMETH is not set
+
+# 命令行与hush脚本解析
+CMDLINE=y
+HUSH_PARSER=y
+
+# 脚本执行核心
+CONFIG_CMD_SOURCE=y
+CONFIG_CMD_PART=y
+
+# MMC加载、文件系统、内核启动
+CONFIG_MMC=y
+CONFIG_CMD_MMC=y
+CONFIG_CMD_LOAD=y
+CONFIG_CMD_FS_GENERIC=y
+CONFIG_CMD_BOOTM=y
+CONFIG_CMD_BOOTI=y
+
+# 环境变量脚本操作
+CONFIG_CMD_RUN=y
+CONFIG_CMD_ECHO=y
+CONFIG_CMD_SETEXPR=y
+
+# 开机执行脚本启动命令
 CONFIG_USE_BOOTCOMMAND=y
-CONFIG_BOOTCOMMAND="load ${devtype} ${devnum}:1 ${loadaddr} boot.scr; source ${loadaddr}"
+CONFIG_BOOTCOMMAND="load mmc 0:1 ${loadaddr} boot.scr; source ${loadaddr}"
+CONFIG_BOOTDELAY=2
 
 # ===== 正式阶段所需的控制命令与通用文件系统读取 =====
 CONFIG_CMD_MMC=y
