@@ -13,6 +13,8 @@ CONFIG_LOADADDR=0x03000000
 CONFIG_SYS_SOC="rk3528"
 CONFIG_SYS_CONFIG_NAME="rk3528_common"
 CONFIG_BOOTMAPSZ=0x2000000
+CONFIG_SYS_LOAD_ADDR=0xc00800
+CONFIG_LOADADDR=0xc00800
 
 # ===== 现代 Upstream 路径与厂商子目录匹配 =====
 CONFIG_OF_UPSTREAM=y
@@ -170,6 +172,8 @@ CONFIG_CMD_SETEXPR=y
 CONFIG_USE_BOOTCOMMAND=y
 CONFIG_BOOTCOMMAND="if load mmc 0:1 0xc00800 boot.scr; then source 0xc00800; fi"
 CONFIG_BOOTDELAY=2
+# 预置脚本所需全部环境变量
+CONFIG_EXTRA_ENV_SETTINGS="kernel_addr_r=0x03000000\0devtype=mmc\0devnum=0\0soc=rk3528\0"
 
 # ===== 正式阶段所需的控制命令与通用文件系统读取 =====
 CONFIG_CMD_GPIO=y
