@@ -26,6 +26,9 @@ git clone https://github.com/I-agree/luci-app-bluetooth.git package/luci-app-blu
 # === 5. 磁盘扩容
 git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
 
+# === 6. axs5106触摸驱动
+git clone https://github.com/I-agree/axs5106.git package/kernel/modules/axs5106
+
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
