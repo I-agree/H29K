@@ -128,17 +128,17 @@ CONFIG_NO_NET=y
 # ===== 关闭 USB =====
 # CONFIG_USB is not set
 
-# ===== U-Boot Modern Bootstd (标准现代化引导框架) =====
-CONFIG_BOOTSTD=y
-CONFIG_BOOTSTD_FULL=y
-CONFIG_BOOTSTD_DEFAULTS=y
-CONFIG_BOOTMETH_DISTRO=y
+# ===== 传统脚本启动模式（匹配自定义 boot.scr） =====
+# CONFIG_BOOTSTD is not set
+# CONFIG_BOOTSTD_FULL is not set
+# CONFIG_BOOTSTD_DEFAULTS is not set
+# CONFIG_BOOTMETH_DISTRO is not set
 CONFIG_FIT=y
 CONFIG_FIT_VERBOSE=y
 CONFIG_LEGACY_IMAGE_FORMAT=y
 CONFIG_BOOTDELAY=2
 CONFIG_USE_BOOTCOMMAND=y
-CONFIG_BOOTCOMMAND="bootflow scan -lb"
+CONFIG_BOOTCOMMAND="load ${devtype} ${devnum}:1 ${loadaddr} boot.scr; source ${loadaddr}"
 
 # ===== 正式阶段所需的控制命令与通用文件系统读取 =====
 CONFIG_CMD_MMC=y
