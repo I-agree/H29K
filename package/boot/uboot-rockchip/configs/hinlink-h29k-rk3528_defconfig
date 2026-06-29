@@ -159,6 +159,7 @@ CONFIG_CMD_EXT4=y
 CONFIG_CMD_BOOTM=y
 CONFIG_CMD_BOOTI=y
 CONFIG_CMD_BOOTZ=y
+CONFIG_CMD_FDT=y
 
 # 环境变量脚本操作
 CONFIG_CMD_RUN=y
@@ -167,7 +168,7 @@ CONFIG_CMD_SETEXPR=y
 
 # 开机执行脚本启动命令
 CONFIG_USE_BOOTCOMMAND=y
-CONFIG_BOOTCOMMAND="load mmc 0:1 ${loadaddr} boot.scr; source ${loadaddr}"
+CONFIG_BOOTCOMMAND="if load mmc 0:1 0xc00800 boot.scr; then source 0xc00800; fi"
 CONFIG_BOOTDELAY=2
 
 # ===== 正式阶段所需的控制命令与通用文件系统读取 =====
