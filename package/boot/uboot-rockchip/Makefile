@@ -59,7 +59,7 @@ UBOOT_MAKE_FLAGS += \
 	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL)) \
 	EXTRA_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast -Wno-error=int-conversion"
 
-# 🚀 【现代主线化全面适配】彻底打通 U-Boot 2026+ 原生 OF_UPSTREAM 设备树目录
+# 🚀 【现代主线化全面适配】彻底打通 U-Boot 2025+ 原生 OF_UPSTREAM 设备树目录
 define Build/Prepare
 	$(call Build/Prepare/Default)
 	# 1. 复制自定义 H29K defconfig 到 U-Boot 基础配置目录
@@ -69,6 +69,10 @@ define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	
+	# 3. 创建厂商+板级目录，拷贝 h29k.env 到 board/hinlink/h29k/
+	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/env/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
 endef
 
 define Build/InstallDev
