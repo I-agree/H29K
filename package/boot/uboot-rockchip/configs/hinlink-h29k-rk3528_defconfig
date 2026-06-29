@@ -223,7 +223,6 @@ CONFIG_AUTOBOOT=y
 
 # ==================== SPL分区/GPT支持（SPL读eMMC必备） ====================
 CONFIG_SPL_PARTITIONS=y
-CONFIG_SPL_GPT=y
 
 # ==================== 调试&镜像校验命令 ====================
 CONFIG_CMD_MEMORY=y
