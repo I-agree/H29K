@@ -151,6 +151,7 @@ CONFIG_HUSH_PARSER=y
 # 脚本执行核心
 CONFIG_CMD_SOURCE=y
 CONFIG_CMD_PART=y
+CONFIG_CMD_UUID=y
 
 # MMC加载、文件系统、内核启动
 CONFIG_CMD_MMC=y
@@ -161,7 +162,6 @@ CONFIG_CMD_BOOTM=y
 CONFIG_CMD_BOOTI=y
 CONFIG_CMD_BOOTZ=y
 CONFIG_CMD_FDT=y
-CONFIG_CMD_UUID=y
 
 # 环境变量脚本操作
 CONFIG_CMD_RUN=y
@@ -170,7 +170,7 @@ CONFIG_CMD_SETEXPR=y
 
 # 开机执行脚本启动命令
 CONFIG_USE_BOOTCOMMAND=y
-CONFIG_BOOTCOMMAND="if load mmc 0:1 ${loadaddr} boot.scr; then source ${loadaddr}; fi"
+CONFIG_BOOTCOMMAND="if load mmc ${devnum}:1 boot.scr ${scriptaddr}; then source ${scriptaddr}; fi"
 CONFIG_BOOTDELAY=2
 # 预置脚本所需全部环境变量
 CONFIG_EXTRA_ENV_SETTINGS="scriptaddr=0xc00800\0kernel_addr_r=0x03000000\0fdt_addr_r=0x03f00000\0ramdisk_addr_r=0x04000000\0devtype=mmc\0devnum=0\0soc=rk3528\0"
