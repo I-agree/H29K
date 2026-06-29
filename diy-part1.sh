@@ -150,7 +150,7 @@ CONFIG_SPI=y
 # 背光驱动
 CONFIG_BACKLIGHT_CLASS_DEVICE=y
 # ST7789V屏幕驱动
-CONFIG_DRM_PANEL_SITRONIX_ST7789V=y
+CONFIG_DRM_PANEL_SITRONIX_ST7789V=m
 
 # =================================================================
 # TSADC温度 (Rockchip 平台温控核心配置)
@@ -310,64 +310,6 @@ CONFIG_VIDEO_ROCKCHIP_RGA=y
 # DMA内存必备
 CONFIG_DMA_CMA=y
 CONFIG_DMA_SHARED_BUFFER=y
-
-# =================================================================
-# Mali-450 GPU 2D/3D 图形硬件加速  RK3528 开源 Lima
-# =================================================================
-# DRM总开关
-CONFIG_DRM=y
-# 关闭调试类DRM配置
-# CONFIG_DRM_DEBUG_MM is not set
-# CONFIG_DRM_PANIC is not set
-# CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS is not set
-# CONFIG_DRM_DEBUG_MODESET_LOCK is not set
-
-# 传统fb0兼容 + 固化缓冲比例
-CONFIG_DRM_FBDEV_EMULATION=y
-CONFIG_DRM_FBDEV_OVERALLOC=100
-# 禁用物理地址泄露
-# CONFIG_DRM_FBDEV_LEAK_PHYS_SMEM is not set
-
-CONFIG_DRM_LOAD_EDID_FIRMWARE=y
-# DRM GEM DMA内存管理
-CONFIG_DRM_GEM_DMA_HELPER=y
-
-# 瑞芯VOP+HDMI显示驱动
-CONFIG_DRM_ROCKCHIP=y
-CONFIG_ROCKCHIP_VOP=y
-# CONFIG_ROCKCHIP_VOP2 is not set
-CONFIG_ROCKCHIP_DW_HDMI=y
-# RK平台HDMI I2S音频配置，关闭IMX专用AHB/GP音频
-# CONFIG_DRM_DW_HDMI_AHB_AUDIO is not set
-# CONFIG_DRM_DW_HDMI_GP_AUDIO is not set
-CONFIG_DRM_DW_HDMI_I2S_AUDIO=y
-# CONFIG_DRM_DW_HDMI_CEC is not set
-
-# 关闭未使用显示接口
-# CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
-# CONFIG_ROCKCHIP_LVDS is not set
-# CONFIG_ROCKCHIP_RGB is not set
-# CONFIG_ROCKCHIP_ANALOGIX_DP is not set
-# CONFIG_ROCKCHIP_CDN_DP is not set
-# CONFIG_ROCKCHIP_INNO_HDMI is not set
-# CONFIG_ROCKCHIP_RK3066_HDMI is not set
-
-# RK3528 Mali-450 专用开源LIMA驱动
-CONFIG_DRM_LIMA=y
-# 禁用G52/T860的Panfrost，避免冲突
-# CONFIG_DRM_PANFROST is not set
-
-# 基础内存与IOMMU
-CONFIG_DMA_CMA=y
-CONFIG_DMA_SHARED_BUFFER=y
-CONFIG_ROCKCHIP_IOMMU=y
-
-# ALSA音频全套固化
-CONFIG_SND=y
-CONFIG_SND_SOC=y
-CONFIG_SND_PCM=y
-CONFIG_SND_PCM_ELD=y
-CONFIG_SND_PCM_IEC958=y
 
 EOF
 echo "✅ H29K 内核参数注入完成"
