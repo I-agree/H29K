@@ -69,10 +69,6 @@ define Build/Prepare
 	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	
-	# 3. 创建厂商+板级目录，拷贝 h29k.env 到 board/hinlink/h29k/
-	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/env/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
 endef
 
 define Build/InstallDev
