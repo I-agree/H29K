@@ -1,0 +1,9 @@
+if TARGET_HINLINK_H29K
+
+config SYS_BOARD
+	default "h29k"
+
+config SYS_VENDOR
+	default "hinlink"
+
+endif
