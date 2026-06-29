@@ -234,3 +234,16 @@ CONFIG_CMD_SAVEENV=y
 CONFIG_CMD_PRINTENV=y
 CONFIG_CMD_EDITENV=y
 CONFIG_CMD_ENV_EXISTS=y
+
+# ===== env/Kconfig 补充标准配置 =====
+# 环境哈希表容量
+CONFIG_ENV_MIN_ENTRIES=64
+CONFIG_ENV_MAX_ENTRIES=512
+# 自动生成 soc/board/arch 内置变量
+CONFIG_ENV_VARS_UBOOT=y
+# 内置ver版本环境变量
+CONFIG_VERSION_VARIABLE=y
+# 板级文本环境文件（官方推荐方案）
+CONFIG_ENV_SOURCE_FILE="h29k"
+# 允许saveenv保存环境（配套命令已开）
+CONFIG_SAVEENV=y
