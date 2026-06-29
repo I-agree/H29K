@@ -164,11 +164,6 @@ CONFIG_BOOTCOMMAND="load mmc 0:1 ${loadaddr} boot.scr; source ${loadaddr}"
 CONFIG_BOOTDELAY=2
 
 # ===== 正式阶段所需的控制命令与通用文件系统读取 =====
-CONFIG_CMD_MMC=y
-CONFIG_CMD_EXT4=y
-CONFIG_CMD_FAT=y
-CONFIG_CMD_FS_GENERIC=y
-CONFIG_CMD_PART=y
 CONFIG_CMD_GPIO=y
 CONFIG_CMD_MEMINFO=y
 CONFIG_CMD_MEMINFO_MAP=y
@@ -183,7 +178,6 @@ CONFIG_FS_EXT4=y
 # ===== 非必需功能关闭 =====
 # CONFIG_BOOTMETH_VBE is not set
 # CONFIG_DISPLAY_CPUINFO is not set
-# CONFIG_CMD_SETEXPR is not set
 # CONFIG_SPL_DOS_PARTITION is not set
 # CONFIG_ADC is not set
 # CONFIG_DM_PWM is not set
