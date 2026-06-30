@@ -865,7 +865,6 @@ CONFIG_CRYPTO_USER_API_RNG=y
 CONFIG_CRYPTO_USER_API_AEAD=y
 CONFIG_CRYPTO_USER_API_ENABLE_OBSOLETE=y
 CONFIG_XOR_BLOCKS=y
-source "crypto/async_tx/Kconfig"
 
 # 公钥/密钥协商
 CONFIG_CRYPTO_RSA=y
@@ -1088,8 +1087,6 @@ CONFIG_CRYPTO_DEV_ROCKCHIP=y
 # CONFIG_CRYPTO_DEV_AMLOGIC=n
 # CONFIG_CRYPTO_DEV_SA2UL=n
 # CONFIG_CRYPTO_DEV_STARFIVE=n
-# Allwinner 加密驱动不引入
-source "drivers/crypto/allwinner"
 
 # ================= arch/arm64/crypto RK3528 CPU加密指令加速 =================
 # Hash 哈希系列
