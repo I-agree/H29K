@@ -1,4 +1,5 @@
 name: 一次性输出所有内核升级 NEW 新增配置
+
 on:
   repository_dispatch:
   workflow_dispatch:
@@ -19,10 +20,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
-    # 🔥 【强力注入】显式声明工作流 Token 核心权限，踏平所有 403 权限暗礁
     permissions:
-      contents: write   # 允许创建、修改、删除 GitHub Release 固件
-      actions: write    # 允许清理和删除历史工作流运行记录
+      contents: write
+      actions: write
 
     steps:
     - name: 检出源码
@@ -33,30 +33,20 @@ jobs:
         sudo mkdir -p $WORK_DIR
         sudo chown -R $USER:$USER $WORK_DIR
         
-        # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
-        echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
-        # 1. 停用系统可能存在的零碎、低效旧交换分区
         sudo swapoff -a || true
-        # 2. 划出 5GB 专属全量 Swap 空间
         sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
         sudo chmod 600 /swapfile
         sudo mkswap /swapfile
         sudo swapon /swapfile
-        # 3. 强行修改内核虚拟内存激进系数（从默认 60 压榨到 10）
-        # 迫使 CPU 优先榨干物理内存，不到最后一刻绝不读写硬盘，从底层物理掐断 Swap 造成的 I/O 假死
         sudo sysctl vm.swappiness=10
         echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
         echo "📊 扩容系统全局 /tmp 至 10G"
-        # 扩容系统默认 /tmp 临时分区（关键修复）
         sudo umount /tmp || true
         sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
         echo "✅ /tmp 扩容至 10GB 完成"
         
-        echo "📊 检查当前磁盘空间分布："
         df -h
-        # 额外检查inode，防止小文件耗尽节点
         df -i /tmp
-        # 写入环境变量以便后续步骤继承
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
 
     - name: 初始化构建环境
@@ -110,27 +100,22 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 扫描内核升级所有NEW新增配置项（非交互一次性输出，修复管道报错）
+    - name: 扫描内核升级所有NEW新增配置项（非交互一次性输出，忽略异常退出码）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        # 备份原始.config，防止扫描修改用户配置
         cp .config .config.bak
         echo "========================================"
         echo "开始扫描本次内核升级所有 (NEW) 新增配置项"
         echo "========================================"
-        # 使用 /dev/null 空输入替代 yes，彻底规避 Broken Pipe 管道错误
-        make olddefconfig </dev/null 2>&1 | grep -i "NEW" > kernel_new_configs.log
-        # 控制台打印所有新增配置
+        make olddefconfig </dev/null 2>&1 | grep -i "NEW" > kernel_new_configs.log || true
         cat kernel_new_configs.log
         echo "========================================"
         NEW_COUNT=$(wc -l < kernel_new_configs.log)
         echo "本次内核升级一共发现 ${NEW_COUNT} 个新增(NEW)配置项"
         echo "配置日志已保存至 openwrt/kernel_new_configs.log"
         echo "========================================"
-        # 还原用户原始配置
         cp .config.bak .config
         rm -f .config.bak
-        # 复制日志到工作目录用于Artifact上传
         cp kernel_new_configs.log $GITHUB_WORKSPACE/
 
     - name: 上传内核NEW配置扫描日志
