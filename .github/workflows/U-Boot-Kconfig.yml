@@ -1,0 +1,153 @@
+name: U-Boot defconfig Kconfig预校验日志收集
+on:
+  repository_dispatch:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: openwrt-25.12
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  UBOOT_DEFCONFIG: hinlink-h29k-rk3528_defconfig
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
+
+jobs:
+  uboot-kconfig-check:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+    - name: 检出源码
+      uses: actions/checkout@v6.0.3
+
+    - name: 调整磁盘Swap与临时分区
+      run: |
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
+        
+        sudo swapoff -a || true
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        sudo sysctl vm.swappiness=10
+        echo "✅ Swap扩容至5GB完成"
+
+        sudo umount /tmp || true
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "✅ /tmp扩容至10GB完成"
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+
+    - name: 初始化完整编译依赖
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo docker image prune --all --force
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+
+    - name: 查看CPU/内存硬件信息
+      run: |
+        echo "=== CPU ==="
+        echo "逻辑核心: $(nproc)"
+        cat /proc/cpuinfo | grep name | uniq -c
+        echo -e "\n=== 内存 ==="
+        free -h
+
+    - name: 克隆OpenWrt源码
+      run: |
+        cd $WORK_DIR
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 加载自定义feeds配置与diy-part1
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: 更新 & 安装软件源
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: 加载全局.config与diy-part2脚本
+      run: |
+        # 复制files目录
+        if [ -d "$GITHUB_WORKSPACE/files" ]; then
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+          cp -rn $GITHUB_WORKSPACE/files/* ${{ env.WORK_DIR }}/openwrt/files/
+        fi
+
+        # 校验主配置文件
+        ABS_CONFIG_PATH="$GITHUB_WORKSPACE/${CONFIG_FILE}"
+        if [ ! -f "${ABS_CONFIG_PATH}" ]; then
+          echo "❌ 缺失配置文件 $CONFIG_FILE"
+          ls -la $GITHUB_WORKSPACE
+          exit 1
+        fi
+        cp -f "${ABS_CONFIG_PATH}" "${{ env.WORK_DIR }}/openwrt/.config"
+        [ ! -s "${{ env.WORK_DIR }}/openwrt/.config" ] && exit 1
+
+        # 执行二次自定义脚本
+        chmod +x $DIY_P2_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: 生成基础配置 & 解压U-Boot源码
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make defconfig
+        # 仅解压U-Boot，跳过内核prepare
+        make package/boot/u-boot-rockchip/prepare V=s
+
+    ########################### 仅U-Boot Kconfig校验 ###########################
+    - name: U-Boot defconfig Kconfig校验
+      id: uboot-kconfig-check
+      run: |
+        set -euo pipefail
+        OPENWRT_ROOT="${{ env.WORK_DIR }}/openwrt"
+        UBOOT_LOG="${OPENWRT_ROOT}/uboot_kconfig_verify.log"
+        UBOOT_BASE="${OPENWRT_ROOT}/build_dir/target-aarch64_generic_musl/u-boot-rockchip"
+        # 自动匹配u-boot源码文件夹
+        UBOOT_SRC=$(find "${UBOOT_BASE}" -maxdepth 1 -type d -name "u-boot-*" | head -1)
+
+        if [[ -z "${UBOOT_SRC}" || ! -d "${UBOOT_SRC}" ]]; then
+          echo "ERROR: 未找到U-Boot源码目录" >> "${UBOOT_LOG}"
+          exit 1
+        fi
+        DEFCFG_PATH="${UBOOT_SRC}/configs/${UBOOT_DEFCONFIG}"
+        if [[ ! -f "${DEFCFG_PATH}" ]]; then
+          echo "ERROR: 缺失defconfig: ${UBOOT_DEFCFG_PATH}" >> "${UBOOT_LOG}"
+          exit 1
+        fi
+
+        echo "======================== U-Boot Kconfig校验开始 ========================" >> "${UBOOT_LOG}"
+        echo "执行时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "${UBOOT_LOG}"
+        echo "源码目录: ${UBOOT_SRC}" >> "${UBOOT_SRC}"
+        echo "目标defconfig: ${UBOOT_DEFCONFIG}" >> "${UBOOT_LOG}"
+
+        cd "${UBOOT_SRC}"
+        cp "${DEFCFG_PATH}" .config.origin
+        # 加载defconfig并捕获所有syncconfig警告/裁剪日志
+        make ARCH=arm64 CROSS_COMPILE=aarch64-openwrt-linux- ${UBOOT_DEFCONFIG} 2>> "${UBOOT_LOG}"
+
+        echo -e "\n==== Kconfig自动修改差异(覆盖/失效配置) ====" >> "${UBOOT_LOG}"
+        diff -u .config.origin .config >> "${UBOOT_LOG}" || echo "无配置自动变更" >> "${UBOOT_LOG}"
+        echo -e "\n======================== U-Boot Kconfig校验结束 ========================" >> "${UBOOT_LOG}"
+        cat "${UBOOT_LOG}"
+
+    - name: 上传U-Boot校验日志
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: U-Boot Kconfig校验日志
+        path: ${{ env.WORK_DIR }}/openwrt/uboot_kconfig_verify.log
