@@ -20,9 +20,10 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    # 🔥 【强力注入】显式声明工作流 Token 核心权限，踏平所有 403 权限暗礁
     permissions:
-      contents: write
-      actions: write
+      contents: write   # 允许创建、修改、删除 GitHub Release 固件
+      actions: write    # 允许清理和删除历史工作流运行记录
 
     steps:
     - name: 检出源码
@@ -33,11 +34,16 @@ jobs:
         sudo mkdir -p $WORK_DIR
         sudo chown -R $USER:$USER $WORK_DIR
         
+        # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
+        echo "⚙️ 正在物理重构 Swap 交换分区技术栈..."
+        # 1. 停用系统可能存在的零碎、低效旧交换分区
         sudo swapoff -a || true
+        # 2. 划出 5GB 专属全量 Swap 空间
         sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
         sudo chmod 600 /swapfile
         sudo mkswap /swapfile
         sudo swapon /swapfile
+        # 3. 强行修改内核虚拟内存激进系数（从默认 60 压榨到 10）
         sudo sysctl vm.swappiness=10
         echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
         echo "📊 扩容系统全局 /tmp 至 10G"
@@ -45,6 +51,7 @@ jobs:
         sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
         echo "✅ /tmp 扩容至 10GB 完成"
         
+        echo "📊 检查当前磁盘空间分布："
         df -h
         df -i /tmp
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
@@ -124,20 +131,16 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    # 关键步骤：解压内核+打补丁后再同步配置，此时Kconfig已被补丁修改，才能捕获并应答弹窗
-    - name: 内核解压+应用所有补丁，之后非交互固化所有交互式配置
+    - name: 内核解压+应用所有补丁，非交互固化所有交互式配置
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         export KCONFIG_NONINTERACTIVE=1
         export DEBIAN_FRONTEND=noninteractive
         cp .config .config.kernel_pre.bak
-        # 解压内核源码、应用target下全部补丁
-        make -C target/linux prepare V=s
-        # 内核目录非交互应答所有[Y/N/?]交互式配置
+        # 顶层调用内核准备目标，修复 default-packages.mk 缺失报错
+        make target/linux/prepare V=s
         make -C target/linux olddefconfig </dev/null || true
-        # 全局同步固化内核配置变更
         make olddefconfig </dev/null || true
-        # 记录补丁后产生的所有配置变更（包含你编译弹窗的选项）
         diff -u .config.kernel_pre.bak .config > kernel_patch_config_change.diff
         cp kernel_patch_config_change.diff $GITHUB_WORKSPACE/
         rm -f .config.kernel_pre.bak
