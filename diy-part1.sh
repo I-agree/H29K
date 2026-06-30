@@ -219,7 +219,7 @@ CONFIG_HAS_IOMEM=y
 # PWM总开关（开启后自动启用PWM sysfs导出）
 CONFIG_PWM=y
 CONFIG_PWM_SYSFS=y
-# CONFIG_PWM_GPIO=m
+# CONFIG_PWM_GPIO is not set
 
 # RK硬件PWM驱动，匹配DTS pwm节点
 CONFIG_PWM_ROCKCHIP=y
