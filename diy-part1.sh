@@ -1055,6 +1055,7 @@ CONFIG_CRYPTO_DEV_ROCKCHIP=y
 # CONFIG_CRYPTO_DEV_AMLOGIC is not set
 # CONFIG_CRYPTO_DEV_SA2UL is not set
 # CONFIG_CRYPTO_DEV_STARFIVE is not set
+# CONFIG_PKCS8_PRIVATE_KEY_PARSER is not set
 
 # ================= arch/arm64/crypto RK3528 CPU加密指令加速 =================
 # 前置依赖必须开启
