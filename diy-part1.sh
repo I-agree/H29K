@@ -1158,5 +1158,42 @@ source "lib/fonts/Kconfig"
 # 量产关闭全局编译测试开关
 # CONFIG_COMPILE_TEST is not set
 
+# ===================== drivers/regulator 调压全套配置(RK3528 H29K) =====================
+# 电压/电流调节器总框架(必开)
+CONFIG_REGULATOR=y
+# 提供线性范围工具库(自动被select)
+CONFIG_LINEAR_RANGES=y
+
+# 调试(量产关闭，开发板可开)
+# CONFIG_REGULATOR_DEBUG=n
+
+# 通用基础调压驱动
+CONFIG_REGULATOR_FIXED_VOLTAGE=y    # DTS固定电压regulator
+CONFIG_REGULATOR_VIRTUAL_CONSUMER=m # 虚拟测试负载
+CONFIG_REGULATOR_USERSPACE_CONSUMER=y # 用户态控制电源轨
+CONFIG_REGULATOR_NETLINK_EVENTS=y   # 调压状态netlink上报(网关监控必备)
+
+# GPIO调压备用(外设简单电源开关)
+CONFIG_REGULATOR_GPIO=y
+
+# Rockchip PMIC电源管理芯片(H29K标配RK8xx系列)
+CONFIG_REGULATOR_RK808=y
+
+# PWM电压调压器【重点，PWM调压驱动本体】
+# 依赖 CONFIG_PWM=y (drivers/pwm子系统必须同步开启)
+CONFIG_REGULATOR_PWM=y
+
+# 无关厂商PMIC全部关闭(精简内核)
+# CONFIG_REGULATOR_88PG86X=n
+# CONFIG_REGULATOR_88PM800=n
+# CONFIG_REGULATOR_ACT8865=n
+# CONFIG_REGULATOR_AXP20X=n
+# CONFIG_REGULATOR_DA90XX=n
+# CONFIG_REGULATOR_MAXXXX=n
+# CONFIG_REGULATOR_QCOM_XXX=n
+# CONFIG_REGULATOR_MTXXX=n
+# CONFIG_REGULATOR_TI_XXX=n
+# 其余非RK品牌PMIC全部注释关闭
+
 EOF
 echo "✅ H29K 内核参数注入完成"
