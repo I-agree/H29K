@@ -693,11 +693,20 @@ CONFIG_SPL_LOG_MAX_LEVEL=3
 CONFIG_DISPLAY_BOARDINFO_LATE=y
 CONFIG_ENV_RELOC_GD_ENV_ADDR=y
 
-# ========== 随机熵池初始化 ==========
+# ========== 内存布局传递、内核防内存踩踏 ==========
+CONFIG_CMD_BLOB=y
+CONFIG_OF_MEMORY=y
+CONFIG_FDT_MEM_RESERVE=y
+
+# ========== 内核镜像完整性校验 ==========
+CONFIG_BOOTM_IMAGE_CRC=y
+
+# ========== 随机硬件标识防冲突 ==========
+CONFIG_SETENV_RANDOM=y
 CONFIG_RANDOM=y
 CONFIG_SPL_RANDOM=y
 
 # ===== 标准 CONFIG_EXTRA_ENV_SETTINGS 模板 =====
-CONFIG_EXTRA_ENV_SETTINGS="soc=rk3528\0devtype=mmc\0devnum=0\0kernel_addr_r=0xc0080000\0serial_port=ttyS0\0serial_addr=,0xff9f0000\0boot_openwrt=part uuid ${devtype} ${devnum}:2 uuid;setenv bootargs console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait;load ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img && setenv kernel_size ${filesize} && bootm ${kernel_addr_r}\0"
+CONFIG_EXTRA_ENV_SETTINGS="soc=rk3528\0devtype=mmc\0devnum=0\0kernel_addr_r=0xc0080000\0serial_port=ttyS0\0serial_addr=,0xff9f0000\0boot_openwrt=part uuid ${devtype} ${devnum}:2 uuid;setenv bootargs console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait cma=256M swiotlb=1024 coherent_pool=2M panic=10;load ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img && setenv kernel_size ${filesize} && bootm ${kernel_addr_r}\0"
 CONFIG_BOOTCOMMAND="run boot_openwrt"
 CONFIG_BOOTDELAY=1
