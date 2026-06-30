@@ -79,6 +79,12 @@ CONFIG_ROCKCHIP_COMMON=y
 CONFIG_BOARD_RK3528=y
 CONFIG_ROCKCHIP_BOARD_FDT=y
 
+# ========== 核心打包依赖 ==========
+CONFIG_BINMAN=y
+CONFIG_SPL_LIBCOMMON_SUPPORT=y
+CONFIG_SPL_LIBGENERIC_SUPPORT=y
+# CONFIG_SPL_RAW_IMAGE_SUPPORT is not set
+
 # ===== 基础总线外设驱动 =====
 CONFIG_PINCTRL=y
 CONFIG_RAM=y
@@ -682,6 +688,10 @@ CONFIG_SPL_LOG_MAX_LEVEL=3
 # CONFIG_ADC is not set
 # CONFIG_DM_PWM is not set
 # CONFIG_EFI_LOADER is not set
+
+# ========== 官方标配优化项 ==========
+CONFIG_DISPLAY_BOARDINFO_LATE=y
+CONFIG_ENV_RELOC_GD_ENV_ADDR=y
 
 # ===== 标准 CONFIG_EXTRA_ENV_SETTINGS 模板 =====
 CONFIG_EXTRA_ENV_SETTINGS="soc=rk3528\0devtype=mmc\0devnum=0\0kernel_addr_r=0xc0080000\0serial_port=ttyS0\0serial_addr=,0xff9f0000\0boot_openwrt=part uuid ${devtype} ${devnum}:2 uuid;setenv bootargs console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait;load ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img && setenv kernel_size ${filesize} && bootm ${kernel_addr_r}\0"
