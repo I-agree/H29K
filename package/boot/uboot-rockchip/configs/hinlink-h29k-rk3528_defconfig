@@ -679,3 +679,18 @@ CONFIG_SPL_LOG_MAX_LEVEL=3
 # CONFIG_ADC is not set
 # CONFIG_DM_PWM is not set
 # CONFIG_EFI_LOADER is not set
+
+# ===== 标准 CONFIG_EXTRA_ENV_SETTINGS 模板 =====
+CONFIG_EXTRA_ENV_SETTINGS="\
+# 基础内存/设备变量
+mmcdev=0\0\
+kernel_addr_r=0xc008000\0\
+fdtaddr=0xc1000000\0\
+# 主启动脚本，完全对齐标准bootscript
+boot_openwrt=part uuid ${mmcdev}:2 uuid;if test $soc = 'rk3528'; then serial_addr=',0xff9f0000'; serial_port='ttyS0'; fi;setenv bootargs console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait;load ${mmcdev}:1 ${kernel_addr_r} kernel.img;bootm ${kernel_addr_r}\0\
+# 调试/恢复脚本
+env_reset=env default -a;saveenv;reset\0\
+boot_debug=set bootdelay -1;saveenv;reset\0\
+"
+CONFIG_BOOTCOMMAND="run boot_openwrt"
+CONFIG_BOOTDELAY=3
