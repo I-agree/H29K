@@ -1,4 +1,4 @@
-name: 一次性输出所有内核升级 NEW 新增配置
+name: OpenWrt 固件生成脚本
 
 on:
   repository_dispatch:
@@ -111,32 +111,29 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    # ===================== 新增步骤：批量捕获所有NEW新增内核配置，无交互弹窗 =====================
-    - name: 扫描内核升级所有NEW新增配置项（非交互一次性输出）
+    - name: 扫描内核升级所有NEW新增配置项（非交互一次性输出，修复管道报错）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        # 备份原始.config
+        # 备份原始.config，防止扫描修改用户配置
         cp .config .config.bak
         echo "========================================"
         echo "开始扫描本次内核升级所有 (NEW) 新增配置项"
         echo "========================================"
-        # 非交互执行olddefconfig，捕获所有NEW日志，输出控制台+保存日志文件
-        yes "" | make olddefconfig 2>&1 | grep -i "NEW" > kernel_new_configs.log
-        # 控制台打印全部新增配置
+        # 使用 /dev/null 空输入替代 yes，彻底规避 Broken Pipe 管道错误
+        make olddefconfig </dev/null 2>&1 | grep -i "NEW" > kernel_new_configs.log
+        # 控制台打印所有新增配置
         cat kernel_new_configs.log
         echo "========================================"
-        # 统计新增配置数量
         NEW_COUNT=$(wc -l < kernel_new_configs.log)
         echo "本次内核升级一共发现 ${NEW_COUNT} 个新增(NEW)配置项"
         echo "配置日志已保存至 openwrt/kernel_new_configs.log"
         echo "========================================"
-        # 恢复原始用户配置，避免olddefconfig自动修改配置
+        # 还原用户原始配置
         cp .config.bak .config
         rm -f .config.bak
-        # 上传NEW配置日志作为构建产物，方便后续排查
+        # 复制日志到工作目录用于Artifact上传
         cp kernel_new_configs.log $GITHUB_WORKSPACE/
 
-    # 上传NEW配置日志文件，可在Action产物下载查看完整新增列表
     - name: 上传内核NEW配置扫描日志
       uses: actions/upload-artifact@v7.0.1
       with:
