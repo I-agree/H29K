@@ -299,18 +299,6 @@ CONFIG_VIDEO_ROCKCHIP_RGA=y
 CONFIG_DMA_CMA=y
 CONFIG_DMA_SHARED_BUFFER=y
 
-# =================================================================
-#  交叉编译器兼容配置
-# =================================================================
-# GCC 11/12.3/13.2 存在asm volatile goto输出寄存器覆盖bug
-CONFIG_GCC_ASM_GOTO_OUTPUT_BROKEN=y
-# 低版本编译器关闭原生asm goto输出支持，使用内核屏障workaround
-# CONFIG_CC_HAS_ASM_GOTO_OUTPUT is not set
-
-CONFIG_BINFMT_MISC=m
-CONFIG_COMPAT=y
-CONFIG_COMPAT_BINFMT_ELF=y
-
 # ===================== mm/Kconfig 配套(H29K RK3528 无磁盘Swap) =====================
 # 关闭磁盘交换与zswap
 # CONFIG_SWAP is not set
