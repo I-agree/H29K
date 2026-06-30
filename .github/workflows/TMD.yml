@@ -1,4 +1,4 @@
-name: OpenWrt 固件生成脚本
+name: 一次性输出所有内核升级 NEW 新增配置
 
 on:
   repository_dispatch:
