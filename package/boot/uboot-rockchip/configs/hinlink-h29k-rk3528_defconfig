@@ -76,6 +76,11 @@ CONFIG_ARCH_ROCKCHIP=y
 CONFIG_ROCKCHIP_RK3528=y
 CONFIG_ROCKCHIP_COMMON_BOARD=y
 CONFIG_PARTITION_UUIDS=y
+CONFIG_ROCKCHIP_COMMON=y
+CONFIG_BOARD_RK3528=y
+CONFIG_ROCKCHIP_BOARD_FDT=y
+CONFIG_FDT_BOARD_FIXUP=y
+CONFIG_OF_BOARD_FIXUP=y
 
 # ===== 基础总线外设驱动 =====
 CONFIG_PINCTRL=y
@@ -680,22 +685,7 @@ CONFIG_SPL_LOG_MAX_LEVEL=3
 # CONFIG_DM_PWM is not set
 # CONFIG_EFI_LOADER is not set
 
-# ===== 开启 Rockchip 标准板级钩子 =====
-CONFIG_OF_BOARD_FIXUP=y
-CONFIG_FDT_BOARD_FIXUP=y
-CONFIG_ROCKCHIP_BOARD_FDT=y
-CONFIG_BOARD_RK3528=y
-
 # ===== 标准 CONFIG_EXTRA_ENV_SETTINGS 模板 =====
-CONFIG_EXTRA_ENV_SETTINGS="\
-soc=rk3528\0\
-mmcdev=0\0\
-kernel_addr_r=0xc0080000\0\
-fdtaddr=0xc1000000\0\
-boot_openwrt=part uuid ${mmcdev}:2 uuid;if test $soc = 'rk3528'; then serial_addr=',0xff9f0000'; serial_port='ttyS0'; fi;setenv bootargs console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait;load ${mmcdev}:1 Image;load ${mmcdev}:1 rockchip/rk3528-h29k.dtb ${fdtaddr};booti ${kernel_addr_r} - ${fdtaddr}\0\
-env_reset=env default -a;saveenv;reset\0\
-boot_debug=set bootdelay -1;saveenv;reset\0\
-boot_auto=set bootdelay 1;saveenv;reset\0\
-"
+CONFIG_EXTRA_ENV_SETTINGS="soc=rk3528\0mmcdev=0\0kernel_addr_r=0xc0080000\0fdtaddr=0xc1000000\0boot_openwrt=part uuid ${mmcdev}:2 uuid;if test $soc = 'rk3528';then serial_addr=',0xff9f0000';serial_port='ttyS0';fi;setenv bootargs console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait;load ${mmcdev}:1 ${kernel_addr_r} Image;load ${mmcdev}:1 ${fdtaddr} rockchip/rk3528-h29k.dtb;booti ${kernel_addr_r} - ${fdtaddr}\0env_reset=env default -a;saveenv;reset\0boot_debug=set bootdelay -1;saveenv;reset\0boot_auto=set bootdelay 1;saveenv;reset\0"
 CONFIG_BOOTCOMMAND="run boot_openwrt"
 CONFIG_BOOTDELAY=1
