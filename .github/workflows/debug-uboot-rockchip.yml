@@ -1,4 +1,5 @@
-name: U-Boot defconfig Kconfig预校验日志收集
+name: U-Boot Rockchip 编译日志排查
+
 on:
   repository_dispatch:
   workflow_dispatch:
@@ -10,20 +11,22 @@ env:
   CONFIG_FILE: rk3528-hinlink-h29k.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
-  UBOOT_DEFCONFIG: hinlink-h29k-rk3528_defconfig
   TZ: Asia/Shanghai
   WORK_DIR: /workdir
+  UBOOT_BIN_NAME: hinlink-h29k-rk3528-u-boot-rockchip.bin
 
 jobs:
-  uboot-kconfig-check:
+  build:
     runs-on: ubuntu-22.04
     permissions:
-      contents: read
+      contents: write
+      actions: write
+
     steps:
     - name: 检出源码
       uses: actions/checkout@v6.0.3
 
-    - name: 调整磁盘Swap与临时分区
+    - name: 调整磁盘空间
       run: |
         sudo mkdir -p $WORK_DIR
         sudo chown -R $USER:$USER $WORK_DIR
@@ -34,18 +37,19 @@ jobs:
         sudo mkswap /swapfile
         sudo swapon /swapfile
         sudo sysctl vm.swappiness=10
-        echo "✅ Swap扩容至5GB完成"
-
+        
         sudo umount /tmp || true
         sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
-        echo "✅ /tmp扩容至10GB完成"
+        
+        df -h
+        df -i /tmp
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
 
-    - name: 初始化完整编译依赖
+    - name: 初始化构建环境
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
         sudo docker image prune --all --force
         sudo -E apt-get -qq update
         sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev
@@ -53,106 +57,173 @@ jobs:
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
 
-    - name: 查看CPU/内存硬件信息
+    - name: 查看编译环境硬件规格
       run: |
-        echo "=== CPU ==="
-        echo "逻辑核心: $(nproc)"
-        cat /proc/cpuinfo | grep name | uniq -c
-        echo -e "\n=== 内存 ==="
+        echo "==================== CPU 核心数 ===================="
+        echo "逻辑核心数: $(nproc)"
+        cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+        echo -e "\n==================== 内存大小 ===================="
         free -h
 
-    - name: 克隆OpenWrt源码
+    - name: 克隆 OpenWrt 源码
       run: |
         cd $WORK_DIR
+        df -hT $PWD
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 加载自定义feeds配置与diy-part1
+    - name: 加载自定义软件源
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: 更新 & 安装软件源
-      run: |
-        cd ${{ env.WORK_DIR }}/openwrt
-        ./scripts/feeds update -a
-        ./scripts/feeds install -a
+    - name: 更新软件源索引
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
 
-    - name: 加载全局.config与diy-part2脚本
+    - name: 安装软件源组件
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
+
+    - name: 加载自定义配置与 DIY 补丁
       run: |
-        # 复制files目录
-        if [ -d "$GITHUB_WORKSPACE/files" ]; then
+        if [ -d files ]; then
           mkdir -p ${{ env.WORK_DIR }}/openwrt/files
-          cp -rn $GITHUB_WORKSPACE/files/* ${{ env.WORK_DIR }}/openwrt/files/
+          cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
         fi
-
-        # 校验主配置文件
-        ABS_CONFIG_PATH="$GITHUB_WORKSPACE/${CONFIG_FILE}"
-        if [ ! -f "${ABS_CONFIG_PATH}" ]; then
-          echo "❌ 缺失配置文件 $CONFIG_FILE"
-          ls -la $GITHUB_WORKSPACE
-          exit 1
-        fi
-        cp -f "${ABS_CONFIG_PATH}" "${{ env.WORK_DIR }}/openwrt/.config"
-        [ ! -s "${{ env.WORK_DIR }}/openwrt/.config" ] && exit 1
-
-        # 执行二次自定义脚本
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
         chmod +x $DIY_P2_SH
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 生成基础配置 & 解压U-Boot源码
+    - name: 生成默认配置并编译宿主工具集
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         make defconfig
-        # 仅解压U-Boot，跳过内核prepare
-        make package/boot/u-boot-rockchip/prepare V=s
+        make tools/compile -j$(nproc)
 
-    ########################### 仅U-Boot Kconfig校验 ###########################
-    - name: U-Boot defconfig Kconfig校验
-      id: uboot-kconfig-check
+    - name: 编译目标交叉工具链
       run: |
-        set -euo pipefail
-        OPENWRT_ROOT="${{ env.WORK_DIR }}/openwrt"
-        UBOOT_LOG="${OPENWRT_ROOT}/uboot_kconfig_verify.log"
-        UBOOT_BASE="${OPENWRT_ROOT}/build_dir/target-aarch64_generic_musl/u-boot-rockchip"
-        # 自动匹配u-boot源码文件夹
-        UBOOT_SRC=$(find "${UBOOT_BASE}" -maxdepth 1 -type d -name "u-boot-*" | head -1)
+        cd ${{ env.WORK_DIR }}/openwrt
+        make toolchain/compile -j$(nproc)
+        
+        echo -e "==================== 交叉编译器校验 ===================="
+        ls -lh staging_dir/toolchain-aarch64_*/bin/aarch64-openwrt-linux-musl-gcc
+        ls -lh staging_dir/toolchain-aarch64_*/lib/libgcc_s.so.*
+        echo "✅ 目标工具链编译完成"
 
-        if [[ -z "${UBOOT_SRC}" || ! -d "${UBOOT_SRC}" ]]; then
-          echo "ERROR: 未找到U-Boot源码目录" >> "${UBOOT_LOG}"
+    - name: 编译 rkbin 固件包并校验产物
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make -j1 package/boot/rkbin/compile V=s 2>&1 | tee rkbin-build.log
+        
+        echo -e "\n==================== rkbin 固件安装校验 ===================="
+        ls -lh staging_dir/target-*/image/rk3528_bl31_v1.17.elf
+        ls -lh staging_dir/target-*/image/rk3528_ddr_1056MHz_v1.10.bin
+        
+        echo -e "\n>>> 校验 BL31 固件架构:"
+        file staging_dir/target-*/image/rk3528_bl31_v1.17.elf
+
+    - name: 下载 uboot-rockchip 编译依赖
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        for i in {1..3}; do make package/boot/uboot-rockchip/download -j8 && break || sleep 5; done
+
+    - name: 编译 uboot-rockchip 并保存完整日志
+      id: compile_uboot
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        
+        make -j1 package/boot/uboot-rockchip/compile V=s 2>&1 | tee uboot-rockchip-full.log
+        
+        echo "status=success" >> $GITHUB_OUTPUT
+        
+        echo -e "\n==================== 【1】构建目录关键产物检查 ===================="
+        find build_dir/target-* -name "*u-boot-rockchip.bin" 2>/dev/null | xargs ls -lh
+        
+        echo -e "\n==================== 【2】staging 镜像导出 ===================="
+        UBOOT_SRC=$(find staging_dir/target-*/image -name "*u-boot-rockchip.bin" | head -n1)
+        if [ -f "$UBOOT_SRC" ]; then
+          cp "$UBOOT_SRC" $GITHUB_WORKSPACE/${{ env.UBOOT_BIN_NAME }}
+          echo "✅ 已复制 U-Boot 固件: $UBOOT_SRC -> ${{ env.UBOOT_BIN_NAME }}"
+          echo "UBOOT_BIN_PATH=$UBOOT_SRC" >> $GITHUB_ENV
+        else
+          echo "❌ 未在 staging 目录发现 U-Boot 一体化镜像"
+          echo "UBOOT_BIN_PATH=" >> $GITHUB_ENV
+        fi
+        
+        echo -e "\n==================== 【3】关键日志关键词检索 ===================="
+        echo ">>> Binman 一体化打包执行记录:"
+        grep -E "binman|binman\.dts|packing image|Output image" uboot-rockchip-full.log || echo "未找到 Binman 一体化打包记录"
+
+        echo -e "\n>>> TPL 编译记录:"
+        grep -E "tpl/u-boot-tpl\.elf|built for TPL" uboot-rockchip-full.log || echo "未找到 TPL 编译记录"
+
+        echo -e "\n>>> SPL 编译记录:"
+        grep -E "spl/u-boot-spl\.elf|built for SPL" uboot-rockchip-full.log || echo "未找到 SPL 编译记录"
+
+        echo -e "\n>>> FIT镜像(u-boot.itb)内置打包记录:"
+        grep -E "mkimage -f.*its|FIT image" uboot-rockchip-full.log || echo "未找到 u-boot.itb FIT 打包记录"
+
+        echo -e "\n>>> BL31 ATF 固件链接嵌入记录:"
+        grep -iE "bl31|rk3528_bl31" uboot-rockchip-full.log || echo "未找到 BL31 相关嵌入记录"
+
+        echo -e "\n>>> 最终一体化固件输出记录:"
+        grep -E "u-boot-rockchip\.bin|Writing.*u-boot-rockchip" uboot-rockchip-full.log || echo "未找到一体化BIN生成记录"
+      continue-on-error: true
+
+    # 新增：binman 自动解析固件所有分段，输出清单+十六进制头部（仅当前步骤临时追加PATH）
+    - name: Binman 解析一体化固件分段
+      if: env.UBOOT_BIN_PATH != ''
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        BIN_PATH="${{ env.UBOOT_BIN_PATH }}"
+        # 仅当前shell临时将host工具目录加入PATH，不全局生效
+        export PATH="$PWD/staging_dir/host/bin:$PATH"
+
+        # 先校验binman是否存在
+        if ! command -v binman &> /dev/null; then
+          echo "❌ 错误：未找到 binman 工具，请确认 uboot-rockchip 编译成功"
+          ls -lh staging_dir/host/bin/ || true
           exit 1
         fi
-        DEFCFG_PATH="${UBOOT_SRC}/configs/${UBOOT_DEFCONFIG}"
-        if [[ ! -f "${DEFCFG_PATH}" ]]; then
-          echo "ERROR: 缺失defconfig: ${DEFCFG_PATH}" >> "${UBOOT_LOG}"
-          exit 1
-        fi
 
-        # 清空日志并写入头部信息
-        > "${UBOOT_LOG}"
-        echo "======================== U-Boot Kconfig校验开始 ========================" >> "${UBOOT_LOG}"
-        echo "执行时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "${UBOOT_LOG}"
-        echo "源码目录: ${UBOOT_SRC}" >> "${UBOOT_LOG}"
-        echo "目标defconfig: ${UBOOT_DEFCONFIG}" >> "${UBOOT_LOG}"
+        echo "=================================================="
+        echo "binman ls 完整分段清单 | 固件: $BIN_PATH"
+        echo "=================================================="
+        binman ls "$BIN_PATH" 2>&1 | tee binman-segments.log
+        
+        echo -e "\n=================================================="
+        echo 十六进制头部预览(前1024字节魔数校验)
+        echo "=================================================="
+        xxd -l 1024 "$BIN_PATH"
+        
+        echo -e "\n=================================================="
+        echo 文件大小与文件类型校验
+        echo "=================================================="
+        ls -lh "$BIN_PATH"
+        file "$BIN_PATH"
+        
+        # 复制日志到工作区用于上传制品
+        cp binman-segments.log $GITHUB_WORKSPACE/
 
-        cd "${UBOOT_SRC}"
-        cp "${DEFCFG_PATH}" .config.origin
+    - name: 检查磁盘空间
+      if: always()
+      run: df -hT
 
-        # 导入OpenWrt交叉编译工具链环境
-        export PATH=${OPENWRT_ROOT}/staging_dir/toolchain-aarch64_generic_gcc-14.1-musl/bin:${PATH}
-        # 加载defconfig，捕获所有Kconfig警告、依赖裁剪、配置变更日志
-        make ARCH=arm64 CROSS_COMPILE=aarch64-openwrt-linux- ${UBOOT_DEFCONFIG} 2>> "${UBOOT_LOG}"
-
-        echo -e "\n==== Kconfig自动修改差异(覆盖/失效配置) ====" >> "${UBOOT_LOG}"
-        diff -u .config.origin .config >> "${UBOOT_LOG}" || echo "无配置自动变更" >> "${UBOOT_LOG}"
-        echo -e "\n======================== U-Boot Kconfig校验结束 ========================" >> "${UBOOT_LOG}"
-        cat "${UBOOT_LOG}"
-
-    - name: 上传U-Boot校验日志
+    - name: 上传全部制品(日志+固件+分段解析记录)
       uses: actions/upload-artifact@v7.0.1
+      if: always()
       with:
-        name: U-Boot Kconfig校验日志
-        path: ${{ env.WORK_DIR }}/openwrt/uboot_kconfig_verify.log
+        name: build-full-logs-and-uboot
+        path: |
+          ${{ env.WORK_DIR }}/openwrt/rkbin-build.log
+          ${{ env.WORK_DIR }}/openwrt/uboot-rockchip-full.log
+          ${{ env.WORK_DIR }}/openwrt/binman-segments.log
+          ${{ env.UBOOT_BIN_NAME }}
+
+    - name: 清理历史工作流运行记录
+      uses: Mattraks/delete-workflow-runs@v2.1.0
+      with:
+        retain_days: 0
+        keep_minimum_runs: 2
