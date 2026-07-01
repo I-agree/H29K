@@ -34,7 +34,7 @@ echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
 # 创建全局所需的所有目录架构 (新增 files/www 网页容器支撑)
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
-         package/boot/uboot-rockchip/configs \
+         package/boot/uboot-rockchip/configs/hinlink/h29k \
          package/boot/uboot-rockchip/dts \
          target/linux/rockchip/image \
          package/boot/rkbin \
@@ -76,7 +76,11 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/900-fix-mb-m
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch" "package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
 download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/h29k.env" "package/boot/uboot-rockchip/configs/h29k.env"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env" "package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile" "package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c" "package/boot/uboot-rockchip/configs/hinlink/h29k/board.c"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/Kconfig"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
