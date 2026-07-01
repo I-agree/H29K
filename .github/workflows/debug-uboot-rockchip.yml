@@ -172,19 +172,21 @@ jobs:
         grep -E "u-boot-rockchip\.bin|Writing.*u-boot-rockchip" uboot-rockchip-full.log || echo "未找到一体化BIN生成记录"
       continue-on-error: true
 
-    # 新增：binman 自动解析固件所有分段，输出清单+十六进制头部（仅当前步骤临时追加PATH）
+    # 修复：直接使用U-Boot编译目录内原生binman工具，不再依赖staging_dir/host/bin
     - name: Binman 解析一体化固件分段
       if: env.UBOOT_BIN_PATH != ''
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         BIN_PATH="${{ env.UBOOT_BIN_PATH }}"
-        # 仅当前shell临时将host工具目录加入PATH，不全局生效
-        export PATH="$PWD/staging_dir/host/bin:$PATH"
+        # 自动定位当前U-Boot编译目录
+        UBOOT_BUILD_DIR=$(find build_dir/target-aarch64_generic_musl -name "u-boot-2025.10" -type d | head -n1)
+        # 将U-Boot自带tools目录加入PATH
+        export PATH="${UBOOT_BUILD_DIR}/tools:$PATH"
 
-        # 先校验binman是否存在
+        # 校验binman可执行文件
         if ! command -v binman &> /dev/null; then
           echo "❌ 错误：未找到 binman 工具，请确认 uboot-rockchip 编译成功"
-          ls -lh staging_dir/host/bin/ || true
+          ls -lh ${UBOOT_BUILD_DIR}/tools/ || true
           exit 1
         fi
 
@@ -204,7 +206,7 @@ jobs:
         ls -lh "$BIN_PATH"
         file "$BIN_PATH"
         
-        # 复制日志到工作区用于上传制品
+        # 日志拷贝到工作区用于上传制品
         cp binman-segments.log $GITHUB_WORKSPACE/
 
     - name: 检查磁盘空间
