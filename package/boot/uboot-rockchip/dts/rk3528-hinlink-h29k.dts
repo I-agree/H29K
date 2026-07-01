@@ -5,8 +5,6 @@
 
 /dts-v1/;
 
-#include "rk3528.dtsi"
-
 / {
 	model = "HINLINK H29K";
 	compatible = "hinlink,h29k", "rockchip,rk3528";
