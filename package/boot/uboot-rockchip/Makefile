@@ -70,13 +70,17 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	
-	# 3. 新建板级目录和环境配置文件（新版U-Boot规范）
+	# 3. 完整复制hinlink板级全套文件（新版U-Boot规范）
 	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/Kconfig $(PKG_BUILD_DIR)/board/hinlink/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	
+	# ========== 关键修复：注入板子Kconfig到arm64顶层，让BOARDDIR正常赋值 ==========
+	grep -q 'source "board/hinlink/h29k/Kconfig"' $(PKG_BUILD_DIR)/arch/arm64/Kconfig || \
+	echo 'source "board/hinlink/h29k/Kconfig"' >> $(PKG_BUILD_DIR)/arch/arm64/Kconfig
 endef
 
 define Build/InstallDev
