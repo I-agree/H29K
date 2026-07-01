@@ -66,6 +66,9 @@ CONFIG_NO_NET=y
 # CONFIG_NET is not set
 # CONFIG_NET_LWIP is not set
 
+# ===== 网络设备框架 =====
+CONFIG_ETH=y
+
 # ===== 基础架构与芯片总开关 =====
 CONFIG_ARM=y
 CONFIG_ARM64=y
@@ -93,6 +96,10 @@ CONFIG_SYSCON=y
 CONFIG_DM_REGULATOR_FIXED=y
 CONFIG_DM_RESET=y
 CONFIG_DM_REGULATOR_GPIO=y
+CONFIG_SPI=y
+CONFIG_I2C=y
+CONFIG_MTD=y
+CONFIG_DM_PWM=y
 
 # ===== 三级引导 TPL -> SPL -> U-Boot Proper =====
 CONFIG_ROCKCHIP_EXTERNAL_TPL=y
@@ -341,12 +348,12 @@ CONFIG_SIMPLE_BUS_CORRECT_RANGE=y
 # CONFIG_OF_ISA_BUS is not set
 # CONFIG_OFNODE_MULTI_TREE is not set
 # CONFIG_ACPIGEN is not set
-# CONFIG_BOUNCE_BUFFER is not set
+CONFIG_BOUNCE_BUFFER=y
 
-# ===== SPL 精简：仅分区解析 =====
+# ===== SPL 分区支持 =====
 CONFIG_SPL_LIBDISK_SUPPORT=y
-# CONFIG_SPL_FS_FAT is not set
-# CONFIG_SPL_FS_EXT4 is not set
+CONFIG_SPL_FS_FAT=y
+CONFIG_SPL_FS_EXT4=y
 
 # ===== dts/Kconfig 设备树配置 =====
 CONFIG_SUPPORT_OF_CONTROL=y
@@ -377,7 +384,7 @@ CONFIG_DEFAULT_FDT_FILE="rockchip/rk3528-hinlink-h29k.dtb"
 # CONFIG_SPL_OF_PLATDATA is not set
 # CONFIG_TPL_OF_PLATDATA is not set
 # CONFIG_VPL_OF_CONTROL is not set
-# CONFIG_OF_SEPARATE is not set
+CONFIG_OF_SEPARATE=y
 # CONFIG_OF_EMBED is not set
 # CONFIG_OF_INITIAL_DTB_READONLY is not set
 # CONFIG_MULTI_DTB_FIT_LZO is not set
@@ -420,8 +427,6 @@ CONFIG_CRC32=y
 
 # ===== 硬件裁剪：USB、SPI、MTD、NAND 全部关闭 =====
 # CONFIG_USB is not set
-# CONFIG_SPI is not set
-# CONFIG_MTD is not set
 
 # ===== disk/Kconfig 分区表配置 =====
 CONFIG_PARTITIONS=y
