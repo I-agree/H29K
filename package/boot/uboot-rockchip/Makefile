@@ -71,7 +71,7 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	
 	# 3. 新建板级目录 + 复制 h29k.env 环境配置文件（新版U-Boot规范）
-	mkdir -p $(PKG_BUILD_DIR)/board/rockchip/h29k/
+	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
 endef
 
