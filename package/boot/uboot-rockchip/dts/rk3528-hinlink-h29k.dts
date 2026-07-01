@@ -10,10 +10,10 @@
 	compatible = "hinlink,h29k", "rockchip,rk3528";
 
 	aliases {
-		serial0 = &uart0;
-		ethernet0 = &gmac1;
-		mmc0 = &sdhci;
-		mmc1 = &sdmmc;
+		serial0 = "/serial@ff9f0000";
+		ethernet0 = "/ethernet@ffbe0000";
+		mmc0 = "/mmc@ffbf0000";
+		mmc1 = "/mmc@ffc30000";
 	};
 
 	chosen {
@@ -25,8 +25,8 @@
 		regulator-name = "vcc5v0_sys";
 		regulator-always-on;
 		regulator-boot-on;
-		regulator-min-microvolt = <5000000>;
-		regulator-max-microvolt = <5000000>;
+		regulator-min-microvolt = <0x4c4b40>;
+		regulator-max-microvolt = <0x4c4b40>;
 		bootph-all;
 	};
 
@@ -35,9 +35,10 @@
 		regulator-name = "vcc_3v3";
 		regulator-always-on;
 		regulator-boot-on;
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		vin-supply = <&vcc5v0_sys>;
+		regulator-min-microvolt = <0x325aa0>;
+		regulator-max-microvolt = <0x325aa0>;
+		vin-supply = <0x5d>;
+		phandle = <0x4c>;
 		bootph-all;
 	};
 
@@ -46,33 +47,33 @@
 		regulator-name = "vcc_1v8";
 		regulator-always-on;
 		regulator-boot-on;
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <1800000>;
-		vin-supply = <&vcc_3v3>;
+		regulator-min-microvolt = <0x1b7740>;
+		regulator-max-microvolt = <0x1b7740>;
+		vin-supply = <0x4c>;
+		phandle = <0x37>;
 		bootph-all;
 	};
 
 	vcc3v3_sd: vcc3v3-sd {
 		compatible = "regulator-fixed";
-		gpio = <&gpio4 RK_PA1 GPIO_ACTIVE_LOW>;
+		gpio = <0x25 0x01 0x01>;
 		regulator-name = "vcc3v3_sd";
 		regulator-always-on;
 		regulator-boot-on;
-		regulator-min-microvolt = <3300000>;
-		regulator-max-microvolt = <3300000>;
-		vin-supply = <&vcc_3v3>;
+		regulator-min-microvolt = <0x325aa0>;
+		regulator-max-microvolt = <0x325aa0>;
+		vin-supply = <0x4c>;
 		bootph-all;
 	};
 
 	vccio_sd: vccio-sd {
 		compatible = "regulator-gpio";
-		gpios = <&gpio4 RK_PB6 GPIO_ACTIVE_HIGH>;
+		gpios = <0x25 0x0e 0x00>;
 		regulator-name = "vccio_sd";
-		regulator-min-microvolt = <1800000>;
-		regulator-max-microvolt = <3300000>;
-		states = <1800000 0x0
-			  3300000 0x1>;
-		vin-supply = <&vcc5v0_sys>;
+		regulator-min-microvolt = <0x1b7740>;
+		regulator-max-microvolt = <0x325aa0>;
+		states = <0x1b7740 0x00 0x325aa0 0x01>;
+		vin-supply = <0x5d>;
 		bootph-all;
 	};
 };
@@ -106,6 +107,14 @@
 };
 
 &uart0 {
+	compatible = "rockchip,rk3528\0snps,dw-apb-uart";
+	reg = <0x00 0xff9f0000 0x00 0x100>;
+	interrupts = <0x00 0x28 0x04>;
+	clocks = <0x0a 0x15 0x0a 0x75>;
+	clock-names = "baudclk\0apb_pclk";
+	reg-shift = <0x02>;
+	reg-io-width = <0x04>;
+	dmas = <0x16 0x09 0x16 0x08>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&uart0m0_xfer>;
 	status = "okay";
@@ -113,6 +122,20 @@
 };
 
 &gmac1 {
+	compatible = "rockchip,rk3528-gmac\0snps,dwmac-4.20a";
+	reg = <0x00 0xffbe0000 0x00 0x10000>;
+	interrupts = <0x00 0x79 0x04 0x00 0x7c 0x04>;
+	interrupt-names = "macirq\0eth_wake_irq";
+	clocks = <0x0a 0xd2 0x0a 0xd1 0x0a 0xcf 0x0a 0xce>;
+	clock-names = "stmmaceth\0clk_mac_ref\0pclk_mac\0aclk_mac";
+	resets = <0x0a 0x1c5>;
+	reset-names = "stmmaceth";
+	rockchip,grf = <0x10>;
+	snps,axi-config = <0x43>;
+	snps,mixed-burst;
+	snps,mtl-rx-config = <0x44>;
+	snps,mtl-tx-config = <0x45>;
+	snps,tso;
 	pinctrl-names = "default";
 	pinctrl-0 = <&rgmii_miim &rgmii_tx_bus2 &rgmii_rx_bus2 &rgmii_rgmii_clk &rgmii_rgmii_bus>;
 	phy-mode = "rgmii-id";
@@ -120,23 +143,51 @@
 	phy-handle = <&rgmii_phy>;
 	phy-supply = <&vcc_3v3>;
 	snps,reset-active-low;
-	snps,reset-delays-us = <0 20000 100000>;
-	snps,reset-gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
+	snps,reset-delays-us = <0x00 0x4e20 0x186a0>;
+	snps,reset-gpio = <0x25 0x12 0x01>;
 	status = "okay";
 	bootph-all;
 
 	mdio {
+		compatible = "snps,dwmac-mdio";
 		#address-cells = <1>;
 		#size-cells = <0>;
 
 		rgmii_phy: phy@1 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			reg = <1>;
+			phandle = <0x4b>;
+		};
+		stmmac-axi-config {
+			snps,wr_osr_lmt = <0x04>;
+			snps,rd_osr_lmt = <0x08>;
+			snps,blen = <0x00 0x00 0x00 0x00 0x10 0x08 0x04>;
+			phandle = <0x43>;
+		};
+		rx-queues-config {
+			snps,rx-queues-to-use = <0x01>;
+			phandle = <0x44>;
+			queue0 {};
+		};
+		tx-queues-config {
+			snps,tx-queues-to-use = <0x01>;
+			phandle = <0x45>;
+			queue0 {};
 		};
 	};
 };
 
 &sdhci {
+	compatible = "rockchip,rk3528-dwcmshc\0rockchip,rk3588-dwcmshc";
+	reg = <0x00 0xffbf0000 0x00 0x10000>;
+	interrupts = <0x00 0x88 0x04>;
+	assigned-clocks = <0x0a 0xa6 0x0a 0xa7 0x0a 0xa3>;
+	assigned-clock-rates = <0xbebc200 0x16e3600 0xbebc200>;
+	clocks = <0x0a 0xa3 0x0a 0xa4 0x0a 0xa5 0x0a 0xa6 0x0a 0xa7>;
+	clock-names = "core\0bus\0axi\0block\0timer";
+	resets = <0x0a 0x19f 0x0a 0x1a0 0x0a 0x1a1 0x0a 0x1a2 0x0a 0x1a3>;
+	reset-names = "core\0bus\0axi\0block\0timer";
+	max-frequency = <0xbebc200>;
 	bus-width = <8>;
 	mmc-hs200-1_8v;
 	non-removable;
@@ -149,12 +200,22 @@
 };
 
 &sdmmc {
+	compatible = "rockchip,rk3528-dw-mshc\0rockchip,rk3288-dw-mshc";
+	reg = <0x00 0xffc30000 0x00 0x4000>;
+	interrupts = <0x00 0x85 0x04>;
+	clocks = <0x0a 0x198 0x0a 0x197 0x51 0x01 0x51 0x02>;
+	clock-names = "biu\0ciu\0ciu-drive\0ciu-sample";
+	fifo-depth = <0x100>;
+	max-frequency = <0x8f0d180>;
+	resets = <0x0a 0x2a9>;
+	reset-names = "reset";
+	rockchip,use-v2-tuning;
 	bus-width = <4>;
 	cap-sd-highspeed;
 	disable-wp;
 	pinctrl-names = "default";
 	pinctrl-0 = <&sdmmc_bus4 &sdmmc_clk &sdmmc_cmd &sdmmc_det>;
-	rockchip,default-sample-phase = <90>;
+	rockchip,default-sample-phase = <0x5a>;
 	sd-uhs-sdr12;
 	sd-uhs-sdr25;
 	sd-uhs-sdr50;
