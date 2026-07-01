@@ -1,0 +1,15 @@
+if TARGET_HINLINK_H29K
+
+config SYS_BOARD
+	default "h29k"
+
+config SYS_VENDOR
+	default "hinlink"
+
+config SYS_SOC
+	default "rk3528"
+
+config SYS_CONFIG_NAME
+	default "hinlink-h29k-rk3528"
+
+endif
