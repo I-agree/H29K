@@ -984,6 +984,38 @@ CONFIG_TRUSTED_KEYRING=y
 # CONFIG_CRYPTO_RMD160 is not set
 # CONFIG_CRYPTO_STREEBOG is not set
 
+
+# ===================== certs/Kconfig H29K RK3528 配置 =====================
+# 模块签名密钥文件路径（默认自动生成签名密钥）
+CONFIG_MODULE_SIG_KEY="certs/signing_key.pem"
+# 使用RSA算法做内核模块签名
+CONFIG_MODULE_SIG_KEY_TYPE_RSA=y
+# CONFIG_MODULE_SIG_KEY_TYPE_ECDSA is not set
+
+# 系统全局可信密钥环（IMA、模块验签依赖，必须开启）
+CONFIG_SYSTEM_TRUSTED_KEYRING=y
+# 内置可信根证书文件，留空使用内核内置信任链
+CONFIG_SYSTEM_TRUSTED_KEYS=""
+
+# 禁止内核镜像预留证书追加空间（量产固化固件，无需后期插入证书）
+# CONFIG_SYSTEM_EXTRA_CERTIFICATE is not set
+
+# 二级可信密钥环，支持运行时加载可信证书
+CONFIG_SECONDARY_TRUSTED_KEYRING=y
+# 仅允许内置根证书签名的外部证书加入二级密钥环，收紧安全策略
+CONFIG_SECONDARY_TRUSTED_KEYRING_SIGNED_BY_BUILTIN=y
+
+# 全局密钥黑名单（拉黑失效、恶意证书）
+CONFIG_SYSTEM_BLACKLIST_KEYRING=y
+CONFIG_SYSTEM_BLACKLIST_HASH_LIST=""
+
+# 证书吊销列表支持
+CONFIG_SYSTEM_REVOCATION_LIST=y
+CONFIG_SYSTEM_REVOCATION_KEYS=""
+
+# 允许root加载签名后的黑名单密钥
+CONFIG_SYSTEM_BLACKLIST_AUTH_UPDATE=y
+
 # ===================== drivers/crypto H29K RK3528 硬件加密配置 =====================
 # 硬件加密总开关
 CONFIG_CRYPTO_HW=y
