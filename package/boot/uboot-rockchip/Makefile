@@ -79,8 +79,8 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	
 	# ========== 关键修复：注入板子Kconfig到arm64顶层，让BOARDDIR正常赋值 ==========
-	grep -q 'source "board/hinlink/h29k/Kconfig"' $(PKG_BUILD_DIR)/arch/arm64/Kconfig || \
-	echo 'source "board/hinlink/h29k/Kconfig"' >> $(PKG_BUILD_DIR)/arch/arm64/Kconfig
+	grep -q 'source "board/hinlink/h29k/Kconfig"' $(PKG_BUILD_DIR)/arch/Kconfig || \
+	echo 'source "board/hinlink/h29k/Kconfig"' >> $(PKG_BUILD_DIR)/arch/Kconfig
 endef
 
 define Build/InstallDev
