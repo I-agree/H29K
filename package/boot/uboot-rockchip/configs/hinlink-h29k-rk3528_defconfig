@@ -70,9 +70,7 @@ CONFIG_ENV_SOURCE_FILE="h29k"
 CONFIG_NO_NET=y
 # CONFIG_NET is not set
 # CONFIG_NET_LWIP is not set
-
-# ===== 网络设备框架 =====
-CONFIG_ETH=y
+# CONFIG_ETH is not set
 
 # ===== 基础架构与芯片总开关 =====
 CONFIG_ARM=y
