@@ -6,6 +6,6 @@ config VENDOR_HINLINK
 
 if VENDOR_HINLINK
 
-source "h29k/Kconfig"
+source "board/hinlink/h29k/Kconfig"
 
 endif
