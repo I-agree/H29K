@@ -73,6 +73,11 @@ define Build/Prepare
 	# 3. 新建板级目录 + 复制 h29k.env 环境配置文件（新版U-Boot规范）
 	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	
+	# 4. 复制板级 Kconfig/Makefile/board.c 注册单板（关键，让U-Boot检索.env）
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/Kconfig $(PKG_BUILD_DIR)/board/hinlink/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/Makefile $(PKG_BUILD_DIR)/board/hinlink/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/board.c $(PKG_BUILD_DIR)/board/hinlink/
 endef
 
 define Build/InstallDev
