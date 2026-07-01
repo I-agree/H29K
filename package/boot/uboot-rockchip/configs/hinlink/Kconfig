@@ -1,5 +1,11 @@
-if ARCH_ROCKCHIP
+# SPDX-License-Identifier: GPL-2.0+
+config VENDOR_HINLINK
+	bool
+	help
+	  Selected when any Hinlink board is enabled.
 
-source "board/hinlink/h29k/Kconfig"
+if VENDOR_HINLINK
+
+source "h29k/Kconfig"
 
 endif
