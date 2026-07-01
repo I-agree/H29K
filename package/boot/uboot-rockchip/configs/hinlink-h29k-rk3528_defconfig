@@ -370,7 +370,7 @@ CONFIG_OF_UPSTREAM=y
 CONFIG_OF_LIVE=y
 # CONFIG_OF_BOARD is not set
 CONFIG_OF_HAS_PRIOR_STAGE=y
-# CONFIG_OF_OMIT_DTB is not set
+CONFIG_OF_OMIT_DTB=y
 CONFIG_DEFAULT_DEVICE_TREE="rockchip/rk3528-hinlink-h29k"
 CONFIG_OF_TAG_MIGRATE=y
 CONFIG_OF_SPL_REMOVE_PROPS="clocks clock-names interrupt-parent interrupts pinctrl-0 pinctrl-names"
