@@ -184,6 +184,18 @@
 		};
 	};
 
+	rng@ffc50000 {
+		compatible = "rockchip,rkrng";
+		reg = <0x00 0xffc50000 0x00 0x200>;
+		interrupts = <0x00 0x17 0x04>;
+		clocks = <0x06 0x20>;
+		clock-names = "hclk_trng";
+		resets = <0x0a 0xa3>;
+		reset-names = "reset";
+		status = "okay";
+		bootph-all;
+	};
+
 	sfc: spi@ffc00000 {
 		compatible = "rockchip,sfc";
 		reg = <0x0 0xffc00000 0x0 0x4000>;
