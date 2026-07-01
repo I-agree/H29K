@@ -82,7 +82,7 @@ define Build/Prepare
 	grep -q 'source "board/hinlink/Kconfig"' $(PKG_BUILD_DIR)/arch/Kconfig || \
 	echo 'source "board/hinlink/Kconfig"' >> $(PKG_BUILD_DIR)/arch/Kconfig
 	
-	# ========== 【修复FORCE报错核心两条】 ==========
+	# ========== 【修复FORCE报错】 ==========
 	# 1. 环境文件赋标准可读权限，避免shell读取异常
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/h29k.env
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/Makefile
