@@ -168,7 +168,7 @@
 &{/soc} {
 	grf: syscon@ff300000 {
 		compatible = "rockchip,rk3528-grf", "syscon", "simple-mfd";
-		reg = <0x0 0xff300000 0x0 0x90000>;
+		reg = <0x00 0xff300000 0x00 0x90000>;
 		bootph-all;
 
 		reboot-mode {
@@ -179,10 +179,16 @@
 			mode-loader = <0x5242c301>;
 			mode-normal = <0x5242c300>;
 			mode-recovery = <0x5242c303>;
+
+		};
+		grf-clock-controller {
+			compatible = "rockchip,rk3528-grf-cru";
+			#clock-cells = <0x01>;
+			phandle = <0x51>;
 		};
 	};
 
-	rng@ffc50000 {
+	rng: rng@ffc50000 {
 		compatible = "rockchip,rkrng";
 		reg = <0x00 0xffc50000 0x00 0x200>;
 		interrupts = <0x00 0x17 0x04>;
@@ -196,14 +202,14 @@
 
 	sfc: spi@ffc00000 {
 		compatible = "rockchip,sfc";
-		reg = <0x0 0xffc00000 0x0 0x4000>;
-		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&cru 0xa1>, <&cru 0xa0>;
+		reg = <0x00 0xffc00000 0x00 0x4000>;
+		interrupts = <0x00 0x87 0x04>;
+		clocks = <0x0a 0xa1 0x0a 0xa0>;
 		clock-names = "clk_sfc", "hclk_sfc";
-		assigned-clocks = <&cru 0xa1>;
-		assigned-clock-rates = <10000000>;
-		#address-cells = <1>;
-		#size-cells = <0>;
+		assigned-clocks = <0x0a 0xa1>;
+		assigned-clock-rates = <0x5f5e100>;
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
 		status = "okay";
 		bootph-all;
 	};
