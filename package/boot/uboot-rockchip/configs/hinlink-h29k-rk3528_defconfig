@@ -360,7 +360,7 @@ CONFIG_OF_UPSTREAM=y
 # CONFIG_OF_UPSTREAM_VENDOR is not set
 # CONFIG_OF_UPSTREAM_INCLUDE_LOCAL_FALLBACK_DTBOS is not set
 CONFIG_OF_LIVE=y
-# CONFIG_OF_BOARD is not set
+CONFIG_OF_BOARD=y
 CONFIG_OF_HAS_PRIOR_STAGE=y
 # CONFIG_OF_OMIT_DTB is not set
 CONFIG_DEFAULT_DEVICE_TREE="rockchip/rk3528-hinlink-h29k"
@@ -630,6 +630,7 @@ CONFIG_CMD_EXPORTENV=y
 CONFIG_CMD_IMPORTENV=y
 CONFIG_CMD_ENV_EXISTS=y
 CONFIG_CMD_NVEDIT_INFO=y
+CONFIG_CMD_ENV=y
 
 # ===== 核心启动命令（必须保留） =====
 CONFIG_CMD_SOURCE=y
@@ -693,9 +694,11 @@ CONFIG_SPL_LOG_MAX_LEVEL=3
 CONFIG_DISPLAY_BOARDINFO_LATE=y
 CONFIG_ENV_RELOC_GD_ENV_ADDR=y
 
-# ========== 内存布局传递、内核防内存踩踏 ==========
-CONFIG_CMD_BLOB=y
-CONFIG_OF_MEMORY=y
+# ========== bloblist 底层框架+查看命令 =========
+CONFIG_BLOBLIST=y
+CONFIG_CMD_BLOBLIST=y
+
+# ========== 内存布局传递、内核防内存踩踏 =========
 CONFIG_FDT_MEM_RESERVE=y
 CONFIG_BOOTM_FDT_RELOC=y
 
@@ -706,22 +709,6 @@ CONFIG_BOOTM_IMAGE_CRC=y
 CONFIG_SETENV_RANDOM=y
 CONFIG_RANDOM=y
 CONFIG_SPL_RANDOM=y
-
-# ========= dts/Kconfig 运行时DT修改回调框架 =========
-CONFIG_OF_BOARD=y
-CONFIG_OF_BOARD_FIXUP=y
-
-# ========= boot/Kconfig 内核启动DT内存预留、重定位防踩踏 =========
-CONFIG_FDT_MEM_RESERVE=y
-CONFIG_BOOTM_FDT_RELOC=y
-
-# ========= lib + cmd bloblist底层与查看命令（修正宏名：CMD_BLOBLIST而非CMD_BLOB） =========
-CONFIG_BLOBLIST=y
-CONFIG_CMD_BLOBLIST=y
-
-# ========= cmd/env 完整环境命令总开关 + setenv random随机变量 =========
-CONFIG_CMD_ENV=y
-CONFIG_SETENV_RANDOM=y
 
 # ===== 标准 CONFIG_EXTRA_ENV_SETTINGS 模板 =====
 CONFIG_EXTRA_ENV_SETTINGS="soc=rk3528\0devtype=mmc\0devnum=0\0kernel_addr_r=0xc0080000\0serial_port=ttyS0\0serial_addr=,0xff9f0000\0boot_openwrt=part uuid ${devtype} ${devnum}:2 uuid;setenv bootargs console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait cma=256M swiotlb=1024 coherent_pool=2M panic=10;load ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img && setenv kernel_size ${filesize} && bootm ${kernel_addr_r}\0"
