@@ -85,8 +85,10 @@ define Build/Prepare
 	# ========== 【修复FORCE报错核心两条】 ==========
 	# 1. 环境文件赋标准可读权限，避免shell读取异常
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/h29k.env
-	# 2. 全量清理U-Boot编译缓存，重置Make依赖链，彻底解决FORCE伪目标丢失
-	cd $(PKG_BUILD_DIR) && $(MAKE) distclean
+	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/Makefile
+	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/board.c
+	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/Kconfig
+	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/Kconfig
 	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
 endef
 
