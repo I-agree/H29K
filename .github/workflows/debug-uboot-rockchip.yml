@@ -157,36 +157,39 @@ jobs:
         grep -E "binman|binman\.dts|packing image|Output image" uboot-rockchip-full.log || echo "未找到 Binman 一体化打包记录"
 
         echo -e "\n>>> TPL 编译记录:"
-        grep -E "tpl/u-boot-tpl\.elf|built for TPL" uboot-rockchip-full.log || echo "未找到 TPL 编译记录"
+        grep -E "tpl/.*\.bin" uboot-rockchip-full.log || echo "未找到 TPL 编译记录"
 
         echo -e "\n>>> SPL 编译记录:"
-        grep -E "spl/u-boot-spl\.elf|built for SPL" uboot-rockchip-full.log || echo "未找到 SPL 编译记录"
+        grep -E "spl/.*\.bin" uboot-rockchip-full.log || echo "未找到 SPL 编译记录"
 
         echo -e "\n>>> FIT镜像(u-boot.itb)内置打包记录:"
-        grep -E "mkimage -f.*its|FIT image" uboot-rockchip-full.log || echo "未找到 u-boot.itb FIT 打包记录"
+        echo "当前Rockchip binman一体化打包方案不使用u-boot.itb FIT镜像，该记录无需检索"
 
         echo -e "\n>>> BL31 ATF 固件链接嵌入记录:"
         grep -iE "bl31|rk3528_bl31" uboot-rockchip-full.log || echo "未找到 BL31 相关嵌入记录"
 
         echo -e "\n>>> 最终一体化固件输出记录:"
         grep -E "u-boot-rockchip\.bin|Writing.*u-boot-rockchip" uboot-rockchip-full.log || echo "未找到一体化BIN生成记录"
+
+        # 关键修复：编译结束立刻备份 binman 到工作区，防止被OpenWrt清理
+        UBOOT_BUILD_TMP=$(find build_dir/target-* -name "u-boot-2025.10" -type d | head -n1)
+        if [ -f "${UBOOT_BUILD_TMP}/tools/binman" ]; then
+          cp "${UBOOT_BUILD_TMP}/tools/binman" $GITHUB_WORKSPACE/
+          chmod +x $GITHUB_WORKSPACE/binman
+          echo "BINMAN_PATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+        fi
       continue-on-error: true
 
-    # 修复：直接使用U-Boot编译目录内原生binman工具，不再依赖staging_dir/host/bin
     - name: Binman 解析一体化固件分段
       if: env.UBOOT_BIN_PATH != ''
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         BIN_PATH="${{ env.UBOOT_BIN_PATH }}"
-        # 自动定位当前U-Boot编译目录
-        UBOOT_BUILD_DIR=$(find build_dir/target-aarch64_generic_musl -name "u-boot-2025.10" -type d | head -n1)
-        # 将U-Boot自带tools目录加入PATH
-        export PATH="${UBOOT_BUILD_DIR}/tools:$PATH"
+        export PATH="${{ env.BINMAN_PATH }}:$PATH"
 
-        # 校验binman可执行文件
         if ! command -v binman &> /dev/null; then
           echo "❌ 错误：未找到 binman 工具，请确认 uboot-rockchip 编译成功"
-          ls -lh ${UBOOT_BUILD_DIR}/tools/ || true
+          ls -lh ${{ env.BINMAN_PATH }}/
           exit 1
         fi
 
@@ -206,7 +209,6 @@ jobs:
         ls -lh "$BIN_PATH"
         file "$BIN_PATH"
         
-        # 日志拷贝到工作区用于上传制品
         cp binman-segments.log $GITHUB_WORKSPACE/
 
     - name: 检查磁盘空间
@@ -223,6 +225,7 @@ jobs:
           ${{ env.WORK_DIR }}/openwrt/uboot-rockchip-full.log
           ${{ env.WORK_DIR }}/openwrt/binman-segments.log
           ${{ env.UBOOT_BIN_NAME }}
+          ${{ env.BINMAN_PATH }}/binman
 
     - name: 清理历史工作流运行记录
       uses: Mattraks/delete-workflow-runs@v2.1.0
