@@ -1,0 +1,5 @@
+if ARCH_ROCKCHIP
+
+source "board/hinlink/h29k/Kconfig"
+
+endif
