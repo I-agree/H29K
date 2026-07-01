@@ -1,5 +1,5 @@
 # Hinlink H29K (RK3528) U-Boot defconfig
-# OpenWrt 25.12 + Linux 6.12
+# OpenWrt 25.12 + Linux 6.12 + h29k.env
 
 # ===== General setup 基础编译 & 内存配置 =====
 # CONFIG_COMPILE_TEST is not set
