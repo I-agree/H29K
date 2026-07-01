@@ -87,6 +87,7 @@ define Build/Prepare
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/h29k.env
 	# 2. 全量清理U-Boot编译缓存，重置Make依赖链，彻底解决FORCE伪目标丢失
 	cd $(PKG_BUILD_DIR) && $(MAKE) distclean
+	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
 endef
 
 define Build/InstallDev
