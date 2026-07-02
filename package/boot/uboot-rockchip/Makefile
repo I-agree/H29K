@@ -1,6 +1,6 @@
-# 强制使用bash，彻底规避dash下FORCE伪目标被误解析为文件的兼容性报错
-SHELL := /bin/bash
-export SHELL
+# 全局强制所有子make、子shell使用bash，彻底规避dash解析BUG
+export CONFIG_SHELL:=/bin/bash
+export SHELL:=/bin/bash
 
 #
 # This is free software, licensed under the GNU General Public License v2.
