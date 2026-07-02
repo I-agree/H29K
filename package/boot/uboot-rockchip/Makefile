@@ -87,7 +87,13 @@ define Build/Prepare
 	# 将 cmd_gen_envt 中的 $< 替换为明确的文件路径 include/generated/env.in
 	# 这样即使 FORCE 被意外插入到依赖列表最前面，awk 也能正确读取 env.in 文件
 	sed -i 's|awk -f $$(srctree)/scripts/env2string.awk $$< >$$@|awk -f $$(srctree)/scripts/env2string.awk include/generated/env.in >$$@|g' \
-        $(PKG_BUILD_DIR)/Makefile
+		$(PKG_BUILD_DIR)/Makefile
+	
+	# 验证修复是否生效
+	@if ! grep -q 'env2string.awk include/generated/env.in' $(PKG_BUILD_DIR)/Makefile; then \
+		echo "ERROR: Failed to patch cmd_gen_envt in U-Boot Makefile!"; \
+		exit 1; \
+	fi
 endef
 
 define Build/InstallDev
