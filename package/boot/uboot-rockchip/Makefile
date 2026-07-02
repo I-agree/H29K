@@ -83,12 +83,13 @@ define Build/Prepare
 	echo 'source "board/hinlink/Kconfig"' >> $(PKG_BUILD_DIR)/arch/Kconfig
 	
 	# ========== 【修复FORCE报错】 ==========
-	# 1. 环境文件赋标准可读权限，避免shell读取异常
+	# 环境文件赋标准可读权限，避免shell读取异常+全量清理构建缓存，重置Make上下文
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/h29k.env
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/Makefile
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/board.c
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/Kconfig
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/Kconfig
+	cd $(PKG_BUILD_DIR) && $(MAKE) distclean
 	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
 endef
 
