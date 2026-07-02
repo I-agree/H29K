@@ -86,7 +86,7 @@ define Build/Prepare
 	echo 'source "board/hinlink/Kconfig"' >> $(PKG_BUILD_DIR)/arch/Kconfig
 	
 	# ========== 【修复FORCE报错】 ==========
-	$(CP) $(TOPDIR)/package/boot/BUG/Makefile $(PKG_BUILD_DIR)/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/BUG66/Makefile $(PKG_BUILD_DIR)/
 endef
 
 define Build/InstallDev
