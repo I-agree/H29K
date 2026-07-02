@@ -718,3 +718,7 @@ CONFIG_SPL_RANDOM=y
 
 # ===== 倒计时一秒钟 =====
 CONFIG_BOOTDELAY=1
+
+# ===== 修复BUG =====
+# CONFIG_TOOLS_MKEFICAPSULE is not set
+CONFIG_MKIMAGE_DTC_PATH="scripts/dtc/dtc"
