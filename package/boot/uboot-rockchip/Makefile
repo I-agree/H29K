@@ -79,26 +79,14 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	
 	# ========== 关键修复：注入板子Kconfig到arm顶层，让BOARDDIR正常赋值 ==========
 	grep -q 'source "board/hinlink/Kconfig"' $(PKG_BUILD_DIR)/arch/Kconfig || \
 	echo 'source "board/hinlink/Kconfig"' >> $(PKG_BUILD_DIR)/arch/Kconfig
 	
 	# ========== 【修复FORCE报错】 ==========
-	# 环境文件赋标准可读权限，避免shell读取异常+全量清理构建缓存，重置Make上下文
-	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/h29k.env
-	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/Makefile
-	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/board.c
-	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/Kconfig
-	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/Kconfig
-	cd $(PKG_BUILD_DIR) && $(MAKE) distclean
-
-	# ========== 自动打补丁：隔离shell参数，彻底解决FORCE被误解析为文件报错 ==========
-	sed -i '/^\$(defaultenv_h):.*FORCE/,+1 s|^\t\$(call filechk,defaultenv.h)|quiet_cmd_defenv_gen = GEN     \$\@\
-cmd_defenv_gen = set --; \$(filechk_defaultenv_h)\
-\t\$(call cmd,defenv_gen)|' $(PKG_BUILD_DIR)/Makefile
-
-	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	$(CP) $(TOPDIR)/package/boot/BUG/Makefile $(PKG_BUILD_DIR)/
 endef
 
 define Build/InstallDev
