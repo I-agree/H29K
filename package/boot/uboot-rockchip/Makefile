@@ -88,8 +88,6 @@ define Build/Prepare
 	# 这样即使 FORCE 被意外插入到依赖列表最前面，awk 也能正确读取 env.in 文件
 	sed -i 's|awk -f $$(srctree)/scripts/env2string.awk $$< >$$@|awk -f $$(srctree)/scripts/env2string.awk include/generated/env.in >$$@|g' \
         $(PKG_BUILD_DIR)/Makefile
-
-	$(call Build/Configure/Default)
 endef
 
 define Build/InstallDev
