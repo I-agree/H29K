@@ -92,6 +92,12 @@ define Build/Prepare
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/h29k/Kconfig
 	chmod 644 $(PKG_BUILD_DIR)/board/hinlink/Kconfig
 	cd $(PKG_BUILD_DIR) && $(MAKE) distclean
+
+	# ========== 自动打补丁：隔离shell参数，彻底解决FORCE被误解析为文件报错 ==========
+	sed -i '/^\$(defaultenv_h):.*FORCE/,+1 s|^\t\$(call filechk,defaultenv.h)|quiet_cmd_defenv_gen = GEN     \$\@\
+cmd_defenv_gen = set --; \$(filechk_defaultenv_h)\
+\t\$(call cmd,defenv_gen)|' $(PKG_BUILD_DIR)/Makefile
+
 	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
 endef
 
