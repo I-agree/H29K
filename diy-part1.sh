@@ -81,7 +81,7 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c" "package/boot/uboot-rockchip/configs/hinlink/h29k/board.c"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/Kconfig"
-download_and_check "${BASE_URL}/package/boot/BUG66/Makefile" "package/boot/BUG66/Makefile"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/BUG66/Makefile" "package/boot/uboot-rockchip/BUG66/Makefile"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
