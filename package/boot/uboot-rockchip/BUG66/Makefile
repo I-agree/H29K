@@ -2281,9 +2281,6 @@ $(timestamp_h): $(srctree)/Makefile FORCE
 $(dt_h): $(srctree)/Makefile FORCE
 	$(call filechk,dt.h)
 
-quiet_cmd_defenv_gen = GEN     $@
-cmd_defenv_gen = set --; $(filechk_defaultenv_h)
-
 $(defaultenv_h): $(CONFIG_ENV_DEFAULT_ENV_TEXT_FILE:"%"=%) FORCE
 	set --; $(call filechk,defaultenv.h)
 
