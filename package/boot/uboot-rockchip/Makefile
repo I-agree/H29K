@@ -1,7 +1,3 @@
-# 全局强制所有子make、子shell使用bash，彻底规避dash解析BUG
-export CONFIG_SHELL:=/bin/bash
-export SHELL:=/bin/bash
-
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
@@ -87,8 +83,13 @@ define Build/Prepare
 	grep -q 'source "board/hinlink/Kconfig"' $(PKG_BUILD_DIR)/arch/Kconfig || \
 	echo 'source "board/hinlink/Kconfig"' >> $(PKG_BUILD_DIR)/arch/Kconfig
 	
-	# ========== 【修复FORCE报错】 ==========
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/BUG66/Makefile $(PKG_BUILD_DIR)/
+	# ========== 关键修复：修复 environment.h 生成时 $< 被展开为 FORCE 的问题 ==========
+	# 将 cmd_gen_envt 中的 $< 替换为明确的文件路径 include/generated/env.in
+	# 这样即使 FORCE 被意外插入到依赖列表最前面，awk 也能正确读取 env.in 文件
+	sed -i 's|awk -f $$(srctree)/scripts/env2string.awk $$< >$$@|awk -f $$(srctree)/scripts/env2string.awk include/generated/env.in >$$@|g' \
+        $(PKG_BUILD_DIR)/Makefile
+
+	$(call Build/Configure/Default)
 endef
 
 define Build/InstallDev
