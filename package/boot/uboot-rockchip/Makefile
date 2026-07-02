@@ -1,3 +1,7 @@
+# 强制使用bash，彻底规避dash下FORCE伪目标被误解析为文件的兼容性报错
+SHELL := /bin/bash
+export SHELL
+
 #
 # This is free software, licensed under the GNU General Public License v2.
 # See /LICENSE for more information.
