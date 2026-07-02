@@ -43,9 +43,7 @@ UBOOT_TARGETS := hinlink-h29k-rk3528
 
 UBOOT_CONFIGURE_VARS += USE_PRIVATE_LIBGCC=yes
 
-UBOOT_CUSTOMIZE_CONFIG := \
-	--disable TOOLS_MKEFICAPSULE \
-	--set-str MKIMAGE_DTC_PATH $(PKG_BUILD_DIR)/scripts/dtc/dtc
+# 已删除 UBOOT_CUSTOMIZE_CONFIG 配置注入段，配置迁移至defconfig
 
 # 新增 -j1 单线程 + V=s 详细日志，仅作用于U-Boot内部编译，用于核查TPL/SPL/idbloader/u-boot.itb打包日志
 UBOOT_MAKE_FLAGS += \
