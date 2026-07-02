@@ -84,14 +84,15 @@ define Build/Prepare
 	echo 'source "board/hinlink/Kconfig"' >> $(PKG_BUILD_DIR)/arch/Kconfig
 	
 	# ========== 关键修复：修复 environment.h 生成时 $< 被展开为 FORCE 的问题 ==========
-	# 将 cmd_gen_envt 中的 $< 替换为明确的文件路径 include/generated/env.in
-	# 这样即使 FORCE 被意外插入到依赖列表最前面，awk 也能正确读取 env.in 文件
-	sed -i 's|awk -f $$(srctree)/scripts/env2string.awk $$< >$$@|awk -f $$(srctree)/scripts/env2string.awk include/generated/env.in >$$@|g' \
-		$(PKG_BUILD_DIR)/Makefile
+	# cmd_gen_envt 中的 $< 为明确的文件路径 include/generated/env.in
+	# FORCE 被意外插入到依赖列表最前面，而awk 必须要正确读取 env.in 文件
+	# 幂等处理：先判断是否已经追加过 FORCE，避免多次构建重复添加
+	@grep -qE '^\$\(env_h\):.*include/generated/env\.in.*FORCE' $(PKG_BUILD_DIR)/Makefile || \
+		sed -i -E 's/^(\$\(env_h\):.*include\/generated\/env\.in)$$/\1 FORCE/' $(PKG_BUILD_DIR)/Makefile
 	
 	# 验证修复是否生效
-	@if ! grep -q 'env2string.awk include/generated/env.in' $(PKG_BUILD_DIR)/Makefile; then \
-		echo "ERROR: Failed to patch cmd_gen_envt in U-Boot Makefile!"; \
+	@if ! grep -qE '^\$\(env_h\):.*include/generated/env\.in.*FORCE' $(PKG_BUILD_DIR)/Makefile; then \
+		echo "ERROR: Failed to patch env_h dependency in U-Boot Makefile!"; \
 		exit 1; \
 	fi
 endef
