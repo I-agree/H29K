@@ -2285,7 +2285,7 @@ quiet_cmd_defenv_gen = GEN     $@
 cmd_defenv_gen = set --; $(filechk_defaultenv_h)
 
 $(defaultenv_h): $(CONFIG_ENV_DEFAULT_ENV_TEXT_FILE:"%"=%) FORCE
-	$(call cmd,defenv_gen)
+	set --; $(call filechk,defaultenv.h)
 
 # ---------------------------------------------------------------------------
 # Devicetree files
