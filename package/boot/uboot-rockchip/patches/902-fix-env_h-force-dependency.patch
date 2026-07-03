@@ -1,14 +1,15 @@
 From: OpenWrt Port
-Subject: [PATCH] Makefile: fix $< expanding to FORCE when generating environment.h
+Subject: [PATCH] Makefile: fix $< expanding to FORCE for env generated headers
 
-Append FORCE to the end of the $(env_h) dependency list, ensuring the
-first prerequisite is always include/generated/env.in. This prevents $<
-in cmd_gen_envt from incorrectly expanding to the FORCE phony target,
-which caused the build error:
-  /bin/sh: 1: cannot open FORCE: No such file
+Fix two build failures caused by $< resolving to the FORCE phony target,
+triggering "cannot open FORCE: No such file" shell errors:
 
-This follows U-Boot kbuild convention: real source files first,
-FORCE phony target last in the dependency list.
+1. For $(env_h): explicitly append FORCE at the end of the dependency list
+   to ensure include/generated/env.in is always the first prerequisite.
+
+2. For $(defaultenv_h): add a /dev/null fallback when
+   CONFIG_ENV_DEFAULT_ENV_TEXT_FILE is unset, preventing FORCE from
+   becoming the first dependency when the config option is empty.
 ---
  Makefile | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
@@ -24,5 +25,14 @@ diff --git a/Makefile b/Makefile
 -$(env_h): include/generated/env.in
 +$(env_h): include/generated/env.in FORCE
 	$(call cmd,gen_envt)
+ 
+ # ---------------------------------------------------------------------------
+@@ -2281,7 +2281,7 @@
+ $(dt_h): $(srctree)/Makefile FORCE
+ 	$(call filechk,dt.h)
+ 
+-$(defaultenv_h): $(CONFIG_ENV_DEFAULT_ENV_TEXT_FILE:"%"=%) FORCE
++$(defaultenv_h): $(if $(CONFIG_ENV_DEFAULT_ENV_TEXT_FILE:"%"=%),$(CONFIG_ENV_DEFAULT_ENV_TEXT_FILE:"%"=%),/dev/null) FORCE
+ 	$(call filechk,defaultenv.h)
  
  # ---------------------------------------------------------------------------
