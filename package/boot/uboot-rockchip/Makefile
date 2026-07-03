@@ -86,7 +86,7 @@ define Build/Prepare
 	# ========== 关键修复：修复 environment.h 生成时 $< 被展开为 FORCE 的问题 ==========
 	# cmd_gen_envt 中的 $< 为明确的文件路径 include/generated/env.in
 	# FORCE 被意外插入到依赖列表最前面，而awk 必须要正确读取 env.in 文件
-	$(TOPDIR)/package/boot/uboot-rockchip/BUG66/fix_env_h.sh $(PKG_BUILD_DIR)/Makefile
+	# 使用902-fix-env_h-force-dependency.patch
 endef
 
 define Build/InstallDev
