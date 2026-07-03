@@ -371,14 +371,14 @@ CONFIG_OF_LIVE=y
 # CONFIG_OF_BOARD is not set
 CONFIG_OF_HAS_PRIOR_STAGE=y
 CONFIG_OF_OMIT_DTB=y
-CONFIG_DEFAULT_DEVICE_TREE="rockchip/rk3528-hinlink-h29k"
+CONFIG_DEFAULT_DEVICE_TREE="rk3528-hinlink-h29k"
 CONFIG_OF_TAG_MIGRATE=y
 CONFIG_OF_SPL_REMOVE_PROPS="clocks clock-names interrupt-parent interrupts pinctrl-0 pinctrl-names"
 # CONFIG_MULTI_DTB_FIT is not set
 # CONFIG_SPL_MULTI_DTB_FIT is not set
-CONFIG_OF_LIST="rockchip/rk3528-hinlink-h29k"
-CONFIG_SPL_OF_LIST="rockchip/rk3528-hinlink-h29k"
-CONFIG_DEFAULT_FDT_FILE="rockchip/rk3528-hinlink-h29k.dtb"
+CONFIG_OF_LIST="rk3528-hinlink-h29k"
+CONFIG_SPL_OF_LIST="rk3528-hinlink-h29k"
+CONFIG_DEFAULT_FDT_FILE="rk3528-hinlink-h29k.dtb"
 # CONFIG_OF_OVERLAY_LIST is not set
 # CONFIG_DTB_RESELECT is not set
 # CONFIG_OF_DTB_PROPS_REMOVE is not set
