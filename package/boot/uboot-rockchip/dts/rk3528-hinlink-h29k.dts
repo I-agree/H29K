@@ -80,7 +80,6 @@
 	soc {
 		#address-cells = <0x02>;
 		#size-cells = <0x02>;
-		ranges;
 	};
 
 	interrupt-controller@fed01000 {
