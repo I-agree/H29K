@@ -70,6 +70,13 @@
 		interrupts = <0x01 0x0d 0xf08 0x01 0x0e 0xf08 0x01 0x0b 0xf08 0x01 0x0a 0xf08>;
 	};
 
+	xin24m: xin24m {
+		compatible = "fixed-clock";
+		#clock-cells = <0x00>;
+		clock-frequency = <0x16e3600>;
+		clock-output-names = "xin24m";
+	};
+
 	soc {
 		#address-cells = <0x02>;
 		#size-cells = <0x02>;
