@@ -239,14 +239,14 @@
 
 		rx-queues-config {
 			snps,rx-queues-to-use = <0x01>;
-			queue0 {};
 			phandle = <0x44>;
+			queue0 {};
 		};
 
 		tx-queues-config {
 			snps,tx-queues-to-use = <0x01>;
-			queue0 {};
 			phandle = <0x45>;
+			queue0 {};
 		};
 	};
 
