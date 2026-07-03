@@ -344,6 +344,7 @@
 		#size-cells = <0x02>;
 		ranges;
 		phandle = <0x5f>;
+		bootph-all;
 
 		gpio@ff610000 {
 			compatible = "rockchip,gpio-bank";
@@ -505,7 +506,5 @@
 			rockchip,pins = <0x02 0x06 0x01 0x65>;
 			phandle = <0x5a>;
 		};
-
-		bootph-all;
 	};
 };
