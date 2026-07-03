@@ -86,15 +86,7 @@ define Build/Prepare
 	# ========== 关键修复：修复 environment.h 生成时 $< 被展开为 FORCE 的问题 ==========
 	# cmd_gen_envt 中的 $< 为明确的文件路径 include/generated/env.in
 	# FORCE 被意外插入到依赖列表最前面，而awk 必须要正确读取 env.in 文件
-	# 幂等处理：先判断是否已经包含 FORCE，避免多次构建重复添加
-	@grep -q 'env_h): include/generated/env.in FORCE' $(PKG_BUILD_DIR)/Makefile || \
-		sed -i '/env_h): include\/generated\/env\.in/s/$$/ FORCE/' $(PKG_BUILD_DIR)/Makefile
-	
-	# 验证修复是否生效
-	@if ! grep -q 'env_h): include/generated/env.in FORCE' $(PKG_BUILD_DIR)/Makefile; then \
-		echo "ERROR: Failed to patch env_h dependency in U-Boot Makefile!"; \
-		exit 1; \
-	fi
+	$(TOPDIR)/package/boot/uboot-rockchip/scripts/fix_env_h.sh $(PKG_BUILD_DIR)/Makefile
 endef
 
 define Build/InstallDev
