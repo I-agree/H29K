@@ -1,0 +1,25 @@
+From: OpenWrt Port
+Subject: [PATCH] Makefile: fix $< expanding to FORCE when generating environment.h
+
+Append FORCE to the end of the $(env_h) dependency list, ensuring the
+first prerequisite is always include/generated/env.in. This prevents $<
+in cmd_gen_envt from incorrectly expanding to the FORCE phony target,
+which caused the build error:
+  /bin/sh: 1: cannot open FORCE: No such file
+
+This follows U-Boot kbuild convention: real source files first,
+FORCE phony target last in the dependency list.
+---
+ Makefile | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -2105,7 +2105,7 @@ quiet_cmd_gen_envt = ENVT    $@
+       cmd_gen_envt = \
+ 	awk -f $(srctree)/scripts/env2string.awk $< >$@
+ 
+-$(env_h): include/generated/env.in
++$(env_h): include/generated/env.in FORCE
+ 	$(call cmd,gen_envt)
