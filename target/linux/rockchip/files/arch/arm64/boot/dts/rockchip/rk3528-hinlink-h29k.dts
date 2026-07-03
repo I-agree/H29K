@@ -4,8 +4,8 @@
 	interrupt-parent = <0x01>;
 	#address-cells = <0x02>;
 	#size-cells = <0x02>;
-	model = "HINLINK H29K Board";
-	compatible = "hinlink,h29k\0rockchip,rk3528";
+	model = "HINLINK H29K";
+	compatible = "hinlink,h29k", "rockchip,rk3528";
 
 	aliases {
 		gpio0 = "/pinctrl/gpio@ff610000";
