@@ -64,7 +64,6 @@
 		interrupts = <0x01 0x0d 0xf08 0x01 0x0e 0xf08 0x01 0x0b 0xf08 0x01 0x0a 0xf08>;
 	};
 
-	/* GIC 上移至此处，确保 interrupt-parent = <0x01> 的解析兼容性 */
 	interrupt-controller@fed01000 {
 		compatible = "arm,gic-400";
 		#interrupt-cells = <0x03>;
@@ -182,7 +181,7 @@
 		reg = <0x00 0xff9f0000 0x00 0x100>;
 		interrupts = <0x00 0x28 0x04>;
 		clocks = <0x0a 0x15 0x0a 0x75>;
-		clock-names = "baudclk\0apb_pclk";
+		clock-names = "baudclk", "apb_pclk";
 		reg-shift = <0x02>;
 		reg-io-width = <0x04>;
 		dmas = <0x16 0x09 0x16 0x08>;
@@ -193,12 +192,12 @@
 	};
 
 	gmac1: ethernet@ffbe0000 {
-		compatible = "rockchip,rk3528-gmac\0snps,dwmac-4.20a";
+		compatible = "rockchip,rk3528-gmac", "snps,dwmac-4.20a";
 		reg = <0x00 0xffbe0000 0x00 0x10000>;
 		interrupts = <0x00 0x79 0x04 0x00 0x7c 0x04>;
-		interrupt-names = "macirq\0eth_wake_irq";
+		interrupt-names = "macirq", "eth_wake_irq";
 		clocks = <0x0a 0xd2 0x0a 0xd1 0x0a 0xcf 0x0a 0xce>;
-		clock-names = "stmmaceth\0clk_mac_ref\0pclk_mac\0aclk_mac";
+		clock-names = "stmmaceth", "clk_mac_ref", "pclk_mac", "aclk_mac";
 		resets = <0x0a 0x1c5>;
 		reset-names = "stmmaceth";
 		rockchip,grf = <0x10>;
@@ -252,15 +251,15 @@
 	};
 
 	sdhci: mmc@ffbf0000 {
-		compatible = "rockchip,rk3528-dwcmshc\0rockchip,rk3588-dwcmshc";
+		compatible = "rockchip,rk3528-dwcmshc", "rockchip,rk3588-dwcmshc";
 		reg = <0x00 0xffbf0000 0x00 0x10000>;
 		interrupts = <0x00 0x88 0x04>;
 		assigned-clocks = <0x0a 0xa6 0x0a 0xa7 0x0a 0xa3>;
 		assigned-clock-rates = <0xbebc200 0x16e3600 0xbebc200>;
 		clocks = <0x0a 0xa3 0x0a 0xa4 0x0a 0xa5 0x0a 0xa6 0x0a 0xa7>;
-		clock-names = "core\0bus\0axi\0block\0timer";
+		clock-names = "core", "bus", "axi", "block", "timer";
 		resets = <0x0a 0x19f 0x0a 0x1a0 0x0a 0x1a1 0x0a 0x1a2 0x0a 0x1a3>;
-		reset-names = "core\0bus\0axi\0block\0timer";
+		reset-names = "core", "bus", "axi", "block", "timer";
 		max-frequency = <0xbebc200>;
 		bus-width = <8>;
 		mmc-hs200-1_8v;
@@ -274,11 +273,11 @@
 	};
 
 	sdmmc: mmc@ffc30000 {
-		compatible = "rockchip,rk3528-dw-mshc\0rockchip,rk3288-dw-mshc";
+		compatible = "rockchip,rk3528-dw-mshc", "rockchip,rk3288-dw-mshc";
 		reg = <0x00 0xffc30000 0x00 0x4000>;
 		interrupts = <0x00 0x85 0x04>;
 		clocks = <0x0a 0x198 0x0a 0x197 0x51 0x01 0x51 0x02>;
-		clock-names = "biu\0ciu\0ciu-drive\0ciu-sample";
+		clock-names = "biu", "ciu", "ciu-drive", "ciu-sample";
 		fifo-depth = <0x100>;
 		max-frequency = <0x8f0d180>;
 		resets = <0x0a 0x2a9>;
@@ -327,7 +326,7 @@
 	};
 
 	pdma: dma-controller@ffd60000 {
-		compatible = "arm,pl330\0arm,primecell";
+		compatible = "arm,pl330", "arm,primecell";
 		reg = <0x00 0xffd60000 0x00 0x4000>;
 		interrupts = <0x00 0x00 0x04 0x00 0x01 0x04 0x00 0x02 0x04 0x00 0x03 0x04 0x00 0x04 0x04 0x00 0x05 0x04 0x00 0x06 0x04 0x00 0x07 0x04 0x00 0x10 0x04>;
 		arm,pl330-periph-burst;
