@@ -76,13 +76,6 @@
 		compatible = "rockchip,rk3528-dmc";
 	};
 
-	soc {
-		otp: nv@ffce0000 {
-			compatible = "rockchip,rk3528-otp";
-			reg = <0x0 0xffce0000 0x0 0x4000>;
-		};
-	};
-
 	interrupt-controller@fed01000 {
 		compatible = "arm,gic-400";
 		#interrupt-cells = <0x03>;
