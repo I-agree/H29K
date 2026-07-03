@@ -16,10 +16,13 @@ FORCE phony target last in the dependency list.
 diff --git a/Makefile b/Makefile
 --- a/Makefile
 +++ b/Makefile
-@@ -2105,7 +2105,7 @@ quiet_cmd_gen_envt = ENVT    $@
+@@ -2103,8 +2103,8 @@
+ # Write out the resulting environment, converted to a C string
+ quiet_cmd_gen_envt = ENVT    $@
        cmd_gen_envt = \
- 	awk -f $(srctree)/scripts/env2string.awk $< >$@
- 
+	awk -f $(srctree)/scripts/env2string.awk $< >$@
 -$(env_h): include/generated/env.in
 +$(env_h): include/generated/env.in FORCE
- 	$(call cmd,gen_envt)
+	$(call cmd,gen_envt)
+ 
+ # ---------------------------------------------------------------------------
