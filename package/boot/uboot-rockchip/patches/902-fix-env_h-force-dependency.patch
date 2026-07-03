@@ -12,7 +12,7 @@ triggering "cannot open FORCE: No such file" shell errors:
    becoming the first dependency when the config option is empty.
 ---
  Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/Makefile b/Makefile
 --- a/Makefile
