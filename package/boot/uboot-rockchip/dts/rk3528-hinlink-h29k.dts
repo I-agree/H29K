@@ -6,7 +6,7 @@
  *
  * 以下节点已由 rk3528-u-boot.dtsi 完整提供，
  * 本文件不再重复定义：
- *   - otp, rng, dmc, xin24m (整段删除)
+ *   - otp, rng, dmc (整段删除)
  *   - cru, ioc_grf, pinctrl 顶层 bootph-all (仅删属性)
  *   - uart0, sdhci, sdmmc, emmc/sdmmc pinctrl 子节点 bootph-* (仅删属性)
  */
