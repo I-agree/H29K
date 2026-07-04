@@ -5,7 +5,7 @@ Add U-Boot build target for the HINLINK H29K single board computer
 based on the RK3528 SoC.
 
 ---
- package/boot/uboot-rockchip | 7 +++++++
+ package/boot/uboot-rockchip/Makefile | 7 +++++++
  1 file changed, 7 insertions(+)
 
 diff --git a/package/boot/uboot-rockchip/Makefile b/package/boot/uboot-rockchip/Makefile
