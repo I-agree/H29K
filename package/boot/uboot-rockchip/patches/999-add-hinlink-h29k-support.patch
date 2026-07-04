@@ -1,9 +1,20 @@
-diff --git a/configs/hinlink-h29k-rk3528_defconfig b/configs/hinlink-h29k-rk3528_defconfig
-new file mode 100644
-index 0000000000..e69de29bb2
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chukun Pan <amadeus@jmu.edu.cn>
+Date: Wed, 3 Dec 2025 20:03:22 +0800
+Subject: [PATCH] board: rockchip: add HINLINK H29K
+
+The HINLINK H29K is a single board computer based on the
+RK3528 SoC. Add support for the HINLINK H29K board.
+
+Signed-off-by: Chukun Pan <amadeus@jmu.edu.cn>
+---
+ configs/hinlink-h29k-rk3528_defconfig           | 578 ++++++++++++++++++++++++
+ dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts | 514 +++++++++++++++++++
+ 2 files changed, 1092 insertions(+)
+
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
-@@ -0,0 +1,498 @@
+@@ -0,0 +1,578 @@
 +# Hinlink H29K (RK3528) U-Boot defconfig
 +# OpenWrt 25.12 + Linux 6.12 + h29k.env
 +# ===== General setup 基础编译 & 内存配置 =====
@@ -664,10 +675,10 @@ index 0000000000..e69de29bb2
 +# ========== 官方标配优化项 ==========
 +CONFIG_DISPLAY_BOARDINFO_LATE=y
 +CONFIG_ENV_RELOC_GD_ENV_ADDR=y
-+# ========== bloblist 底层框架+查看命令 ==========
++# ========== bloblist 底层框架+查看命令 =========
 +CONFIG_BLOBLIST=y
 +CONFIG_CMD_BLOBLIST=y
-+# ========== 内存布局传递、内核防内存踩踏 ==========
++# ========== 内存布局传递、内核防内存踩踏 =========
 +CONFIG_FDT_MEM_RESERVE=y
 +CONFIG_BOOTM_FDT_RELOC=y
 +# ========== 内核镜像完整性校验 ==========
@@ -678,12 +689,9 @@ index 0000000000..e69de29bb2
 +CONFIG_SPL_RANDOM=y
 +# ===== 倒计时一秒钟 =====
 +CONFIG_BOOTDELAY=1
-diff --git a/dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts b/dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts
-new file mode 100644
-index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,514 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * U-Boot 2025.10 DTS for HINLINK H29K (RK3528)
@@ -692,36 +700,30 @@ index 0000000000..e69de29bb2
 + *
 + * 以下节点已由 rk3528-u-boot.dtsi 完整提供，
 + * 本文件不再重复定义：
-+ * - otp, rng, dmc (整段删除)
-+ * - cru, ioc_grf, pinctrl 顶层 bootph-all (仅删属性)
-+ * - uart0, sdhci, sdmmc, emmc/sdmmc pinctrl 子节点 bootph-* (仅删属性)
++ *   - otp, rng, dmc (整段删除)
++ *   - cru, ioc_grf, pinctrl 顶层 bootph-all (仅删属性)
++ *   - uart0, sdhci, sdmmc, emmc/sdmmc pinctrl 子节点 bootph-* (仅删属性)
 + */
-+
 +/dts-v1/;
-+
 +/ {
 +	interrupt-parent = <0x01>;
 +	#address-cells = <0x02>;
 +	#size-cells = <0x02>;
 +	model = "HINLINK H29K";
 +	compatible = "hinlink,h29k", "rockchip,rk3528";
-+
 +	aliases {
 +		serial0 = "/serial@ff9f0000";
 +		ethernet0 = "/ethernet@ffbe0000";
 +		mmc0 = "/mmc@ffbf0000";
 +		mmc1 = "/mmc@ffc30000";
 +	};
-+
 +	chosen {
 +		stdout-path = "serial0:1500000n8";
 +	};
-+
 +	reserved-memory {
 +		#address-cells = <0x02>;
 +		#size-cells = <0x02>;
 +		ranges;
-+
 +		shmem@10f000 {
 +			compatible = "arm,scmi-shmem";
 +			reg = <0x00 0x10f000 0x00 0x100>;
@@ -729,7 +731,6 @@ index 0000000000..e69de29bb2
 +			phandle = <0x09>;
 +		};
 +	};
-+
 +	firmware {
 +		scmi {
 +			compatible = "arm,scmi-smc";
@@ -737,7 +738,6 @@ index 0000000000..e69de29bb2
 +			shmem = <0x09>;
 +			#address-cells = <0x01>;
 +			#size-cells = <0x00>;
-+
 +			protocol@14 {
 +				reg = <0x14>;
 +				#clock-cells = <0x01>;
@@ -745,30 +745,25 @@ index 0000000000..e69de29bb2
 +			};
 +		};
 +	};
-+
 +	psci {
 +		compatible = "arm,psci-1.0";
 +		method = "smc";
 +	};
-+
 +	timer {
 +		compatible = "arm,armv8-timer";
 +		interrupts = <0x01 0x0d 0xf08 0x01 0x0e 0xf08 0x01 0x0b 0xf08 0x01 0x0a 0xf08>;
 +	};
-+
 +	xin24m: xin24m {
 +		compatible = "fixed-clock";
 +		#clock-cells = <0x00>;
 +		clock-frequency = <0x16e3600>;
 +		clock-output-names = "xin24m";
 +	};
-+
 +	soc {
 +		#address-cells = <0x02>;
 +		#size-cells = <0x02>;
 +		ranges;
 +	};
-+
 +	interrupt-controller@fed01000 {
 +		compatible = "arm,gic-400";
 +		#interrupt-cells = <0x03>;
@@ -778,7 +773,6 @@ index 0000000000..e69de29bb2
 +		interrupts = <0x01 0x09 0xf08>;
 +		phandle = <0x01>;
 +	};
-+
 +	vcc5v0_sys: vcc5v0-sys {
 +		compatible = "regulator-fixed";
 +		regulator-name = "vcc5v0_sys";
@@ -788,7 +782,6 @@ index 0000000000..e69de29bb2
 +		regulator-max-microvolt = <0x4c4b40>;
 +		phandle = <0x5d>;
 +	};
-+
 +	vcc_3v3: vcc-3v3 {
 +		compatible = "regulator-fixed";
 +		regulator-name = "vcc_3v3";
@@ -799,7 +792,6 @@ index 0000000000..e69de29bb2
 +		vin-supply = <0x5d>;
 +		phandle = <0x4c>;
 +	};
-+
 +	vcc_1v8: vcc-1v8 {
 +		compatible = "regulator-fixed";
 +		regulator-name = "vcc_1v8";
@@ -810,7 +802,6 @@ index 0000000000..e69de29bb2
 +		vin-supply = <0x4c>;
 +		phandle = <0x37>;
 +	};
-+
 +	vcc3v3_sd: vcc3v3-sd {
 +		compatible = "regulator-fixed";
 +		gpio = <0x25 0x01 0x01>;
@@ -822,7 +813,6 @@ index 0000000000..e69de29bb2
 +		vin-supply = <0x4c>;
 +		phandle = <0x5b>;
 +	};
-+
 +	vccio_sd: vccio-sd {
 +		compatible = "regulator-gpio";
 +		gpios = <0x25 0x0e 0x00>;
@@ -833,12 +823,10 @@ index 0000000000..e69de29bb2
 +		vin-supply = <0x5d>;
 +		phandle = <0x5c>;
 +	};
-+
 +	grf: syscon@ff300000 {
 +		compatible = "rockchip,rk3528-grf", "syscon", "simple-mfd";
 +		reg = <0x00 0xff300000 0x00 0x90000>;
 +		phandle = <0x10>;
-+
 +		reboot-mode {
 +			compatible = "syscon-reboot-mode";
 +			offset = <0x70200>;
@@ -848,14 +836,12 @@ index 0000000000..e69de29bb2
 +			mode-normal = <0x5242c300>;
 +			mode-recovery = <0x5242c303>;
 +		};
-+
 +		grf-clock-controller {
 +			compatible = "rockchip,rk3528-grf-cru";
 +			#clock-cells = <0x01>;
 +			phandle = <0x51>;
 +		};
 +	};
-+
 +	cru: clock-controller@ff4a0000 {
 +		compatible = "rockchip,rk3528-cru";
 +		reg = <0x00 0xff4a0000 0x00 0x30000>;
@@ -866,13 +852,11 @@ index 0000000000..e69de29bb2
 +		assigned-clock-rates = <0x8000 0x46cf7100 0x3b9aca00 0x3b5dc100 0xee6b280 0x1dcd6500 0x2faf080 0x5f5e100 0x8f0d180 0xbebc200 0x11e1a300 0x1443fd00 0x17d78400 0x23c34600 0x2faf080 0x5f5e100 0x7735940 0x1dcd6500 0x1443fd00 0x11e1a300 0xbebc200>;
 +		phandle = <0x0a>;
 +	};
-+
 +	ioc_grf: syscon@ff540000 {
 +		compatible = "rockchip,rk3528-ioc-grf", "syscon";
 +		reg = <0x00 0xff540000 0x00 0x40000>;
 +		phandle = <0x5e>;
 +	};
-+
 +	uart0: serial@ff9f0000 {
 +		compatible = "rockchip,rk3528-uart", "snps,dw-apb-uart";
 +		reg = <0x00 0xff9f0000 0x00 0x100>;
@@ -886,7 +870,6 @@ index 0000000000..e69de29bb2
 +		pinctrl-0 = <0x20>;
 +		status = "okay";
 +	};
-+
 +	gmac1: ethernet@ffbe0000 {
 +		compatible = "rockchip,rk3528-gmac", "snps,dwmac-4.20a";
 +		reg = <0x00 0xffbe0000 0x00 0x10000>;
@@ -912,39 +895,33 @@ index 0000000000..e69de29bb2
 +		snps,reset-delays-us = <0x00 0x4e20 0x186a0>;
 +		snps,reset-gpio = <0x25 0x12 0x01>;
 +		status = "okay";
-+
 +		mdio {
 +			compatible = "snps,dwmac-mdio";
 +			#address-cells = <0x01>;
 +			#size-cells = <0x00>;
-+
 +			rgmii_phy: phy@1 {
 +				compatible = "ethernet-phy-ieee802.3-c22";
 +				reg = <0x01>;
 +				phandle = <0x4b>;
 +			};
 +		};
-+
 +		stmmac-axi-config {
 +			snps,wr_osr_lmt = <0x04>;
 +			snps,rd_osr_lmt = <0x08>;
 +			snps,blen = <0x00 0x00 0x00 0x00 0x10 0x08 0x04>;
 +			phandle = <0x43>;
 +		};
-+
 +		rx-queues-config {
 +			snps,rx-queues-to-use = <0x01>;
 +			phandle = <0x44>;
 +			queue0 {};
 +		};
-+
 +		tx-queues-config {
 +			snps,tx-queues-to-use = <0x01>;
 +			phandle = <0x45>;
 +			queue0 {};
 +		};
 +	};
-+
 +	sdhci: mmc@ffbf0000 {
 +		compatible = "rockchip,rk3528-dwcmshc", "rockchip,rk3588-dwcmshc";
 +		reg = <0x00 0xffbf0000 0x00 0x10000>;
@@ -965,7 +942,6 @@ index 0000000000..e69de29bb2
 +		vqmmc-supply = <0x37>;
 +		status = "okay";
 +	};
-+
 +	sdmmc: mmc@ffc30000 {
 +		compatible = "rockchip,rk3528-dw-mshc", "rockchip,rk3288-dw-mshc";
 +		reg = <0x00 0xffc30000 0x00 0x4000>;
@@ -991,7 +967,6 @@ index 0000000000..e69de29bb2
 +		vqmmc-supply = <0x5c>;
 +		status = "okay";
 +	};
-+
 +	sfc: spi@ffc00000 {
 +		compatible = "rockchip,sfc";
 +		reg = <0x00 0xffc00000 0x00 0x4000>;
@@ -1004,7 +979,6 @@ index 0000000000..e69de29bb2
 +		#size-cells = <0x00>;
 +		status = "okay";
 +	};
-+
 +	pdma: dma-controller@ffd60000 {
 +		compatible = "arm,pl330", "arm,primecell";
 +		reg = <0x00 0xffd60000 0x00 0x4000>;
@@ -1015,7 +989,6 @@ index 0000000000..e69de29bb2
 +		#dma-cells = <0x01>;
 +		phandle = <0x16>;
 +	};
-+
 +	pinctrl: pinctrl {
 +		compatible = "rockchip,rk3528-pinctrl";
 +		rockchip,grf = <0x5e>;
@@ -1023,7 +996,6 @@ index 0000000000..e69de29bb2
 +		#size-cells = <0x02>;
 +		ranges;
 +		phandle = <0x5f>;
-+
 +		gpio@ff610000 {
 +			compatible = "rockchip,gpio-bank";
 +			reg = <0x00 0xff610000 0x00 0x200>;
@@ -1036,7 +1008,6 @@ index 0000000000..e69de29bb2
 +			#interrupt-cells = <0x02>;
 +			phandle = <0x1f>;
 +		};
-+
 +		gpio@ffaf0000 {
 +			compatible = "rockchip,gpio-bank";
 +			reg = <0x00 0xffaf0000 0x00 0x200>;
@@ -1049,7 +1020,6 @@ index 0000000000..e69de29bb2
 +			#interrupt-cells = <0x02>;
 +			phandle = <0x1e>;
 +		};
-+
 +		gpio@ffb00000 {
 +			compatible = "rockchip,gpio-bank";
 +			reg = <0x00 0xffb00000 0x00 0x200>;
@@ -1061,7 +1031,6 @@ index 0000000000..e69de29bb2
 +			interrupt-controller;
 +			#interrupt-cells = <0x02>;
 +		};
-+
 +		gpio@ffb10000 {
 +			compatible = "rockchip,gpio-bank";
 +			reg = <0x00 0xffb10000 0x00 0x200>;
@@ -1073,7 +1042,6 @@ index 0000000000..e69de29bb2
 +			interrupt-controller;
 +			#interrupt-cells = <0x02>;
 +		};
-+
 +		gpio@ffb20000 {
 +			compatible = "rockchip,gpio-bank";
 +			reg = <0x00 0xffb20000 0x00 0x200>;
@@ -1086,117 +1054,95 @@ index 0000000000..e69de29bb2
 +			#interrupt-cells = <0x02>;
 +			phandle = <0x25>;
 +		};
-+
 +		pcfg_pull_up: pcfg-pull-up {
 +			bias-pull-up;
 +			phandle = <0x65>;
 +		};
-+
 +		pcfg-pull-down {
 +			bias-pull-down;
 +			phandle = <0x66>;
 +		};
-+
 +		pcfg_pull_none: pcfg-pull-none {
 +			bias-disable;
 +			phandle = <0x60>;
 +		};
-+
 +		pcfg-pull-none-drv-level-0 {
 +			bias-disable;
 +			drive-strength = <0x00>;
 +			phandle = <0x64>;
 +		};
-+
 +		pcfg-pull-none-drv-level-2 {
 +			bias-disable;
 +			drive-strength = <0x02>;
 +			phandle = <0x62>;
 +		};
-+
 +		pcfg_pull_up_drv_level_2: pcfg-pull-up-drv-level-2 {
 +			bias-pull-up;
 +			drive-strength = <0x02>;
 +			phandle = <0x61>;
 +		};
-+
 +		pcfg-pull-up-drv-level-6 {
 +			bias-pull-up;
 +			drive-strength = <0x06>;
 +			phandle = <0x67>;
 +		};
-+
 +		pcfg-pull-none-smt {
 +			bias-disable;
 +			input-schmitt-enable;
 +			phandle = <0x63>;
 +		};
-+
 +		uart0m0_xfer: uart0m0-xfer {
 +			rockchip,pins = <0x04 0x17 0x01 0x65 0x04 0x18 0x01 0x65>;
 +			phandle = <0x20>;
 +		};
-+
 +		rgmii-miim {
 +			rockchip,pins = <0x03 0x0e 0x02 0x62 0x03 0x0f 0x02 0x62>;
 +			phandle = <0x46>;
 +		};
-+
 +		rgmii-rx_bus2 {
 +			rockchip,pins = <0x03 0x03 0x02 0x60 0x03 0x02 0x02 0x60 0x03 0x12 0x02 0x60>;
 +			phandle = <0x48>;
 +		};
-+
 +		rgmii-tx_bus2 {
 +			rockchip,pins = <0x03 0x01 0x02 0x62 0x03 0x00 0x02 0x62 0x03 0x10 0x02 0x60>;
 +			phandle = <0x47>;
 +		};
-+
 +		gmac0_clk: rgmii-rgmii_clk {
 +			rockchip,pins = <0x03 0x05 0x02 0x60 0x03 0x04 0x02 0x62>;
 +			phandle = <0x49>;
 +		};
-+
 +		rgmii-rgmii_bus {
 +			rockchip,pins = <0x03 0x07 0x02 0x60 0x03 0x06 0x02 0x60 0x03 0x09 0x02 0x62 0x03 0x08 0x02 0x62>;
 +			phandle = <0x4a>;
 +		};
-+
 +		emmc_bus8: emmc-bus8 {
 +			rockchip,pins = <0x01 0x14 0x01 0x61 0x01 0x15 0x01 0x61 0x01 0x16 0x01 0x61 0x01 0x17 0x01 0x61 0x01 0x18 0x01 0x61 0x01 0x19 0x01 0x61 0x01 0x1a 0x01 0x61 0x01 0x1b 0x01 0x61>;
 +			phandle = <0x4d>;
 +		};
-+
 +		emmc_clk: emmc-clk {
 +			rockchip,pins = <0x01 0x1d 0x01 0x61>;
 +			phandle = <0x4e>;
 +		};
-+
 +		emmc_cmd: emmc-cmd {
 +			rockchip,pins = <0x01 0x1c 0x01 0x61>;
 +			phandle = <0x4f>;
 +		};
-+
 +		emmc_strb: emmc-strb {
 +			rockchip,pins = <0x01 0x1f 0x01 0x60>;
 +			phandle = <0x50>;
 +		};
-+
 +		sdmmc_bus4: sdmmc-bus4 {
 +			rockchip,pins = <0x02 0x00 0x01 0x61 0x02 0x01 0x01 0x61 0x02 0x02 0x01 0x61 0x02 0x03 0x01 0x61>;
 +			phandle = <0x57>;
 +		};
-+
 +		sdmmc_clk: sdmmc-clk {
 +			rockchip,pins = <0x02 0x05 0x01 0x61>;
 +			phandle = <0x58>;
 +		};
-+
 +		sdmmc_cmd: sdmmc-cmd {
 +			rockchip,pins = <0x02 0x04 0x01 0x61>;
 +			phandle = <0x59>;
 +		};
-+
 +		sdmmc_det: sdmmc-det {
 +			rockchip,pins = <0x02 0x06 0x01 0x65>;
 +			phandle = <0x5a>;
