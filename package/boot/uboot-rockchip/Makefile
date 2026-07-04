@@ -17,6 +17,27 @@ UBOOT_USE_INTREE_DTC:=1
 include $(INCLUDE_DIR)/u-boot.mk
 include $(INCLUDE_DIR)/package.mk
 
+# 🚀 【现代主线化全面适配】彻底打通 U-Boot 2025+ 原生设备树目录
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	# 1. 复制自定义 H29K defconfig 到 U-Boot 基础配置目录
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
+	
+	# 2. 🛠️ 核心修正：适配现代 U-Boot 规范
+	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	
+	# 3. 完整复制hinlink板级全套文件（新版U-Boot规范）
+	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/Kconfig $(PKG_BUILD_DIR)/board/hinlink/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
+	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
+endef
+
 define U-Boot/Default
   BUILD_TARGET:=rockchip
   UENV:=default
@@ -47,40 +68,9 @@ UBOOT_CUSTOMIZE_CONFIG := \
 	--disable TOOLS_MKEFICAPSULE \
 	--set-str MKIMAGE_DTC_PATH $(PKG_BUILD_DIR)/scripts/dtc/dtc
 
-# 新增 -j1 单线程 + V=s 详细日志，仅作用于U-Boot内部编译，用于核查TPL/SPL/idbloader/u-boot.itb打包日志
 UBOOT_MAKE_FLAGS += \
-	-j1 \
-	V=s \
-	PKG_CONFIG=pkg-config \
-	PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig" \
-	BINMAN_ALLOW_MISSING=0 \
-	BINMAN_INTRUSIVE_AS_NEEDED=1 \
-	BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
-	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL)) \
-	EXTRA_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast -Wno-error=int-conversion" \
-	of-list=rockchip/rk3528-hinlink-h29k \
-	default-dt=rockchip/rk3528-hinlink-h29k
-
-# 🚀 【现代主线化全面适配】彻底打通 U-Boot 2025+ 原生设备树目录
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	# 1. 复制自定义 H29K defconfig 到 U-Boot 基础配置目录
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
-	
-	# 2. 🛠️ 核心修正：适配现代 U-Boot 规范
-	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	
-	# 3. 完整复制hinlink板级全套文件（新版U-Boot规范）
-	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/Kconfig $(PKG_BUILD_DIR)/board/hinlink/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
-endef
+  BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
+  $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
 define Build/InstallDev
 	$(INSTALL_DIR) $(STAGING_DIR_IMAGE)
