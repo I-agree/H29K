@@ -68,9 +68,9 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
 	
 	# 2. 🛠️ 核心修正：适配现代 U-Boot 规范
-	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/
+	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
+	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	
 	# 3. 完整复制hinlink板级全套文件（新版U-Boot规范）
 	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
@@ -80,15 +80,6 @@ define Build/Prepare
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
 	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	
-	# ========== 关键修复：注入板子Kconfig到arm顶层，让BOARDDIR正常赋值 ==========
-	grep -q 'source "board/hinlink/Kconfig"' $(PKG_BUILD_DIR)/arch/Kconfig || \
-	echo 'source "board/hinlink/Kconfig"' >> $(PKG_BUILD_DIR)/arch/Kconfig
-	
-	# ========== 关键修复：修复 environment.h 生成时 $< 被展开为 FORCE 的问题 ==========
-	# cmd_gen_envt 中的 $< 为明确的文件路径 include/generated/env.in
-	# FORCE 被意外插入到依赖列表最前面，而awk 必须要正确读取 env.in 文件
-	# 使用902-fix-env_h-force-dependency.patch
 endef
 
 define Build/InstallDev
