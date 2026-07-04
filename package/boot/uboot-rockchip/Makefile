@@ -57,7 +57,9 @@ UBOOT_MAKE_FLAGS += \
 	BINMAN_INTRUSIVE_AS_NEEDED=1 \
 	BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
 	$(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL)) \
-	EXTRA_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast -Wno-error=int-conversion"
+	EXTRA_CFLAGS="-Wno-error=implicit-function-declaration -Wno-error=int-to-pointer-cast -Wno-error=pointer-to-int-cast -Wno-error=int-conversion" \
+	of-list=$(CONFIG_OF_LIST) \
+	default-dt=$(CONFIG_DEFAULT_DEVICE_TREE)
 
 # 🚀 【现代主线化全面适配】彻底打通 U-Boot 2025+ 原生设备树目录
 define Build/Prepare
