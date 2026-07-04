@@ -9,39 +9,47 @@ Makefile, board init code and default environment script.
 
 Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 ---
- board/hinlink/Kconfig       |  8 ++++++++
- board/hinlink/h29k/Kconfig  | 13 +++++++++++++
+ board/hinlink/Kconfig       |  10 ++++++++
+ board/hinlink/h29k/Kconfig  | 18 +++++++++++++
  board/hinlink/h29k/Makefile |  5 +++++
- board/hinlink/h29k/board.c  | 10 ++++++++++
- board/hinlink/h29k/h29k.env | 10 ++++++++++
+ board/hinlink/h29k/board.c  | 11 ++++++++++
+ board/hinlink/h29k/h29k.env | 12 ++++++++++
  5 files changed, 46 insertions(+)
 
 --- /dev/null
 +++ b/board/hinlink/Kconfig
-@@ -0,0 +1,8 @@
+@@ -0,0 +1,10 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +config VENDOR_HINLINK
 +	bool
 +	help
 +	  Selected when any Hinlink board is enabled.
++
 +if VENDOR_HINLINK
++
 +source "board/hinlink/h29k/Kconfig"
++
 +endif
 --- /dev/null
 +++ b/board/hinlink/h29k/Kconfig
-@@ -0,0 +1,13 @@
+@@ -0,0 +1,18 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +config TARGET_HINLINK_H29K
 +	bool "Hinlink H29K RK3528 Board"
 +	select VENDOR_HINLINK
 +	select ARCH_ROCKCHIP
++
 +if TARGET_HINLINK_H29K
++
 +config SYS_VENDOR
 +	default "hinlink"
++
 +config SYS_BOARD
 +	default "h29k"
++
 +config SYS_CONFIG_NAME
 +	default "hinlink-h29k-rk3528"
++
 +endif
 --- /dev/null
 +++ b/board/hinlink/h29k/Makefile
@@ -53,12 +61,13 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 +obj-y := board.o
 --- /dev/null
 +++ b/board/hinlink/h29k/board.c
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,11 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Board init for Hinlink H29K RK3528
 + */
 +#include <common.h>
++
 +int board_init(void)
 +{
 +	gd->bd->bi_boot_params = 0x40000000 + 0x100;
@@ -66,14 +75,16 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 +}
 --- /dev/null
 +++ b/board/hinlink/h29k/h29k.env
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,12 @@
 +soc=rk3528
 +devtype=mmc
 +kernel_addr_r=0xc0080000
++
 +boot_openwrt=part uuid ${devtype} ${devnum}:2 uuid;
 +setenv serial_addr ",0xff9f0000";
 +setenv serial_port "ttyS0";
 +setenv bootargs "console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait";
 +load ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img;
 +bootm ${kernel_addr_r}
++
 +bootcmd=run boot_openwrt
