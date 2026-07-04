@@ -82,6 +82,7 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c" "package/boot/uboot-rockchip/configs/hinlink/h29k/board.c"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/Kconfig"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/997-uboot-rockchip-add-hinlink-h29k-target.patch" "package/boot/uboot-rockchip/patches/997-uboot-rockchip-add-hinlink-h29k-target.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch" "package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch"
 
