@@ -1,10 +1,10 @@
-if VENDOR_HINLINK
-
+# SPDX-License-Identifier: GPL-2.0+
 config TARGET_HINLINK_H29K
 	bool "Hinlink H29K RK3528 Board"
+	select VENDOR_HINLINK
 	select ARCH_ROCKCHIP
-	select ARM64
-	default y
+
+if TARGET_HINLINK_H29K
 
 config SYS_VENDOR
 	default "hinlink"
