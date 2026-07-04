@@ -1,78 +1,77 @@
-diff --git a/board/hinlink/Kconfig b/board/hinlink/Kconfig
-new file mode 100644
-index 0000000000..e69de29bb2
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Chukun Pan <amadeus@jmu.edu.cn>
+Date: Wed, 3 Dec 2025 20:03:22 +0800
+Subject: [PATCH] board: hinlink: add HINLINK H29K board support
+
+Add board support files for the HINLINK H29K single board computer
+based on the RK3528 SoC, including vendor Kconfig, board Kconfig,
+Makefile, board init code and default environment script.
+
+Signed-off-by: Chukun Pan <amadeus@jmu.edu.cn>
+---
+ board/hinlink/Kconfig       |  8 ++++++++
+ board/hinlink/h29k/Kconfig  | 13 +++++++++++++
+ board/hinlink/h29k/Makefile |  5 +++++
+ board/hinlink/h29k/board.c  | 10 ++++++++++
+ board/hinlink/h29k/h29k.env | 10 ++++++++++
+ 5 files changed, 46 insertions(+)
+
 --- /dev/null
 +++ b/board/hinlink/Kconfig
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,8 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +config VENDOR_HINLINK
-+bool
-+help
-+Selected when any Hinlink board is enabled.
-+
++	bool
++	help
++	  Selected when any Hinlink board is enabled.
 +if VENDOR_HINLINK
 +source "board/hinlink/h29k/Kconfig"
 +endif
-diff --git a/board/hinlink/h29k/Kconfig b/board/hinlink/h29k/Kconfig
-new file mode 100644
-index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/h29k/Kconfig
-@@ -0,0 +1,17 @@
+@@ -0,0 +1,13 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +config TARGET_HINLINK_H29K
-+bool "Hinlink H29K RK3528 Board"
-+select VENDOR_HINLINK
-+select ARCH_ROCKCHIP
-+
++	bool "Hinlink H29K RK3528 Board"
++	select VENDOR_HINLINK
++	select ARCH_ROCKCHIP
 +if TARGET_HINLINK_H29K
 +config SYS_VENDOR
-+default "hinlink"
-+
++	default "hinlink"
 +config SYS_BOARD
-+default "h29k"
-+
++	default "h29k"
 +config SYS_CONFIG_NAME
-+default "hinlink-h29k-rk3528"
++	default "hinlink-h29k-rk3528"
 +endif
-diff --git a/board/hinlink/h29k/Makefile b/board/hinlink/h29k/Makefile
-new file mode 100644
-index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/h29k/Makefile
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,5 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +#
 +# (C) Copyright 2026 Hinlink
 +#
 +obj-y := board.o
-diff --git a/board/hinlink/h29k/board.c b/board/hinlink/h29k/board.c
-new file mode 100644
-index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/h29k/board.c
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,10 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Board init for Hinlink H29K RK3528
 + */
 +#include <common.h>
-+
 +int board_init(void)
 +{
 +	gd->bd->bi_boot_params = 0x40000000 + 0x100;
 +	return 0;
 +}
-diff --git a/board/hinlink/h29k/h29k.env b/board/hinlink/h29k/h29k.env
-new file mode 100644
-index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/h29k/h29k.env
 @@ -0,0 +1,10 @@
 +soc=rk3528
 +devtype=mmc
 +kernel_addr_r=0xc0080000
-+boot_openwrt=part uuid ${devtype} ${devnum}:2 uuid;setenv serial_addr ",0xff9f0000";
++boot_openwrt=part uuid ${devtype} ${devnum}:2 uuid;
++setenv serial_addr ",0xff9f0000";
 +setenv serial_port "ttyS0";
 +setenv bootargs "console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait";
 +load ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img;
