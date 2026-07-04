@@ -122,7 +122,7 @@ jobs:
         ls -lh staging_dir/target-*/image/rk3528_ddr_1056MHz_v1.10.bin
         
         echo -e "\n>>> 校验 BL31 固件架构:"
-        file staging_dir/target-*/image/rk3528_bl31_v1.20.elf
+        file staging_dir/target-*/image/rk3528_bl31_v1.17.elf
 
     - name: 下载 uboot-rockchip 编译依赖
       run: |
