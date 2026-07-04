@@ -14,7 +14,7 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
-@@ -0,0 +1,578 @@
+@@ -0,0 +1,674 @@
 +# Hinlink H29K (RK3528) U-Boot defconfig
 +# OpenWrt 25.12 + Linux 6.12 + h29k.env
 +# ===== General setup 基础编译 & 内存配置 =====
@@ -691,7 +691,7 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 +CONFIG_BOOTDELAY=1
 --- /dev/null
 +++ b/dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts
-@@ -0,0 +1,514 @@
+@@ -0,0 +1,457 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +/*
 + * U-Boot 2025.10 DTS for HINLINK H29K (RK3528)
