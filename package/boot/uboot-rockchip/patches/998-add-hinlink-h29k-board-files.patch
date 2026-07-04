@@ -1,13 +1,13 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Chukun Pan <amadeus@jmu.edu.cn>
-Date: Wed, 3 Dec 2025 20:03:22 +0800
+From: aaa aaa <aaaaaaa@aaa.edu.cn>
+Date: Wed, 3 Dec 2026 20:03:22 +0800
 Subject: [PATCH] board: hinlink: add HINLINK H29K board support
 
 Add board support files for the HINLINK H29K single board computer
 based on the RK3528 SoC, including vendor Kconfig, board Kconfig,
 Makefile, board init code and default environment script.
 
-Signed-off-by: Chukun Pan <amadeus@jmu.edu.cn>
+Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 ---
  board/hinlink/Kconfig       |  8 ++++++++
  board/hinlink/h29k/Kconfig  | 13 +++++++++++++
