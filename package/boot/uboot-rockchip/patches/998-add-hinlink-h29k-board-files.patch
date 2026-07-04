@@ -1,3 +1,6 @@
+diff --git a/board/hinlink/Kconfig b/board/hinlink/Kconfig
+new file mode 100644
+index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/Kconfig
 @@ -0,0 +1,10 @@
@@ -10,6 +13,9 @@
 +if VENDOR_HINLINK
 +source "board/hinlink/h29k/Kconfig"
 +endif
+diff --git a/board/hinlink/h29k/Kconfig b/board/hinlink/h29k/Kconfig
+new file mode 100644
+index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/h29k/Kconfig
 @@ -0,0 +1,17 @@
@@ -29,6 +35,9 @@
 +config SYS_CONFIG_NAME
 +default "hinlink-h29k-rk3528"
 +endif
+diff --git a/board/hinlink/h29k/Makefile b/board/hinlink/h29k/Makefile
+new file mode 100644
+index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/h29k/Makefile
 @@ -0,0 +1,6 @@
@@ -37,6 +46,9 @@
 +# (C) Copyright 2026 Hinlink
 +#
 +obj-y := board.o
+diff --git a/board/hinlink/h29k/board.c b/board/hinlink/h29k/board.c
+new file mode 100644
+index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/h29k/board.c
 @@ -0,0 +1,14 @@
@@ -51,6 +63,9 @@
 +	gd->bd->bi_boot_params = 0x40000000 + 0x100;
 +	return 0;
 +}
+diff --git a/board/hinlink/h29k/h29k.env b/board/hinlink/h29k/h29k.env
+new file mode 100644
+index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/board/hinlink/h29k/h29k.env
 @@ -0,0 +1,10 @@
