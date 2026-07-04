@@ -9,16 +9,16 @@ Makefile, board init code and default environment script.
 
 Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 ---
- board/hinlink/Kconfig       |  10 ++++++++
+ board/hinlink/Kconfig       | 11 ++++++++
  board/hinlink/h29k/Kconfig  | 18 +++++++++++++
  board/hinlink/h29k/Makefile |  5 +++++
  board/hinlink/h29k/board.c  | 11 ++++++++++
  board/hinlink/h29k/h29k.env | 12 ++++++++++
- 5 files changed, 46 insertions(+)
+ 5 files changed, 57 insertions(+)
 
 --- /dev/null
 +++ b/board/hinlink/Kconfig
-@@ -0,0 +1,10 @@
+@@ -0,0 +1,11 @@
 +# SPDX-License-Identifier: GPL-2.0+
 +config VENDOR_HINLINK
 +	bool
