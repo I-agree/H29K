@@ -118,8 +118,8 @@ jobs:
         make -j1 package/boot/rkbin/compile V=s 2>&1 | tee rkbin-build.log
         
         echo -e "\n==================== rkbin 固件安装校验 ===================="
-        ls -lh staging_dir/target-*/image/rk3528_bl31_v1.20.elf
-        ls -lh staging_dir/target-*/image/rk3528_ddr_1056MHz_v1.11.bin
+        ls -lh staging_dir/target-*/image/rk3528_bl31_v1.17.elf
+        ls -lh staging_dir/target-*/image/rk3528_ddr_1056MHz_v1.10.bin
         
         echo -e "\n>>> 校验 BL31 固件架构:"
         file staging_dir/target-*/image/rk3528_bl31_v1.20.elf
