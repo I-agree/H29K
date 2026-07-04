@@ -12,9 +12,6 @@ config SYS_VENDOR
 config SYS_BOARD
 	default "h29k"
 
-config SYS_SOC
-	default "rk3528"
-
 config SYS_CONFIG_NAME
 	default "hinlink-h29k-rk3528"
 
