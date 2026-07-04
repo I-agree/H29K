@@ -1,3 +1,6 @@
+diff --git a/configs/hinlink-h29k-rk3528_defconfig b/configs/hinlink-h29k-rk3528_defconfig
+new file mode 100644
+index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
 @@ -0,0 +1,498 @@
@@ -675,6 +678,9 @@
 +CONFIG_SPL_RANDOM=y
 +# ===== 倒计时一秒钟 =====
 +CONFIG_BOOTDELAY=1
+diff --git a/dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts b/dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts
+new file mode 100644
+index 0000000000..e69de29bb2
 --- /dev/null
 +++ b/dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts
 @@ -0,0 +1,322 @@
