@@ -2,7 +2,9 @@
 /*
  * Board init for Hinlink H29K RK3528
  */
-#include <common.h>
+#include <asm/global_data.h>
+
+DECLARE_GLOBAL_DATA_PTR;
 
 int board_init(void)
 {
