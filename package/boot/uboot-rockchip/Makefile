@@ -17,27 +17,6 @@ UBOOT_USE_INTREE_DTC:=1
 include $(INCLUDE_DIR)/u-boot.mk
 include $(INCLUDE_DIR)/package.mk
 
-# 🚀 【现代主线化全面适配】彻底打通 U-Boot 2025+ 原生设备树目录
-define Build/Prepare
-	# 1. 复制自定义 H29K defconfig 到 U-Boot 基础配置目录
-	mkdir -p $(PKG_BUILD_DIR)/configs/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
-	
-	# 2. DTS复制到现代 U-Boot 规范文件夹目录
-	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
-	
-	# 3. 完整复制hinlink板级全套文件（新版U-Boot规范）
-	mkdir -p $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/Kconfig $(PKG_BUILD_DIR)/board/hinlink/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env $(PKG_BUILD_DIR)/board/hinlink/h29k/
-	ls $(PKG_BUILD_DIR)/board/hinlink/h29k/
-endef
-
 define U-Boot/Default
   BUILD_TARGET:=rockchip
   UENV:=default
