@@ -12,9 +12,9 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
  board/hinlink/Kconfig       | 11 ++++++++
  board/hinlink/h29k/Kconfig  | 18 +++++++++++++
  board/hinlink/h29k/Makefile |  5 +++++
- board/hinlink/h29k/board.c  | 11 ++++++++++
+ board/hinlink/h29k/board.c  | 13 ++++++++++
  board/hinlink/h29k/h29k.env | 12 ++++++++++
- 5 files changed, 57 insertions(+)
+ 5 files changed, 59 insertions(+)
 
 --- /dev/null
 +++ b/board/hinlink/Kconfig
@@ -61,12 +61,14 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 +obj-y := board.o
 --- /dev/null
 +++ b/board/hinlink/h29k/board.c
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,13 @@
 +// SPDX-License-Identifier: GPL-2.0+
 +/*
 + * Board init for Hinlink H29K RK3528
 + */
-+#include <common.h>
++#include <asm/global_data.h>
++
++DECLARE_GLOBAL_DATA_PTR;
 +
 +int board_init(void)
 +{
