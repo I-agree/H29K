@@ -19,11 +19,11 @@ include $(INCLUDE_DIR)/package.mk
 
 # 🚀 【现代主线化全面适配】彻底打通 U-Boot 2025+ 原生设备树目录
 define Build/Prepare
-	$(call Build/Prepare/Default)
 	# 1. 复制自定义 H29K defconfig 到 U-Boot 基础配置目录
+	mkdir -p $(PKG_BUILD_DIR)/configs/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig $(PKG_BUILD_DIR)/configs/
 	
-	# 2. 🛠️ 核心修正：适配现代 U-Boot 规范
+	# 2. DTS复制到现代 U-Boot 规范文件夹目录
 	mkdir -p $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
 	$(CP) $(TOPDIR)/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi $(PKG_BUILD_DIR)/dts/upstream/src/arm64/rockchip/
