@@ -56,7 +56,9 @@ define Build/Compile
 	$(call Build/Exports,$(STAMP_BUILT)); \
 	# 2. 额外导出RK所需ATF/TPL全局shell环境（解决子Make丢失变量）
 	export BL31=$(STAGING_DIR_IMAGE)/$(ATF); \
-	export ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL); \
+	if [ -n "$(TPL)" ]; then \
+		export ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL); \
+	fi; \
 	# 3. 完整复刻默认编译所有内置参数，一丝不漏
 	$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \
 		$(TARGET_CONFIGURE_OPTS) \
