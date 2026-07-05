@@ -51,6 +51,16 @@ UBOOT_MAKE_FLAGS += \
   BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
   $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
+define Build/Compile
+	export BL31=$(STAGING_DIR_IMAGE)/$(ATF); \
+	if [ -n "$(TPL)" ]; then \
+		export ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL); \
+	fi; \
+	$(MAKE) -C $(PKG_BUILD_DIR) \
+		CROSS_COMPILE=$(TARGET_CROSS) \
+		$(UBOOT_MAKE_FLAGS)
+endef
+
 define Build/InstallDev
 	$(INSTALL_DIR) $(STAGING_DIR_IMAGE)
 	$(CP) $(PKG_BUILD_DIR)/u-boot-rockchip.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot-rockchip.bin
