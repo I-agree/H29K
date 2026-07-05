@@ -17,28 +17,6 @@ UBOOT_USE_INTREE_DTC:=1
 include $(INCLUDE_DIR)/u-boot.mk
 include $(INCLUDE_DIR)/package.mk
 
-define Build/Compile
-	# ===== BEGIN BINMAN DIAGNOSTICS =====
-	@echo "========== [DIAG] Dumping binman nodes from DTB ==========" | tee $(PKG_BUILD_DIR)/binman_diag.log
-	@dtc -I dtb -O dts \
-		$(PKG_BUILD_DIR)/arch/arm/dts/rk3528-hinlink-h29k.dtb \
-		2>/dev/null | grep -B2 -A15 'binman\|rockchip-tpl\|atf-bl31\|simple-bin\|u-boot-spl' \
-		>> $(PKG_BUILD_DIR)/binman_diag.log 2>&1 || true
-
-	@echo "========== [DIAG] Running binman manually ==========" | tee -a $(PKG_BUILD_DIR)/binman_diag.log
-	@cd $(PKG_BUILD_DIR) && python3 tools/binman/binman \
-		--toolpath $(STAGING_DIR_HOST)/bin \
-		-D arch/arm/dts/rk3528-hinlink-h29k.dtb \
-		-a bl31=$(STAGING_DIR_IMAGE)/rk3528_bl31_v1.17.elf \
-		-a rockchip-tpl=$(STAGING_DIR_IMAGE)/rk3528_ddr_1056MHz_v1.10.bin \
-		build u-boot-rockchip.bin \
-		>> $(PKG_BUILD_DIR)/binman_diag.log 2>&1 || true
-
-	@echo "========== [DIAG] Full log at: $(PKG_BUILD_DIR)/binman_diag.log =========="
-	@cat $(PKG_BUILD_DIR)/binman_diag.log
-	# ===== END BINMAN DIAGNOSTICS =====
-endef
-
 define U-Boot/Default
   BUILD_TARGET:=rockchip
   UENV:=default
@@ -80,5 +58,32 @@ endef
 
 define Package/u-boot/install/default
 endef
+
+# ===== BEGIN BINMAN DIAGNOSTICS HOOK =====
+define Build/U-Boot/DiagnoseBinman
+	@echo "========== [DIAG] Dumping binman nodes from DTB ==========" | tee $(PKG_BUILD_DIR)/binman_diag.log
+	@dtc -I dtb -O dts \
+		$(PKG_BUILD_DIR)/arch/arm/dts/rk3528-hinlink-h29k.dtb \
+		2>/dev/null | grep -B2 -A15 'binman\|rockchip-tpl\|atf-bl31\|simple-bin\|u-boot-spl' \
+		>> $(PKG_BUILD_DIR)/binman_diag.log 2>&1 || true
+
+	@echo "========== [DIAG] Running binman manually ==========" | tee -a $(PKG_BUILD_DIR)/binman_diag.log
+	@cd $(PKG_BUILD_DIR) && python3 tools/binman/binman \
+		--toolpath $(STAGING_DIR_HOST)/bin \
+		-D arch/arm/dts/rk3528-hinlink-h29k.dtb \
+		-a bl31=$(STAGING_DIR_IMAGE)/$(ATF) \
+		-a rockchip-tpl=$(STAGING_DIR_IMAGE)/$(TPL) \
+		build u-boot-rockchip.bin \
+		>> $(PKG_BUILD_DIR)/binman_diag.log 2>&1 || true
+
+	@echo "========== [DIAG] Full log below =========="
+	@cat $(PKG_BUILD_DIR)/binman_diag.log
+endef
+
+# 将诊断钩子挂载到 U-Boot 编译步骤之前
+# 注意：这里复用了你 Makefile 中已定义的 $(ATF) 和 $(TPL) 变量
+HOOKS_TARGET := U-Boot/Compile/Pre
+$(eval $(call Build/U-Boot/DiagnoseBinman))
+# ===== END BINMAN DIAGNOSTICS HOOK =====
 
 $(eval $(call BuildPackage/U-Boot))
