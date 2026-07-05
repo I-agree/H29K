@@ -1,0 +1,5 @@
+--- a/Makefile
++++ b/Makefile
+@@ -1627,1 +1627,1 @@
+-		-a rockchip-tpl-path=$(ROCKCHIP_TPL) \
++		$(if $(strip $(ROCKCHIP_TPL)),-a rockchip-tpl-path=$(ROCKCHIP_TPL)) \
