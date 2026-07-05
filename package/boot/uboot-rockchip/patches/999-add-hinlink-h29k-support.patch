@@ -734,8 +734,8 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 +CONFIG_RANDOM=y
 +CONFIG_SPL_RANDOM=y
 +
-+# ===== 倒计时一秒钟 =====
-+CONFIG_BOOTDELAY=1
++# ===== 倒计时0秒钟 =====
++CONFIG_BOOTDELAY=0
 --- /dev/null
 +++ b/dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts
 @@ -0,0 +1,502 @@
