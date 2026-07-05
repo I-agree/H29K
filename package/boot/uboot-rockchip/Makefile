@@ -30,6 +30,7 @@ define U-Boot/rk3528/Default
   DEPENDS:=+PACKAGE_u-boot-$(1):trusted-firmware-a-rk3528
   ATF:=rk3528_bl31_v1.20.elf
   TPL:=rk3528_ddr_1056MHz_v1.11.bin
+  CONFIG_ENV_SOURCE_FILE:=h29k
 endef
 
 define U-Boot/hinlink-h29k-rk3528
