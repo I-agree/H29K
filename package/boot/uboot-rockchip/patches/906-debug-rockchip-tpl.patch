@@ -1,6 +1,6 @@
 --- a/tools/binman/etype/rockchip_tpl.py
 +++ b/tools/binman/etype/rockchip_tpl.py
-@@ -17,6 +17,13 @@
+@@ -8,9 +8,17 @@
  class Entry_rockchip_tpl(Entry_blob_named_by_arg):
      def __init__(self, section, etype, node):
          super().__init__(section, etype, node, 'rockchip-tpl')
@@ -8,7 +8,6 @@
 +        from u_boot_pylib import tout
 +        tout.info(f"[DEBUG rockchip-tpl __init__ after super] self._filename = {repr(self._filename)}, type={type(self._filename)}")
          self.external = True
-+        # 兜底修复
 +        if self._filename is None:
 +            tout.warning("[DEBUG rockchip-tpl] Fix self._filename None -> empty string")
 +            self._filename = ""
