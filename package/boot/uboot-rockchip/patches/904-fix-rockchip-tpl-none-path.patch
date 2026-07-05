@@ -6,4 +6,4 @@
          self.external = True
 +    def ObtainArgs(self):
 +        super().ObtainArgs()
-+        self._pathname = self._pathname or ""
++        self._filename = self._filename or ""
