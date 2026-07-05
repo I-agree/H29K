@@ -73,8 +73,6 @@ download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/li
 download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/900-fix-mb-missing-header.patch" "package/boot/uboot-rockchip/patches/900-fix-mb-missing-header.patch"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch" "package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
 # download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env" "package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env"
@@ -82,7 +80,8 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/901-fix-dwc3
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c" "package/boot/uboot-rockchip/configs/hinlink/h29k/board.c"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/Kconfig"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/997-uboot-rockchip-add-hinlink-h29k-target.patch" "package/boot/uboot-rockchip/patches/997-uboot-rockchip-add-hinlink-h29k-target.patch"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/900-fix-mb-missing-header.patch" "package/boot/uboot-rockchip/patches/900-fix-mb-missing-header.patch"
+download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch" "package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch" "package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch"
 
