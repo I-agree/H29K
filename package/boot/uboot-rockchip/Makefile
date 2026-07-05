@@ -52,14 +52,15 @@ UBOOT_MAKE_FLAGS += \
   $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
 define Build/Compile
-	# 1. 先复用框架内置全局导出逻辑（复刻默认Build/Exports行为）
+	# 复用框架原生全局环境导出，补齐PATH/PKG_CONFIG/STAGING路径
 	$(call Build/Exports,$(STAMP_BUILT)); \
-	# 2. 额外导出RK所需ATF/TPL全局shell环境（解决子Make丢失变量）
+	# 全局导出ATF固件路径
 	export BL31=$(STAGING_DIR_IMAGE)/$(ATF); \
+	# 存在TPL时再导出，避免空环境变量
 	if [ -n "$(TPL)" ]; then \
 		export ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL); \
 	fi; \
-	# 3. 完整复刻默认编译所有内置参数，一丝不漏
+	# 完整携带全部框架、U-Boot编译参数，对齐原生默认行为
 	$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \
 		$(TARGET_CONFIGURE_OPTS) \
 		$(UBOOT_CONFIGURE_VARS) \
