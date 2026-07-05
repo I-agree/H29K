@@ -51,6 +51,19 @@ UBOOT_MAKE_FLAGS += \
   BL31=$(STAGING_DIR_IMAGE)/$(ATF) \
   $(if $(TPL),ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL))
 
+define Build/Compile
+	# 1. 先复用框架内置全局导出逻辑（复刻默认Build/Exports行为）
+	$(call Build/Exports,$(STAMP_BUILT)); \
+	# 2. 额外导出RK所需ATF/TPL全局shell环境（解决子Make丢失变量）
+	export BL31=$(STAGING_DIR_IMAGE)/$(ATF); \
+	export ROCKCHIP_TPL=$(STAGING_DIR_IMAGE)/$(TPL); \
+	# 3. 完整复刻默认编译所有内置参数，一丝不漏
+	$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \
+		$(TARGET_CONFIGURE_OPTS) \
+		$(UBOOT_CONFIGURE_VARS) \
+		$(UBOOT_MAKE_FLAGS)
+endef
+
 define Build/InstallDev
 	$(INSTALL_DIR) $(STAGING_DIR_IMAGE)
 	$(CP) $(PKG_BUILD_DIR)/u-boot-rockchip.bin $(STAGING_DIR_IMAGE)/$(BUILD_VARIANT)-u-boot-rockchip.bin
