@@ -1,0 +1,9 @@
+--- a/tools/binman/etype/rockchip_tpl.py
++++ b/tools/binman/etype/rockchip_tpl.py
+@@ -18,3 +18,6 @@
+     def __init__(self, section, etype, node):
+         super().__init__(section, etype, node, 'rockchip-tpl')
+         self.external = True
++    def ObtainArgs(self):
++        super().ObtainArgs()
++        self._pathname = self._pathname or ""
