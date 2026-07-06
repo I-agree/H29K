@@ -1,10 +1,12 @@
 --- a/tools/binman/etype/rockchip_tpl.py
 +++ b/tools/binman/etype/rockchip_tpl.py
-@@ -18,3 +18,7 @@
+@@ -18,3 +18,9 @@
      def __init__(self, section, etype, node):
++        fname_arg = "rockchip-tpl-path"
++        filename, = self.GetEntryArgsOrProps([EntryArg(fname_arg, str)])
++        self._hardcoded_tpl_path = filename
          super().__init__(section, etype, node, 'rockchip-tpl')
          self.external = True
-+        self._real_file_path = self._filename
 +
 +    def GetDefaultFilename(self):
-+        return self._real_file_path
++        return self._hardcoded_tpl_path
