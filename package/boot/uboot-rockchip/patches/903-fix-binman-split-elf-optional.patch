@@ -1,0 +1,9 @@
+--- a/tools/binman/etype/fit.py
++++ b/tools/binman/etype/fit.py
+@@ -894,4 +894,6 @@
+                 if not missing_opt_list:
++                    entry.ObtainContents()
++                    entry.Pack(0)
+                     segs = entry.read_elf_segments()
+                     if segs:
+                         segments, entry_addr = segs
