@@ -1,6 +1,6 @@
 --- a/tools/binman/etype/rockchip_tpl.py
 +++ b/tools/binman/etype/rockchip_tpl.py
-@@ -18,3 +18,7 @@
+@@ -18,3 +18,14 @@
      def __init__(self, section, etype, node):
          super().__init__(section, etype, node, 'rockchip-tpl')
          self.external = True
@@ -8,3 +8,10 @@
 +
 +    def GetDefaultFilename(self):
 +        return self._fixed_path
++
++    def ObtainContents(self, fake_size=0):
++        fname = self.GetDefaultFilename()
++        self._pathname = tools.get_input_filename(fname, self.external and (self.optional or self.section.GetAllowMissing()))
++        if self._pathname is None:
++            self._pathname = ""
++        return super().ObtainContents(fake_size)
