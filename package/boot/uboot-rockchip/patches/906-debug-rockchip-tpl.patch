@@ -1,6 +1,11 @@
 --- a/tools/binman/etype/rockchip_tpl.py
 +++ b/tools/binman/etype/rockchip_tpl.py
-@@ -18,3 +18,15 @@
+@@ -6,3 +6,4 @@
+ from binman.etype.blob_named_by_arg import Entry_blob_named_by_arg
++from u_boot_pylib import tools
+ 
+ class Entry_rockchip_tpl(Entry_blob_named_by_arg):
+@@ -18,3 +19,15 @@
      def __init__(self, section, etype, node):
          super().__init__(section, etype, node, 'rockchip-tpl')
          self.external = True
