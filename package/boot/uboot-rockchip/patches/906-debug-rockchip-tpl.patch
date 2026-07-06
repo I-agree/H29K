@@ -5,7 +5,7 @@
 +from u_boot_pylib import tools
  
  class Entry_rockchip_tpl(Entry_blob_named_by_arg):
-@@ -18,3 +19,16 @@
+@@ -18,3 +19,25 @@
      def __init__(self, section, etype, node):
          super().__init__(section, etype, node, 'rockchip-tpl')
          self.external = True
@@ -14,11 +14,20 @@
 +    def GetDefaultFilename(self):
 +        return self._fixed_abs
 +
-+    @property
-+    def _pathname(self):
-+        val = self.__dict__.get('_pathname')
-+        return val if val is not None else ""
++    def ObtainContents(self, fake_size=0) -> bool:
++        self._filename = self.GetDefaultFilename()
++        raw_path = tools.get_input_filename(self._filename, self.external and (self.optional or self.section.GetAllowMissing()))
++        self._pathname = raw_path if raw_path is not None else ""
 +
-+    @_pathname.setter
-+    def _pathname(self, value):
-+        self.__dict__['_pathname'] = value
++        if not self._pathname:
++            self._pathname = self.check_fake_fname(self._filename, fake_size)
++            self.missing = True
++            if self.optional:
++                self.mark_absent("missing but optional")
++            if not self.faked:
++                content_size = self.assume_size or 0
++                self.SetContents(tools.get_bytes(0, content_size))
++                return True
++
++        self.ReadBlobContents()
++        return True
