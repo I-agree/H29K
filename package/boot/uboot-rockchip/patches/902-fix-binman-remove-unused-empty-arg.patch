@@ -1,13 +1,18 @@
 --- a/Makefile
 +++ b/Makefile
-@@ -1620,16 +1620,10 @@
+@@ -1620,16 +1620,16 @@
 -		-a atf-bl1-path=${BL1} \
++		-a atf-bl1-path=$(if $(BL1),$(BL1),/dev/null) \
  		-a atf-bl31-path=${BL31} \
 -		-a tee-os-path=${TEE} \
 -		-a ti-dm-path=${TI_DM} \
 -		-a opensbi-path=${OPENSBI} \
++		-a tee-os-path=$(if $(TEE),$(TEE),/dev/null) \
++		-a ti-dm-path=$(if $(TI_DM),$(TI_DM),/dev/null) \
++		-a opensbi-path=$(if $(OPENSBI),$(OPENSBI),/dev/null) \
  		-a default-dt=$(default_dt) \
 -		-a scp-path=$(SCP) \
++		-a scp-path=$(if $(SCP),$(SCP),/dev/null) \
  		-a rockchip-tpl-path=$(ROCKCHIP_TPL) \
  		-a spl-bss-pad=$(if $(CONFIG_SPL_SEPARATE_BSS),,1) \
  		-a tpl-bss-pad=$(if $(CONFIG_TPL_SEPARATE_BSS),,1) \
@@ -16,4 +21,5 @@
  		-a tpl-dtb=$(CONFIG_TPL_OF_REAL) \
  		-a vpl-dtb=$(CONFIG_VPL_OF_REAL) \
 -		-a pre-load-key-path=${PRE_LOAD_KEY_PATH} \
++		-a pre-load-key-path=$(if $(PRE_LOAD_KEY_PATH),$(PRE_LOAD_KEY_PATH),/dev/null) \
  		-a of-spl-remove-props=$(CONFIG_OF_SPL_REMOVE_PROPS) \
