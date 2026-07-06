@@ -1,21 +1,9 @@
 --- a/tools/binman/etype/rockchip_tpl.py
 +++ b/tools/binman/etype/rockchip_tpl.py
-@@ -18,3 +18,18 @@
+@@ -18,3 +18,6 @@
      def __init__(self, section, etype, node):
++        Entry_blob_named_by_arg.__init__(self, section, etype, node, 'rockchip-tpl')
++        real_tpl_path = self._filename
          super().__init__(section, etype, node, 'rockchip-tpl')
++        self._filename = real_tpl_path
          self.external = True
-+        from u_boot_pylib import tout
-+        tout.info("[ROCKCHIP_TPL DEBUG __init__] self._filename = %r, type=%s" % (self._filename, type(self._filename)))
-+        if self._filename is None:
-+            tout.warning("[ROCKCHIP_TPL DEBUG __init__] Found None filename, set to empty string")
-+            self._filename = ""
-+
-+    def GetDefaultFilename(self):
-+        raw_fname = super().GetDefaultFilename()
-+        from u_boot_pylib import tout
-+        tout.info("[ROCKCHIP_TPL DEBUG GetDefaultFilename] raw return = %r" % raw_fname)
-+        if raw_fname is None:
-+            tout.warning("[ROCKCHIP_TPL DEBUG GetDefaultFilename] raw filename is None, replace with empty str")
-+            return ""
-+        tout.info("[ROCKCHIP_TPL DEBUG GetDefaultFilename] final return = %r" % raw_fname)
-+        return raw_fname
