@@ -1,6 +1,19 @@
 --- a/tools/binman/etype/rockchip_tpl.py
 +++ b/tools/binman/etype/rockchip_tpl.py
-@@ -18,3 +18,9 @@
+@@ -6,15 +6,22 @@
+ from binman.etype.blob_named_by_arg import Entry_blob_named_by_arg
++from binman.entry import EntryArg
+
+ class Entry_rockchip_tpl(Entry_blob_named_by_arg):
+     """Rockchip TPL binary
+
+     Properties / Entry arguments:
+         - rockchip-tpl-path: Filename of file to read into the entry,
+                              typically <soc>_ddr_<version>.bin
+
+     This entry holds an external TPL binary used by some Rockchip SoCs
+     instead of normal U-Boot TPL, typically to initialize DRAM.
+     """
      def __init__(self, section, etype, node):
 +        fname_arg = "rockchip-tpl-path"
 +        filename, = self.GetEntryArgsOrProps([EntryArg(fname_arg, str)])
