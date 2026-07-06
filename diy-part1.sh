@@ -86,7 +86,7 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/903-binman-s
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/904-fix-rockchip-tpl-none-path.patch" "package/boot/uboot-rockchip/patches/904-fix-rockchip-tpl-none-path.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch" "package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/905-debug-blob-obtain.patch" "package/boot/uboot-rockchip/patches/905-debug-blob-obtain.patch"
+# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/905-debug-blob-obtain.patch" "package/boot/uboot-rockchip/patches/905-debug-blob-obtain.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/906-debug-rockchip-tpl.patch" "package/boot/uboot-rockchip/patches/906-debug-rockchip-tpl.patch"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
