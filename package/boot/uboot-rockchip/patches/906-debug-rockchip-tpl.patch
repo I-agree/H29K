@@ -1,6 +1,11 @@
 --- a/tools/binman/etype/rockchip_tpl.py
 +++ b/tools/binman/etype/rockchip_tpl.py
-@@ -6,15 +6,22 @@
+@@ -1,20 +1,30 @@
+ # SPDX-License-Identifier: GPL-2.0+
+ #
+ # Entry-type module for Rockchip TPL binary
++import os
+
  from binman.etype.blob_named_by_arg import Entry_blob_named_by_arg
 +from binman.entry import EntryArg
 
@@ -15,9 +20,12 @@
      instead of normal U-Boot TPL, typically to initialize DRAM.
      """
      def __init__(self, section, etype, node):
++        self._hardcoded_tpl_path = os.environ.get("ROCKCHIP_TPL")
 +        fname_arg = "rockchip-tpl-path"
-+        filename, = self.GetEntryArgsOrProps([EntryArg(fname_arg, str)])
-+        self._hardcoded_tpl_path = filename
++        filename, = self.GetEntryArgsOrProps([EntryArg(fname_arg, str)], required=False)
++        if filename:
++            self._hardcoded_tpl_path = filename
++
          super().__init__(section, etype, node, 'rockchip-tpl')
          self.external = True
 +
