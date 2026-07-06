@@ -4,7 +4,7 @@
      def __init__(self, section, etype, node):
          super().__init__(section, etype, node, 'rockchip-tpl')
          self.external = True
-+        self._fixed_path = self._filename
++        self._fixed_path = self._filename if self._filename is not None else self.etype
 +
 +    def GetDefaultFilename(self):
 +        return self._fixed_path
