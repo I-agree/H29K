@@ -719,3 +719,23 @@ CONFIG_SPL_RANDOM=y
 
 # ===== 倒计时0秒钟 =====
 CONFIG_BOOTDELAY=0
+
+# VPL完全禁用
+# CONFIG_VPL is not set
+# CONFIG_VPL_CLK is not set
+# CONFIG_VPL_DM is not set
+# CONFIG_VPL_OF_CONTROL is not set
+# EFI/FWU固件更新关闭
+# CONFIG_FWU is not set
+# CONFIG_EFI_LOADER is not set
+# CONFIG_EFI_PARTITION 仅保留分区解析，关闭启动相关
+# CONFIG_FIT_SIGNATURE is not set
+# TEE/OPTEE全套禁用
+# CONFIG_SPL_OPTEE_IMAGE is not set
+# 多余以太网PHY驱动全部关闭
+# CONFIG_DM_PHY is not set
+# 调试打印精简
+# CONFIG_DISPLAY_CPUINFO is not set
+# CONFIG_TRACE is not set
+# 强制关闭BOOTSTD
+# CONFIG_BOOTSTD is not set
