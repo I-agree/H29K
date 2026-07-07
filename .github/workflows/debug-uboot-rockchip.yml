@@ -170,26 +170,36 @@ jobs:
           cp "${UBOOT_BUILD_TMP}/tools/binman" $GITHUB_WORKSPACE/
           chmod +x $GITHUB_WORKSPACE/binman
           echo "BINMAN_PATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
+          # 新增：显式验证备份后的 binman 是否可执行
+          test -x "$GITHUB_WORKSPACE/binman" && echo "✅ binman 备份成功且可执行" || echo "❌ binman 备份后不可执行"
+        else
+          echo "❌ 未找到 binman 工具，无法备份"
         fi
       continue-on-error: true
 
     - name: Binman 解析一体化固件分段
       if: env.UBOOT_BIN_PATH != ''
       run: |
-        cd ${{ env.WORK_DIR }}/openwrt
+        # 使用 GITHUB_WORKSPACE 预定义变量，避免环境变量传递延迟
+        BINMAN_TOOL="$GITHUB_WORKSPACE/binman"
         BIN_PATH="${{ env.UBOOT_BIN_PATH }}"
-        export PATH="${{ env.BINMAN_PATH }}:$PATH"
 
-        if ! command -v binman &> /dev/null; then
-          echo "❌ 错误：未找到 binman 工具，请确认 uboot-rockchip 编译成功"
-          ls -lh ${{ env.BINMAN_PATH }}/
+        # 显式检查 binman 是否存在且可执行
+        if [ ! -f "$BINMAN_TOOL" ]; then
+          echo "❌ 错误：binman 工具未找到！预期路径：$BINMAN_TOOL"
+          ls -la "$GITHUB_WORKSPACE"/ || true
           exit 1
         fi
+        if [ ! -x "$BINMAN_TOOL" ]; then
+          echo "⚠️ 警告：binman 不可执行，尝试修复权限..."
+          chmod +x "$BINMAN_TOOL" || { echo "权限修复失败"; exit 1; }
+        fi
 
+        echo "✅ 使用 binman 工具：$(realpath "$BINMAN_TOOL")"
         echo "=================================================="
         echo "binman ls 完整分段清单 | 固件: $BIN_PATH"
         echo "=================================================="
-        binman ls "$BIN_PATH" 2>&1 | tee binman-segments.log
+        "$BINMAN_TOOL" ls "$BIN_PATH" 2>&1 | tee binman-segments.log
         
         echo -e "\n=================================================="
         echo 十六进制头部预览(前1024字节魔数校验)
@@ -218,7 +228,7 @@ jobs:
           ${{ env.WORK_DIR }}/openwrt/uboot-rockchip-full.log
           ${{ env.WORK_DIR }}/openwrt/binman-segments.log
           ${{ env.UBOOT_BIN_NAME }}
-          ${{ env.BINMAN_PATH }}/binman
+          ${{ github.workspace }}/binman
 
     - name: 清理历史工作流运行记录
       uses: Mattraks/delete-workflow-runs@v2.1.0
