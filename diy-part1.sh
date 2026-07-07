@@ -74,7 +74,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/ro
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
-# download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
+download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env" "package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile" "package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig"
