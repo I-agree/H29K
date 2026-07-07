@@ -164,56 +164,6 @@ jobs:
         echo -e "\n>>> 最终一体化固件输出记录:"
         grep -E "u-boot-rockchip\.bin|Writing.*u-boot-rockchip" uboot-rockchip-full.log || echo "未找到一体化BIN生成记录"
 
-        # 关键修复：编译结束立刻备份 binman 到工作区，防止被OpenWrt清理
-        UBOOT_BUILD_TMP=$(find build_dir/target-* -name "u-boot-2025.10" -type d | head -n1)
-        if [ -f "${UBOOT_BUILD_TMP}/tools/binman" ]; then
-          cp "${UBOOT_BUILD_TMP}/tools/binman" $GITHUB_WORKSPACE/
-          chmod +x $GITHUB_WORKSPACE/binman
-          echo "BINMAN_PATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
-          # 新增：显式验证备份后的 binman 是否可执行
-          test -x "$GITHUB_WORKSPACE/binman" && echo "✅ binman 备份成功且可执行" || echo "❌ binman 备份后不可执行"
-        else
-          echo "❌ 未找到 binman 工具，无法备份"
-        fi
-      continue-on-error: true
-
-    - name: Binman 解析一体化固件分段
-      if: env.UBOOT_BIN_PATH != ''
-      run: |
-        # 使用 GITHUB_WORKSPACE 预定义变量，避免环境变量传递延迟
-        BINMAN_TOOL="$GITHUB_WORKSPACE/binman"
-        BIN_PATH="${{ env.UBOOT_BIN_PATH }}"
-
-        # 显式检查 binman 是否存在且可执行
-        if [ ! -f "$BINMAN_TOOL" ]; then
-          echo "❌ 错误：binman 工具未找到！预期路径：$BINMAN_TOOL"
-          ls -la "$GITHUB_WORKSPACE"/ || true
-          exit 1
-        fi
-        if [ ! -x "$BINMAN_TOOL" ]; then
-          echo "⚠️ 警告：binman 不可执行，尝试修复权限..."
-          chmod +x "$BINMAN_TOOL" || { echo "权限修复失败"; exit 1; }
-        fi
-
-        echo "✅ 使用 binman 工具：$(realpath "$BINMAN_TOOL")"
-        echo "=================================================="
-        echo "binman ls 完整分段清单 | 固件: $BIN_PATH"
-        echo "=================================================="
-        "$BINMAN_TOOL" ls "$BIN_PATH" 2>&1 | tee binman-segments.log
-        
-        echo -e "\n=================================================="
-        echo 十六进制头部预览(前1024字节魔数校验)
-        echo "=================================================="
-        xxd -l 1024 "$BIN_PATH"
-        
-        echo -e "\n=================================================="
-        echo 文件大小与文件类型校验
-        echo "=================================================="
-        ls -lh "$BIN_PATH"
-        file "$BIN_PATH"
-        
-        cp binman-segments.log $GITHUB_WORKSPACE/
-
     - name: 检查磁盘空间
       if: always()
       run: df -hT
