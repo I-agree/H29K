@@ -1,14 +1,12 @@
 --- a/tools/binman/etype/fit.py
 +++ b/tools/binman/etype/fit.py
-@@ -884,7 +884,9 @@
-                 # Entry_section.ObtainContents() either returns True or
-                 # raises an exception.
+@@ -886,1 +886,5 @@
                  missing_opt_list = []
 +                entry.CheckMissing(missing_opt_list)
 +                entry.CheckOptional(missing_opt_list)
 +                if missing_opt_list:
 +                    continue
-                 entry.ObtainContents()
+@@ -888,3 +891,1 @@
                  entry.Pack(0)
 -                entry.CheckMissing(missing_opt_list)
 -                entry.CheckOptional(missing_opt_list)
