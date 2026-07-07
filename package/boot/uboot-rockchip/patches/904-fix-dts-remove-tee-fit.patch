@@ -1,0 +1,27 @@
+--- a/arch/arm/dts/rockchip-u-boot.dtsi
++++ b/arch/arm/dts/rockchip-u-boot.dtsi
+@@ -95,24 +95,4 @@
+ #endif
+ 			};
+-			@tee-SEQ {
+-				fit,operation = "split-elf";
+-				description = "TEE";
+-				type = "tee";
+-				arch = FIT_ARCH;
+-				os = "tee";
+-				compression = "none";
+-				fit,load;
+-				fit,entry;
+-				fit,data;
+-
+-				tee-os {
+-					optional;
+-				};
+-#ifdef FIT_HASH_ALGO
+-				hash {
+-					algo = FIT_HASH_ALGO;
+-				};
+-#endif
+-			};
+ #else /* !CONFIG_ARM64 */
+ 			op-tee {
