@@ -14,7 +14,7 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
-@@ -0,0 +1,739 @@
+@@ -0,0 +1,740 @@
 +# Hinlink H29K (RK3528) U-Boot defconfig
 +# OpenWrt 25.12 + Linux 6.12 + h29k.env
 +
