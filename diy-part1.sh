@@ -84,7 +84,7 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/900-fix-mb-m
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch" "package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/902-fix-binman-remove-unused-empty-arg.patch" "package/boot/uboot-rockchip/patches/902-fix-binman-remove-unused-empty-arg.patch"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/904-fix-dts-remove-tee-fit.patch" "package/boot/uboot-rockchip/patches/904-fix-dts-remove-tee-fit.patch"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch" "package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch"
+# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch" "package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
