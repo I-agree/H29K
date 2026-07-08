@@ -8,9 +8,9 @@ RK3528 SoC. Add support for the HINLINK H29K board.
 
 Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 ---
- configs/hinlink-h29k-rk3528_defconfig           | 739 ++++++++++++++++++++++++
+ configs/hinlink-h29k-rk3528_defconfig           | 740 ++++++++++++++++++++++++
  dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts | 502 +++++++++++++++++++
- 2 files changed, 1241 insertions(+)
+ 2 files changed, 1242 insertions(+)
 
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
