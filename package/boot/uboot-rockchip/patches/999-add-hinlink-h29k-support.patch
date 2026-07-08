@@ -666,6 +666,7 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 +CONFIG_CMD_GO=y
 +CONFIG_CMD_IMINFO=y
 +CONFIG_CMD_XIMG=y
++CONFIG_CMD_TEST=y
 +
 +# ===== 基础调试命令 =====
 +CONFIG_CMD_ECHO=y
