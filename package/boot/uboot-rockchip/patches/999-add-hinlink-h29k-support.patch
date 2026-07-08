@@ -746,7 +746,7 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 +# CONFIG_EFI_LOADER is not set
 +# CONFIG_EFI_PARTITION 仅保留分区解析，关闭启动相关
 +# CONFIG_FIT_SIGNATURE is not set
-# CONFIG_SPL_FIT_SIGNATURE is not set
++# CONFIG_SPL_FIT_SIGNATURE is not set
 +# TEE/OPTEE全套禁用
 +# CONFIG_SPL_OPTEE_IMAGE is not set
 +# 多余以太网PHY驱动全部关闭
