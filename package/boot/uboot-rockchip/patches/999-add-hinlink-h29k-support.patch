@@ -8,13 +8,13 @@ RK3528 SoC. Add support for the HINLINK H29K board.
 
 Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 ---
- configs/hinlink-h29k-rk3528_defconfig           | 721 ++++++++++++++++++++++++
+ configs/hinlink-h29k-rk3528_defconfig           | 742 ++++++++++++++++++++++++
  dts/upstream/src/arm64/rockchip/rk3528-hinlink-h29k.dts | 502 +++++++++++++++++++
- 2 files changed, 1223 insertions(+)
+ 2 files changed, 1244 insertions(+)
 
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
-@@ -0,0 +1,741 @@
+@@ -0,0 +1,742 @@
 +# Hinlink H29K (RK3528) U-Boot defconfig
 +# OpenWrt 25.12 + Linux 6.12 + h29k.env
 +
@@ -106,6 +106,7 @@ Signed-off-by: aaa aaa <aaaaaaa@aaa.edu.cn>
 +CONFIG_SPL_LIBCOMMON_SUPPORT=y
 +CONFIG_SPL_LIBGENERIC_SUPPORT=y
 +# CONFIG_SPL_RAW_IMAGE_SUPPORT is not set
++CONFIG_BINMAN_DTB="arch/arm/dts/rockchip-u-boot.dtsi"
 +
 +# ===== 基础总线外设驱动 =====
 +CONFIG_PINCTRL=y
