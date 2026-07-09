@@ -185,7 +185,7 @@ define U-Boot/generic-rk3528
   $(U-Boot/rk3528/Default)
   NAME:=GENERIC RK3528
   BUILD_DEVICES:= \
-    hinlink_h29k \
+    hinlink_h29k
 endef
 
 define U-Boot/hinlink-h28k-rk3528
