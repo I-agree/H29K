@@ -49,11 +49,11 @@ if [ -f "$REAL_AIC_MAKEFILE" ]; then
     if curl -sSL --connect-timeout 8 --retry 3 \
       "https://raw.githubusercontent.com/I-agree/H29K/main/package/kernel/aic8800/Makefile" > "$TMP_AIC_MAKEFILE"; then
       
-        if [ -s "$TMP_AIC_MAKEFILE" ] && grep -q "-DBUILD_OPENWRT -Wno-missing-prototypes" "$TMP_AIC_MAKEFILE"; then
+        if [ -s "$TMP_AIC_MAKEFILE" ] && grep -q "QUILT:=1" "$TMP_AIC_MAKEFILE"; then
             mv -f "$TMP_AIC_MAKEFILE" "$REAL_AIC_MAKEFILE"
             echo "✅ aic8800 Makefile 覆盖成功！"
         else
-            echo "❌ 校验失败：Makefile 中缺失 -DBUILD_OPENWRT -Wno-missing-prototypes 或文件为空，编译将终止！"
+            echo "❌ 校验失败：Makefile 中缺失 补丁应用代码 或文件为空，编译将终止！"
             rm -f "$TMP_AIC_MAKEFILE"
             exit 1
         fi
