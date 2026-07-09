@@ -87,7 +87,7 @@ NOSTDINC_FLAGS:= \
 	-I$(STAGING_DIR)/usr/include/mac80211/uapi \
 	-include backport/autoconf.h \
 	-include backport/backport.h \
-	-DBUILD_OPENWRT
+	-DBUILD_OPENWRT -Wno-missing-prototypes -Wno-error=missing-prototypes -Wno-expansion-to-defined -Wno-error=expansion-to-defined -Wno-attribute-warning -Wno-error=attribute-warning -Wno-unused-function -Wno-error=unused-function -Wno-incompatible-pointer-types -Wno-error=incompatible-pointer-types -Wno-implicit-function-declaration -Wno-error=implicit-function-declaration
 
 define Build/Compile
 
