@@ -7,16 +7,27 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=aic8800
 PKG_RELEASE:=4
 
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/radxa-pkg/aic8800.git
+PKG_SOURCE_DATE:=2026-03-10
 PKG_SOURCE_VERSION:=89f865b80f5f2ba6c0711c560e1d0191e87a1bf0
-PKG_SOURCE:=$(PKG_NAME)-$(PKG_SOURCE_VERSION).tar.gz
-PKG_SOURCE_URL:=https://codeload.github.com/radxa-pkg/$(PKG_NAME)/tar.gz/$(PKG_SOURCE_VERSION)?
-PKG_HASH:=skip
+PKG_MIRROR_HASH:=fb54d2ac13109cf49c1b981424f26e3cc595826f033392284f6b3835a162e069
 
 PKG_CONFIG_DEPENDS:=CONFIG_AIC8800_SDIO_BT_SUPPORT
 PKG_FLAGS:=nonshared
 
+QUILT:=1
+
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
+
+define Build/Prepare
+	$(call Build/Prepare/Default)
+endef
+
+define Build/Patch
+	$(call PatchDir,$(PKG_BUILD_DIR),$(PATCH_DIR))
+endef
 
 define Package/aic8800-firmware/Default
   SECTION:=firmware
