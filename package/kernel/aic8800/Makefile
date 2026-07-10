@@ -22,12 +22,13 @@ include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
 
 define Build/Patch
-	if \[ ! -d "$(PATCH\_DIR)" \] || ! ls $(PATCH\_DIR)/\*.patch >/dev/null 2>&1; then
+	if [ ! -d "$(PATCH_DIR)" ] || ! ls $(PATCH_DIR)/*.patch >/dev/null 2>&1; then
 		echo "ERROR: patches目录不存在或无补丁文件，终止编译！"
 		exit 1
 	fi
 	$(call Build/Patch/Default)
 endef
+
 
 define Package/aic8800-firmware/Default
   SECTION:=firmware
