@@ -40,7 +40,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/usr/bin \
          files/www \
          package/boot/uboot-rockchip/patches \
-         package/boot/uboot-rockchip/BUG66 \
+         package/kernel/aic8800/patches \
          files/usr/share/docker-images
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
@@ -63,24 +63,18 @@ download_and_check() {
 
 # --- 批量下载核心底座组件 ---
 download_and_check "${BASE_URL}/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig" "package/boot/uboot-rockchip/configs/hinlink-h29k-rk3528_defconfig"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
 download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k-u-boot.dtsi"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts" "package/boot/uboot-rockchip/dts/rk3528-hinlink-h29k.dts"
-# download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env" "package/boot/uboot-rockchip/configs/hinlink/h29k/h29k.env"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile" "package/boot/uboot-rockchip/configs/hinlink/h29k/Makefile"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/h29k/Kconfig"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/h29k/board.c" "package/boot/uboot-rockchip/configs/hinlink/h29k/board.c"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/configs/hinlink/Kconfig" "package/boot/uboot-rockchip/configs/hinlink/Kconfig"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/900-fix-mb-missing-header.patch" "package/boot/uboot-rockchip/patches/900-fix-mb-missing-header.patch"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch" "package/boot/uboot-rockchip/patches/901-fix-dwc3-dma-proto.patch"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/902-fix-binman-remove-unused-empty-arg.patch" "package/boot/uboot-rockchip/patches/902-fix-binman-remove-unused-empty-arg.patch"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/904-fix-dts-remove-tee-fit.patch" "package/boot/uboot-rockchip/patches/904-fix-dts-remove-tee-fit.patch"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch" "package/boot/uboot-rockchip/patches/998-add-hinlink-h29k-board-files.patch"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-support.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/Makefile" "package/kernel/aic8800/Makefile"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/010-fix-fall-through.patch" "package/kernel/aic8800/patches/010-fix-fall-through.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/020-wireless-6.16.patch" "package/kernel/aic8800/patches/020-wireless-6.16.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/030-update-firmware-path.patch" "package/kernel/aic8800/patches/030-update-firmware-path.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/040-rename-module.patch" "package/kernel/aic8800/patches/040-rename-module.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/050-log-level.patch" "package/kernel/aic8800/patches/050-log-level.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/060-fix-read-cpuid.patch" "package/kernel/aic8800/patches/060-fix-read-cpuid.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch" "package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
