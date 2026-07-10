@@ -23,10 +23,7 @@ include $(INCLUDE_DIR)/package.mk
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
-endef
-
-define Build/Patch
-	$(call PatchDir,$(PKG_BUILD_DIR),$(PATCH_DIR))
+	cd $(PKG_BUILD_DIR) && $(PATCH) $(PATCH_DIR)/*.patch
 endef
 
 define Package/aic8800-firmware/Default
