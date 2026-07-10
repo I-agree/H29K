@@ -16,25 +16,18 @@ PKG_MIRROR_HASH:=c46b00b6f9fd6ea00089f8ddc519ca9f74ff1ebe0d8f42d700f680db9aebf0e
 PKG_CONFIG_DEPENDS:=CONFIG_AIC8800_SDIO_BT_SUPPORT
 PKG_FLAGS:=nonshared
 
+QUILT:=1
+
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
 
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	if [ ! -d "$(PATCH_DIR)" ]; then
-		echo "ERROR: patches directory missing, abort build!"
+define Build/Patch
+	if \[ ! -d "$(PATCH\_DIR)" \] || ! ls $(PATCH\_DIR)/\*.patch >/dev/null 2>&1; then
+		echo "ERROR: patches目录不存在或无补丁文件，终止编译！"
 		exit 1
 	fi
-	if ! ls $(PATCH_DIR)/*.patch >/dev/null 2>&1; then
-		echo "ERROR: No patch files found in patches folder, abort build!"
-		exit 1
-	fi
-	cd $(PKG_BUILD_DIR) || exit 1
-	for p in $(PATCH_DIR)/*.patch; do
-		echo "Applying patch: $$p"
-		patch -p1 < "$$p" || exit 1
-	done
-end
+	$(call Build/Patch/Default)
+endef
 
 define Package/aic8800-firmware/Default
   SECTION:=firmware
