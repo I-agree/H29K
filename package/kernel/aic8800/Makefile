@@ -27,17 +27,16 @@ define Build/Prepare
 		echo "ERROR: patches directory missing, abort build!"
 		exit 1
 	fi
-	PATCH_LIST=($(PATCH_DIR)/*.patch)
-	if [ ${#PATCH_LIST[@]} -eq 0 ]; then
+	if ! ls $(PATCH_DIR)/*.patch >/dev/null 2>&1; then
 		echo "ERROR: No patch files found in patches folder, abort build!"
 		exit 1
 	fi
-	cd $(PKG_BUILD_DIR)
+	cd $(PKG_BUILD_DIR) || exit 1
 	for p in $(PATCH_DIR)/*.patch; do
 		echo "Applying patch: $$p"
 		patch -p1 < "$$p" || exit 1
 	done
-endef
+end
 
 define Package/aic8800-firmware/Default
   SECTION:=firmware
