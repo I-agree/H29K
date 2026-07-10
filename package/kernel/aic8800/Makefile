@@ -90,13 +90,20 @@ NOSTDINC_FLAGS:= \
 	-DBUILD_OPENWRT
 
 define Build/Compile
-	cd $(PKG_BUILD_DIR) && \
-	for p in '$(PATCH_DIR)/*.patch'; do \
-		if [ -f "$$p" ]; then \
-			echo "==== Applying patch: $$p ===="; \
-			patch -p1 --forward < "$$p" || true; \
-		fi; \
-	done
+	# ====== 强制在编译前打补丁 ======
+	@echo "==== Checking for patches in $(CURDIR)/patches ===="
+	@if [ -d "$(CURDIR)/patches" ]; then \
+		cd $(PKG_BUILD_DIR) && \
+		for p in '$(CURDIR)/patches/*.patch'; do \
+			if [ -f "$$p" ]; then \
+				echo "==== Applying patch: $$p ===="; \
+				patch -p1 --forward < "$$p" || true; \
+			fi; \
+		done; \
+	else \
+		echo "==== No patches directory found ===="; \
+	fi
+	# =================================
 
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-btusb),)
 	+$(KERNEL_MAKE) $(PKG_JOBS) \
