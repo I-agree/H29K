@@ -21,8 +21,12 @@ QUILT:=1
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
 
-define Build/Patch
-	$(call Build/Patch/Default)
+define Kernel/Patch
+	cd $(PKG_BUILD_DIR) && \
+	for p in $(PATCH_DIR)/*.patch; do \
+		echo "Apply patch: $$p"; \
+		patch -p1 < $$p || exit 1; \
+	done
 endef
 
 define Package/aic8800-firmware/Default
