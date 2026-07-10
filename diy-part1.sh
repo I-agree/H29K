@@ -9,9 +9,6 @@ set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终�
 # 添加 QModem 软件源
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 
-# === 2. aic8800无线网卡驱动 ===
-git clone https://github.com/I-agree/aic8800.git package/kernel/aic8800
-
 # === 3. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
