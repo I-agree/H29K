@@ -22,10 +22,10 @@ include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
 
 define Kernel/Patch
-	cd $(PKG_BUILD_DIR) && \
-	for p in $(PATCH_DIR)/*.patch; do \
-		echo "Apply patch: $$p"; \
-		patch -p1 < $$p || exit 1; \
+	cd $(PKG\_BUILD\_DIR) && \\
+	for p in $(PATCH\_DIR)/\*.patch; do \\
+		echo "Applying patch $$p"; \\
+		patch -p1 < $$p || exit 1; \\
 	done
 endef
 
