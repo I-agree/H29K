@@ -15,6 +15,8 @@ PKG_MIRROR_HASH:=c46b00b6f9fd6ea00089f8ddc519ca9f74ff1ebe0d8f42d700f680db9aebf0e
 
 PKG_CONFIG_DEPENDS:=CONFIG_AIC8800_SDIO_BT_SUPPORT
 PKG_FLAGS:=nonshared
+PKG_FILE_DEPENDS += $(wildcard $(CURDIR)/patches/*.patch)
+CONFIG_AUTOREMOVE:=1
 
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
@@ -100,16 +102,16 @@ define Build/Prepare
 	if [ ! -d "$$PATCH_DIR" ]; then \
 		echo "Skip patch: patches folder not exist"; \
 	else \
-		PATCH_LIST=($$(ls -1 "$$PATCH_DIR"/*.patch 2>/dev/null)); \
-		if [ $${#PATCH_LIST[@]} -eq 0 ]; then \
+		found=0; \
+		for patchfile in "$$PATCH_DIR"/*.patch; do \
+			[ -f "$$patchfile" ] || continue; \
+			found=1; \
+			echo "Apply patch file: $$patchfile"; \
+			cd "$(PKG_BUILD_DIR)" && patch -p1 --forward -N < "$$patchfile" || echo "Warning: $$patchfile already applied"; \
+		done; \
+		if [ "$$found" -eq 0 ]; then \
 			echo "Skip patch: no *.patch files found"; \
 		else \
-			echo "Found $${#PATCH_LIST[@]} patch files, start apply"; \
-			cd "$(PKG_BUILD_DIR)"; \
-			for patchfile in "$${PATCH_LIST[@]}"; do \
-				echo "Apply patch file: $$patchfile"; \
-				patch -p1 --forward -N < "$$patchfile" || echo "Warning: $$patchfile already applied"; \
-			done; \
 			echo "All patches applied finished"; \
 		fi; \
 	fi
@@ -117,7 +119,6 @@ define Build/Prepare
 endef
 
 define Build/Compile
-	rm -f $(STAMP_PREPARED)
 
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-btusb),)
 	+$(KERNEL_MAKE) $(PKG_JOBS) \
