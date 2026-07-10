@@ -89,21 +89,21 @@ NOSTDINC_FLAGS:= \
 	-include backport/backport.h \
 	-DBUILD_OPENWRT
 
-define Build/Compile
-	# ====== 强制在编译前打补丁 ======
-	@echo "==== Checking for patches in $(CURDIR)/patches ===="
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	@echo "==== Start apply local patches ===="
 	@if [ -d "$(CURDIR)/patches" ]; then \
-		cd $(PKG_BUILD_DIR) && \
+		cd $(PKG_BUILD_DIR); \
+		shopt -s nullglob; \
 		for p in $(CURDIR)/patches/*.patch; do \
-			if [ -f "$$p" ]; then \
-				echo "==== Applying patch: $$p ===="; \
-				patch -p1 --forward < "$$p" || true; \
-			fi; \
+			echo "Apply patch: $$p"; \
+			patch -p1 --forward < "$$p" || true; \
 		done; \
-	else \
-		echo "==== No patches directory found ===="; \
+		unset nullglob; \
 	fi
-	# =================================
+endef
+
+define Build/Compile
 
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-btusb),)
 	+$(KERNEL_MAKE) $(PKG_JOBS) \
