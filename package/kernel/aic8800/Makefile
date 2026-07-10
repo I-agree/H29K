@@ -90,20 +90,34 @@ NOSTDINC_FLAGS:= \
 	-DBUILD_OPENWRT
 
 define Build/Prepare
-	$(call Build/Prepare/Default)
-	@echo "==== Start apply local patches ===="
-	@if [ -d "$(CURDIR)/patches" ]; then \
-		cd $(PKG_BUILD_DIR); \
-		shopt -s nullglob; \
-		for p in $(CURDIR)/patches/*.patch; do \
-			echo "Apply patch: $$p"; \
-			patch -p1 --forward < "$$p" || true; \
-		done; \
-		unset nullglob; \
+	@echo "========== ENTER CUSTOM Build/Prepare =========="
+	rm -rf "$(PKG_BUILD_DIR)"
+	mkdir -p "$(PKG_BUILD_DIR)"
+	$(PKG_UNPACK)
+
+	PATCH_DIR="$(CURDIR)/patches"; \
+	echo "Patch directory: $$PATCH_DIR"; \
+	if [ ! -d "$$PATCH_DIR" ]; then \
+		echo "Skip patch: patches folder not exist"; \
+	else \
+		PATCH_LIST=($$(ls -1 "$$PATCH_DIR"/*.patch 2>/dev/null)); \
+		if [ $${#PATCH_LIST[@]} -eq 0 ]; then \
+			echo "Skip patch: no *.patch files found"; \
+		else \
+			echo "Found $${#PATCH_LIST[@]} patch files, start apply"; \
+			cd "$(PKG_BUILD_DIR)"; \
+			for patchfile in "$${PATCH_LIST[@]}"; do \
+				echo "Apply patch file: $$patchfile"; \
+				patch -p1 --forward -N < "$$patchfile" || echo "Warning: $$patchfile already applied"; \
+			done; \
+			echo "All patches applied finished"; \
+		fi; \
 	fi
+	@echo "========== LEAVE CUSTOM Build/Prepare =========="
 endef
 
 define Build/Compile
+	rm -f $(STAMP_PREPARED)
 
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-btusb),)
 	+$(KERNEL_MAKE) $(PKG_JOBS) \
