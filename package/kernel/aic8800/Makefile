@@ -16,8 +16,6 @@ PKG_MIRROR_HASH:=c46b00b6f9fd6ea00089f8ddc519ca9f74ff1ebe0d8f42d700f680db9aebf0e
 PKG_CONFIG_DEPENDS:=CONFIG_AIC8800_SDIO_BT_SUPPORT
 PKG_FLAGS:=nonshared
 
-QUILT:=1
-
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
 
