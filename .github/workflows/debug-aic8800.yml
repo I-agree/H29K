@@ -1,7 +1,8 @@
 name: 🚨 Aic8800 专属 Debug 强行逼供脚本
 
 on:
-  workflow_dispatch: # 手动触发
+  repository_dispatch:
+  workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/openwrt/openwrt
@@ -10,31 +11,48 @@ env:
   CONFIG_FILE: rk3528-hinlink-h29k.config
   DIY_P1_SH: diy-part1.sh
   DIY_P2_SH: diy-part2.sh
-  WORK_DIR: /mnt/workdir
-  CCACHE_DIR: /mnt/ccache
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
 
 jobs:
-  debug_build:
+  build:
     runs-on: ubuntu-22.04
+    # 🔥 【强力注入】显式声明工作流 Token 核心权限，踏平所有 403 权限暗礁
+    permissions:
+      contents: write   # 允许创建、修改、删除 GitHub Release 固件
+      actions: write    # 允许清理和删除历史工作流运行记录
 
     steps:
-    - name: 1. 检出本地配置
+    - name: 检出源码
       uses: actions/checkout@v6.0.3
 
-    - name: 2. 初始化高容错大盘环境 (带 Swap 固若金汤)
+    - name: 调整磁盘空间
       run: |
-        sudo mkdir -p $WORK_DIR $CCACHE_DIR /mnt/tmp
-        sudo chown -R $USER:$USER $WORK_DIR $CCACHE_DIR /mnt/tmp
-        sudo mount --bind /mnt/tmp /tmp
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
+        
+        # 🚨 【针对性物理解决 Swap 核心隐患】 🚨
+        echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
         sudo swapoff -a || true
-        sudo dd if=/dev/zero of=/mnt/swapfile bs=1M count=8192
-        sudo chmod 600 /mnt/swapfile
-        sudo mkswap /mnt/swapfile
-        sudo swapon /mnt/swapfile
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
         sudo sysctl vm.swappiness=10
+        echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
+        
+        echo "📊 扩容系统全局 /tmp 至 10G"
+        sudo umount /tmp || true
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "✅ /tmp 扩容至 10GB 完成"
+        
+        echo "📊 检查当前磁盘空间分布："
+        df -h
+        df -i /tmp
         echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
-        echo "CCACHE_DIR=$CCACHE_DIR" >> $GITHUB_ENV
-        echo "TMPDIR=/mnt/tmp" >> $GITHUB_ENV
 
     - name: 初始化构建环境
       env:
@@ -47,7 +65,7 @@ jobs:
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
-
+ 
     - name: 4. 克隆 OpenWrt 主线源码
       run: |
         cd $WORK_DIR
