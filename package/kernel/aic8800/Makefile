@@ -29,7 +29,6 @@ define Build/Patch
 	$(call Build/Patch/Default)
 endef
 
-
 define Package/aic8800-firmware/Default
   SECTION:=firmware
   CATEGORY:=Firmware
