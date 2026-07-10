@@ -49,7 +49,7 @@ if [ -f "$REAL_AIC_MAKEFILE" ]; then
     if curl -sSL --connect-timeout 8 --retry 3 \
       "https://raw.githubusercontent.com/I-agree/H29K/main/package/kernel/aic8800/Makefile" > "$TMP_AIC_MAKEFILE"; then
       
-        if [ -s "$TMP_AIC_MAKEFILE" ] && grep -q "QUILT:=1" "$TMP_AIC_MAKEFILE"; then
+        if [ -s "$TMP_AIC_MAKEFILE" ] && grep -q "PKG_SOURCE_DATE:=2026-03-10" "$TMP_AIC_MAKEFILE"; then
             mv -f "$TMP_AIC_MAKEFILE" "$REAL_AIC_MAKEFILE"
             echo "✅ aic8800 Makefile 覆盖成功！"
         else
