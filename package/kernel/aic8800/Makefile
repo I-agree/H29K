@@ -2,7 +2,6 @@
 #
 # Copyright (c) 2025 ImmortalWrt.org
 
-QUILT:=1
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=aic8800
@@ -19,6 +18,15 @@ PKG_FLAGS:=nonshared
 
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
+
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	cd $(PKG\_BUILD\_DIR) && \\
+	for p in $(PATCH\_DIR)/\*.patch; do \\
+		echo "==== Applying patch $$p ===="; \\
+		patch -p1 < $$p || exit 1; \\
+	done
+endef
 
 define Kernel/Patch
 	cd $(PKG_BUILD_DIR) && \
