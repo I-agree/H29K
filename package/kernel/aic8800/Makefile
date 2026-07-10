@@ -19,15 +19,6 @@ PKG_FLAGS:=nonshared
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
 
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	cd $(PKG_BUILD_DIR) && \
-	for p in $(PATCH_DIR)/*.patch; do \
-		echo "==== Applying patch $$p ===="; \
-		patch -p1 < $$p || exit 1; \
-	done
-endef
-
 define Package/aic8800-firmware/Default
   SECTION:=firmware
   CATEGORY:=Firmware
@@ -99,6 +90,13 @@ NOSTDINC_FLAGS:= \
 	-DBUILD_OPENWRT
 
 define Build/Compile
+	cd $(PKG_BUILD_DIR) && \
+	for p in '$(PATCH_DIR)/*.patch'; do \
+		if [ -f "$$p" ]; then \
+			echo "==== Applying patch: $$p ===="; \
+			patch -p1 --forward < "$$p" || true; \
+		fi; \
+	done
 
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-btusb),)
 	+$(KERNEL_MAKE) $(PKG_JOBS) \
