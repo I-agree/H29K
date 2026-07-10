@@ -94,7 +94,7 @@ define Build/Compile
 	@echo "==== Checking for patches in $(CURDIR)/patches ===="
 	@if [ -d "$(CURDIR)/patches" ]; then \
 		cd $(PKG_BUILD_DIR) && \
-		for p in '$(CURDIR)/patches/*.patch'; do \
+		for p in $(CURDIR)/patches/*.patch; do \
 			if [ -f "$$p" ]; then \
 				echo "==== Applying patch: $$p ===="; \
 				patch -p1 --forward < "$$p" || true; \
