@@ -23,7 +23,14 @@ include $(INCLUDE_DIR)/package.mk
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
-	cd $(PKG_BUILD_DIR) && $(PATCH) $(PATCH_DIR)/*.patch
+	if [ ! -d $(PATCH_DIR) ] || ! ls $(PATCH_DIR)/*.patch 1>/dev/null 2>&1; then
+		echo "ERROR: Missing required patch files, compile aborted!"
+		exit 1
+	fi
+endef
+
+define Build/Patch
+	$(call PatchDir,$(PKG_BUILD_DIR),$(PATCH_DIR))
 endef
 
 define Package/aic8800-firmware/Default
