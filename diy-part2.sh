@@ -36,36 +36,4 @@ fi
 
 # =================================================================================
 
-# =================================================================================
-# 🚨 针对 aic8800 本地 Makefile 的终极补丁（支持 set -e 严格模式）
-# =================================================================================
-REAL_AIC_MAKEFILE="package/kernel/aic8800/Makefile"
-
-if [ -f "$REAL_AIC_MAKEFILE" ]; then
-    echo "📥 侦测到目标组件，正在从自定义仓库强制下载覆盖 aic8800 Makefile..."
-    
-    # 👇 【已加固】先下载到临时文件，校验成功后再覆盖，防止 pipefail 和空文件导致 grep 崩溃
-    TMP_AIC_MAKEFILE=$(mktemp)
-    if curl -sSL --connect-timeout 8 --retry 3 \
-      "https://raw.githubusercontent.com/I-agree/H29K/main/package/kernel/aic8800/Makefile" > "$TMP_AIC_MAKEFILE"; then
-      
-        if [ -s "$TMP_AIC_MAKEFILE" ] && grep -q "PKG_SOURCE_DATE:=2026-03-10" "$TMP_AIC_MAKEFILE"; then
-            mv -f "$TMP_AIC_MAKEFILE" "$REAL_AIC_MAKEFILE"
-            echo "✅ aic8800 Makefile 覆盖成功！"
-        else
-            echo "❌ 校验失败：Makefile 中缺失 补丁应用代码 或文件为空，编译将终止！"
-            rm -f "$TMP_AIC_MAKEFILE"
-            exit 1
-        fi
-    else
-        echo "❌ 下载失败：无法获取 aic8800 Makefile，编译将终止！"
-        rm -f "$TMP_AIC_MAKEFILE"
-        exit 1
-    fi
-else
-    echo "⚠️ 警告：在 $REAL_AIC_MAKEFILE 未找到该组件，请确认源码路径！"
-fi
-
-# =================================================================================
-
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
