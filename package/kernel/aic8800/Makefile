@@ -91,7 +91,6 @@ NOSTDINC_FLAGS:= \
 	-Wno-error=missing-prototypes \
 	-Wno-error=expansion-to-defined \
 	-Wno-error=attribute-warning \
-	-Wno-error=missing-prototypes
 	-Wno-error=unused-function \
 	-Wno-error=incompatible-pointer-types \
 	-Wno-error=implicit-function-declaration
