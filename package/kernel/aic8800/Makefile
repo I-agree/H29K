@@ -26,6 +26,10 @@ define Build/Prepare/Pre
 	rm -rf $(PKG_BUILD_DIR)
 endef
 
+define Build/Prepare/Post
+	[ -d $(PKG_BUILD_DIR)/patches ] && cd $(PKG_BUILD_DIR)/patches && ls -1 *.patch | sort > series
+endef
+
 define Package/aic8800-firmware/Default
   SECTION:=firmware
   CATEGORY:=Firmware
