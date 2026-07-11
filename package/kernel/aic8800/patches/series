@@ -1,0 +1,8 @@
+010-fix-fall-through.patch
+020-wireless-6.16.patch
+030-update-firmware-path.patch
+040-rename-module.patch
+050-log-level.patch
+060-fix-read-cpuid.patch
+070-fix-mips-pc-macro-conflict.patch
+080-fix-export-symbols-conflict.patch
