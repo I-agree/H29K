@@ -22,6 +22,10 @@ include $(INCLUDE_DIR)/package.mk
 QUILT:=1
 PKG_FILE_DEPENDS += $(wildcard $(CURDIR)/patches/*.patch)
 
+define Build/Prepare/Pre
+	rm -rf $(PKG_BUILD_DIR)
+endef
+
 define Package/aic8800-firmware/Default
   SECTION:=firmware
   CATEGORY:=Firmware
