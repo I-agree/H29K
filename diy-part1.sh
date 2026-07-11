@@ -72,6 +72,7 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/050-log-level.pat
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/060-fix-read-cpuid.patch" "package/kernel/aic8800/patches/060-fix-read-cpuid.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch" "package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
