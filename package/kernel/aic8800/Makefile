@@ -90,14 +90,6 @@ NOSTDINC_FLAGS:= \
 	-DBUILD_OPENWRT
 
 define Build/Compile
-	@echo "========== Applying patches from series =========="
-	cd $(PKG_BUILD_DIR) && \
-	while read patchfile; do \
-		[ -z "$$patchfile" ] || [[ "$$patchfile" == \#* ]] && continue; \
-		echo "Applying $$patchfile"; \
-		patch -p1 --no-backup-if-mismatch < $(CURDIR)/patches/$$patchfile; \
-	done < $(CURDIR)/patches/series
-	@echo "========== Patch apply done =========="
 
 ifneq ($(CONFIG_PACKAGE_kmod-aic8800-btusb),)
 	+$(KERNEL_MAKE) $(PKG_JOBS) \
