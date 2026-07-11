@@ -11,12 +11,16 @@ PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/radxa-pkg/aic8800.git
 PKG_SOURCE_DATE:=2026-03-10
 PKG_SOURCE_VERSION:=89f865b80f5f2ba6c0711c560e1d0191e87a1bf0
-PKG_MIRROR_HASH:=c46b00b6f9fd6ea00089f8ddc519ca9f74ff1ebe0d8f42d700f680db9aebf0ec
+PKG_MIRROR_HASH:=fb54d2ac13109cf49c1b981424f26e3cc595826f033392284f6b3835a162e069
 
 PKG_CONFIG_DEPENDS:=CONFIG_AIC8800_SDIO_BT_SUPPORT
 PKG_FLAGS:=nonshared
+QUILT:=1
 PKG_FILE_DEPENDS += $(wildcard $(CURDIR)/patches/*.patch)
-CONFIG_AUTOREMOVE:=1
+
+define Build/Prepare/Pre
+	rm -rf $(PKG_BUILD_DIR)
+endef
 
 include $(INCLUDE_DIR)/kernel.mk
 include $(INCLUDE_DIR)/package.mk
@@ -90,33 +94,6 @@ NOSTDINC_FLAGS:= \
 	-include backport/autoconf.h \
 	-include backport/backport.h \
 	-DBUILD_OPENWRT
-
-define Build/Prepare
-	@echo "========== ENTER CUSTOM Build/Prepare =========="
-	rm -rf "$(PKG_BUILD_DIR)"
-	mkdir -p "$(PKG_BUILD_DIR)"
-	$(PKG_UNPACK)
-
-	PATCH_DIR="$(CURDIR)/patches"; \
-	echo "Patch directory: $$PATCH_DIR"; \
-	if [ ! -d "$$PATCH_DIR" ]; then \
-		echo "Skip patch: patches folder not exist"; \
-	else \
-		found=0; \
-		for patchfile in "$$PATCH_DIR"/*.patch; do \
-			[ -f "$$patchfile" ] || continue; \
-			found=1; \
-			echo "Apply patch file: $$patchfile"; \
-			cd "$(PKG_BUILD_DIR)" && patch -p1 --forward -N < "$$patchfile" || echo "Warning: $$patchfile already applied"; \
-		done; \
-		if [ "$$found" -eq 0 ]; then \
-			echo "Skip patch: no *.patch files found"; \
-		else \
-			echo "All patches applied finished"; \
-		fi; \
-	fi
-	@echo "========== LEAVE CUSTOM Build/Prepare =========="
-endef
 
 define Build/Compile
 
