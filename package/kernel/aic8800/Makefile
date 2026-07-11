@@ -15,15 +15,16 @@ PKG_MIRROR_HASH:=fb54d2ac13109cf49c1b981424f26e3cc595826f033392284f6b3835a162e06
 
 PKG_CONFIG_DEPENDS:=CONFIG_AIC8800_SDIO_BT_SUPPORT
 PKG_FLAGS:=nonshared
+
+include $(INCLUDE_DIR)/kernel.mk
+include $(INCLUDE_DIR)/package.mk
+
 QUILT:=1
 PKG_FILE_DEPENDS += $(wildcard $(CURDIR)/patches/*.patch)
 
 define Build/Prepare/Pre
 	rm -rf $(PKG_BUILD_DIR)
 endef
-
-include $(INCLUDE_DIR)/kernel.mk
-include $(INCLUDE_DIR)/package.mk
 
 define Package/aic8800-firmware/Default
   SECTION:=firmware
