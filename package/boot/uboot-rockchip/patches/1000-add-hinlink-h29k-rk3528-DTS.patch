@@ -5,9 +5,9 @@
 +
 +#include "rk3528.dtsi"
 +
-#ifdef CONFIG\_SPL\_BUILD
-#include "rk3528-u-boot.dtsi"
-#endif
++#ifdef CONFIG_SPL_BUILD
++#include "rk3528-u-boot.dtsi"
++#endif
 +
 +/ {
 +	interrupt-parent = <0x01>;
@@ -332,6 +332,10 @@
 +		resets = <0x0a 0x211>;
 +		reset-names = "usb3-otg";
 +		status = "okay";
++
++		#ifdef CONFIG_SPL_BUILD
++		status = "disabled";
++		#endif
 +	};
 +
 +	interrupt-controller@fed01000 {
@@ -353,6 +357,10 @@
 +		phys = <0x0f>;
 +		phy-names = "usb2-phy";
 +		status = "okay";
++
++		#ifdef CONFIG_SPL_BUILD
++		status = "disabled";
++		#endif
 +	};
 +
 +	usb@ff140000 {
@@ -364,6 +372,10 @@
 +		phys = <0x0f>;
 +		phy-names = "usb2-phy";
 +		status = "okay";
++
++		#ifdef CONFIG_SPL_BUILD
++		status = "disabled";
++		#endif
 +	};
 +
 +	qos@ff200000 {
@@ -628,6 +640,10 @@
 +		status = "okay";
 +		mali-supply = <0x15>;
 +		phandle = <0x36>;
++
++		#ifdef CONFIG_SPL_BUILD
++		status = "disabled";
++		#endif
 +	};
 +
 +	spi@ff9c0000 {
@@ -661,6 +677,18 @@
 +		assigned-clocks = <0x0a 0xbe>;
 +		assigned-clock-rates = <0xbebc200>;
 +		num-cs = <0x01>;
++
++		#ifdef CONFIG_SPL_BUILD
++		panel@0 {
++			status = "disabled";
++		};
++		panel@2 {
++			status = "disabled";
++		};
++		panel@3 {
++			status = "disabled";
++		};
++		#endif
 +
 +		panel@0 {
 +			compatible = "sitronix,gc9307";
@@ -839,6 +867,10 @@
 +		#address-cells = <0x01>;
 +		#size-cells = <0x00>;
 +		status = "okay";
++
++		#ifdef CONFIG_SPL_BUILD
++		status = "disabled";
++		#endif
 +
 +		touchscreen@63 {
 +			compatible = "chipone,axs5106";
@@ -1224,6 +1256,10 @@
 +		snps,reset-active-low;
 +		snps,reset-delays-us = <0x00 0x4e20 0x186a0>;
 +		snps,reset-gpio = <0x25 0x12 0x01>;
++
++		#ifdef CONFIG_SPL_BUILD
++		status = "disabled";
++		#endif
 +
 +		mdio {
 +			compatible = "snps,dwmac-mdio";
