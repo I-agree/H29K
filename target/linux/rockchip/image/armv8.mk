@@ -13,7 +13,7 @@ define Device/hinlink_h29k
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
-  UBOOT_DEVICE_NAME := generic-rk3528
+  UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   KERNEL_LOADADDR := 0x03000000
   IMAGES := factory.img.gz
   IMAGE/factory.img.gz := boot-common | boot-script | pine64-img | gzip | append-metadata
