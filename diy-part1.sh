@@ -61,7 +61,7 @@ download_and_check() {
 # --- 批量下载核心底座组件 ---
 download_and_check "${BASE_URL}/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
-download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/rockchip/Makefile"
+# download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch" "package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch"
@@ -85,7 +85,7 @@ done
 echo "🚀 [diy-part1.sh] 软件源与独立包与配置文件下载圆满完成！"
 
 # ======================== 【H29K 主线内核配置合并注入】 ========================
-CONFIG_FILE="target/linux/rockchip/armv8/config-6.12"
+CONFIG_FILE="target/linux/rockchip/armv8/config-6.18"
 
 echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
 
