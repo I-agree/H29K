@@ -61,7 +61,7 @@ jobs:
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
 
-    - name: 查看编译环境硬件规格 (CPU/内存)
+    - name: 查看编译硬件资源
       run: |
         echo "==================== CPU 核心数 ===================="
         echo "逻辑核心数: $(nproc)"
@@ -69,27 +69,26 @@ jobs:
         echo -e "\n==================== 内存大小 ===================="
         free -h
 
-    - name: 克隆 OpenWrt 源码到磁盘
+    - name: 克隆 OpenWrt 源码
       run: |
         cd $WORK_DIR
-        df -hT $PWD
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 加载自定义软件源
+    - name: 加载自定义 feeds
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd ${{ env.WORK_DIR }}/openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
-    - name: 更新软件源索引
+    - name: 更新 feeds 索引
       run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
 
-    - name: 安装软件源组件
+    - name: 安装 feeds 组件
       run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
 
-    - name: 加载自定义配置文件
+    - name: 加载自定义配置与补丁脚本
       run: |
         if [ -d files ]; then
           mkdir -p ${{ env.WORK_DIR }}/openwrt/files
@@ -109,48 +108,45 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
-    - name: 预编译内核（触发patch自动打全）
-      # 关键：只编译内核部分，不编译完整固件，内核解压+平台patch全部应用完成
+    - name: 内核预处理（解压+全部平台Patch自动应用）
+      id: kernel_prep
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         make defconfig
         make -j$(nproc) target/linux/prepare V=s
-        echo "kernel_prepare_done=true" >> $GITHUB_OUTPUT
+        echo "kernel_prepare_success=true" >> $GITHUB_OUTPUT
 
-    # ====================== 新增：提取打过所有补丁的真实rk3528.dtsi / rk3528-pinctrl.dtsi ======================
-    - name: 提取打全补丁后的RK3528原始DTSI
+    # 提取打完所有补丁的 rk3528.dtsi / rk3528-pinctrl.dtsi
+    - name: 提取RK3528完整补丁DTSI
       id: extract_dtsi
-      if: steps.package.outputs.success == 'true' && steps.extract_dtsi.outputs.kernel_prepare_done == 'true'
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        echo "🔍 定位内核dts目录（已全部应用OpenWrt平台补丁）"
-        # 匹配armv8 rockchip内核目录
-        DTS_ROOT=$(find build_dir/target-*_linux-gnu_armv8/linux-*/arch/arm64/boot/dts/rockchip -maxdepth 1 -type d 2>/dev/null | head -n1)
-        if [ -z "$DTS_ROOT" ]; then
-          echo "❌ 未找到内核DTS目录，内核prepare未完成"
-          touch no_dtsi.log
-          exit 1
-        fi
-        echo "✅ DTS目录路径: $DTS_ROOT"
         mkdir -p dtsi_export
+        echo "===== 开始搜索内核DTS目录 ====="
+        # 精准匹配rockchip armv8 6.18内核路径
+        DTS_ROOT=$(find build_dir/target-aarch64_generic_musl/linux-rockchip_armv8/linux-*/arch/arm64/boot/dts/rockchip -maxdepth 1 -type d 2>/dev/null | head -n1)
+        echo "搜索结果 DTS_ROOT: $DTS_ROOT"
 
-        # 复制目标文件
-        cp -v "$DTS_ROOT/rk3528.dtsi" dtsi_export/
-        cp -v "$DTS_ROOT/rk3528-pinctrl.dtsi" dtsi_export/
+        if [ -n "$DTS_ROOT" ] && [ -d "$DTS_ROOT" ]; then
+          echo "✅ 找到补丁后DTS目录，复制文件"
+          cp "$DTS_ROOT/rk3528.dtsi" ./dtsi_export/
+          cp "$DTS_ROOT/rk3528-pinctrl.dtsi" ./dtsi_export/
+          cd dtsi_export
+          sha256sum rk3528.dtsi rk3528-pinctrl.dtsi > dts_checksum.sha256
+          echo "===== 文件列表 ====="
+          ls -lh
+          echo "extract_status=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ 未匹配到内核DTS目录，内核prepare可能失败"
+          echo "DTS_ROOT_NOT_FOUND" > dtsi_export/dts_missing.log
+          echo "extract_status=fail" >> $GITHUB_OUTPUT
+        fi
 
-        # 生成校验哈希
-        cd dtsi_export
-        sha256sum rk3528.dtsi rk3528-pinctrl.dtsi > dtsi_checksum.sha256
-        ls -lh
-        echo "✅ 提取完成，文件为OpenWrt所有patch合并后的真实版本"
-      # ==================================================================================================
-
-    # 制品1：导出补丁后rk3528 dtsi文件
-    - name: 上传RK3528补丁完整DTSI制品
+    # 上传DTSI制品（无论是否找到都上传日志）
+    - name: 上传RK3528补丁DTSI包
       uses: actions/upload-artifact@v7.0.1
-      if: steps.extract_dtsi.outcome == 'success'
       with:
-        name: RK3528-Patched-DTSI-Full
+        name: RK3528-Patched-DTSI-Full-6.18
         path: ${{ env.WORK_DIR }}/openwrt/dtsi_export
         retention-days: 14
 
@@ -158,23 +154,7 @@ jobs:
       if: (!cancelled())
       run: df -hT
 
-    - name: 整理固件
-      id: organize
-      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
-      run: |
-        cd ${{ env.WORK_DIR }}/openwrt/bin/targets/*/*
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: 上传固件制品
-      uses: actions/upload-artifact@v7.0.1
-      if: steps.organize.outputs.status == 'success' && !cancelled()
-      with:
-        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
-
-    - name: 清理旧运行记录
+    - name: 清理历史工作流
       uses: Mattraks/delete-workflow-runs@v2.1.0
       with:
         retain_days: 0
