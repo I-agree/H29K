@@ -106,10 +106,5 @@ CONFIG_TCP_CONG_BBR=y
 # CONFIG_DEFAULT_CUBIC is not set
 CONFIG_DEFAULT_BBR=y
 
-# =================================================================
-# 🔄 解决mac80211警告
-# =================================================================
-CONFIG_CRYPTO_LIB_ARC4=m
-
 EOF
 echo "✅ H29K 内核参数注入完成"
