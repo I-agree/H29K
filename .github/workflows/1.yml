@@ -1,0 +1,181 @@
+name: 提取补丁后RK3528 DTSI
+on:
+  repository_dispatch:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: main
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: true
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+    - name: 检出当前仓库源码
+      uses: actions/checkout@v6.0.3
+
+    - name: 调整磁盘Swap与临时分区
+      run: |
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
+        
+        sudo swapoff -a || true
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        sudo sysctl vm.swappiness=10
+        echo "Swap扩容完成"
+        
+        sudo umount /tmp || true
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "/tmp扩容完成"
+        
+        echo "📊 检查当前磁盘空间分布："
+        df -h
+        df -i /tmp
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+
+    - name: 初始化编译依赖环境
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+
+    - name: 查看编译环境硬件规格 (CPU/内存)
+      run: |
+        echo "==================== CPU 核心数 ===================="
+        echo "逻辑核心数: $(nproc)"
+        cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+        echo -e "\n==================== 内存大小 ===================="
+        free -h
+
+    - name: 克隆 OpenWrt 源码到磁盘
+      run: |
+        cd $WORK_DIR
+        df -hT $PWD
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 加载自定义软件源
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: 更新软件源索引
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
+
+    - name: 安装软件源组件
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
+
+    - name: 加载自定义配置文件
+      run: |
+        if [ -d files ]; then
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+          cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
+        fi
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: 下载源码依赖
+      id: package
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make defconfig
+        for i in {1..3}; do make download -j8 && break || sleep 5; done
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: 预编译内核（触发patch自动打全）
+      # 关键：只编译内核部分，不编译完整固件，内核解压+平台patch全部应用完成
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make defconfig
+        make -j$(nproc) target/linux/prepare V=s
+        echo "kernel_prepare_done=true" >> $GITHUB_OUTPUT
+
+    # ====================== 新增：提取打过所有补丁的真实rk3528.dtsi / rk3528-pinctrl.dtsi ======================
+    - name: 提取打全补丁后的RK3528原始DTSI
+      id: extract_dtsi
+      if: steps.package.outputs.success == 'true' && steps.extract_dtsi.outputs.kernel_prepare_done == 'true'
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo "🔍 定位内核dts目录（已全部应用OpenWrt平台补丁）"
+        # 匹配armv8 rockchip内核目录
+        DTS_ROOT=$(find build_dir/target-*_linux-gnu_armv8/linux-*/arch/arm64/boot/dts/rockchip -maxdepth 1 -type d 2>/dev/null | head -n1)
+        if [ -z "$DTS_ROOT" ]; then
+          echo "❌ 未找到内核DTS目录，内核prepare未完成"
+          touch no_dtsi.log
+          exit 1
+        fi
+        echo "✅ DTS目录路径: $DTS_ROOT"
+        mkdir -p dtsi_export
+
+        # 复制目标文件
+        cp -v "$DTS_ROOT/rk3528.dtsi" dtsi_export/
+        cp -v "$DTS_ROOT/rk3528-pinctrl.dtsi" dtsi_export/
+
+        # 生成校验哈希
+        cd dtsi_export
+        sha256sum rk3528.dtsi rk3528-pinctrl.dtsi > dtsi_checksum.sha256
+        ls -lh
+        echo "✅ 提取完成，文件为OpenWrt所有patch合并后的真实版本"
+      # ==================================================================================================
+
+    # 制品1：导出补丁后rk3528 dtsi文件
+    - name: 上传RK3528补丁完整DTSI制品
+      uses: actions/upload-artifact@v7.0.1
+      if: steps.extract_dtsi.outcome == 'success'
+      with:
+        name: RK3528-Patched-DTSI-Full
+        path: ${{ env.WORK_DIR }}/openwrt/dtsi_export
+        retention-days: 14
+
+    - name: 磁盘空间检查
+      if: (!cancelled())
+      run: df -hT
+
+    - name: 整理固件
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 上传固件制品
+      uses: actions/upload-artifact@v7.0.1
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      with:
+        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}
+
+    - name: 清理旧运行记录
+      uses: Mattraks/delete-workflow-runs@v2.1.0
+      with:
+        retain_days: 0
+        keep_minimum_runs: 2
