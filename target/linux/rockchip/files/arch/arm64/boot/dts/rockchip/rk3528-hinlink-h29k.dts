@@ -1,5 +1,7 @@
 /dts-v1/;
 
+#include "rk3528.dtsi"
+
 / {
 	interrupt-parent = <0x01>;
 	#address-cells = <0x02>;
