@@ -4,7 +4,10 @@
 +/dts-v1/;
 +
 +#include "rk3528.dtsi"
-+#include "rk3528-u-boot.dtsi"
++
+#ifdef CONFIG\_SPL\_BUILD
+#include "rk3528-u-boot.dtsi"
+#endif
 +
 +/ {
 +	interrupt-parent = <0x01>;
