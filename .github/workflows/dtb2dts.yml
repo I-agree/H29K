@@ -1,41 +1,46 @@
 name: Download and Decompile DTB
-
 on:
-  workflow_dispatch: # 允许在网页端手动点击运行
+  workflow_dispatch: # 网页手动触发
 
 jobs:
   decompile:
     runs-on: ubuntu-latest
     steps:
-      - name: 1. 安装 DTC 反编译工具
-        run: sudo apt-get update && sudo apt-get install -y device-tree-compiler
-
-      - name: 2. 从 URL 下载 DTB 文件
+      - name: 1. 更新系统并安装 DTC 设备树工具
         run: |
-          echo "⬇️ 正在从指定网址下载 rockchip.dtb ..."
-          # 使用 curl 下载文件，-L 表示跟随重定向，-o 指定保存的文件名
-          curl -L -o rockchip.dtb "https://raw.githubusercontent.com/I-agree/H29K/main/DTB/rockchip.dtb"
+          sudo apt-get update -y
+          sudo apt-get install -y device-tree-compiler
+          dtc --version # 打印dtc版本，方便排查语法差异
+
+      - name: 2. 下载 rockchip.dtb
+        run: |
+          echo "⬇️ 下载 DTB: https://raw.githubusercontent.com/I-agree/H29K/main/DTB/rockchip.dtb"
+          curl -fL --connect-timeout 10 -o rockchip.dtb "https://raw.githubusercontent.com/I-agree/H29K/main/DTB/rockchip.dtb"
           
-          # 检查文件是否下载成功并打印大小
-          if [ -f "rockchip.dtb" ]; then
-            ls -lh rockchip.dtb
-            echo "✅ 下载完成！"
-          else
-            echo "❌ 下载失败，请检查网址是否正确！"
+          # 校验文件存在+非空
+          if [ ! -f "rockchip.dtb" ] || [ ! -s "rockchip.dtb" ]; then
+            echo "❌ DTB下载失败/文件为空，链接失效或仓库权限问题"
             exit 1
           fi
+          ls -lh rockchip.dtb
+          echo "✅ DTB下载成功"
 
-      - name: 3. 执行反编译 (DTB -> DTS)
+      - name: 3. DTB 反编译输出可读DTS（保留警告，方便定位异常节点）
         run: |
-          echo "☁️ 正在云端反编译 rockchip.dtb ..."
-          # 执行 dtc 反编译命令，忽略警告输出
-          dtc -I dtb -O dts -o rockchip_reversed.dts rockchip.dtb 2>/dev/null || true
-          ls -lh rockchip_reversed.dts
-          echo "✅ 反编译完成！"
+          echo "🔧 开始反编译 DTB -> DTS"
+          # 不屏蔽dtc警告，6.6老dtb的废弃属性会打印出来，后续迁移6.12内核有用
+          dtc -I dtb -O dts --sort rockchip.dtb -o rockchip_reversed_raw.dts
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ 反编译执行出错，DTB文件损坏"
+            exit 1
+          fi
+          ls -lh rockchip_reversed_raw.dts
+          echo "✅ 反编译原始DTS生成完成"
 
-      - name: 4. 上传 DTS 文件供您下载
-        uses: actions/upload-artifact@v4
+      - name: 4. 上传逆向DTS制品
+        uses: actions/upload-artifact@v7.0.1
         with:
-          name: Decompiled-H29K-DTS
-          path: rockchip_reversed.dts
-          retention-days: 7
+          name: H29K-6.6-DTB-Reversed-DTS
+          path: rockchip_reversed_raw.dts
+          retention-days: 14 # 延长保存时间，方便下载
