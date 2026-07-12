@@ -10,7 +10,7 @@ SUBTARGETS:=armv8
 # 👇【关键修复】强制 target/linux/install 等待 tools/squashfs4/install 完成
 HOST_BUILD_DEPENDS += squashfs4/host
 
-KERNEL_PATCHVER:=6.12
+KERNEL_PATCHVER:=6.18
 
 define Target/Description
 	Build firmware image for Rockchip SoC devices.
