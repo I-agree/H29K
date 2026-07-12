@@ -5,10 +5,6 @@
 +
 +#include "rk3528.dtsi"
 +
-+#ifdef CONFIG_SPL_BUILD
-+#include "rk3528-u-boot.dtsi"
-+#endif
-+
 +/ {
 +	interrupt-parent = <0x01>;
 +	#address-cells = <0x02>;
@@ -2213,3 +2209,7 @@
 +		phandle = <0x52>;
 +	};
 +};
++
++#ifdef CONFIG_SPL_BUILD
++#include "rk3528-u-boot.dtsi"
++#endif
