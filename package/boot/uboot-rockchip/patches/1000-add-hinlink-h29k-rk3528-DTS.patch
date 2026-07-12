@@ -1,7 +1,10 @@
 --- /dev/null
 +++ b/arch/arm/dts/rockchip/rk3528-hinlink-h29k.dts
-@@ -0,0 +1,2179 @@
+@@ -0,0 +1,2182 @@
 +/dts-v1/;
++
++#include "rk3528.dtsi"
++#include "rk3528-u-boot.dtsi"
 +
 +/ {
 +	interrupt-parent = <0x01>;
