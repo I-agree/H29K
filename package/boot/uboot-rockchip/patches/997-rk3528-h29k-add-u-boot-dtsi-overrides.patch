@@ -1,5 +1,5 @@
 --- /dev/null
-+++ b/arch/arm/dts/rk3528-hinlink-h29k-u-boot.dtsi
++++ b/arch/arm/dts/rockchip/rk3528-hinlink-h29k-u-boot.dtsi
 @@ -0,0 +1,33 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
