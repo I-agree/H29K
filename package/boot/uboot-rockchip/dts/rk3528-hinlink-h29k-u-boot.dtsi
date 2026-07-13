@@ -20,6 +20,10 @@
     u-boot,dm-pre-reloc;
 };
 
+&uart0 {
+    u-boot,dm-pre-reloc;
+};
+
 &sdhci {
     u-boot,dm-pre-reloc;
 };
@@ -28,6 +32,22 @@
     u-boot,dm-pre-reloc;
 };
 
-&uart0 {
-    u-boot,dm-pre-reloc;
+&gpu {
+    status = "disabled";
+};
+
+&gmac1 {
+    status = "disabled";
+};
+
+&usb_host0_xhci {
+    status = "disabled";
+};
+
+&usb_host0_ehci {
+    status = "disabled";
+};
+
+&usb_host0_ohci {
+    status = "disabled";
 };
