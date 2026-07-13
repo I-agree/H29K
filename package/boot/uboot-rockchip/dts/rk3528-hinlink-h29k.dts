@@ -40,7 +40,6 @@
 		serial7 = &uart7;
 		spi0 = &spi0;
 		spi1 = &spi1;
-		spi2 = &sfc;
 	};
 
 	chosen {
@@ -332,22 +331,6 @@
 	status = "okay";
 };
 
-&sfc {
-	status = "okay";
-};
-
-&pdm {
-	status = "disabled";
-};
-
-&spdif {
-	status = "disabled";
-};
-
-&wdt {
-	status = "disabled";
-};
-
 &uart0 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -383,10 +366,6 @@
 
 &i2c2 { status = "disabled"; }
 &i2c3 { status = "disabled"; }
-&i2c4 { status = "disabled"; }
-&i2c5 { status = "disabled"; }
-&i2c6 { status = "disabled"; }
-&i2c7 { status = "disabled"; }
 
 &spi0 {
 	status = "disabled";
