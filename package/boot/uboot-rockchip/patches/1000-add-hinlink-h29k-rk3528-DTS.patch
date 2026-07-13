@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/arch/arm/dts/rockchip/rk3528-hinlink-h29k.dts
-@@ -0,0 +1,694 @@
+@@ -0,0 +1,637 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
 +/dts-v1/;
@@ -249,63 +249,6 @@
 +		type = "wwan";
 +		power-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_LOW>;
 +		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
-+	};
-+};
-+
-+&cpu_opp_table {
-+	opp-408000000 {
-+		opp-hz = /bits/ 64 <408000000>;
-+		opp-microvolt = <825000 825000 1100000>;
-+		clock-latency-ns = <40000>;
-+		opp-suspend;
-+	};
-+
-+	opp-600000000 {
-+		opp-hz = /bits/ 64 <600000000>;
-+		opp-microvolt = <825000 825000 1100000>;
-+		clock-latency-ns = <40000>;
-+	};
-+
-+	opp-816000000 {
-+		opp-hz = /bits/ 64 <816000000>;
-+		opp-microvolt = <825000 825000 1100000>;
-+		clock-latency-ns = <40000>;
-+	};
-+
-+	opp-1008000000 {
-+		opp-hz = /bits/ 64 <1008000000>;
-+		opp-microvolt = <825000 825000 1100000>;
-+		clock-latency-ns = <40000>;
-+	};
-+
-+	opp-1200000000 {
-+		opp-hz = /bits/ 64 <1200000000>;
-+		opp-microvolt = <825000 825000 1100000>;
-+		clock-latency-ns = <40000>;
-+	};
-+
-+	opp-1416000000 {
-+		opp-hz = /bits/ 64 <1416000000>;
-+		opp-microvolt = <962500 962500 1100000>;
-+		clock-latency-ns = <40000>;
-+	};
-+
-+	opp-1608000000 {
-+		opp-hz = /bits/ 64 <1608000000>;
-+		opp-microvolt = <1012500 1012500 1100000>;
-+		clock-latency-ns = <40000>;
-+	};
-+
-+	opp-1800000000 {
-+		opp-hz = /bits/ 64 <1800000000>;
-+		opp-microvolt = <1062500 1062500 1100000>;
-+		clock-latency-ns = <40000>;
-+	};
-+
-+	opp-2016000000 {
-+		opp-hz = /bits/ 64 <2016000000>;
-+		opp-microvolt = <1100000 1100000 1100000>;
-+		clock-latency-ns = <40000>;
 +	};
 +};
 +
