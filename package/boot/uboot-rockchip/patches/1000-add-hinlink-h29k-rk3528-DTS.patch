@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/arch/arm/dts/rockchip/rk3528-hinlink-h29k.dts
-@@ -0,0 +1,715 @@
+@@ -0,0 +1,717 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
 +/dts-v1/;
@@ -11,6 +11,8 @@
 +#include <dt-bindings/pinctrl/rockchip.h>
 +#include "rk3528.dtsi"
 +#include "rk3528-pinctrl.dtsi"
++#include "rk3528-h29k.dts"
++#include "rk3528-h29k-u-boot.dtsi"
 +
 +/ {
 +	model = "HINLINK H29K";
