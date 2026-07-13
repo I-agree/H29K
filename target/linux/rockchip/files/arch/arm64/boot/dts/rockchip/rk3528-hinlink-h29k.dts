@@ -4,8 +4,10 @@
 
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/input.h>
+#include <dt-bindings/thermal/thermal.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include "rk3528.dtsi"
+#include "rk3528-pinctrl.dtsi"
 
 / {
 	model = "HINLINK H29K";
@@ -163,7 +165,7 @@
 		regulator-max-microvolt = <3300000>;
 		regulator-always-on;
 		regulator-boot-on;
-		gpio = <&gpio4 RK_PB1 GPIO_ACTIVE_LOW>;
+		gpio = <&gpio4 RK_PA1 GPIO_ACTIVE_LOW>;
 		vin-supply = <&vcc_3v3>;
 	};
 
@@ -181,7 +183,7 @@
 		compatible = "pwm-regulator";
 		regulator-name = "vdd_arm";
 		regulator-min-microvolt = <745000>;
-		regulator-max-microvolt = <1200000>;
+		regulator-max-microvolt = <1201000>;
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
@@ -192,8 +194,8 @@
 	vdd_logic: vdd-logic {
 		compatible = "pwm-regulator";
 		regulator-name = "vdd_logic";
-		regulator-min-microvolt = <700000>;
-		regulator-max-microvolt = <1000000>;
+		regulator-min-microvolt = <705000>;
+		regulator-max-microvolt = <1006000>;
 		regulator-always-on;
 		regulator-boot-on;
 		regulator-settling-time-up-us = <250>;
@@ -208,17 +210,17 @@
 
 		modem_4g {
 			label = "red:modem_4g";
-			gpios = <&gpio4 RK_PD0 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio4 RK_PC0 GPIO_ACTIVE_LOW>;
 		};
 
 		modem_5g {
 			label = "blue:modem_5g";
-			gpios = <&gpio4 RK_PB3 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio4 RK_PC3 GPIO_ACTIVE_LOW>;
 		};
 
 		work_led: work {
 			label = "green:work";
-			gpios = <&gpio4 RK_PA7 GPIO_ACTIVE_LOW>;
+			gpios = <&gpio4 RK_PB7 GPIO_ACTIVE_LOW>;
 		};
 	};
 
@@ -233,7 +235,7 @@
 		compatible = "rfkill-gpio";
 		type = "wwan";
 		power-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_LOW>;
-		reset-gpios = <&gpio4 RK_PA4 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
 	};
 };
 
@@ -260,6 +262,36 @@
 	opp-1008000000 {
 		opp-hz = /bits/ 64 <1008000000>;
 		opp-microvolt = <825000 825000 1100000>;
+		clock-latency-ns = <40000>;
+	};
+
+	opp-1200000000 {
+		opp-hz = /bits/ 64 <1200000000>;
+		opp-microvolt = <825000 825000 1100000>;
+		clock-latency-ns = <40000>;
+	};
+
+	opp-1416000000 {
+		opp-hz = /bits/ 64 <1416000000>;
+		opp-microvolt = <962500 962500 1100000>;
+		clock-latency-ns = <40000>;
+	};
+
+	opp-1608000000 {
+		opp-hz = /bits/ 64 <1608000000>;
+		opp-microvolt = <1012500 1012500 1100000>;
+		clock-latency-ns = <40000>;
+	};
+
+	opp-1800000000 {
+		opp-hz = /bits/ 64 <1800000000>;
+		opp-microvolt = <1062500 1062500 1100000>;
+		clock-latency-ns = <40000>;
+	};
+
+	opp-2016000000 {
+		opp-hz = /bits/ 64 <2016000000>;
+		opp-microvolt = <1100000 1100000 1100000>;
 		clock-latency-ns = <40000>;
 	};
 };
@@ -313,8 +345,6 @@
 
 &i2c0 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c0m0_xfer>;
 };
 
 &i2c1 {
@@ -340,46 +370,15 @@
 	};
 };
 
-&i2c2 {
-	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c2m0_xfer>;
-};
-
-&i2c3 {
-	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c3m0_xfer>;
-};
-
-&i2c4 {
-	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c4_xfer>;
-};
-
-&i2c5 {
-	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c5m0_xfer>;
-};
-
-&i2c6 {
-	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c6m0_xfer>;
-};
-
-&i2c7 {
-	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2c7_xfer>;
-};
+&i2c2 { status = "disabled"; }
+&i2c3 { status = "disabled"; }
+&i2c4 { status = "disabled"; }
+&i2c5 { status = "disabled"; }
+&i2c6 { status = "disabled"; }
+&i2c7 { status = "disabled"; }
 
 &spi0 {
 	status = "disabled";
-	pinctrl-names = "default";
-	pinctrl-0 = <&spi0_csn0>, <&spi0_csn1>, <&spi0_pins>;
 };
 
 &spi1 {
@@ -400,11 +399,12 @@
 		rotate = <270>;
 		width = <172>;
 		height = <320>;
-		dc-gpios = <&gpio1 RK_PA4 GPIO_ACTIVE_HIGH>;
+		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		backlight-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
 		power-supply = <&vcc_3v3_lcd>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_dc_pin>;
+		debug = <0>;
 	};
 
 	panel@2 {
@@ -417,11 +417,12 @@
 		rotate = <270>;
 		width = <135>;
 		height = <240>;
-		dc-gpios = <&gpio1 RK_PA4 GPIO_ACTIVE_HIGH>;
+		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		backlight-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_LOW>;
 		power-supply = <&vcc_3v3_lcd>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_dc_pin>;
+		debug = <0>;
 	};
 
 	panel@3 {
@@ -434,19 +435,16 @@
 		rotate = <90>;
 		width = <135>;
 		height = <240>;
-		dc-gpios = <&gpio1 RK_PA4 GPIO_ACTIVE_HIGH>;
+		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		backlight-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_LOW>;
 		power-supply = <&vcc_3v3_lcd>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_dc_pin>;
+		debug = <0>;
 	};
 };
 
-&pwm0 {
-	status = "disabled";
-	pinctrl-names = "active";
-	pinctrl-0 = <&pwm0m0_pins>;
-};
+&pwm0 { status = "disabled"; }
 
 &pwm1 {
 	status = "okay";
@@ -460,37 +458,18 @@
 	pinctrl-0 = <&pwm2m0_pins>;
 };
 
-&pwm3 {
-	status = "disabled";
-	pinctrl-names = "active";
-	pinctrl-0 = <&pwm3m0_pins>;
-};
-
-&pwm4 {
-	status = "disabled";
-	pinctrl-names = "active";
-	pinctrl-0 = <&pwm4m0_pins>;
-};
-
-&pwm5 {
-	status = "disabled";
-	pinctrl-names = "active";
-	pinctrl-0 = <&pwm5m0_pins>;
-};
+&pwm3 { status = "disabled"; }
+&pwm4 { status = "disabled"; }
+&pwm5 { status = "disabled"; }
 
 &pwm6 {
 	status = "okay";
 	pinctrl-names = "default";
 	pinctrl-0 = <&panel_pwm_pin>;
-	assigned-clocks = <&cru CLK_PWM1>;
 	assigned-clock-rates = <100000000>;
 };
 
-&pwm7 {
-	status = "disabled";
-	pinctrl-names = "active";
-	pinctrl-0 = <&pwm7m0_pins>;
-};
+&pwm7 { status = "disabled"; }
 
 &sdhci {
 	status = "okay";
@@ -541,8 +520,6 @@
 
 &gmac0 {
 	status = "disabled";
-	phy-mode = "rmii";
-	clock_in_out = "input";
 };
 
 &gmac1 {
@@ -563,7 +540,7 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		rgmii_phy1: phy@1 {
+		rgmii_phy1: ethernet-phy@1 {
 			compatible = "ethernet-phy-ieee802.3-c22";
 			reg = <1>;
 		};
@@ -612,6 +589,52 @@
 	status = "okay";
 };
 
+&soc_thermal {
+	polling-delay-passive = <20>;
+	polling-delay = <1000>;
+	sustainable-power = <638>;
+	thermal-sensors = <&tsadc 0>;
+
+	trips {
+		threshold: trip-point-0 {
+			temperature = <95000>;
+			hysteresis = <2000>;
+			type = "passive";
+		};
+
+		target: trip-point-1 {
+			temperature = <110000>;
+			hysteresis = <2000>;
+			type = "passive";
+		};
+
+		soc_crit: soc-crit {
+			temperature = <120000>;
+			hysteresis = <2000>;
+			type = "critical";
+		};
+	};
+
+	cooling-maps {
+		map0 {
+			trip = <&target>;
+			cooling-device =
+				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+				<&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+				<&cpu2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
+				<&cpu3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+			contribution = <1024>;
+		};
+
+		map1 {
+			trip = <&target>;
+			cooling-device =
+				<&gpu THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+			contribution = <1024>;
+		};
+	};
+};
+
 &pinctrl {
 	lcd {
 		lcd_backlight_pin: lcd-backlight-pin {
@@ -625,7 +648,7 @@
 		};
 
 		lcd_dc_pin: lcd-dc-pin {
-			rockchip,pins = <1 RK_PA4 RK_FUNC_GPIO &pcfg_pull_up_drv_level_6>;
+			rockchip,pins = <1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up_drv_level_6>;
 		};
 	};
 
@@ -651,15 +674,15 @@
 
 	leds {
 		led_work_en: led-work-en {
-			rockchip,pins = <4 RK_PA7 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <4 RK_PB7 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
 		modem_4g_led: modem_4g_led {
-			rockchip,pins = <4 RK_PD0 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <4 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 
 		modem_5g_led: modem_5g_led {
-			rockchip,pins = <4 RK_PB3 RK_FUNC_GPIO &pcfg_pull_none>;
+			rockchip,pins = <4 RK_PC3 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
 	};
 
