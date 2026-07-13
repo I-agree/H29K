@@ -18,6 +18,7 @@
 		i2c0 = &i2c0;
 		i2c1 = &i2c1;
 		i2c2 = &i2c2;
+		i2c3 = &i2c3;
 		i2c4 = &i2c4;
 		i2c5 = &i2c5;
 		i2c6 = &i2c6;
@@ -363,7 +364,12 @@
 	};
 };
 
-&i2c2 { status = "disabled"; }
+&i2c2 { status = "disabled"; };
+&i2c3 { status = "disabled"; };
+&i2c4 { status = "disabled"; };
+&i2c5 { status = "disabled"; };
+&i2c6 { status = "disabled"; };
+&i2c7 { status = "disabled"; };
 
 &spi0 {
 	status = "disabled";
@@ -432,7 +438,7 @@
 	};
 };
 
-&pwm0 { status = "disabled"; }
+&pwm0 { status = "disabled"; };
 
 &pwm1 {
 	status = "okay";
@@ -446,9 +452,9 @@
 	pinctrl-0 = <&pwm2m0_pins>;
 };
 
-&pwm3 { status = "disabled"; }
-&pwm4 { status = "disabled"; }
-&pwm5 { status = "disabled"; }
+&pwm3 { status = "disabled"; };
+&pwm4 { status = "disabled"; };
+&pwm5 { status = "disabled"; };
 
 &pwm6 {
 	status = "okay";
@@ -457,7 +463,7 @@
 	assigned-clock-rates = <100000000>;
 };
 
-&pwm7 { status = "disabled"; }
+&pwm7 { status = "disabled"; };
 
 &sdhci {
 	status = "okay";
