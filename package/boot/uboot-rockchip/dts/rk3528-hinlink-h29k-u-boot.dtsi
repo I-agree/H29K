@@ -61,3 +61,7 @@
 &soc_thermal {
     status = "disabled";
 };
+
+&rng {
+    status = "disabled";
+};
