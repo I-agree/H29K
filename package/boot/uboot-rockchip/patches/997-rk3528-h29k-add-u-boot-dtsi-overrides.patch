@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/arch/arm/dts/rockchip/rk3528-hinlink-h29k-u-boot.dtsi
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,57 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
 +&spi1 {
@@ -52,5 +52,9 @@
 +};
 +
 +&usb_host0_ohci {
++    status = "disabled";
++};
++
++&sdio0 {
 +    status = "disabled";
 +};
