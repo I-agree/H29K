@@ -1,11 +1,5 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 
-/ {
-    chosen {
-        tick-timer = &timer0; 
-    };
-};
-
 &spi1 {
     status = "disabled";
 };
