@@ -51,3 +51,7 @@
 &usb_host0_ohci {
     status = "disabled";
 };
+
+&sdio0 {
+    status = "disabled";
+};
