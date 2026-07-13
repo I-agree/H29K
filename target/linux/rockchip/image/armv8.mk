@@ -212,7 +212,6 @@ define Device/hinlink_h29k
   $(Device/rk3528)
   DEVICE_VENDOR := HINLINK
   DEVICE_MODEL := H29K
-  DEVICE_ALT0_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
   UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
   DEVICE_PACKAGES := kmod-aic8800-sdio
