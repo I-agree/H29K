@@ -365,7 +365,6 @@
 };
 
 &i2c2 { status = "disabled"; }
-&i2c3 { status = "disabled"; }
 
 &spi0 {
 	status = "disabled";
