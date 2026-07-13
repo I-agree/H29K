@@ -57,3 +57,7 @@
 &sdio0 {
     status = "disabled";
 };
+
+&soc_thermal {
+    status = "disabled";
+};
