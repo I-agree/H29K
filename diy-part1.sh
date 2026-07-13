@@ -63,7 +63,6 @@ download_and_check "${BASE_URL}/target/linux/rockchip/files/arch/arm64/boot/dts/
 download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
 # download_and_check "${BASE_URL}/target/linux/rockchip/Makefile" "target/linux/rockchip/Makefile"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
-download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/996-add-uboot-dts.patch" "package/boot/uboot-rockchip/patches/996-add-uboot-dts.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/997-rk3528-h29k-add-u-boot-dtsi-overrides.patch" "package/boot/uboot-rockchip/patches/997-rk3528-h29k-add-u-boot-dtsi-overrides.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch" "package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch"
