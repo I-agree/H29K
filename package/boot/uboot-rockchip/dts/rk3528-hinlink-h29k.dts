@@ -8,6 +8,8 @@
 #include <dt-bindings/pinctrl/rockchip.h>
 #include "rk3528.dtsi"
 #include "rk3528-pinctrl.dtsi"
+#include "rk3528-h29k.dts"
+#include "rk3528-h29k-u-boot.dtsi"
 
 / {
 	model = "HINLINK H29K";
