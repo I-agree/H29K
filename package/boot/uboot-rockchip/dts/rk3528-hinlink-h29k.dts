@@ -10,8 +10,3 @@
 #include "rk3528-pinctrl.dtsi"
 #include "rk3528-hinlink-kernel-h29k.dts"
 #include "rk3528-h29k-u-boot.dtsi"
-
-/ {
-	model = "HINLINK H29K";
-	compatible = "hinlink,h29k", "rockchip,rk3528";
-};
