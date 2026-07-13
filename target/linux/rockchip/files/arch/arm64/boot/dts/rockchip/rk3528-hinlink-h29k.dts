@@ -40,7 +40,6 @@
 		serial7 = &uart7;
 		spi0 = &spi0;
 		spi1 = &spi1;
-		spi2 = &sfc;
 	};
 
 	chosen {
@@ -330,22 +329,6 @@
 &gpu {
 	mali-supply = <&vdd_logic>;
 	status = "okay";
-};
-
-&sfc {
-	status = "okay";
-};
-
-&pdm {
-	status = "disabled";
-};
-
-&spdif {
-	status = "disabled";
-};
-
-&wdt {
-	status = "disabled";
 };
 
 &uart0 {
