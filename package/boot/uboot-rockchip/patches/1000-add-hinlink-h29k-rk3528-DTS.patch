@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/arch/arm/dts/rockchip/rk3528-hinlink-h29k.dts
-@@ -0,0 +1,698 @@
+@@ -0,0 +1,694 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
 +/dts-v1/;
@@ -369,10 +369,6 @@
 +
 +&i2c2 { status = "disabled"; }
 +&i2c3 { status = "disabled"; }
-+&i2c4 { status = "disabled"; }
-+&i2c5 { status = "disabled"; }
-+&i2c6 { status = "disabled"; }
-+&i2c7 { status = "disabled"; }
 +
 +&spi0 {
 +	status = "disabled";
