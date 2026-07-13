@@ -8,7 +8,7 @@
 #include <dt-bindings/pinctrl/rockchip.h>
 #include "rk3528.dtsi"
 #include "rk3528-pinctrl.dtsi"
-#include "../../../../../../target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
+#include "rk3528-hinlink-kernel-h29k.dts"
 #include "rk3528-h29k-u-boot.dtsi"
 
 / {
