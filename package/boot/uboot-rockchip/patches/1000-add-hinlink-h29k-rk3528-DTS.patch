@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/arch/arm/dts/rockchip/rk3528-hinlink-h29k.dts
-@@ -0,0 +1,558 @@
+@@ -0,0 +1,547 @@
 +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 +
 +/dts-v1/;
@@ -231,17 +231,6 @@
 +		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
 +		pinctrl-names = "default";
 +		pinctrl-0 = <&wifi_enable_h>;
-+	};
-+
-+	rng: rng@ffc50000 {
-+		compatible = "rockchip,rkrng";
-+		reg = <0x0 0xffc50000 0x0 0x200>;
-+		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru 32>;
-+		clock-names = "hclk_trng";
-+		resets = <&cru 163>;
-+		reset-names = "reset";
-+		status = "okay";
 +	};
 +
 +	rfkill_modem: rfkill-modem {
