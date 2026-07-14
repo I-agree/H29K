@@ -93,8 +93,58 @@ echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
 # ========== 第一阶段：sed 原位替换（处理已知确切值的条目）==========
 # 这些条目在原始 config-6.12 中有确定值，sed 可直接精确匹配
 sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
+sed -i 's/^# CONFIG_BLK_DEV_INITRD is not set$/CONFIG_BLK_DEV_INITRD=y/' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
+
+# =================================================================
+# 🔄 补充到内核以支持启动 OpenWrt
+# =================================================================
+CONFIG_TMPFS=y
+CONFIG_PROC_FS=y
+CONFIG_SYSFS=y
+CONFIG_TMPFS_POSIX_ACL=y
+
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_DEVTMPFS_SAFE=y
+# CONFIG_UEVENT_HELPER is not set
+# CONFIG_DEBUG_DRIVER is not set
+# CONFIG_DEBUG_DEVRES is not set
+# CONFIG_ALLOW_DEV_COREDUMP is not set
+
+CONFIG_BLK_DEV=y
+CONFIG_BLK_DEV_RAM=y
+CONFIG_BLK_DEV_RAM_COUNT=16
+# 其余无关块设备全部关闭
+# CONFIG_BLK_DEV_FD is not set
+# CONFIG_BLK_DEV_LOOP is not set
+# CONFIG_BLK_DEV_NBD is not set
+# CONFIG_XEN_BLKDEV_FRONTEND is not set
+# CONFIG_VIRTIO_BLK is not set
+# CONFIG_BLK_DEV_RBD is not set
+
+CONFIG_INITRAMFS_SOURCE=""
+# CONFIG_INITRAMFS_FORCE is not set
+CONFIG_RD_GZIP=y
+# CONFIG_RD_BZIP2 is not set
+# CONFIG_RD_LZMA is not set
+# CONFIG_RD_XZ is not set
+# CONFIG_RD_LZO is not set
+# CONFIG_RD_LZ4 is not set
+# CONFIG_RD_ZSTD is not set
+# CONFIG_INITRAMFS_COMPRESSION_GZIP is not set
+# CONFIG_INITRAMFS_COMPRESSION_BZIP2 is not set
+# CONFIG_INITRAMFS_COMPRESSION_LZMA is not set
+# CONFIG_INITRAMFS_COMPRESSION_XZ is not set
+# CONFIG_INITRAMFS_COMPRESSION_LZO is not set
+# CONFIG_INITRAMFS_COMPRESSION_LZ4 is not set
+# CONFIG_INITRAMFS_COMPRESSION_ZSTD is not set
+# CONFIG_INITRAMFS_COMPRESSION_NONE is not set
+
+CONFIG_BLK_DEV_INITRD=y
+CONFIG_INITRAMFS_PRESERVE_MTIME=y
+# CONFIG_BOOT_CONFIG is not set
 
 # =================================================================
 # 🔄 TCP BBR + FQ
