@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,49 @@
 +# Hinlink H29K (RK3528) U-Boot defconfig
 +# OpenWrt 25.12 + Linux 6.18
 +
@@ -49,9 +49,4 @@
 +# CONFIG_FIT_SIGNATURE is not set
 +# CONFIG_FIT_FULL_CHECK is not set
 +# CONFIG_SPL_FIT_SIGNATURE is not set
-+# CONFIG_BOOTSTD is not set
-+# CONFIG_BOOTSTD_FULL is not set
-+# CONFIG_CMD_BOOTFLOW is not set
-+# CONFIG_EFI_BOOTMGR is not set
-+# CONFIG_EFI_LOADER is not set
 +CONFIG_BOOTCOMMAND="setenv devtype mmc; setenv devnum 0; load mmc 0:1 ${scriptaddr} boot.scr && source ${scriptaddr}"
