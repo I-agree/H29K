@@ -42,23 +42,7 @@
     status = "disabled";
 };
 
-&usb_host0_xhci {
-    status = "disabled";
-};
-
-&usb_host0_ehci {
-    status = "disabled";
-};
-
-&usb_host0_ohci {
-    status = "disabled";
-};
-
 &sdio0 {
-    status = "disabled";
-};
-
-&soc_thermal {
     status = "disabled";
 };
 
