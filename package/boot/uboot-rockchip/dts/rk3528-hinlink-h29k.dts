@@ -484,92 +484,9 @@
 	};
 };
 
-&usb2phy {
-	status = "okay";
-};
-
-&usb2phy_otg {
-	status = "okay";
-	phy-supply = <&vcc5v0_sys>;
-	vbus-supply = <&vcc_3v3>;
-};
-
-&usb2phy_host {
-	status = "okay";
-	phy-supply = <&vcc5v0_sys>;
-	speed = "high";
-};
-
-&usb_host0_xhci {
-	status = "okay";
-	dr_mode = "host";
-};
-
-&usb_host0_ehci {
-	status = "okay";
-};
-
-&usb_host0_ohci {
-	status = "okay";
-};
-
-&combphy {
-	status = "okay";
-};
-
 &saradc {
 	status = "okay";
 	vref-supply = <&vcc_1v8>;
-};
-
-&tsadc {
-	status = "okay";
-};
-
-&soc_thermal {
-	polling-delay-passive = <20>;
-	polling-delay = <1000>;
-	sustainable-power = <638>;
-	thermal-sensors = <&tsadc 0>;
-
-	trips {
-		threshold: trip-point-0 {
-			temperature = <95000>;
-			hysteresis = <2000>;
-			type = "passive";
-		};
-
-		target: trip-point-1 {
-			temperature = <110000>;
-			hysteresis = <2000>;
-			type = "passive";
-		};
-
-		soc_crit: soc-crit {
-			temperature = <120000>;
-			hysteresis = <2000>;
-			type = "critical";
-		};
-	};
-
-	cooling-maps {
-		map0 {
-			trip = <&target>;
-			cooling-device =
-				<&cpu0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-				<&cpu1 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-				<&cpu2 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-				<&cpu3 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-			contribution = <1024>;
-		};
-
-		map1 {
-			trip = <&target>;
-			cooling-device =
-				<&gpu THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-			contribution = <1024>;
-		};
-	};
 };
 
 &pinctrl {
