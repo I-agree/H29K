@@ -46,3 +46,9 @@ CONFIG_BOOTDELAY=0
 # CONFIG_FIT_SIGNATURE is not set
 # CONFIG_FIT_FULL_CHECK is not set
 # CONFIG_SPL_FIT_SIGNATURE is not set
+# CONFIG_BOOTSTD is not set
+# CONFIG_BOOTSTD_FULL is not set
+# CONFIG_CMD_BOOTFLOW is not set
+# CONFIG_EFI_BOOTMGR is not set
+# CONFIG_EFI_LOADER is not set
+CONFIG_BOOTCOMMAND="load mmc 0:1 ${scriptaddr} boot.scr && source ${scriptaddr}"
