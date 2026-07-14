@@ -1,5 +1,5 @@
 # Hinlink H29K (RK3528) U-Boot defconfig
-# OpenWrt 25.12 + Linux 6.12
+# OpenWrt 25.12 + Linux 6.18
 
 CONFIG_ARM=y
 CONFIG_SKIP_LOWLEVEL_INIT=y
