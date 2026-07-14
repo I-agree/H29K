@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
-@@ -0,0 +1,47 @@
+@@ -0,0 +1,45 @@
 +# Hinlink H29K (RK3528) U-Boot defconfig
 +# OpenWrt 25.12 + Linux 6.18
 +
@@ -46,5 +46,3 @@
 +# CONFIG_OF_LIVE is not set
 +CONFIG_DM_REGULATOR_GPIO=y
 +CONFIG_BOOTDELAY=0
-+CONFIG_DM_RNG=y
-+CONFIG_RNG_ROCKCHIP=y
