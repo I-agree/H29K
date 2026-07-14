@@ -121,6 +121,10 @@ CONFIG_BLK_DEV_LOOP=y
 # 其余无关块设备全部关闭
 # CONFIG_BLK_DEV_FD is not set
 # CONFIG_BLK_DEV_NBD is not set
+# CONFIG_BLK_DEV_NULL_BLK is not set
+# CONFIG_ZRAM is not set
+# CONFIG_BLK_DEV_DRBD is not set
+# CONFIG_BLK_DEV_PCIESSD_MTIP32XX is not set
 # CONFIG_XEN_BLKDEV_FRONTEND is not set
 # CONFIG_VIRTIO_BLK is not set
 # CONFIG_BLK_DEV_RBD is not set
