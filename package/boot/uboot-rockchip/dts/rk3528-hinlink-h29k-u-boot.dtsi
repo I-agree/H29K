@@ -45,7 +45,3 @@
 &sdio0 {
     status = "disabled";
 };
-
-&rng {
-    status = "disabled";
-};
