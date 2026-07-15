@@ -163,5 +163,10 @@ CONFIG_TCP_CONG_BBR=y
 # CONFIG_DEFAULT_CUBIC is not set
 CONFIG_DEFAULT_BBR=y
 
+# =================================================================
+# 🔄 硬件加解密
+# =================================================================
+CONFIG_CRYPTO_DEV_ROCKCHIP=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
