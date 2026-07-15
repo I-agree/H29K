@@ -71,13 +71,13 @@
 	};
 
 	rng@ffc50000 {
-		clock-names = "hclk_trng";
-		clocks = <0x06 0x20>;
 		compatible = "rockchip,rkrng";
-		interrupts = <0x00 0x17 0x04>;
 		reg = <0x00 0xffc50000 0x00 0x200>;
-		reset-names = "reset";
+		interrupts = <0x00 0x17 0x04>;
+		clocks = <0x06 0x20>;
+		clock-names = "hclk_trng";
 		resets = <0x0a 0xa3>;
+		reset-names = "reset";
 		status = "okay";
 	};
 
