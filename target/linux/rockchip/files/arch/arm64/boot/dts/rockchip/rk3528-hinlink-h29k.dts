@@ -4,7 +4,6 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/interrupt-controller/arm-gic.h>
-#include <dt-bindings/clock/scmi-clock-rk3528.h>
 #include <dt-bindings/reset/rockchip,rk3528-cru.h>
 
 #include "rk3528.dtsi"
@@ -79,7 +78,7 @@
 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&scmi_clk SCMI_HCLK_TRNG>;
 		clock-names = "hclk_trng";
-		resets = <&cru SRST_HRESETN_TRNG_NS>;
+		clocks = <&cru HCLK_TRNG>;
 		reset-names = "reset";
 		status = "okay";
 	};
