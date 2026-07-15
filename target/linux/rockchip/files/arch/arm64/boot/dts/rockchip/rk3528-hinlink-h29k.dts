@@ -3,6 +3,9 @@
 /dts-v1/;
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/clock/scmi-clock-rk3528.h>
+#include <dt-bindings/reset/rockchip,rk3528-cru.h>
 
 #include "rk3528.dtsi"
 
