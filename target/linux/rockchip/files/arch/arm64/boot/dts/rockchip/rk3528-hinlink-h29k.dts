@@ -78,7 +78,7 @@
 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
 		clocks = <&scmi_clk SCMI_HCLK_TRNG>;
 		clock-names = "hclk_trng";
-		clocks = <&cru HCLK_TRNG>;
+		resets = <&cru SRST_HRESETN_TRNG_NS>;
 		reset-names = "reset";
 		status = "okay";
 	};
