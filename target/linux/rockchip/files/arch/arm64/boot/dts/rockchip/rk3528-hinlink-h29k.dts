@@ -70,6 +70,17 @@
 		reset-gpios = <&gpio1 RK_PA6 GPIO_ACTIVE_LOW>;
 	};
 
+	rng@ffc50000 {
+		clock-names = "hclk_trng";
+		clocks = <0x06 0x20>;
+		compatible = "rockchip,rkrng";
+		interrupts = <0x00 0x17 0x04>;
+		reg = <0x00 0xffc50000 0x00 0x200>;
+		reset-names = "reset";
+		resets = <0x0a 0xa3>;
+		status = "okay";
+	};
+
 	vcc5v0_sys: vcc5v0-sys {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc5v0_sys";
