@@ -73,10 +73,10 @@
 	rng@ffc50000 {
 		compatible = "rockchip,rkrng";
 		reg = <0x0 0xffc50000 0x0 0x200>;
-		interrupts = <0x00 0x17 0x04>;
-		clocks = <0x06 0x20>;
+		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&scmi_clk SCMI_HCLK_TRNG>;
 		clock-names = "hclk_trng";
-		resets = <0x0a 0xa3>;
+		resets = <&cru SRST_HRESETN_TRNG_NS>;
 		reset-names = "reset";
 		status = "okay";
 	};
