@@ -164,9 +164,15 @@ CONFIG_TCP_CONG_BBR=y
 CONFIG_DEFAULT_BBR=y
 
 # =================================================================
-# 🔄 硬件加解密
+# 🔄 加密加速 + 硬件随机
 # =================================================================
+CONFIG_CRYPTO=y
+CONFIG_CRYPTO_HW=y
+CONFIG_ARCH_ROCKCHIP=y
 CONFIG_CRYPTO_DEV_ROCKCHIP=y
+CONFIG_RANDOM=y
+CONFIG_HW_RANDOM=y
+CONFIG_HW_RANDOM_ROCKCHIP=y
 
 EOF
 echo "✅ H29K 内核参数注入完成"
