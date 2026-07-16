@@ -120,13 +120,12 @@
 
 	vcc_3v3_lcd: vcc-3v3-lcd {
 		compatible = "regulator-fixed";
-		enable-active-high;
-		gpio = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
 		regulator-name = "vcc_3v3_lcd";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 		regulator-always-on;
-		vin-supply = <&vcc5v0_sys>;
+		regulator-boot-on;
+		vin-supply = <&vcc_3v3>;
 	};
 
 	vcc3v3_sd: vcc3v3-sd {
@@ -379,7 +378,7 @@
 	assigned-clocks = <&cru CLK_SPI1>;
 	assigned-clock-rates = <100000000>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&spi1_pins &spi1_csn0>;
+	pinctrl-0 = <&spi1m1_pins &spi1m1_csn0>;
 
 	panel@0 {
 		compatible = "panel-mipi-dbi-spi";
@@ -405,6 +404,8 @@
 			vsync-len = <4>;
 			clock-frequency = <4000000>;
 		};
+		
+		firmware = "st7789v.bin"; 
 	};
 };
 
