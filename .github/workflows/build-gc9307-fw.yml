@@ -18,7 +18,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils python3 wget
+          sudo apt-get install -y binutils python3 git wget
 
       - name: Download fb_gc9307.ko
         run: |
@@ -40,11 +40,12 @@ jobs:
             rodata_dump.txt
             strings_dump.txt
 
-      - name: Download mainline mipi-dbi-cmd tool
+      - name: Download official mipi-dbi-cmd tool from author repo
         run: |
-          # 下载主线内核用于生成 mipi-dbi 固件的官方 Python 脚本
-          wget -O mipi-dbi-cmd https://raw.githubusercontent.com/torvalds/linux/master/drivers/gpu/drm/tiny/mipi-dbi-cmd
-          chmod +x mipi-dbi-cmd
+          # 从驱动作者 notro 的官方仓库克隆工具
+          git clone --depth 1 https://github.com/notro/panel-mipi-dbi.git
+          chmod +x panel-mipi-dbi/mipi-dbi-cmd
+          ls -l panel-mipi-dbi/
 
       - name: Create placeholder gc9307.txt
         run: |
@@ -75,8 +76,8 @@ jobs:
 
       - name: Generate gc9307.bin
         run: |
-          echo "Generating gc9307.bin using mipi-dbi-cmd..."
-          python3 mipi-dbi-cmd gc9307.bin gc9307.txt
+          echo "Generating gc9307.bin using official mipi-dbi-cmd..."
+          python3 panel-mipi-dbi/mipi-dbi-cmd gc9307.bin gc9307.txt
           ls -lh gc9307.bin
 
       - name: Upload generated firmware
