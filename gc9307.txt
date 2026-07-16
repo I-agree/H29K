@@ -3,45 +3,46 @@
 # Hardware Reset is handled by GPIO, wait for power to stabilize
 delay 20
 
-# Software Reset
-01
+# Software Reset (0x01)
+command 0x01
 delay 200
 
-# Sleep Out
-11
+# Sleep Out (0x11)
+command 0x11
 delay 120
 
-# TE (Tearing Effect) off (optional, prevents flickering on some panels)
-35 00
+# TE (Tearing Effect) off (0x35)
+command 0x35 0x00
 
-# Memory Access Control (MADCTL) - CRITICAL for 270 degree rotation
+# Memory Access Control (MADCTL) - CRITICAL for 270 degree rotation (0x36)
 # 0x08 = MY=0, MX=0, MV=1, ML=0, BGR=1, MH=0
-# MV=1 swaps X/Y (landscape), BGR=1 fixes color order
-36 08
+command 0x36 0x08
 
-# Pixel Format Set (COLMOD) - 16-bit/pixel (RGB565)
-3a 55
+# Pixel Format Set (COLMOD) - 16-bit/pixel (RGB565) (0x3A)
+command 0x3a 0x55
 
-# Display Inversion ON (Required for GC9307 IPS panels to show correct colors)
-21
+# Display Inversion ON (Required for GC9307 IPS panels) (0x21)
+command 0x21
 
-# Gamma Setting (Positive) - Adjusts contrast and color balance
-e0 1f 3f 31 48 0c 0b 09 4d 79 32 38 29 2c 01 00 00
-e1 1f 3f 31 48 0c 0b 09 4d 79 32 38 29 2c 01 00 00
+# Inner Register Enable 1 (0xFE)
+command 0xfe
+# Inner Register Enable 2 (0xEF)
+command 0xef 0x08
 
-# Inner Register Enable 1 (Required for GC9307 specific power settings)
-fe
-ef 08
+# Power Control / Gamma settings
+command 0xf2 0x11
 
-# Power Control 1 (VCOM amplitude)
-f2 11
+# Gamma Setting (Positive) (0xE0)
+command 0xe0 0x1f 0x3f 0x31 0x48 0x0c 0x0b 0x09 0x4d 0x79 0x32 0x38 0x29 0x2c 0x01 0x00 0x00
+# Gamma Setting (Negative) (0xE1)
+command 0xe1 0x1f 0x3f 0x31 0x48 0x0c 0x0b 0x09 0x4d 0x79 0x32 0x38 0x29 0x2c 0x01 0x00 0x00
 
-# Display ON
-29
+# Display ON (0x29)
+command 0x29
 delay 50
 
-# Set Column Address (0 to 171)
-2a 00 00 00 ab
+# Set Column Address (0x2A) - 0 to 171 (0x00AB)
+command 0x2a 0x00 0x00 0x00 0xab
 
-# Set Row Address (0 to 319)
-2b 00 00 01 3f
+# Set Row Address (0x2B) - 0 to 319 (0x013F)
+command 0x2b 0x00 0x00 0x01 0x3f
