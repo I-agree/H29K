@@ -368,13 +368,15 @@
 	panel@0 {
 		compatible = "sitronix,st7789v";
 		reg = <0>;
-		buswidth = <8>;
-		pinctrl-names = "default";
-		pinctrl-0 = <&lcd_rs_pin>;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
-		led-gpios = <&gpio0 RK_PA1 GPIO_ACTIVE_HIGH>;
-		spi-max-frequency = <15000000>;
+		buswidth = <8>;
+		spi-cpol;
+		spi-cpha;
+		spi-max-frequency = <6000000>;
+		backlight = <&backlight>;
 		power-supply = <&vcc_3v3_lcd>;
+		rotate = <270>;
+		fps = <30>;
 	};
 };
 
