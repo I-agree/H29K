@@ -177,5 +177,20 @@ CONFIG_HW_RANDOM=y
 CONFIG_HW_RANDOM_ROCKCHIP=y
 # CONFIG_CRYPTO_DEV_ROCKCHIP_DEBUG is not set
 
+# =================================================================
+# 🔄 Thermal + TSADC
+# =================================================================
+CONFIG_THERMAL=y
+CONFIG_THERMAL_OF=y
+CONFIG_ROCKCHIP_THERMAL=y
+CONFIG_THERMAL_HWMON=y
+CONFIG_NVMEM=y
+CONFIG_ROCKCHIP_OTP=y
+CONFIG_CPU_THERMAL=y
+CONFIG_CPU_FREQ_THERMAL=y
+CONFIG_DEVFREQ_THERMAL=y
+CONFIG_THERMAL_GOV_STEP_WISE=y
+CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
