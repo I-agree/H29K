@@ -333,6 +333,13 @@
 	status = "okay";
 };
 
+&pwm6 {
+	pinctrl-0 = <&panel_pwm_pin>;
+	pinctrl-names = "default";
+	assigned-clock-rates = <100000000>;
+	status = "okay";
+};
+
 &sdhci {
 	bus-width = <8>;
 	mmc-hs200-1_8v;
@@ -386,7 +393,7 @@
 
 &spi1 {
 	pinctrl-names = "default";
-	pinctrl-0 = <&spi1_pins>;
+	pinctrl-0 = <&spi1_pins &lcd_rs_pin>;
 	status = "okay";
 
 	panel@0 {
