@@ -304,7 +304,7 @@
 };
 
 &pwm6 {
-	pinctrl-0 = <&panel_pwm_pin>;
+	pinctrl-0 = <&pwm6m0_pins>; 
 	pinctrl-names = "default";
 	assigned-clock-rates = <100000000>;
 	status = "okay";
@@ -366,7 +366,7 @@
 	assigned-clocks = <&cru CLK_SPI1>;
 	assigned-clock-rates = <100000000>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&spi1m1_pins &spi1m1_csn0>;
+	pinctrl-0 = <&spi1_pins &spi1_csn0>; 
 
 	panel@0 {
 		compatible = "panel-mipi-dbi-spi";
