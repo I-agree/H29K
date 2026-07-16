@@ -397,8 +397,6 @@
 			vsync-len = <4>;
 			clock-frequency = <4000000>;
 		};
-		
-		firmware = "st7789v.bin"; 
 	};
 };
 
