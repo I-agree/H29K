@@ -1,0 +1,86 @@
+name: Build GC9307 Firmware
+
+on:
+  workflow_dispatch:
+    inputs:
+      ko_url:
+        description: 'URL to fb_gc9307.ko'
+        required: true
+        default: 'https://raw.githubusercontent.com/I-agree/H29K/main/DTB/fb_gc9307.ko'
+
+jobs:
+  extract-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y binutils python3 wget
+
+      - name: Download fb_gc9307.ko
+        run: |
+          wget -O fb_gc9307.ko "${{ github.event.inputs.ko_url }}"
+          file fb_gc9307.ko
+
+      - name: Extract .rodata for manual analysis (Reverse Engineering Helper)
+        run: |
+          echo "Extracting .rodata section for manual hex analysis..."
+          objdump -s -j .rodata fb_gc9307.ko > rodata_dump.txt
+          echo "Extracting strings..."
+          strings fb_gc9307.ko > strings_dump.txt
+          
+      - name: Upload analysis dumps
+        uses: actions/upload-artifact@v4
+        with:
+          name: ko-analysis-dumps
+          path: |
+            rodata_dump.txt
+            strings_dump.txt
+
+      - name: Download mainline mipi-dbi-cmd tool
+        run: |
+          # 下载主线内核用于生成 mipi-dbi 固件的官方 Python 脚本
+          wget -O mipi-dbi-cmd https://raw.githubusercontent.com/torvalds/linux/master/drivers/gpu/drm/tiny/mipi-dbi-cmd
+          chmod +x mipi-dbi-cmd
+
+      - name: Create placeholder gc9307.txt
+        run: |
+          # 这是一个模板，你需要根据 rodata_dump.txt 的分析结果修改它
+          cat << 'EOF' > gc9307.txt
+          # GC9307 Initialization Sequence
+          # ⚠️ 警告：以下数据为示例占位符！
+          # 请务必根据 rodata_dump.txt 中提取的真实十六进制数据进行修改。
+          
+          # Soft Reset
+          01
+          delay 5
+          
+          # Sleep Out
+          11
+          delay 120
+          
+          # Pixel Format (16-bit) - 必须保留
+          3a 55
+          
+          # MADCTL (Display Direction) - 根据你的旋转需求调整
+          36 08
+          
+          # Display ON
+          29
+          delay 50
+          EOF
+
+      - name: Generate gc9307.bin
+        run: |
+          echo "Generating gc9307.bin using mipi-dbi-cmd..."
+          python3 mipi-dbi-cmd gc9307.bin gc9307.txt
+          ls -lh gc9307.bin
+
+      - name: Upload generated firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: gc9307-firmware
+          path: gc9307.bin
