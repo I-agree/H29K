@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.3
 
       - name: Install dependencies
         run: |
@@ -33,7 +33,7 @@ jobs:
           strings fb_gc9307.ko > strings_dump.txt
           
       - name: Upload analysis dumps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: ko-analysis-dumps
           path: |
@@ -81,7 +81,7 @@ jobs:
           ls -lh gc9307.bin
 
       - name: Upload generated firmware
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.1
         with:
           name: gc9307-firmware
           path: gc9307.bin
