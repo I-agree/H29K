@@ -22,6 +22,7 @@
 		led-failsafe = &led_work;
 		led-running = &led_work;
 		led-upgrade = &led_work;
+		spi1 = &spi1;
 	};
 
 	chosen {
