@@ -2,14 +2,9 @@ name: Build GC9307 Firmware
 
 on:
   workflow_dispatch:
-    inputs:
-      ko_url:
-        description: 'URL to fb_gc9307.ko'
-        required: true
-        default: 'https://raw.githubusercontent.com/I-agree/H29K/main/DTB/fb_gc9307.ko'
 
 jobs:
-  extract-and-build:
+  build-firmware:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -18,65 +13,24 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y binutils python3 git wget
+          sudo apt-get install -y python3 git
 
-      - name: Download fb_gc9307.ko
+      - name: Download official mipi-dbi-cmd tool
         run: |
-          wget -O fb_gc9307.ko "${{ github.event.inputs.ko_url }}"
-          file fb_gc9307.ko
-
-      - name: Extract .rodata for manual analysis (Reverse Engineering Helper)
-        run: |
-          echo "Extracting .rodata section for manual hex analysis..."
-          objdump -s -j .rodata fb_gc9307.ko > rodata_dump.txt
-          echo "Extracting strings..."
-          strings fb_gc9307.ko > strings_dump.txt
-          
-      - name: Upload analysis dumps
-        uses: actions/upload-artifact@v7.0.1
-        with:
-          name: ko-analysis-dumps
-          path: |
-            rodata_dump.txt
-            strings_dump.txt
-
-      - name: Download official mipi-dbi-cmd tool from author repo
-        run: |
-          # 从驱动作者 notro 的官方仓库克隆工具
           git clone --depth 1 https://github.com/notro/panel-mipi-dbi.git
           chmod +x panel-mipi-dbi/mipi-dbi-cmd
-          ls -l panel-mipi-dbi/
 
-      - name: Create placeholder gc9307.txt
+      - name: Verify gc9307.txt exists
         run: |
-          # 这是一个模板，你需要根据 rodata_dump.txt 的分析结果修改它
-          cat << 'EOF' > gc9307.txt
-          # GC9307 Initialization Sequence
-          # ⚠️ 警告：以下数据为示例占位符！
-          # 请务必根据 rodata_dump.txt 中提取的真实十六进制数据进行修改。
-          
-          # Soft Reset
-          01
-          delay 5
-          
-          # Sleep Out
-          11
-          delay 120
-          
-          # Pixel Format (16-bit) - 必须保留
-          3a 55
-          
-          # MADCTL (Display Direction) - 根据你的旋转需求调整
-          36 08
-          
-          # Display ON
-          29
-          delay 50
-          EOF
+          if [ ! -f "gc9307.txt" ]; then
+            echo "Error: gc9307.txt not found in repository root!"
+            exit 1
+          fi
+          ls -l gc9307.txt
 
       - name: Generate gc9307.bin
         run: |
-          echo "Generating gc9307.bin using official mipi-dbi-cmd..."
+          echo "Generating gc9307.bin..."
           python3 panel-mipi-dbi/mipi-dbi-cmd gc9307.bin gc9307.txt
           ls -lh gc9307.bin
 
