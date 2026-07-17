@@ -34,7 +34,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          target/linux/rockchip/image \
          package/boot/rkbin \
          gc9307 \
-         files/etc/config/screen \
+         files/root/splash \
          files/etc/init.d \
          files/etc/fonts/conf.d \
          files/usr/bin \
@@ -82,7 +82,7 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
-    download_and_check "${LOGO_URL}/LOGO${i}.jpg" "files/etc/config/screen/LOGO${i}.jpg"
+    download_and_check "${LOGO_URL}/LOGO${i}.jpg" "files/root/splash/LOGO${i}.jpg"
 done
 
 # ==============================================================================
