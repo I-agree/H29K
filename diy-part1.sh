@@ -9,7 +9,7 @@ set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终�
 # 添加 QModem 软件源
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 
-# === 3. 安装网页端文件管理器
+# === 2. 安装网页端文件管理器
 git clone https://github.com/sbwml/luci-app-quickfile package/quickfile
 
 # === 3. 安装 argon 主题
@@ -68,16 +68,16 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/b
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/997-rk3528-h29k-add-u-boot-dtsi-overrides.patch" "package/boot/uboot-rockchip/patches/997-rk3528-h29k-add-u-boot-dtsi-overrides.patch"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch" "package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/Makefile" "package/kernel/aic8800/Makefile"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/010-fix-fall-through.patch" "package/kernel/aic8800/patches/010-fix-fall-through.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/020-wireless-6.16.patch" "package/kernel/aic8800/patches/020-wireless-6.16.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/030-update-firmware-path.patch" "package/kernel/aic8800/patches/030-update-firmware-path.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/040-rename-module.patch" "package/kernel/aic8800/patches/040-rename-module.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/050-log-level.patch" "package/kernel/aic8800/patches/050-log-level.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/060-fix-read-cpuid.patch" "package/kernel/aic8800/patches/060-fix-read-cpuid.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch" "package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
-# download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
+download_and_check "${BASE_URL}/package/kernel/aic8800/Makefile" "package/kernel/aic8800/Makefile"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/010-fix-fall-through.patch" "package/kernel/aic8800/patches/010-fix-fall-through.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/020-wireless-6.16.patch" "package/kernel/aic8800/patches/020-wireless-6.16.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/030-update-firmware-path.patch" "package/kernel/aic8800/patches/030-update-firmware-path.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/040-rename-module.patch" "package/kernel/aic8800/patches/040-rename-module.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/050-log-level.patch" "package/kernel/aic8800/patches/050-log-level.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/060-fix-read-cpuid.patch" "package/kernel/aic8800/patches/060-fix-read-cpuid.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch" "package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
