@@ -369,29 +369,30 @@
 	pinctrl-0 = <&spi1_pins &spi1_csn0>; 
 
 	panel@0 {
-		compatible = "panel-mipi-dbi-spi";
+		compatible = "sitronix,gc9307", "panel-mipi-dbi-spi";
 		reg = <0>;
 		spi-max-frequency = <6000000>;
 		spi-cpol;
 		spi-cpha;
+		write-only;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		backlight = <&backlight>;
 		power-supply = <&vcc_3v3_lcd>;
 		width-mm = <24>;
 		height-mm = <44>;
 		rotation = <270>;
-		firmware = "gc9307.bin";
+		firmware-name = "gc9307.bin";
 
 		panel-timing {
 			hactive = <172>;
 			vactive = <320>;
-			hback-porch = <38>;
-			hfront-porch = <10>;
-			hsync-len = <10>;
-			vback-porch = <8>;
-			vfront-porch = <4>;
-			vsync-len = <4>;
 			clock-frequency = <4000000>;
+			hfront-porch = <0>;
+			hsync-len = <0>;
+			hback-porch = <0>;
+			vfront-porch = <0>;
+			vsync-len = <0>;
+			vback-porch = <0>;
 		};
 	};
 };
