@@ -33,7 +33,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/boot/uboot-rockchip/dts \
          target/linux/rockchip/image \
          package/boot/rkbin \
-         files/etc/config/screen \
+         gc9307 \
          files/etc/docker/mediamtx \
          files/etc/init.d \
          files/etc/fonts/conf.d \
