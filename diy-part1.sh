@@ -65,7 +65,7 @@ download_and_check() {
 download_and_check "${BASE_URL}/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
-download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "/lib/firmware/sitronix,gc9307.bin"
+download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "files/lib/firmware/sitronix,gc9307.bin"
 download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "gc9307/sitronix,gc9307.bin"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch" "package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch"
