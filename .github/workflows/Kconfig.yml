@@ -27,7 +27,7 @@ jobs:
 
     steps:
     - name: 检出源码
-      uses: actions/checkout@v6.0.3
+      uses: actions/checkout@v7.0.0
 
     - name: 调整磁盘空间
       run: |
@@ -251,7 +251,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: 上传固件至 GitHub Release
-      uses: softprops/action-gh-release@v3.0.0
+      uses: softprops/action-gh-release@v3.0.2
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
