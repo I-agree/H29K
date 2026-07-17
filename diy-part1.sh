@@ -65,6 +65,7 @@ download_and_check() {
 download_and_check "${BASE_URL}/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
+download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "/lib/firmware/sitronix,gc9307.bin"
 download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "gc9307/sitronix,gc9307.bin"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch" "package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch"
@@ -223,6 +224,8 @@ CONFIG_FRAMEBUFFER_CONSOLE=y
 CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
 CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER=y
 # CONFIG_FRAMEBUFFER_CONSOLE_ROTATION is not set
+CONFIG_EXTRA_FIRMWARE="sitronix,gc9307.bin"
+CONFIG_EXTRA_FIRMWARE_DIR="/workdir/openwrt/gc9307"
 
 EOF
 echo "✅ H29K 内核参数注入完成"
