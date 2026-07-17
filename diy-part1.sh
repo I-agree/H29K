@@ -38,7 +38,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/etc/init.d \
          files/etc/fonts/conf.d \
          files/usr/bin \
-         files/www \
+         files/lib/firmware \
          package/boot/uboot-rockchip/patches \
          package/kernel/aic8800/patches \
          files/usr/share/docker-images
@@ -65,7 +65,7 @@ download_and_check() {
 download_and_check "${BASE_URL}/target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts" "target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts"
 download_and_check "${BASE_URL}/target/linux/rockchip/image/armv8.mk" "target/linux/rockchip/image/armv8.mk"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/boot/uboot-rockchip/Makefile"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/997-rk3528-h29k-add-u-boot-dtsi-overrides.patch" "package/boot/uboot-rockchip/patches/997-rk3528-h29k-add-u-boot-dtsi-overrides.patch"
+download_and_check "${BASE_URL}/gc9307/gc9307.bin" "gc9307/gc9307.bin"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch"
 # download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch" "package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/Makefile" "package/kernel/aic8800/Makefile"
