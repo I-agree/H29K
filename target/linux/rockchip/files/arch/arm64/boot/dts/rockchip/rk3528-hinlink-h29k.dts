@@ -380,6 +380,7 @@
 		width-mm = <24>;
 		height-mm = <44>;
 		rotation = <270>;
+		firmware = "gc9307.bin";
 
 		panel-timing {
 			hactive = <172>;
