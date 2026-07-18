@@ -380,7 +380,6 @@
 		power-supply = <&vcc_3v3_lcd>;
 		width-mm = <24>;
 		height-mm = <44>;
-		rotation = <270>;
 		firmware-name = "sitronix,gc9307.bin";
 
 		panel-timing {
