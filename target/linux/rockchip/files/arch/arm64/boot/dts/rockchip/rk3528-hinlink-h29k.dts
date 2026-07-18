@@ -67,7 +67,8 @@
 		compatible = "rfkill-gpio";
 		label = "rfkill-modem";
 		radio-type = "wwan";
-		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
+		power-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
 	};
 
 	sdio_pwrseq: sdio-pwrseq {
@@ -238,6 +239,9 @@
 	snps,reset-active-low;
 	snps,reset-delays-us = <0 20000 100000>;
 	snps,reset-gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
+	tx_delay = <0x30>;
+	rx_delay = <0x10>;
+	
 	status = "okay";
 };
 
@@ -378,6 +382,7 @@
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		backlight = <&backlight>;
 		power-supply = <&vcc_3v3_lcd>;
+		io-supply = <&vcc_3v3_lcd>;
 		width-mm = <24>;
 		height-mm = <44>;
 		firmware-name = "sitronix,gc9307.bin";
@@ -443,4 +448,12 @@
 &usb_host0_xhci {
 	dr_mode = "host";
 	status = "okay";
+};
+
+&power {
+	power-controller {
+		pd_gpu@4 {
+			/delete-property/ clocks;
+		};
+	};
 };
