@@ -452,7 +452,3 @@
 	dr_mode = "host";
 	status = "okay";
 };
-
-&{/pmu@ff600000/power-controller/power-domain@RK3528_PD_GPU} {
-	/delete-property/ clocks;
-};
