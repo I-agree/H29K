@@ -258,6 +258,7 @@
 
 &gpu {
 	mali-supply = <&vdd_logic>;
+	power-domains = <&power RK3528_PD_GPU>;
 	status = "okay";
 };
 
