@@ -41,7 +41,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/lib/firmware \
          package/boot/uboot-rockchip/patches \
          package/kernel/aic8800/patches \
-         files/usr/share/docker-images
+         files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
 LOGO_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
@@ -79,6 +79,7 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/060-fix-read-cpui
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch" "package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
+download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
