@@ -7,6 +7,7 @@
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/clock/rockchip,rk3528-cru.h>
 #include <dt-bindings/reset/rockchip,rk3528-cru.h>
+#include <dt-bindings/power/rockchip,rk3528-power.h>
 
 #include "rk3528.dtsi"
 
@@ -32,12 +33,6 @@
 
 	chosen {
 		stdout-path = "serial0:1500000n8";
-	};
-
-	power-management {
-		compatible = "rockchip,rk3528-power-controller";
-		clocks = <&cru PCLK_PM>;
-		clock-names = "pclk_pm";
 	};
 
 	backlight: backlight {
