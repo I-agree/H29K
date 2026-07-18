@@ -32,7 +32,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/boot/uboot-rockchip/configs/hinlink/h29k \
          package/boot/uboot-rockchip/dts \
          target/linux/rockchip/image \
-         package/boot/rkbin \
+         files/etc \
          gc9307 \
          files/usr/share/splash \
          files/etc/init.d \
