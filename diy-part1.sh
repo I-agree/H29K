@@ -68,7 +68,7 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/b
 download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "files/lib/firmware/sitronix,gc9307.bin"
 download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "gc9307/sitronix,gc9307.bin"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch"
-# download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch" "package/boot/uboot-rockchip/patches/1000-add-hinlink-h29k-rk3528-DTS.patch"
+download_and_check "${BASE_URL}/JPG/splash_anim" "files/etc/init.d/splash_anim"
 download_and_check "${BASE_URL}/package/kernel/aic8800/Makefile" "package/kernel/aic8800/Makefile"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/010-fix-fall-through.patch" "package/kernel/aic8800/patches/010-fix-fall-through.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/020-wireless-6.16.patch" "package/kernel/aic8800/patches/020-wireless-6.16.patch"
