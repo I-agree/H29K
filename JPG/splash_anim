@@ -2,21 +2,89 @@
 START=10
 STOP=99
 
+# --- 动态探测函数 ---
+
+# 1. 动态查找正确的 framebuffer 设备
+find_fb_device() {
+    # 优先查找 name 包含 mipi/spi/panel-mipi-dbi 的 fb
+    for fb in /sys/class/graphics/fb*; do
+        [ -e "$fb/name" ] || continue
+        name=$(cat "$fb/name")
+        if echo "$name" | grep -qiE "mipi|spi|panel-mipi-dbi"; then
+            echo "/dev/$(basename $fb)"
+            return 0
+        fi
+    done
+    
+    # 兜底：第一个存在的fb设备
+    for fb in /sys/class/graphics/fb*; do
+        [ -e "$fb/dev" ] && echo "/dev/$(basename $fb)" && return 0
+    done
+    
+    return 1
+}
+
+# 2. 动态查找可用虚拟终端tty
+find_tty_number() {
+    for i in 1 2 3 4 5 6; do
+        if [ -c "/dev/tty$i" ]; then
+            echo "$i"
+            return 0
+        fi
+    done
+    [ -c "/dev/tty0" ] && echo "0" && return 0
+    return 1
+}
+
 start() {
-    echo 255 > /sys/class/backlight/backlight/brightness
+    # 等待fb设备就绪，最长10秒
+    local i=0
+    FB_DEV=""
+    while [ $i -lt 20 ]; do
+        FB_DEV=$(find_fb_device)
+        [ -n "$FB_DEV" ] && break
+        usleep 500000
+        i=$((i + 1))
+    done
+
+    if [ -z "$FB_DEV" ]; then
+        logger -t splash "ERROR: No framebuffer found, exit splash"
+        return 1
+    fi
+
+    TTY_NUM=$(find_tty_number)
+    TTY_ARG=""
+    if [ -n "$TTY_NUM" ]; then
+        TTY_ARG="-T $TTY_NUM"
+    else
+        logger -t splash "WARNING: No tty found, run fbi without tty arg"
+    fi
+
+    # 点亮背光，屏蔽不存在路径报错
+    echo 255 > /sys/class/backlight/backlight/brightness 2>/dev/null
+
+    logger -t splash "Start splash anim, fb=$FB_DEV tty=$TTY_NUM"
+
+    # 后台循环播放，图片存放于只读/usr/share/splash，启动早期即可读取
     (
         while true; do
-            # 按文件名自然排序循环 LOGO*.jpg
-            for img in /root/LOGO*.jpg; do
-                fbi -d /dev/fb0 -once -noverbose "$img"
+            # 数字自然排序遍历LOGO，路径改为只读分区
+            for img in $(ls -1 /usr/share/splash/LOGO*.jpg 2>/dev/null | sort -V); do
+                [ -f "$img" ] || continue
+                fbi $TTY_ARG -d "$FB_DEV" -once -noverbose -fit "$img"
                 usleep 70000
             done
         done
     ) &
+    
     echo $! > /var/run/splash.pid
 }
 
 stop() {
-    [ -f /var/run/splash.pid ] && kill $(cat /var/run/splash.pid)
-    rm -f /var/run/splash.pid
+    # 稳妥杀死动画进程
+    if [ -f /var/run/splash.pid ]; then
+        kill $(cat /var/run/splash.pid) 2>/dev/null
+        rm -f /var/run/splash.pid
+    fi
+    killall -q fbi
 }
