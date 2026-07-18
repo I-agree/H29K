@@ -43,6 +43,9 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/kernel/aic8800/patches \
          files/usr/share/fonts
 
+# 新建空白rc.local
+touch files/etc/rc.local
+chmod +x files/etc/rc.local
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
 LOGO_URL="https://raw.githubusercontent.com/I-agree/H29K/main/JPG"
 
