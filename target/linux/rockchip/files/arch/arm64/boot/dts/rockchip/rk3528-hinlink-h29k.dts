@@ -69,8 +69,8 @@
 		compatible = "rfkill-gpio";
 		label = "rfkill-modem";
 		radio-type = "wwan";
-		shutdown-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_HIGH>;
-		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_HIGH>;
+		shutdown-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
 	};
 
 	sdio_pwrseq: sdio-pwrseq {
