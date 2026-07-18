@@ -60,7 +60,7 @@ start() {
         logger -t splash "WARNING: No tty found, run fbi without tty arg"
     fi
 
-    # ========== 修复背光代码 ==========
+    # 修复背光：仅支持0/1档位
     BL_DIR="/sys/class/backlight/backlight"
     if [ -d "$BL_DIR" ]; then
         echo 1 > ${BL_DIR}/brightness 2>/dev/null
@@ -68,10 +68,9 @@ start() {
 
     logger -t splash "Start splash anim, fb=$FB_DEV tty=$TTY_NUM"
 
-    # 后台循环播放，图片存放于只读/usr/share/splash
+    # 后台循环播放LOGO动画
     (
         while true; do
-            # 数字自然排序遍历LOGO
             for img in $(ls -1 /usr/share/splash/LOGO*.jpg 2>/dev/null | sort -V); do
                 [ -f "$img" ] || continue
                 fbi $TTY_ARG -d "$FB_DEV" -once -noverbose -fit "$img"
@@ -84,10 +83,21 @@ start() {
 }
 
 stop() {
-    # 稳妥杀死动画进程
+    # 杀死开机动画进程
     if [ -f /var/run/splash.pid ]; then
         kill $(cat /var/run/splash.pid) 2>/dev/null
         rm -f /var/run/splash.pid
     fi
     killall -q fbi
+
+    # stop函数重新探测fb，修复变量不存在问题
+    local FB_DEV=$(find_fb_device)
+    if [ -z "$FB_DEV" ]; then
+        logger -t splash "stop stage: can not find fb device, skip text render"
+        return 1
+    fi
+
+    sleep 2
+    python3 /usr/bin/show_sentence.py
+    fbi -d "$FB_DEV" -once -noverbose /tmp/screen_out.jpg &
 }
