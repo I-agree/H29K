@@ -60,15 +60,18 @@ start() {
         logger -t splash "WARNING: No tty found, run fbi without tty arg"
     fi
 
-    # 点亮背光，屏蔽不存在路径报错
-    echo 255 > /sys/class/backlight/backlight/brightness 2>/dev/null
+    # ========== 修复背光代码 ==========
+    BL_DIR="/sys/class/backlight/backlight"
+    if [ -d "$BL_DIR" ]; then
+        echo 1 > ${BL_DIR}/brightness 2>/dev/null
+    fi
 
     logger -t splash "Start splash anim, fb=$FB_DEV tty=$TTY_NUM"
 
-    # 后台循环播放，图片存放于只读/usr/share/splash，启动早期即可读取
+    # 后台循环播放，图片存放于只读/usr/share/splash
     (
         while true; do
-            # 数字自然排序遍历LOGO，路径改为只读分区
+            # 数字自然排序遍历LOGO
             for img in $(ls -1 /usr/share/splash/LOGO*.jpg 2>/dev/null | sort -V); do
                 [ -f "$img" ] || continue
                 fbi $TTY_ARG -d "$FB_DEV" -once -noverbose -fit "$img"
