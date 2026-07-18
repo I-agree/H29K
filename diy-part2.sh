@@ -36,9 +36,14 @@ fi
 
 # =================================================================================
 
-# 给启动脚本、Python程序添加可执行权限
+# ===================== 新增赋权与开机自启 =====================
+echo "🔧 给可执行脚本添加运行权限"
 chmod +x files/etc/init.d/splash_anim
 chmod +x files/usr/bin/splash_loop.py
 chmod +x files/usr/bin/show_sentence.py
+
+# 写入开机自启命令
+echo "/etc/init.d/splash_anim enable" >> files/etc/rc.local
+# ==============================================================
 
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
