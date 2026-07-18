@@ -3,10 +3,7 @@ START=10
 STOP=99
 
 # --- 动态探测函数 ---
-
-# 1. 动态查找正确的 framebuffer 设备
 find_fb_device() {
-    # 优先查找 name 包含 mipi/spi/panel-mipi-dbi 的 fb
     for fb in /sys/class/graphics/fb*; do
         [ -e "$fb/name" ] || continue
         name=$(cat "$fb/name")
@@ -15,16 +12,12 @@ find_fb_device() {
             return 0
         fi
     done
-    
-    # 兜底：第一个存在的fb设备
     for fb in /sys/class/graphics/fb*; do
         [ -e "$fb/dev" ] && echo "/dev/$(basename $fb)" && return 0
     done
-    
     return 1
 }
 
-# 2. 动态查找可用虚拟终端tty
 find_tty_number() {
     for i in 1 2 3 4 5 6; do
         if [ -c "/dev/tty$i" ]; then
@@ -37,7 +30,7 @@ find_tty_number() {
 }
 
 start() {
-    # 等待fb设备就绪，最长10秒
+    # 等待fb就绪
     local i=0
     FB_DEV=""
     while [ $i -lt 20 ]; do
@@ -52,45 +45,28 @@ start() {
         return 1
     fi
 
-    TTY_NUM=$(find_tty_number)
-    TTY_ARG=""
-    if [ -n "$TTY_NUM" ]; then
-        TTY_ARG="-T $TTY_NUM"
-    else
-        logger -t splash "WARNING: No tty found, run fbi without tty arg"
-    fi
-
-    # 修复背光：仅支持0/1档位
+    # 点亮背光（仅支持0/1）
     BL_DIR="/sys/class/backlight/backlight"
     if [ -d "$BL_DIR" ]; then
         echo 1 > ${BL_DIR}/brightness 2>/dev/null
     fi
 
-    logger -t splash "Start splash anim, fb=$FB_DEV tty=$TTY_NUM"
+    logger -t splash "Start splash anim, fb=$FB_DEV"
 
-    # 后台循环播放LOGO动画
-    (
-        while true; do
-            for img in $(ls -1 /usr/share/splash/LOGO*.jpg 2>/dev/null | sort -V); do
-                [ -f "$img" ] || continue
-                fbi $TTY_ARG -d "$FB_DEV" -once -noverbose -fit "$img"
-                usleep 70000
-            done
-        done
-    ) &
-    
+    # 后台运行Python循环播放LOGO，替代fbi
+    python3 /usr/bin/splash_loop.py &
     echo $! > /var/run/splash.pid
 }
 
 stop() {
-    # 杀死开机动画进程
+    # 杀掉动画Python进程
     if [ -f /var/run/splash.pid ]; then
         kill $(cat /var/run/splash.pid) 2>/dev/null
         rm -f /var/run/splash.pid
     fi
-    killall -q fbi
+    # 无fbi，不需要killall fbi
 
-    # stop函数重新探测fb，修复变量不存在问题
+    # 重新探测fb，渲染网络短句画面
     local FB_DEV=$(find_fb_device)
     if [ -z "$FB_DEV" ]; then
         logger -t splash "stop stage: can not find fb device, skip text render"
@@ -99,5 +75,6 @@ stop() {
 
     sleep 2
     python3 /usr/bin/show_sentence.py
-    fbi -d "$FB_DEV" -once -noverbose /tmp/screen_out.jpg &
+    # 直接用PIL写入fb，不再调用fbi
+    python3 -c "from PIL import Image; img=Image.open('/tmp/screen_out.jpg').convert('RGB'); img.save('/dev/fb0','raw')" &
 }
