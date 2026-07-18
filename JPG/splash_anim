@@ -1,0 +1,22 @@
+#!/bin/sh /etc/rc.common
+START=10
+STOP=99
+
+start() {
+    echo 255 > /sys/class/backlight/backlight/brightness
+    (
+        while true; do
+            # 按文件名自然排序循环 LOGO*.jpg
+            for img in /root/LOGO*.jpg; do
+                fbi -d /dev/fb0 -once -noverbose "$img"
+                usleep 70000
+            done
+        done
+    ) &
+    echo $! > /var/run/splash.pid
+}
+
+stop() {
+    [ -f /var/run/splash.pid ] && kill $(cat /var/run/splash.pid)
+    rm -f /var/run/splash.pid
+}
