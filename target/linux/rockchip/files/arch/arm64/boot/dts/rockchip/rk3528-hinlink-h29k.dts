@@ -217,6 +217,30 @@
 	};
 };
 
+&pmu {
+	power {
+		power-domain@RK3528_PD_GPU {
+			clocks = <&cru ACLK_GPU>;
+			clock-names = "aclk_gpu";
+		};
+		power-domain@RK3528_PD_VPU {
+			clocks = <&cru ACLK_VPU>;
+			clock-names = "aclk_vpu";
+		};
+		power-domain@RK3528_PD_VO {
+			clocks = <&cru ACLK_VO>;
+			clock-names = "aclk_vo";
+		};
+		power-domain@RK3528_PD_RKVENC {
+			clocks = <&cru ACLK_RKVENC>;
+			clock-names = "aclk_rkvenc";
+		};
+		power-domain@RK3528_PD_RKVDEC {
+			clocks = <&cru ACLK_RKVDEC>;
+		};
+	};
+};
+
 &combphy {
 	status = "okay";
 };
