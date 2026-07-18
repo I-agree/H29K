@@ -421,18 +421,17 @@
 		io-supply = <&vcc_3v3_lcd>;
 		width-mm = <24>;
 		height-mm = <44>;
-		firmware-name = "sitronix,gc9307.bin";
 
 		panel-timing {
 			hactive = <172>;
 			vactive = <320>;
-			clock-frequency = <4000000>;
+			hback-porch = <34>;
+			vback-porch = <0>;
+			clock-frequency = <0>;
 			hfront-porch = <0>;
 			hsync-len = <0>;
-			hback-porch = <0>;
 			vfront-porch = <0>;
 			vsync-len = <0>;
-			vback-porch = <0>;
 		};
 	};
 };
