@@ -96,6 +96,7 @@
 		interrupts = <GIC_SPI 181 IRQ_TYPE_LEVEL_HIGH>;
 		resets = <&cru SRST_H_TRNG_NS>;
 		reset-names = "reset";
+		power-domains = <&power RK3528_PD_VPU>;
 		status = "okay";
 	};
 
