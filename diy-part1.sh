@@ -71,8 +71,6 @@ download_and_check "${BASE_URL}/package/boot/uboot-rockchip/Makefile" "package/b
 download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "files/lib/firmware/sitronix,gc9307.bin"
 download_and_check "${BASE_URL}/gc9307/sitronix,gc9307.bin" "gc9307/sitronix,gc9307.bin"
 download_and_check "${BASE_URL}/package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch" "package/boot/uboot-rockchip/patches/999-add-hinlink-h29k-rk3528.patch"
-download_and_check "${BASE_URL}/JPG/splash_anim" "files/etc/init.d/splash_anim"
-download_and_check "${BASE_URL}/JPG/splash_loop.py" "files/usr/bin/splash_loop.py"
 download_and_check "${BASE_URL}/package/kernel/aic8800/Makefile" "package/kernel/aic8800/Makefile"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/010-fix-fall-through.patch" "package/kernel/aic8800/patches/010-fix-fall-through.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/020-wireless-6.16.patch" "package/kernel/aic8800/patches/020-wireless-6.16.patch"
@@ -83,8 +81,10 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/060-fix-read-cpui
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch" "package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
-download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
-download_and_check "${BASE_URL}/fonts/show_sentence.py" "files/usr/bin/show_sentence.py"
+# download_and_check "${BASE_URL}/JPG/splash_anim" "files/etc/init.d/splash_anim"
+# download_and_check "${BASE_URL}/JPG/splash_loop.py" "files/usr/bin/splash_loop.py"
+# download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
+# download_and_check "${BASE_URL}/fonts/show_sentence.py" "files/usr/bin/show_sentence.py"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
