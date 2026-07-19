@@ -429,8 +429,8 @@
 			clock-frequency = <10000000>;
 			hactive = <320>;
 			vactive = <172>;
-			hback-porch = <34>;
-			hfront-porch = <10>;
+			hback-porch = <0>;
+			hfront-porch = <0>;
 			hsync-len = <0>;
 			vback-porch = <2>;
 			vfront-porch = <2>;
