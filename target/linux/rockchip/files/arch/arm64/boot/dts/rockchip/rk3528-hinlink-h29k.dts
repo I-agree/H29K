@@ -282,6 +282,9 @@
 		panel_dc_pin: panel-dc-pin {
 			rockchip,pins = <1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
 		};
+		panel_rst_pin: panel-rst-pin {
+			rockchip,pins = <1 RK_PB5 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
 	};
 
 	ir {
