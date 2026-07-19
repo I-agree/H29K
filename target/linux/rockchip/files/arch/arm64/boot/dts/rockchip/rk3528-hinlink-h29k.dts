@@ -403,18 +403,10 @@
 &spi1 {
 	#address-cells = <1>;
 	#size-cells = <0>;
-	assigned-clock-rates = <0xbebc200>;
-	assigned-clocks = <&cru 0xbe>;
-	clock-names = "spiclk", "apb_pclk", "sclk_in";
-	clocks = <&cru 0xbe>, <&cru 0xbd>, <&cru 0xbf>;
 	compatible = "rockchip,rk3528-spi", "rockchip,rk3066-spi";
-	dma-names = "tx", "rx";
-	dmas = <&dma 0x1f>, <&dma 0x1e>;
-	interrupts = <GIC_SPI 132 IRQ_TYPE_LEVEL_HIGH>;
 	num-cs = <1>;
-	pinctrl-names = "default", "panel-gpio";
+	pinctrl-names = "default";
 	pinctrl-0 = <&spi1m0_cs0 &spi1m0_sclk_mosi_miso>;
-	pinctrl-1 = <&panel_dc_pin &panel_rst_pin>;
 	status = "okay";
 
 	panel@0 {
@@ -424,8 +416,8 @@
 		spi-cpol;
 		spi-cpha;
 		write-only;
-		dc-gpios = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-		reset-gpios = <&gpio1 13 GPIO_ACTIVE_LOW>;
+		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
 		format = "r5g6b5";
 		backlight = <&backlight>;
 		power-supply = <&vcc_3v3_lcd>;
@@ -434,15 +426,15 @@
 		height-mm = <44>;
 
 		panel-timing {
-			clock-frequency = <0>;
 			hactive = <172>;
 			vactive = <320>;
 			hback-porch = <0>;
+			vback-porch = <0>;
 			hfront-porch = <0>;
 			hsync-len = <0>;
-			vback-porch = <0>;
 			vfront-porch = <0>;
 			vsync-len = <0>;
+			clock-frequency = <0>;
 		};
 	};
 };
