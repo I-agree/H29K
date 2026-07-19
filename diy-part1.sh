@@ -100,7 +100,8 @@ CONFIG_FILE="target/linux/rockchip/armv8/config-6.18"
 echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
 
 # ========== 第一阶段：sed 原位替换（处理已知确切值的条目）==========
-# 这些条目在原始 config-6.12 中有确定值，sed 可直接精确匹配
+# 这些条目在原始 config-6.18 中有确定值，sed 可直接精确匹配
+sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
 sed -i 's/^# CONFIG_BLK_DEV_INITRD is not set$/CONFIG_BLK_DEV_INITRD=y/' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
