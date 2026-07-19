@@ -403,7 +403,6 @@
 &spi1 {
 	#address-cells = <1>;
 	#size-cells = <0>;
-	compatible = "rockchip,rk3528-spi", "rockchip,rk3066-spi";
 	num-cs = <1>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi1m0_cs0 &spi1m0_sclk_mosi_miso>;
@@ -424,6 +423,8 @@
 		io-supply = <&vcc_3v3_lcd>;
 		width-mm = <24>;
 		height-mm = <44>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&panel_dc_pin &panel_rst_pin>;
 
 		panel-timing {
 			hactive = <172>;
