@@ -400,7 +400,7 @@
 &spi1 {
 	status = "okay";
 	assigned-clocks = <&cru CLK_SPI1>;
-	assigned-clock-rates = <100000000>;
+	assigned-clock-rates = <50000000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi1_pins &spi1_csn0>; 
 
@@ -411,9 +411,11 @@
 		spi-cpol;
 		spi-cpha;
 		write-only;
+		format = "r5g6b5";
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&panel_dc_pin>;
+		pinctrl-0 = <&panel_dc_pin &panel_rst_pin>;
 		backlight = <&backlight>;
 		power-supply = <&vcc_3v3_lcd>;
 		io-supply = <&vcc_3v3_lcd>;
@@ -421,15 +423,15 @@
 		height-mm = <44>;
 
 		panel-timing {
-			hactive = <172>;
-			vactive = <320>;
+			clock-frequency = <10000000>;
+			hactive = <320>;
+			vactive = <172>;
 			hback-porch = <34>;
-			vback-porch = <0>;
-			clock-frequency = <0>;
 			hfront-porch = <0>;
-			hsync-len = <0>;
+			hsync-len = <10>;
+			vback-porch = <0>;
 			vfront-porch = <0>;
-			vsync-len = <0>;
+			vsync-len = <2>;
 		};
 	};
 };
