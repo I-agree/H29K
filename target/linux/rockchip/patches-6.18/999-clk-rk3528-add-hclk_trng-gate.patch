@@ -5,7 +5,7 @@
  			RK3528_CLKGATE_CON(10), 0, GFLAGS),
 +	/* TRNG Non-Secure AHB Clock HCLK_TRNG_NS ID=106 */
 +	GATE(HCLK_TRNG_NS, "hclk_trng", "clk_100m_src", 0,
-+ 			RK3528_CLKGATE_CON(10), 3, GFLAGS),
-
++			RK3528_CLKGATE_CON(10), 3, GFLAGS),
+ 
  	GATE(CLK_TIMER_ROOT, "clk_timer_root", "xin24m", 0,
  			RK3528_CLKGATE_CON(8), 9, GFLAGS),
