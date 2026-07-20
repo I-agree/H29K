@@ -252,10 +252,6 @@
 	snps,reset-gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
 	tx_delay = <0x30>;
 	rx_delay = <0x10>;
-	interrupts-extended = <&gic GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
-			      <&gic GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
-			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-	interrupt-names = "macirq", "eth_wake_irq", "sfty";
 	status = "okay";
 };
 
