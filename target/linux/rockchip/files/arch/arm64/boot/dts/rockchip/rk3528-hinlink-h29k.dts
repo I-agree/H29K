@@ -412,8 +412,6 @@
 		compatible = "sitronix,gc9307", "panel-mipi-dbi-spi";
 		reg = <0>;
 		spi-max-frequency = <6000000>;
-		spi-cpol;
-		spi-cpha;
 		write-only;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
