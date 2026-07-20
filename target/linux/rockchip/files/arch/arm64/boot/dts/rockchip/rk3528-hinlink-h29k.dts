@@ -91,7 +91,7 @@
 	rng: rng@ffc50000 {
 		compatible = "rockchip,rk3576-rng";
 		reg = <0x0 0xffc50000 0x0 0x200>;
-		clocks = <&scmi_clk SCMI_HCLK_TRNG>;
+		clocks = <&cru HCLK_TRNG_NS>;
 		clock-names = "hclk_trng";
 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
 		resets = <&cru SRST_H_TRNG_NS>;
@@ -251,7 +251,11 @@
 	snps,reset-delays-us = <0 20000 100000>;
 	snps,reset-gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
 	tx_delay = <0x30>;
-	rx_delay = <0x10>;	
+	rx_delay = <0x10>;
+	interrupts-extended = <&gic GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
+			      <&gic GIC_SPI 124 IRQ_TYPE_LEVEL_HIGH>,
+			      <&gic GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
+	interrupt-names = "macirq", "eth_wake_irq", "sfty";
 	status = "okay";
 };
 
@@ -484,5 +488,11 @@
 
 &usb_host0_xhci {
 	dr_mode = "host";
+	status = "okay";
+};
+
+&power_management {
+	clocks = <&cru PCLK_PM>, <&cru HCLK_PM>;
+	clock-names = "pclk", "hclk";
 	status = "okay";
 };
