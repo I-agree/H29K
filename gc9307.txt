@@ -1,6 +1,7 @@
 # ST7789V Initialization Sequence
-# Extracted directly from Linux kernel fb_st7789v.c (HSD20_IPS profile)
-# Resolution: 240x320 (or 240x240 with offset), 16-bit RGB565
+# Extracted from Linux kernel fb_st7789v.c (HSD20_IPS profile)
+# Rotation: 270 Degree (Landscape, Reversed)
+# Resolution: 16-bit RGB565
 
 # Exit Sleep Mode
 command 0x11
@@ -16,10 +17,9 @@ command 0xB2 0x05 0x05 0x00 0x33 0x33
 command 0xB7 0x75
 
 # VDV and VRH Command Enable
-# Note: fb_st7789v.c passes two parameters here (0x01, 0xFF)
 command 0xC2 0x01 0xFF
 
-# VRH Set: VAP=4.3V+(VCOM+VCOM offset+0.5*VDV), VAN=-4.3V+(...) (HSD20_IPS)
+# VRH Set
 command 0xC3 0x13
 
 # VDV Set: VDV=0V
@@ -34,11 +34,13 @@ command 0xC5 0x20
 # Power Control 1: AVDD=6.8V, AVCL=-4.8V, VDS=2.3V
 command 0xD0 0xA4 0xA1
 
-# Tearing Effect Line ON (Optional: only if TE pin is connected)
-# command 0x35 0x00
-
 # Display Inversion ON (Required for HSD20_IPS panels!)
 command 0x21
+
+# Memory Data Access Control (MADCTL)
+# 270 Degree Rotation: MV (0x20) | MX (0x40) = 0x60
+# (If colors are inverted Red<->Blue, change 0x60 to 0x68 for BGR)
+command 0x36 0x60
 
 # Display ON
 command 0x29
