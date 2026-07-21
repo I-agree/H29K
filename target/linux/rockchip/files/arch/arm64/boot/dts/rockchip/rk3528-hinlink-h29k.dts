@@ -424,7 +424,7 @@
 		spi-cpha;
 		spi-max-frequency = <6000000>;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
-		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
+		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_HIGH>;
 		format = "r5g6b5";
 		backlight = <&backlight>;
 		power-supply = <&vcc_3v3_lcd>;
