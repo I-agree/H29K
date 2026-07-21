@@ -413,9 +413,6 @@
 };
 
 &spi1 {
-	#address-cells = <1>;
-	#size-cells = <0>;
-	num-cs = <1>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi1_pins>;
 	status = "okay";
