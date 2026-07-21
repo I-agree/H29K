@@ -293,8 +293,9 @@
 				<1 RK_PB6 2 &pcfg_pull_none_drv_level_2>,
 				<1 RK_PB7 2 &pcfg_pull_none_drv_level_2>;
 		};
-		spi1_csn0: spi1-csn0 {
-			rockchip,pins = <1 RK_PB3 2 &pcfg_pull_none_drv_level_2>;
+
+		lcd_rs_pin: lcd-rs-pin {
+			rockchip,pins = <1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
 
@@ -416,7 +417,7 @@
 	#size-cells = <0>;
 	num-cs = <1>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&spi1_pins &spi1_csn0>;
+	pinctrl-0 = <&spi1_pins>;
 	status = "okay";
 
 	panel@0 {
@@ -435,7 +436,7 @@
 		width-mm = <24>;
 		height-mm = <44>;
 		pinctrl-names = "default";
-		pinctrl-0 = <&panel_dc_pin &panel_rst_pin>;
+		pinctrl-0 = <&lcd_rs_pin>;
 
 		panel-timing {
 			hactive = <172>;
