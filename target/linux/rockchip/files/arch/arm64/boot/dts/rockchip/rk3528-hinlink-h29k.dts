@@ -278,15 +278,6 @@
 		};
 	};
 
-	panel {
-		panel_dc_pin: panel-dc-pin {
-			rockchip,pins = <1 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-		panel_rst_pin: panel-rst-pin {
-			rockchip,pins = <1 RK_PB5 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-
 	ir {
 		ir_int_pin: ir-int-pin {
 			rockchip,pins = <4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_up>;
@@ -424,7 +415,6 @@
 		spi-cpha;
 		spi-max-frequency = <6000000>;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
-		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_HIGH>;
 		format = "r5g6b5";
 		backlight = <&backlight>;
 		power-supply = <&vcc_3v3_lcd>;
