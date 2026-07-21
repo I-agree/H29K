@@ -488,7 +488,7 @@
 };
 
 &power_management {
-	clocks = <&cru PCLK_PM>, <&cru HCLK_PM>;
-	clock-names = "pclk", "hclk";
-	status = "okay";
+    clocks = <&cru PCLK_PMU>, <&cru HCLK_PMU_ROOT>;
+    clock-names = "pclk", "hclk";
+    status = "okay";
 };
