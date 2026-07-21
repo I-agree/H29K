@@ -16,7 +16,7 @@ elif test $soc = 'rk3588'; then
 	serial_addr=',0xfeb50000'; serial_port='ttyS2';
 fi
 
-setenv bootargs "console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait";
+setenv bootargs "console=${serial_port},1500000 earlycon=uart8250,mmio32${serial_addr} root=PARTUUID=${uuid} rw rootwait fbcon=map:0";
 
 load ${devtype} ${devnum}:1 ${kernel_addr_r} kernel.img
 
