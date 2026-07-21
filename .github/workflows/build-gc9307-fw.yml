@@ -1,7 +1,7 @@
 name: Build GC9307 Firmware
-
+run-name: Build sitronix,gc9307.bin
 on:
-  workflow_dispatch:
+  workflow_dispatch
 
 jobs:
   build-firmware:
@@ -13,29 +13,29 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3 git
+          sudo apt install -y python3 python3-pip git
 
-      - name: Download official mipi-dbi-cmd tool
+      - name: Clone official mipi-dbi tool
         run: |
           git clone --depth 1 https://github.com/notro/panel-mipi-dbi.git
-          chmod +x panel-mipi-dbi/mipi-dbi-cmd
+          chmod +x ./panel-mipi-dbi/mipi-dbi-cmd
 
-      - name: Verify gc9307.txt exists
+      - name: Check source firmware script
         run: |
-          if [ ! -f "gc9307.txt" ]; then
-            echo "Error: gc9307.txt not found in repository root!"
+          if [ ! -f "gc9307.in" ]; then
+            echo "ERROR: gc9307.in missing in repo root!"
             exit 1
           fi
-          ls -l gc9307.txt
+          ls -la gc9307.in
 
-      - name: Generate gc9307.bin
+      - name: Compile MIPI DBI firmware binary
         run: |
-          echo "Generating firmware..."
-          python3 panel-mipi-dbi/mipi-dbi-cmd sitronix,gc9307.bin gc9307.txt
+          python3 ./panel-mipi-dbi/mipi-dbi-cmd sitronix,gc9307.bin gc9307.in -v
           ls -lh sitronix,gc9307.bin
 
-      - name: Upload generated firmware
+      - name: Upload firmware artifact
         uses: actions/upload-artifact@v7.0.1
         with:
           name: gc9307-firmware
           path: sitronix,gc9307.bin
+          retention-days: 14
