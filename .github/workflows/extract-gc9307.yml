@@ -1,0 +1,33 @@
+name: Extract GC9307 Init Sequence
+run-name: Extract init_sequence from fb_gc9307.ko
+on:
+  workflow_dispatch:
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y binutils wget
+
+      - name: Download fb_gc9307.ko
+        run: |
+          wget -O fb_gc9307.ko https://raw.githubusercontent.com/I-agree/H29K/main/DTB/fb_gc9307.ko
+          ls -l fb_gc9307.ko
+
+      - name: Full disassembly
+        run: |
+          objdump -d fb_gc9307.ko > disasm_full.txt
+          grep -n -A150 "gc9307_init_sequence" disasm_full.txt > gc9307_init_raw.txt
+          cat gc9307_init_raw.txt
+
+      - name: Upload disassemble logs
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: gc9307-disasm-output
+          path: |
+            disasm_full.txt
+            gc9307_init_raw.txt
+          retention-days: 14
