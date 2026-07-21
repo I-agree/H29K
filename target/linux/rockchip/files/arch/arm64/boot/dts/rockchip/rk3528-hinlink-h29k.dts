@@ -423,7 +423,6 @@
 		spi-cpol;
 		spi-cpha;
 		spi-max-frequency = <6000000>;
-		write-only;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		reset-gpios = <&gpio1 RK_PB5 GPIO_ACTIVE_LOW>;
 		format = "r5g6b5";
