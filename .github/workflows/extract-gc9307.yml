@@ -10,7 +10,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt update
-          sudo apt install -y wget llvm
+          sudo apt install -y wget llvm file
 
       - name: Download fb_gc9307.ko
         run: |
@@ -18,17 +18,17 @@ jobs:
           ls -l fb_gc9307.ko
           file fb_gc9307.ko
 
-      - name: Dump read-only data section（优先方案，初始化数组在.rodata）
+      - name: Dump all sections content
         run: |
-          llvm-objdump -s -j .rodata fb_gc9307.ko > rodata_dump.txt
-          grep -n -A200 "gc9307_init_sequence" rodata_dump.txt > gc9307_init_raw.txt
+          llvm-objdump -s fb_gc9307.ko > all_sections_dump.txt
+          grep -n -A250 "gc9307_init_sequence" all_sections_dump.txt > gc9307_init_raw.txt
           cat gc9307_init_raw.txt
 
-      - name: Upload disassemble logs
+      - name: Upload logs
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: gc9307-disasm-output
+          name: gc9307-dump-output
           path: |
-            rodata_dump.txt
+            all_sections_dump.txt
             gc9307_init_raw.txt
           retention-days: 14
