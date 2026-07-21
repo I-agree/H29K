@@ -287,6 +287,17 @@
 		};
 	};
 
+	spi1 {
+		spi1_pins: spi1-pins {
+			rockchip,pins =
+				<1 RK_PB6 2 &pcfg_pull_none_drv_level_2>,
+				<1 RK_PB7 2 &pcfg_pull_none_drv_level_2>;
+		};
+		spi1_csn0: spi1-csn0 {
+			rockchip,pins = <1 RK_PB3 2 &pcfg_pull_none_drv_level_2>;
+		};
+	};
+
 	ir {
 		ir_int_pin: ir-int-pin {
 			rockchip,pins = <4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_up>;
@@ -411,6 +422,8 @@
 	panel@0 {
 		compatible = "sitronix,gc9307", "panel-mipi-dbi-spi";
 		reg = <0>;
+		spi-cpol;
+		spi-cpha;
 		spi-max-frequency = <6000000>;
 		write-only;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
