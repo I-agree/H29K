@@ -82,6 +82,7 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-m
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/999-clk-rk3528-add-hclk_trng-gate.patch" "target/linux/rockchip/patches-6.18/999-clk-rk3528-add-hclk_trng-gate.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/image/default.bootscript" "target/linux/rockchip/image/default.bootscript"
 # download_and_check "${BASE_URL}/JPG/splash_anim" "files/etc/init.d/splash_anim"
 # download_and_check "${BASE_URL}/JPG/splash_loop.py" "files/usr/bin/splash_loop.py"
 # download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
