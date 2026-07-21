@@ -486,9 +486,3 @@
 	dr_mode = "host";
 	status = "okay";
 };
-
-&power_management {
-    clocks = <&cru PCLK_PMU>, <&cru HCLK_PMU_ROOT>;
-    clock-names = "pclk", "hclk";
-    status = "okay";
-};
