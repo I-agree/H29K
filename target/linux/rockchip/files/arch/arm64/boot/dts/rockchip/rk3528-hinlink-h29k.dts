@@ -410,7 +410,6 @@
 		format = "r5g6b5";
 		backlight-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
 		power-supply = <&vcc_3v3_lcd>;
-		io-supply = <&vcc_3v3_lcd>;
 		width-mm = <20>;
 		height-mm = <37>;
 		pinctrl-names = "default";
