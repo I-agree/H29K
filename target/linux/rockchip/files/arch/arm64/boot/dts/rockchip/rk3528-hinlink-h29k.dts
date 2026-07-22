@@ -135,6 +135,7 @@
 		regulator-max-microvolt = <3300000>;
 		regulator-always-on;
 		regulator-boot-on;
+		startup-delay-us = <20000>;
 		vin-supply = <&vcc_3v3>;
 	};
 
