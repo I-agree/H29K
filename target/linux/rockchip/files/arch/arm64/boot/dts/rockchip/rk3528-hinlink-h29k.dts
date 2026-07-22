@@ -294,12 +294,6 @@
 		};
 	};
 
-	spi1 {
-		spi4_custom_pins: spi4-custom-pins {
-			rockchip,pins = <0x01 0x0e 0x02 0x62 0x01 0x0f 0x02 0x62>;
-		};
-	};
-
 	lcd {
 		lcd_backlight_pin: lcd-backlight-pin {
 			rockchip,pins = <0x00 0x00 0x00 0x65>;
@@ -307,6 +301,10 @@
 
 		lcd_dc_pin: lcd-dc-pin {
 			rockchip,pins = <0x01 0x0c 0x00 0x67>;
+		};
+
+		spi4_custom_pins: spi4-custom-pins {
+			rockchip,pins = <0x01 0x0e 0x02 0x62 0x01 0x0f 0x02 0x62>;
 		};
 	};
 
@@ -394,6 +392,8 @@
 };
 
 &spi1 {
+	assigned-clocks = <&cru CLK_SPI1>;
+	assigned-clock-rates = <200000000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&spi4_custom_pins &lcd_backlight_pin>;
 	status = "okay";
