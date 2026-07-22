@@ -91,6 +91,12 @@
 		status = "okay";
 	};
 
+	backlight_lcd: backlight-lcd {
+		compatible = "gpio-backlight";
+		gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+		default-on;
+	};
+
 	vcc5v0_sys: vcc5v0-sys {
 		compatible = "regulator-fixed";
 		regulator-name = "vcc5v0_sys";
@@ -407,8 +413,9 @@
 		spi-cpha;
 		spi-max-frequency = <6000000>;
 		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
+		write-only;
 		format = "r5g6b5";
-		backlight-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+		backlight = <&backlight_lcd>;
 		power-supply = <&vcc_3v3_lcd>;
 		width-mm = <20>;
 		height-mm = <37>;
