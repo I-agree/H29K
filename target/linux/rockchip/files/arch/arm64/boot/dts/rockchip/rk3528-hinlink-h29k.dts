@@ -419,8 +419,8 @@
 		backlight = <&backlight>;
 		power-supply = <&vcc_3v3_lcd>;
 		io-supply = <&vcc_3v3_lcd>;
-		width-mm = <24>;
-		height-mm = <44>;
+		width-mm = <18>;
+		height-mm = <33>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_rs_pin>;
 
