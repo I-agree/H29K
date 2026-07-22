@@ -35,14 +35,6 @@
 		stdout-path = "serial0:1500000n8";
 	};
 
-	backlight: backlight {
-		compatible = "gpio-backlight";
-		gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
-		default-on;
-		pinctrl-names = "default";
-		pinctrl-0 = <&backlight_pin>;
-	};
-
 	ir-receiver {
 		compatible = "gpio-ir-receiver";
 		gpios = <&gpio4 RK_PC6 GPIO_ACTIVE_LOW>;
