@@ -95,6 +95,8 @@
 		compatible = "gpio-backlight";
 		gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
 		default-on;
+		pinctrl-names = "default";
+		pinctrl-0 = <&lcd_backlight_pin>;
 	};
 
 	vcc5v0_sys: vcc5v0-sys {
@@ -403,7 +405,7 @@
 	assigned-clocks = <&cru CLK_SPI1>;
 	assigned-clock-rates = <200000000>;
 	pinctrl-names = "default";
-	pinctrl-0 = <&spi4_custom_pins &lcd_backlight_pin>;
+	pinctrl-0 = <&spi4_custom_pins>;
 	status = "okay";
 
 	panel@0 {
