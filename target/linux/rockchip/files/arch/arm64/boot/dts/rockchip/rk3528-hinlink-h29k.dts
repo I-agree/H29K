@@ -295,18 +295,20 @@
 	};
 
 	spi1 {
+		spi4_custom_pins: spi4-custom-pins {
+			rockchip,pins =
+				<1 RK_PB6 2 &pcfg_pull_none_drv_level_2>,
+				<1 RK_PB7 2 &pcfg_pull_none_drv_level_2>;
+		};
+	};
+
+	lcd {
 		lcd_backlight_pin: lcd-backlight-pin {
 			rockchip,pins = <0 RK_PA0 0 &pcfg_pull_up>;
 		};
 
 		lcd_dc_pin: lcd-dc-pin {
 			rockchip,pins = <1 RK_PB4 0 &pcfg_pull_up_drv_level_6>;
-		};
-
-		spi4_custom_pins: spi4-custom-pins {
-			rockchip,pins =
-				<1 RK_PB6 2 &pcfg_pull_none_drv_level_2>,
-				<1 RK_PB7 2 &pcfg_pull_none_drv_level_2>;
 		};
 	};
 
