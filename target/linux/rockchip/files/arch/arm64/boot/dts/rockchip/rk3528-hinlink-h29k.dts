@@ -296,15 +296,17 @@
 
 	lcd {
 		lcd_backlight_pin: lcd-backlight-pin {
-			rockchip,pins = <0x00 0x00 0x00 0x65>;
+			rockchip,pins = <0 RK_PA0 0 &pcfg_pull_up>;
 		};
 
 		lcd_dc_pin: lcd-dc-pin {
-			rockchip,pins = <0x01 0x0c 0x00 0x67>;
+			rockchip,pins = <1 RK_PB4 0 &pcfg_pull_up_drv_level_6>;
 		};
 
 		spi4_custom_pins: spi4-custom-pins {
-			rockchip,pins = <0x01 0x0e 0x02 0x62 0x01 0x0f 0x02 0x62>;
+			rockchip,pins =
+				<1 RK_PB6 2 &pcfg_pull_none_drv_level_2>,
+				<1 RK_PB7 2 &pcfg_pull_none_drv_level_2>;
 		};
 	};
 
@@ -404,9 +406,9 @@
 		spi-cpol;
 		spi-cpha;
 		spi-max-frequency = <6000000>;
-		dc-gpios = <0x1e 0x0c 0x00>;
+		dc-gpios = <&gpio1 RK_PB4 GPIO_ACTIVE_HIGH>;
 		format = "r5g6b5";
-		backlight-gpios = <0x1f 0x00 0x00>;
+		backlight-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
 		power-supply = <&vcc_3v3_lcd>;
 		io-supply = <&vcc_3v3_lcd>;
 		width-mm = <20>;
