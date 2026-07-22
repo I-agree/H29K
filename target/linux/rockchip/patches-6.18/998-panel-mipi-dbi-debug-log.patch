@@ -1,13 +1,22 @@
 --- a/drivers/gpu/drm/tiny/panel-mipi-dbi.c
 +++ b/drivers/gpu/drm/tiny/panel-mipi-dbi.c
-@@ -248,5 +248,10 @@
+@@ -205,5 +205,8 @@
+ 	commands = panel_mipi_dbi_check_commands(dev, fw);
+ 	release_firmware(fw);
+ 
++	if (!IS_ERR(commands))
++		dev_info(dev, "Firmware '%s' loaded OK, %zu bytes of commands\n",
++			 fw_name, commands->len);
+ 	return commands;
+ }
+@@ -248,5 +251,10 @@
  	ret = mipi_dbi_poweron_conditional_reset(dbidev);
-+	dev_info(dbidev->drm.dev, "mipi_dbi_poweron_conditional_reset ret=%d", ret);
++	dev_info(dbidev->drm.dev, "mipi_dbi_poweron_conditional_reset ret=%d\n", ret);
  	if (ret < 0)
  		goto out_exit;
 +	if (!ret)
-+		dev_info(dbidev->drm.dev, "ID read failed, will run firmware init");
++		dev_info(dbidev->drm.dev, "Panel was reset, running firmware init\n");
 +	else
-+		dev_info(dbidev->drm.dev, "Success read panel ID, skip firmware init");
++		dev_info(dbidev->drm.dev, "Panel already on, skipping firmware init\n");
  	if (!ret)
  		panel_mipi_dbi_commands_execute(dbi, dbidev->driver_private);
