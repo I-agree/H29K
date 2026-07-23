@@ -9,7 +9,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       # --- 1. 转换 MP4 为 RAW (XRGB8888) ---
       - name: Install FFmpeg and tools
