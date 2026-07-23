@@ -35,31 +35,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Setup ARM64 libdrm (Sysroot Method - No Install)
+      - name: Setup ARM64 libdrm (Sysroot Method)
         run: |
           sudo dpkg --add-architecture arm64
-          
-          # 添加 Ubuntu arm64 源，使用 trusted=yes 跳过 GPG 验证
           UBUNTU_CODENAME=$(lsb_release -cs)
           echo "deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports $UBUNTU_CODENAME main" | sudo tee /etc/apt/sources.list.d/ubuntu-ports-arm64.list
-          
-          # 仅更新这个特定的 arm64 源，避免影响主系统
           sudo apt-get update -o Dir::Etc::sourcelist="/etc/apt/sources.list.d/ubuntu-ports-arm64.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
           
-          # 创建本地 sysroot 目录
           mkdir -p /tmp/arm64-sysroot
           cd /tmp/arm64-sysroot
-          
-          # 只下载 .deb 包，不安装！
           apt-get download libdrm-dev:arm64 libdrm2:arm64 libdrm-common
-          
-          # 将 .deb 包解压到当前目录
           for deb in *.deb; do
             dpkg -x "$deb" .
           done
-          
-          echo "Sysroot prepared:"
-          ls -la usr/include/
 
       - name: Create DRM Player C Source
         run: |
@@ -67,12 +55,13 @@ jobs:
           #include <fcntl.h>
           #include <unistd.h>
           #include <sys/mman.h>
-          #include <xf86drm.h>
-          #include <xf86drmMode.h>
           #include <stdio.h>
           #include <stdlib.h>
           #include <string.h>
           #include <time.h>
+          #include <xf86drm.h>
+          #include <xf86drmMode.h>
+          #include <drm_fourcc.h>
 
           #define WIDTH  172
           #define HEIGHT 172
@@ -131,26 +120,24 @@ jobs:
               printf("Playing %s on %s ...\n", raw_file, drm_device);
 
               while (1) {
-                  if (fread(map[cur], 1, frame_size, fp) < frame_size) {
+                  size_t read_bytes = fread(map[cur], 1, frame_size, fp);
+                  if (read_bytes < frame_size) {
                       fseek(fp, 0, SEEK_SET);
-                      fread(map[cur], 1, frame_size, fp);
+                      read_bytes = fread(map[cur], 1, frame_size, fp);
+                      if (read_bytes == 0) break;
                   }
                   drmModeSetCrtc(fd, crtc->crtc_id, fb_id[cur], 0, 0, &conn->connector_id, 1, &conn->modes[0]);
                   cur = 1 - cur;
                   sleep_ms(1000 / FPS);
               }
+              
+              fclose(fp);
               return 0;
           }
           EOF
 
       - name: Cross Compile for ARM64 (RK3528)
         run: |
-          # 先看看 drm.h 到底在哪（方便调试）
-          echo "=== Looking for drm.h ==="
-          find /tmp/arm64-sysroot -name "drm.h" 2>/dev/null
-          echo "========================="
-
-          # 编译时加上 libdrm 子目录的 include 路径
           aarch64-linux-gnu-gcc -O3 -o drm_play_arm64 drm_play.c \
             -I/tmp/arm64-sysroot/usr/include \
             -I/tmp/arm64-sysroot/usr/include/libdrm \
@@ -161,6 +148,7 @@ jobs:
           
           chmod +x drm_play_arm64
           file drm_play_arm64
+          ldd drm_play_arm64 || true
 
       # --- 3. 上传产物 ---
       - name: Upload Artifacts
