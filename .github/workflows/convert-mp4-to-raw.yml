@@ -29,15 +29,27 @@ jobs:
           ls -lh apple.raw
 
       # --- 2. 交叉编译 ARM64 DRM 播放程序 ---
-      - name: Install ARM64 Cross-Compiler & libdrm
+      - name: Install ARM64 Cross-Compiler
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
-          # 添加 arm64 架构支持并安装 arm64 的 libdrm 开发库
+
+      - name: Setup ARM64 libdrm (from Debian)
+        run: |
+          # 添加 arm64 架构
           sudo dpkg --add-architecture arm64
-          sudo sed -i 's/^deb /deb [arch=amd64] /g' /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs) main universe" | sudo tee -a /etc/apt/sources.list
-          sudo apt-get update
+          
+          # 添加 Debian arm64 源（稳定且包含 arm64 包）
+          echo "deb [arch=arm64] http://deb.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-arm64.list
+          
+          # 添加 Debian 的 GPG key
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 648ACFD622F3D138
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9
+          
+          # 只更新 Debian arm64 源
+          sudo apt-get update -o Dir::Etc::sourcelist="/etc/apt/sources.list.d/debian-arm64.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
+          
+          # 安装 arm64 的 libdrm 开发库
           sudo apt-get install -y libdrm-dev:arm64
 
       - name: Create DRM Player C Source
