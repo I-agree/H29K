@@ -14,7 +14,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7.0.0
 
-      # --- 1. 转换 MP4 为 RAW (XRGB8888, 172x172) ---
+      # --- 1. 转换 MP4 为 RAW (XRGB8888) ---
       - name: Install FFmpeg
         run: |
           sudo apt-get update
@@ -26,8 +26,8 @@ jobs:
 
       - name: Convert MP4 to RAW (XRGB8888, 172x172)
         run: |
-          # 【关键变化】输出格式改为 bgr0 (= XRGB8888, 4字节/像素)
-          # 172x172 的视频，每帧 172*172*4 = 118,336 字节
+          # 输出 bgr0 = XRGB8888, 4字节/像素
+          # 172x172 每帧 118336 字节
           ffmpeg -i apple.mp4 -f rawvideo -pix_fmt bgr0 apple.raw
           ls -lh apple.raw
 
@@ -51,18 +51,22 @@ jobs:
             dpkg -x "$deb" .
           done
 
-      - name: Create DRM Player C Source (XRGB8888 + 172x320 screen)
+      - name: Create DRM Player C Source
         run: |
           cat << 'ENDOFSOURCE' > drm_play.c
           #include <fcntl.h>
           #include <unistd.h>
           #include <sys/mman.h>
           #include <sys/ioctl.h>
+          #include <sys/wait.h>
+          #include <sys/stat.h>
           #include <stdio.h>
           #include <stdlib.h>
           #include <string.h>
           #include <time.h>
           #include <errno.h>
+          #include <libgen.h>
+          #include <limits.h>
           #include <xf86drm.h>
           #include <xf86drmMode.h>
           #include <drm_fourcc.h>
@@ -71,18 +75,9 @@ jobs:
           #define VIDEO_H  172
           #define BPP      32
           #define FPS      25
+          #define DURATION 36   /* 播放时长（秒） */
 
-          /* 屏幕物理尺寸（运行时从 DRM mode 读取） */
           static uint32_t screen_w, screen_h;
-
-          static const char *conn_status_str(int status) {
-              switch (status) {
-                  case DRM_MODE_CONNECTED: return "CONNECTED";
-                  case DRM_MODE_DISCONNECTED: return "DISCONNECTED";
-                  case DRM_MODE_UNKNOWNCONNECTION: return "UNKNOWN";
-                  default: return "INVALID";
-              }
-          }
 
           void sleep_ms(int ms) {
               struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000 };
@@ -90,22 +85,18 @@ jobs:
           }
 
           /*
-           * 把一帧 172x172 的 XRGB8888 数据写到 172x320 缓冲区的垂直居中位置
-           * 屏幕比视频高的部分用黑色填充
+           * 把 172x172 的 XRGB8888 帧数据写到屏幕缓冲区的垂直居中位置
            */
           void copy_frame_centered(void *dst, const void *src, uint32_t pitch) {
               uint8_t *buf = (uint8_t *)dst;
               const uint8_t *frame = (const uint8_t *)src;
               
-              /* 清空整个缓冲区（黑色） */
               memset(buf, 0, pitch * screen_h);
               
-              /* 计算垂直居中偏移 */
               int y_offset = ((int)screen_h - VIDEO_H) / 2;
               if (y_offset < 0) y_offset = 0;
               
-              /* 复制视频帧到居中位置 */
-              uint32_t src_row_bytes = VIDEO_W * (BPP / 8);  /* 172 * 4 = 688 */
+              uint32_t src_row_bytes = VIDEO_W * (BPP / 8);
               for (int y = 0; y < VIDEO_H; y++) {
                   memcpy(buf + (y + y_offset) * pitch,
                          frame + y * src_row_bytes,
@@ -113,20 +104,66 @@ jobs:
               }
           }
 
+          /*
+           * 获取可执行文件所在目录
+           * argv[0] 可能是 "./drm_play_arm64" 或 "/tmp/drm_play_arm64"
+           */
+          int get_exe_dir(char *dir_buf, size_t buf_size) {
+              /* 优先用 /proc/self/exe 获取真实路径 */
+              ssize_t len = readlink("/proc/self/exe", dir_buf, buf_size - 1);
+              if (len > 0) {
+                  dir_buf[len] = '\0';
+                  char *d = dirname(dir_buf);
+                  if (d != dir_buf) {
+                      memmove(dir_buf, d, strlen(d) + 1);
+                  }
+                  return 0;
+              }
+              /* 回退：用 argv[0] */
+              return -1;
+          }
+
           int main(int argc, char *argv[]) {
-              if (argc < 2) { fprintf(stderr, "Usage: %s <raw_file> [drm_device]\n", argv[0]); return 1; }
+              if (argc < 2) {
+                  fprintf(stderr, "Usage: %s <raw_file> [drm_device]\n", argv[0]);
+                  return 1;
+              }
               const char *raw_file = argv[1];
               const char *drm_device = (argc > 2) ? argv[2] : "/dev/dri/card0";
 
+              /* ========== 记录程序所在目录 ========== */
+              char exe_dir[PATH_MAX] = "/tmp";
+              if (get_exe_dir(exe_dir, sizeof(exe_dir)) != 0) {
+                  /* 回退：从 argv[0] 提取目录 */
+                  char tmp[PATH_MAX];
+                  strncpy(tmp, argv[0], PATH_MAX - 1);
+                  tmp[PATH_MAX - 1] = '\0';
+                  char *d = dirname(tmp);
+                  if (d && strlen(d) < PATH_MAX) {
+                      /* 如果是相对路径，转绝对路径 */
+                      if (d[0] != '/') {
+                          char cwd[PATH_MAX];
+                          if (getcwd(cwd, sizeof(cwd))) {
+                              snprintf(exe_dir, sizeof(exe_dir), "%s/%s", cwd, d);
+                          }
+                      } else {
+                          strncpy(exe_dir, d, sizeof(exe_dir) - 1);
+                      }
+                  }
+              }
+              printf("Program directory: %s\n", exe_dir);
+
+              /* ========== [1/7] 打开 DRM 设备 ========== */
               printf("[1/7] Opening DRM device: %s\n", drm_device);
               int fd = open(drm_device, O_RDWR | O_CLOEXEC);
               if (fd < 0) { perror("  ERROR: open drm device failed"); return 1; }
               printf("  OK (fd=%d)\n", fd);
 
+              /* ========== [2/7] 检查 DRM 能力 ========== */
               printf("[2/7] Checking DRM capabilities...\n");
               uint64_t has_dumb = 0;
               if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0) {
-                  printf("  WARNING: DRM_CAP_DUMB_BUFFER query failed: %s\n", strerror(errno));
+                  printf("  WARNING: DRM_CAP_DUMB_BUFFER query failed\n");
               } else {
                   printf("  DUMB_BUFFER support: %s\n", has_dumb ? "YES" : "NO");
                   if (!has_dumb) {
@@ -135,15 +172,17 @@ jobs:
                   }
               }
 
+              /* ========== [3/7] 获取 DRM 资源 ========== */
               printf("[3/7] Getting DRM resources...\n");
               drmModeRes *res = drmModeGetResources(fd);
               if (!res) {
-                  fprintf(stderr, "  ERROR: drmModeGetResources() returned NULL: %s\n", strerror(errno));
+                  fprintf(stderr, "  ERROR: drmModeGetResources() failed\n");
                   return 1;
               }
               printf("  OK: %d connector(s), %d CRTC(s), %d encoder(s)\n",
                      res->count_connectors, res->count_crtcs, res->count_encoders);
 
+              /* ========== [4/7] 查找显示器 ========== */
               drmModeConnector *conn = NULL;
               uint32_t crtc_id = 0;
 
@@ -152,9 +191,9 @@ jobs:
                   drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
                   if (!c) continue;
                   
-                  printf("  Connector[%d]: id=%u, type=%d, status=%s, modes=%d\n",
+                  printf("  Connector[%d]: id=%u, type=%d, status=%d, modes=%d\n",
                          i, c->connector_id, c->connector_type,
-                         conn_status_str(c->connection), c->count_modes);
+                         c->connection, c->count_modes);
                   
                   for (int m = 0; m < c->count_modes; m++) {
                       printf("    Mode[%d]: %dx%d@%dHz\n", m,
@@ -162,9 +201,7 @@ jobs:
                              c->modes[m].vrefresh);
                   }
 
-                  if (!conn && c->count_modes > 0 &&
-                      (c->connection == DRM_MODE_CONNECTED ||
-                       c->connection == DRM_MODE_UNKNOWNCONNECTION)) {
+                  if (!conn && c->count_modes > 0) {
                       conn = c;
                       screen_w = c->modes[0].hdisplay;
                       screen_h = c->modes[0].vdisplay;
@@ -180,6 +217,7 @@ jobs:
                   return 1;
               }
 
+              /* ========== [5/7] 查找 CRTC ========== */
               printf("[5/7] Finding CRTC...\n");
               drmModeCrtc *crtc = NULL;
               
@@ -209,6 +247,7 @@ jobs:
               }
               printf("  CRTC id: %u\n", crtc_id);
 
+              /* ========== [6/7] 创建帧缓冲区 ========== */
               printf("[6/7] Creating XRGB8888 framebuffers (%dx%d)...\n", screen_w, screen_h);
               struct drm_mode_create_dumb dumb[2];
               void *map[2];
@@ -220,8 +259,7 @@ jobs:
                   dumb[i].height = screen_h;
                   dumb[i].bpp = BPP;
                   
-                  int ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb[i]);
-                  if (ret < 0) {
+                  if (drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb[i]) < 0) {
                       fprintf(stderr, "  ERROR: CREATE_DUMB[%d] failed: %s\n", i, strerror(errno));
                       return 1;
                   }
@@ -231,10 +269,9 @@ jobs:
                   uint32_t handles[4] = {dumb[i].handle, 0, 0, 0};
                   uint32_t pitches[4] = {dumb[i].pitch, 0, 0, 0};
                   uint32_t offsets[4] = {0, 0, 0, 0};
-                  ret = drmModeAddFB2(fd, screen_w, screen_h, DRM_FORMAT_XRGB8888,
-                                      handles, pitches, offsets, &fb_id[i], 0);
-                  if (ret < 0) {
-                      fprintf(stderr, "  ERROR: AddFB2 XRGB8888 [%d] failed: %s\n", i, strerror(errno));
+                  if (drmModeAddFB2(fd, screen_w, screen_h, DRM_FORMAT_XRGB8888,
+                                    handles, pitches, offsets, &fb_id[i], 0) < 0) {
+                      fprintf(stderr, "  ERROR: AddFB2[%d] failed: %s\n", i, strerror(errno));
                       return 1;
                   }
                   printf("  FB[%d] created: id=%u\n", i, fb_id[i]);
@@ -242,8 +279,7 @@ jobs:
                   struct drm_mode_map_dumb map_req;
                   memset(&map_req, 0, sizeof(map_req));
                   map_req.handle = dumb[i].handle;
-                  ret = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req);
-                  if (ret < 0) {
+                  if (drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) < 0) {
                       fprintf(stderr, "  ERROR: MAP_DUMB[%d] failed: %s\n", i, strerror(errno));
                       return 1;
                   }
@@ -253,65 +289,131 @@ jobs:
                       fprintf(stderr, "  ERROR: mmap[%d] failed: %s\n", i, strerror(errno));
                       return 1;
                   }
-                  memset(map[i], 0, dumb[i].size);  /* 初始化为黑色 */
-                  printf("  Buffer %d mapped at %p\n", i, map[i]);
+                  memset(map[i], 0, dumb[i].size);
               }
 
+              /* ========== [7/7] 播放动画 ========== */
               printf("[7/7] Opening RAW file and starting playback...\n");
               FILE *fp = fopen(raw_file, "rb");
               if (!fp) { perror("  ERROR: open raw file failed"); return 1; }
+              
               fseek(fp, 0, SEEK_END);
               long file_size = ftell(fp);
               fseek(fp, 0, SEEK_SET);
-              size_t frame_size = VIDEO_W * VIDEO_H * (BPP / 8);
-              printf("  File size: %ld bytes, Frame size: %zu bytes, Frames: ~%ld\n",
-                     file_size, frame_size, (long)(file_size / frame_size));
+              
+              size_t frame_size = VIDEO_W * VIDEO_H * (BPP / 8);  /* 118336 */
+              long total_frames = file_size / frame_size;
+              long total_duration_frames = FPS * DURATION;  /* 25 * 36 = 900 */
+              
+              printf("  File: %ld bytes, Frame: %zu bytes, Total frames: %ld\n",
+                     file_size, frame_size, total_frames);
+              printf("  Duration: %d seconds = %ld frames at %d FPS\n",
+                     DURATION, total_duration_frames, FPS);
 
-              /* 临时缓冲区，用于读取一帧原始数据 */
               void *tmp_frame = malloc(frame_size);
-              if (!tmp_frame) { perror("  ERROR: malloc tmp_frame"); return 1; }
+              if (!tmp_frame) { perror("  ERROR: malloc"); return 1; }
 
-              /* 先显示第一帧 */
+              /* 显示第一帧 */
               size_t read_bytes = fread(tmp_frame, 1, frame_size, fp);
               if (read_bytes < frame_size) {
-                  fprintf(stderr, "  WARNING: First frame incomplete (%zu/%zu)\n", read_bytes, frame_size);
+                  fprintf(stderr, "  WARNING: First frame incomplete\n");
               }
               copy_frame_centered(map[0], tmp_frame, dumb[0].pitch);
 
               int ret = drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
                                        &conn->connector_id, 1, &conn->modes[0]);
               if (ret < 0) {
-                  fprintf(stderr, "  ERROR: drmModeSetCrtc failed: %s\n", strerror(errno));
-                  free(tmp_frame);
-                  fclose(fp);
-                  return 1;
+                  fprintf(stderr, "  ERROR: SetCrtc failed: %s\n", strerror(errno));
+                  free(tmp_frame); fclose(fp); return 1;
               }
-              printf("  First frame displayed! Screen should show content now.\n");
+              printf("  First frame displayed! Starting %d-second loop...\n", DURATION);
 
+              /* ========== 循环播放 36 秒 ========== */
               int cur = 1;
-              int frame_count = 1;
+              long frame_count = 1;
+              time_t start_time = time(NULL);
 
-              while (1) {
+              while (frame_count < total_duration_frames) {
+                  /* 检查是否超过 36 秒（双重保险） */
+                  if (difftime(time(NULL), start_time) >= DURATION) {
+                      printf("  Time limit reached (%d seconds).\n", DURATION);
+                      break;
+                  }
+
                   read_bytes = fread(tmp_frame, 1, frame_size, fp);
                   if (read_bytes < frame_size) {
+                      /* 文件播完，从头循环 */
                       fseek(fp, 0, SEEK_SET);
                       read_bytes = fread(tmp_frame, 1, frame_size, fp);
                       if (read_bytes == 0) break;
                   }
+                  
                   copy_frame_centered(map[cur], tmp_frame, dumb[cur].pitch);
                   drmModeSetCrtc(fd, crtc_id, fb_id[cur], 0, 0,
                                  &conn->connector_id, 1, &conn->modes[0]);
                   cur = 1 - cur;
                   frame_count++;
+                  
                   if (frame_count % 100 == 0) {
-                      printf("  Played %d frames...\n", frame_count);
+                      long elapsed = (long)difftime(time(NULL), start_time);
+                      printf("  Frame %ld/%ld (%ld seconds elapsed)\n",
+                             frame_count, total_duration_frames, elapsed);
                   }
+                  
                   sleep_ms(1000 / FPS);
               }
+
+              printf("Animation finished. Played %ld frames.\n", frame_count);
               
-              printf("Playback finished. Total frames: %d\n", frame_count);
+              /* ========== 清理 DRM 资源 ========== */
               free(tmp_frame);
               fclose(fp);
+
+              /* 清空屏幕（黑色） */
+              memset(map[0], 0, dumb[0].size);
+              drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                             &conn->connector_id, 1, &conn->modes[0]);
+
+              for (int i = 0; i < 2; i++) {
+                  drmModeRmFB(fd, fb_id[i]);
+                  munmap(map[i], dumb[i].size);
+                  drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dumb[i]);
+              }
+
+              drmModeFreeCrtc(crtc);
+              drmModeFreeConnector(conn);
+              drmModeFreeResources(res);
+
+              /* ========== 检查并运行 bo.py ========== */
+              char bo_path[PATH_MAX];
+              snprintf(bo_path, sizeof(bo_path), "%s/bo.py", exe_dir);
+              
+              struct stat st;
+              if (stat(bo_path, &st) == 0) {
+                  printf("Found bo.py at: %s\n", bo_path);
+                  printf("Launching bo.py in background...\n");
+                  
+                  /* fork 子进程运行 bo.py，父进程继续退出 */
+                  pid_t pid = fork();
+                  if (pid == 0) {
+                      /* 子进程：运行 bo.py */
+                      execlp("python3", "python3", bo_path, NULL);
+                      /* 如果 python3 不存在，尝试 python */
+                      execlp("python", "python", bo_path, NULL);
+                      /* 都失败了 */
+                      fprintf(stderr, "  ERROR: Failed to exec bo.py: %s\n", strerror(errno));
+                      _exit(1);
+                  } else if (pid > 0) {
+                      printf("bo.py launched (pid=%d). Animation exiting.\n", pid);
+                  } else {
+                      fprintf(stderr, "  ERROR: fork() failed: %s\n", strerror(errno));
+                  }
+              } else {
+                  printf("No bo.py found at: %s\n", bo_path);
+                  printf("Animation exiting normally.\n");
+              }
+
+              close(fd);
               return 0;
           }
           ENDOFSOURCE
