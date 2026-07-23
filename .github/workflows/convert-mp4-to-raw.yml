@@ -145,9 +145,16 @@ jobs:
 
       - name: Cross Compile for ARM64 (RK3528)
         run: |
-          # 指定刚才解压的 arm64 头文件和库文件路径进行编译
+          # 先看看 drm.h 到底在哪（方便调试）
+          echo "=== Looking for drm.h ==="
+          find /tmp/arm64-sysroot -name "drm.h" 2>/dev/null
+          echo "========================="
+
+          # 编译时加上 libdrm 子目录的 include 路径
           aarch64-linux-gnu-gcc -O3 -o drm_play_arm64 drm_play.c \
             -I/tmp/arm64-sysroot/usr/include \
+            -I/tmp/arm64-sysroot/usr/include/libdrm \
+            -I/tmp/arm64-sysroot/usr/include/drm \
             -I/tmp/arm64-sysroot/usr/include/aarch64-linux-gnu \
             -L/tmp/arm64-sysroot/usr/lib/aarch64-linux-gnu \
             -ldrm
