@@ -1,38 +1,139 @@
-name: Convert MP4 to RAW
+name: Build DRM Player & Convert MP4
 
 on:
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch:
   push:
     branches:
-      - main # 或者你所在的默认分支
+      - main
 
 jobs:
-  convert:
+  build-and-convert:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7.0.0
 
+      # --- 1. 转换 MP4 为 RAW ---
       - name: Install FFmpeg
         run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
       - name: Download MP4
         run: |
           curl -L -o apple.mp4 "https://raw.githubusercontent.com/I-agree/H29K/main/JPG/apple.mp4"
-          echo "Download complete."
-          ls -lh apple.mp4
 
-      - name: Convert MP4 to RGB565（16位色）
+      - name: Convert MP4 to RAW (RGB565)
         run: |
-          # 将 MP4 转换为 DRM 友好的 RGB565（16位色） 裸数据
-          # 分辨率保持不变，保留原始帧率
+          # 保持 原始分辨率，转换为 RGB565 裸数据
           ffmpeg -i apple.mp4 -f rawvideo -pix_fmt rgb565le apple.raw
-          echo "Conversion complete."
           ls -lh apple.raw
 
-      - name: Upload RAW artifact
+      # --- 2. 交叉编译 ARM64 DRM 播放程序 ---
+      - name: Install ARM64 Cross-Compiler & libdrm
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          # 添加 arm64 架构支持并安装 arm64 的 libdrm 开发库
+          sudo dpkg --add-architecture arm64
+          sudo sed -i 's/^deb /deb [arch=amd64] /g' /etc/apt/sources.list
+          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports $(lsb_release -cs) main universe" | sudo tee -a /etc/apt/sources.list
+          sudo apt-get update
+          sudo apt-get install -y libdrm-dev:arm64
+
+      - name: Create DRM Player C Source
+        run: |
+          cat << 'EOF' > drm_play.c
+          #include <fcntl.h>
+          #include <unistd.h>
+          #include <sys/mman.h>
+          #include <xf86drm.h>
+          #include <xf86drmMode.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <time.h>
+
+          #define WIDTH  172
+          #define HEIGHT 172
+          #define BPP    16
+          #define FPS    25
+
+          void sleep_ms(int ms) {
+              struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000 };
+              nanosleep(&ts, NULL);
+          }
+
+          int main(int argc, char *argv[]) {
+              if (argc < 2) { fprintf(stderr, "Usage: %s <raw_file> [drm_device]\n", argv[0]); return 1; }
+              const char *raw_file = argv[1];
+              const char *drm_device = (argc > 2) ? argv[2] : "/dev/dri/card0";
+
+              int fd = open(drm_device, O_RDWR | O_CLOEXEC);
+              if (fd < 0) { perror("open drm"); return 1; }
+
+              drmModeRes *res = drmModeGetResources(fd);
+              drmModeConnector *conn = NULL;
+              drmModeCrtc *crtc = NULL;
+
+              for (int i = 0; i < res->count_connectors; i++) {
+                  conn = drmModeGetConnector(fd, res->connectors[i]);
+                  if (conn && conn->connection == DRM_MODE_CONNECTED && conn->count_modes > 0) {
+                      drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
+                      if (enc) { crtc = drmModeGetCrtc(fd, enc->crtc_id); drmModeFreeEncoder(enc); if (crtc) break; }
+                  }
+                  drmModeFreeConnector(conn); conn = NULL;
+              }
+              if (!conn || !crtc) { fprintf(stderr, "No display found\n"); return 1; }
+
+              struct drm_mode_create_dumb dumb[2];
+              void *map[2];
+              uint32_t fb_id[2];
+
+              for (int i = 0; i < 2; i++) {
+                  memset(&dumb[i], 0, sizeof(dumb[i]));
+                  dumb[i].width = WIDTH; dumb[i].height = HEIGHT; dumb[i].bpp = BPP;
+                  drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb[i]);
+                  
+                  uint32_t handles[4] = {dumb[i].handle}, pitches[4] = {dumb[i].pitch}, offsets[4] = {0};
+                  drmModeAddFB2(fd, WIDTH, HEIGHT, DRM_FORMAT_RGB565, handles, pitches, offsets, &fb_id[i], 0);
+
+                  struct drm_mode_map_dumb map_req = { .handle = dumb[i].handle };
+                  drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req);
+                  map[i] = mmap(0, dumb[i].size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_req.offset);
+              }
+
+              FILE *fp = fopen(raw_file, "rb");
+              if (!fp) { perror("open raw"); return 1; }
+
+              size_t frame_size = WIDTH * HEIGHT * (BPP / 8);
+              int cur = 0;
+              printf("Playing %s on %s ...\n", raw_file, drm_device);
+
+              while (1) {
+                  if (fread(map[cur], 1, frame_size, fp) < frame_size) {
+                      fseek(fp, 0, SEEK_SET);
+                      fread(map[cur], 1, frame_size, fp);
+                  }
+                  drmModeSetCrtc(fd, crtc->crtc_id, fb_id[cur], 0, 0, &conn->connector_id, 1, &conn->modes[0]);
+                  cur = 1 - cur;
+                  sleep_ms(1000 / FPS);
+              }
+              return 0;
+          }
+          EOF
+
+      - name: Cross Compile for ARM64 (RK3528)
+        run: |
+          # 使用 aarch64 交叉编译器，链接 arm64 的 libdrm
+          aarch64-linux-gnu-gcc -O3 -o drm_play_arm64 drm_play.c -ldrm
+          chmod +x drm_play_arm64
+          file drm_play_arm64
+
+      # --- 3. 上传产物 ---
+      - name: Upload Artifacts
         uses: actions/upload-artifact@v7.0.1
         with:
-          name: apple-raw-原始分辨率-RGB565
-          path: apple.raw
+          name: H29K-DRM-Animation-Pack
+          path: |
+            apple.raw
+            drm_play_arm64
