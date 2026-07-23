@@ -1,0 +1,9 @@
+#!/bin/sh /etc/rc.common
+START=5
+
+start() {
+    # 执行启用自启
+    /etc/init.d/99-bootanim enable
+    # 执行完毕删除自身，永久不再运行
+    rm -f "$0"
+}
