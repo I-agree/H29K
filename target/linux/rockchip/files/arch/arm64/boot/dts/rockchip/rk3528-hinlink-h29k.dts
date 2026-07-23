@@ -426,8 +426,8 @@
 		pinctrl-0 = <&lcd_dc_pin>;
 
 		panel-timing {
-			hactive = <172>;
-			vactive = <320>;
+			hactive = <320>;
+			vactive = <172>;
 			hback-porch = <0>;
 			vback-porch = <0>;
 			hfront-porch = <0>;
