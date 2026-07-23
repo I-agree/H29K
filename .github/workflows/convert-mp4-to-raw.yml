@@ -33,7 +33,8 @@ jobs:
       - name: Install ARM64 Cross-Compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
+          # 【修改点1】：增加 libc6-dev-arm64-cross，提供静态编译所需的 C 库静态文件
+          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
       - name: Setup ARM64 libdrm (Sysroot Method)
         run: |
@@ -138,7 +139,8 @@ jobs:
 
       - name: Cross Compile for ARM64 (RK3528)
         run: |
-          aarch64-linux-gnu-gcc -O3 -o drm_play_arm64 drm_play.c \
+          # 【修改点2】：加入 -static 参数，将 glibc 和 libdrm 全部打包进二进制文件，解决 OpenWrt musl libc 的 not found 问题
+          aarch64-linux-gnu-gcc -O3 -static -o drm_play_arm64 drm_play.c \
             -I/tmp/arm64-sysroot/usr/include \
             -I/tmp/arm64-sysroot/usr/include/libdrm \
             -I/tmp/arm64-sysroot/usr/include/drm \
@@ -148,6 +150,7 @@ jobs:
           
           chmod +x drm_play_arm64
           file drm_play_arm64
+          # 验证是否为静态编译 (statically linked)
           ldd drm_play_arm64 || true
 
       # --- 3. 上传产物 ---
