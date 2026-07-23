@@ -33,7 +33,6 @@ jobs:
       - name: Install ARM64 Cross-Compiler
         run: |
           sudo apt-get update
-          # 【修改点1】：增加 libc6-dev-arm64-cross，提供静态编译所需的 C 库静态文件
           sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
 
       - name: Setup ARM64 libdrm (Sysroot Method)
@@ -50,16 +49,18 @@ jobs:
             dpkg -x "$deb" .
           done
 
-      - name: Create DRM Player C Source
+      - name: Create DRM Player C Source (SPI Panel Fix)
         run: |
-          cat << 'EOF' > drm_play.c
+          cat << 'ENDOFSOURCE' > drm_play.c
           #include <fcntl.h>
           #include <unistd.h>
           #include <sys/mman.h>
+          #include <sys/ioctl.h>
           #include <stdio.h>
           #include <stdlib.h>
           #include <string.h>
           #include <time.h>
+          #include <errno.h>
           #include <xf86drm.h>
           #include <xf86drmMode.h>
           #include <drm_fourcc.h>
@@ -68,6 +69,15 @@ jobs:
           #define HEIGHT 172
           #define BPP    16
           #define FPS    25
+
+          static const char *conn_status_str(int status) {
+              switch (status) {
+                  case DRM_MODE_CONNECTED: return "CONNECTED";
+                  case DRM_MODE_DISCONNECTED: return "DISCONNECTED";
+                  case DRM_MODE_UNKNOWNCONNECTION: return "UNKNOWN";
+                  default: return "INVALID";
+              }
+          }
 
           void sleep_ms(int ms) {
               struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000 };
@@ -79,67 +89,218 @@ jobs:
               const char *raw_file = argv[1];
               const char *drm_device = (argc > 2) ? argv[2] : "/dev/dri/card0";
 
+              printf("[1/7] Opening DRM device: %s\n", drm_device);
               int fd = open(drm_device, O_RDWR | O_CLOEXEC);
-              if (fd < 0) { perror("open drm"); return 1; }
+              if (fd < 0) { perror("  ERROR: open drm device failed"); return 1; }
+              printf("  OK (fd=%d)\n", fd);
 
+              printf("[2/7] Checking DRM capabilities...\n");
+              uint64_t has_dumb = 0;
+              if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0) {
+                  printf("  WARNING: DRM_CAP_DUMB_BUFFER query failed: %s\n", strerror(errno));
+              } else {
+                  printf("  DUMB_BUFFER support: %s\n", has_dumb ? "YES" : "NO");
+                  if (!has_dumb) {
+                      fprintf(stderr, "  ERROR: No dumb buffer support!\n");
+                      return 1;
+                  }
+              }
+
+              printf("[3/7] Getting DRM resources...\n");
               drmModeRes *res = drmModeGetResources(fd);
+              if (!res) {
+                  fprintf(stderr, "  ERROR: drmModeGetResources() returned NULL: %s\n", strerror(errno));
+                  return 1;
+              }
+              printf("  OK: %d connector(s), %d CRTC(s), %d encoder(s)\n",
+                     res->count_connectors, res->count_crtcs, res->count_encoders);
+
               drmModeConnector *conn = NULL;
+              uint32_t crtc_id = 0;
               drmModeCrtc *crtc = NULL;
 
-              for (int i = 0; i < res->count_connectors; i++) {
-                  conn = drmModeGetConnector(fd, res->connectors[i]);
-                  if (conn && conn->connection == DRM_MODE_CONNECTED && conn->count_modes > 0) {
-                      drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
-                      if (enc) { crtc = drmModeGetCrtc(fd, enc->crtc_id); drmModeFreeEncoder(enc); if (crtc) break; }
-                  }
-                  drmModeFreeConnector(conn); conn = NULL;
-              }
-              if (!conn || !crtc) { fprintf(stderr, "No display found\n"); return 1; }
+              printf("[4/7] Finding display (SPI panel compatible mode)...\n");
 
+              /* 遍历所有 connector，打印详细信息 */
+              for (int i = 0; i < res->count_connectors; i++) {
+                  drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
+                  if (!c) continue;
+                  
+                  printf("  Connector[%d]: id=%u, type=%d, status=%s, modes=%d, encoder_id=%u\n",
+                         i, c->connector_id, c->connector_type,
+                         conn_status_str(c->connection), c->count_modes, c->encoder_id);
+                  
+                  for (int m = 0; m < c->count_modes; m++) {
+                      printf("    Mode[%d]: %dx%d@%dHz name=%s\n", m,
+                             c->modes[m].hdisplay, c->modes[m].vdisplay,
+                             c->modes[m].vrefresh, c->modes[m].name);
+                  }
+
+                  /*
+                   * 【关键修复】SPI 屏幕没有热插拔检测，状态通常是 UNKNOWNCONNECTION
+                   * 只要有 modes，就认为它是可用的屏幕
+                   */
+                  if (!conn && c->count_modes > 0 &&
+                      (c->connection == DRM_MODE_CONNECTED ||
+                       c->connection == DRM_MODE_UNKNOWNCONNECTION)) {
+                      conn = c;  /* 不 free，保留使用 */
+                      printf("  >>> Selected this connector!\n");
+                  } else {
+                      drmModeFreeConnector(c);
+                  }
+              }
+
+              if (!conn) {
+                  fprintf(stderr, "  ERROR: No usable connector found!\n");
+                  drmModeFreeResources(res);
+                  return 1;
+              }
+
+              /* 查找 CRTC */
+              printf("[5/7] Finding CRTC...\n");
+              
+              /* 方案A: 通过 encoder 找 CRTC */
+              if (conn->encoder_id) {
+                  drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
+                  if (enc) {
+                      crtc = drmModeGetCrtc(fd, enc->crtc_id);
+                      if (crtc) crtc_id = crtc->crtc_id;
+                      drmModeFreeEncoder(enc);
+                  }
+              }
+              
+              /* 方案B: SPI 面板通常没有 encoder，直接遍历 CRTC */
+              if (!crtc) {
+                  printf("  No encoder found, trying direct CRTC match...\n");
+                  for (int i = 0; i < res->count_crtcs; i++) {
+                      crtc = drmModeGetCrtc(fd, res->crtcs[i]);
+                      if (crtc) {
+                          crtc_id = crtc->crtc_id;
+                          printf("  Using CRTC[%d]: id=%u\n", i, crtc_id);
+                          break;
+                      }
+                  }
+              }
+              
+              if (!crtc) {
+                  fprintf(stderr, "  ERROR: No CRTC available!\n");
+                  drmModeFreeConnector(conn);
+                  drmModeFreeResources(res);
+                  return 1;
+              }
+              printf("  CRTC id: %u\n", crtc_id);
+
+              /* 创建 framebuffer */
+              printf("[6/7] Creating framebuffers (%dx%d, %dbpp, RGB565)...\n", WIDTH, HEIGHT, BPP);
               struct drm_mode_create_dumb dumb[2];
               void *map[2];
               uint32_t fb_id[2];
 
               for (int i = 0; i < 2; i++) {
                   memset(&dumb[i], 0, sizeof(dumb[i]));
-                  dumb[i].width = WIDTH; dumb[i].height = HEIGHT; dumb[i].bpp = BPP;
-                  drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb[i]);
+                  dumb[i].width = WIDTH;
+                  dumb[i].height = HEIGHT;
+                  dumb[i].bpp = BPP;
                   
-                  uint32_t handles[4] = {dumb[i].handle}, pitches[4] = {dumb[i].pitch}, offsets[4] = {0};
-                  drmModeAddFB2(fd, WIDTH, HEIGHT, DRM_FORMAT_RGB565, handles, pitches, offsets, &fb_id[i], 0);
+                  int ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb[i]);
+                  if (ret < 0) {
+                      fprintf(stderr, "  ERROR: CREATE_DUMB[%d] failed: %s\n", i, strerror(errno));
+                      return 1;
+                  }
+                  printf("  Buffer %d: handle=%u, pitch=%u, size=%llu\n",
+                         i, dumb[i].handle, dumb[i].pitch, (unsigned long long)dumb[i].size);
+                  
+                  uint32_t handles[4] = {dumb[i].handle, 0, 0, 0};
+                  uint32_t pitches[4] = {dumb[i].pitch, 0, 0, 0};
+                  uint32_t offsets[4] = {0, 0, 0, 0};
+                  ret = drmModeAddFB2(fd, WIDTH, HEIGHT, DRM_FORMAT_RGB565, handles, pitches, offsets, &fb_id[i], 0);
+                  if (ret < 0) {
+                      fprintf(stderr, "  ERROR: AddFB2[%d] (RGB565) failed: %s\n", i, strerror(errno));
+                      /* Fallback: 尝试 XRGB8888 */
+                      fprintf(stderr, "  Trying XRGB8888 fallback...\n");
+                      dumb[i].bpp = 32;
+                      drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb[i]);
+                      handles[0] = dumb[i].handle;
+                      pitches[0] = dumb[i].pitch;
+                      ret = drmModeAddFB2(fd, WIDTH, HEIGHT, DRM_FORMAT_XRGB8888, handles, pitches, offsets, &fb_id[i], 0);
+                      if (ret < 0) {
+                          fprintf(stderr, "  ERROR: AddFB2 XRGB8888 also failed: %s\n", strerror(errno));
+                          return 1;
+                      }
+                  }
+                  printf("  FB[%d] created: id=%u\n", i, fb_id[i]);
 
-                  struct drm_mode_map_dumb map_req = { .handle = dumb[i].handle };
-                  drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req);
+                  struct drm_mode_map_dumb map_req;
+                  memset(&map_req, 0, sizeof(map_req));
+                  map_req.handle = dumb[i].handle;
+                  ret = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req);
+                  if (ret < 0) {
+                      fprintf(stderr, "  ERROR: MAP_DUMB[%d] failed: %s\n", i, strerror(errno));
+                      return 1;
+                  }
+                  
                   map[i] = mmap(0, dumb[i].size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_req.offset);
+                  if (map[i] == MAP_FAILED) {
+                      fprintf(stderr, "  ERROR: mmap[%d] failed: %s\n", i, strerror(errno));
+                      return 1;
+                  }
+                  printf("  Buffer %d mapped at %p\n", i, map[i]);
               }
 
+              printf("[7/7] Opening RAW file and starting playback...\n");
               FILE *fp = fopen(raw_file, "rb");
-              if (!fp) { perror("open raw"); return 1; }
-
+              if (!fp) { perror("  ERROR: open raw file failed"); return 1; }
+              fseek(fp, 0, SEEK_END);
+              long file_size = ftell(fp);
+              fseek(fp, 0, SEEK_SET);
               size_t frame_size = WIDTH * HEIGHT * (BPP / 8);
-              int cur = 0;
-              printf("Playing %s on %s ...\n", raw_file, drm_device);
+              printf("  File size: %ld bytes, Frame size: %zu bytes, Frames: ~%ld\n",
+                     file_size, frame_size, (long)(file_size / frame_size));
+
+              /* 先用 SetCrtc 测试第一帧 */
+              size_t read_bytes = fread(map[0], 1, frame_size, fp);
+              if (read_bytes < frame_size) {
+                  fprintf(stderr, "  WARNING: First frame read incomplete (%zu/%zu)\n", read_bytes, frame_size);
+              }
+
+              int ret = drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                                       &conn->connector_id, 1, &conn->modes[0]);
+              if (ret < 0) {
+                  fprintf(stderr, "  ERROR: drmModeSetCrtc failed: %s (errno=%d)\n", strerror(errno), errno);
+                  fprintf(stderr, "  This SPI driver may not support legacy SetCrtc API.\n");
+                  fclose(fp);
+                  return 1;
+              }
+              printf("  First frame displayed! Starting loop...\n");
+
+              int cur = 1;
+              int frame_count = 1;
 
               while (1) {
-                  size_t read_bytes = fread(map[cur], 1, frame_size, fp);
+                  read_bytes = fread(map[cur], 1, frame_size, fp);
                   if (read_bytes < frame_size) {
                       fseek(fp, 0, SEEK_SET);
                       read_bytes = fread(map[cur], 1, frame_size, fp);
                       if (read_bytes == 0) break;
                   }
-                  drmModeSetCrtc(fd, crtc->crtc_id, fb_id[cur], 0, 0, &conn->connector_id, 1, &conn->modes[0]);
+                  drmModeSetCrtc(fd, crtc_id, fb_id[cur], 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]);
                   cur = 1 - cur;
+                  frame_count++;
+                  if (frame_count % 100 == 0) {
+                      printf("  Played %d frames...\n", frame_count);
+                  }
                   sleep_ms(1000 / FPS);
               }
               
+              printf("Playback finished. Total frames: %d\n", frame_count);
               fclose(fp);
               return 0;
           }
-          EOF
+          ENDOFSOURCE
 
       - name: Cross Compile for ARM64 (RK3528)
         run: |
-          # 【修改点2】：加入 -static 参数，将 glibc 和 libdrm 全部打包进二进制文件，解决 OpenWrt musl libc 的 not found 问题
           aarch64-linux-gnu-gcc -O3 -static -o drm_play_arm64 drm_play.c \
             -I/tmp/arm64-sysroot/usr/include \
             -I/tmp/arm64-sysroot/usr/include/libdrm \
@@ -150,7 +311,6 @@ jobs:
           
           chmod +x drm_play_arm64
           file drm_play_arm64
-          # 验证是否为静态编译 (statically linked)
           ldd drm_play_arm64 || true
 
       # --- 3. 上传产物 ---
