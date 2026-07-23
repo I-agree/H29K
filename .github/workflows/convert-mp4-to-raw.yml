@@ -1,0 +1,38 @@
+name: Convert MP4 to RAW
+
+on:
+  workflow_dispatch: # 允许手动触发
+  push:
+    branches:
+      - main # 或者你所在的默认分支
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Download MP4
+        run: |
+          curl -L -o apple.mp4 "https://raw.githubusercontent.com/I-agree/H29K/main/JPG/apple.mp4"
+          echo "Download complete."
+          ls -lh apple.mp4
+
+      - name: Convert MP4 to RAW (XRGB8888)
+        run: |
+          # 将 MP4 转换为 DRM 友好的 RGB565（16位色） 裸数据
+          # 分辨率保持不变，保留原始帧率
+          ffmpeg -i apple.mp4 -f rawvideo -pix_fmt rgb565le apple.raw
+          echo "Conversion complete."
+          ls -lh apple.raw
+
+      - name: Upload RAW artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: apple-raw-原始分辨率-RGB565
+          path: apple.raw
