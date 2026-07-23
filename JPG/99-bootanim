@@ -1,0 +1,21 @@
+#!/bin/sh /etc/rc.common
+
+START=11
+STOP=10
+
+start() {
+    PLAYER="/usr/sbin/drm_play_arm64"
+    DRM_DEV="/dev/dri/card1"
+    
+    [ ! -f "$PLAYER" ] && return 1
+    
+    # 短暂等待 DRM 设备就绪
+    [ ! -e "$DRM_DEV" ] && sleep 1
+    
+    # 静默后台运行，无任何输出，无日志写入
+    "$PLAYER" "$DRM_DEV" >/dev/null 2>&1 &
+}
+
+stop() {
+    killall drm_play_arm64 2>/dev/null
+}

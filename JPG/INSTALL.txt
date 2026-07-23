@@ -1,0 +1,38 @@
+============================================
+  Boot Animation Installation Guide
+============================================
+
+Files:
+  drm_play_arm64  - 动画程序（视频数据已嵌入）
+  99-bootanim     - OpenWrt init.d 开机脚本
+
+Step 1: 上传文件
+-------------------------
+scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
+scp 99-bootanim root@192.168.1.1:/etc/init.d/
+
+Step 2: 设置权限和启用
+-------------------------
+ssh root@192.168.1.1
+chmod +x /usr/sbin/drm_play_arm64
+chmod +x /etc/init.d/99-bootanim
+/etc/init.d/99-bootanim enable
+
+Step 3: 测试
+-------------------------
+/usr/sbin/drm_play_arm64 /dev/dri/card1
+
+Step 4: 重启验证
+-------------------------
+reboot
+
+说明:
+- 程序完全静默运行，无任何日志输出
+- 不会对 eMMC 产生额外读写
+- 如需运行 bo.py，放到 /usr/sbin/bo.py
+- START=99 可改为更小数字以更早启动（修改为START=11）
+
+卸载:
+/etc/init.d/99-bootanim disable
+rm /usr/sbin/drm_play_arm64
+rm /etc/init.d/99-bootanim
