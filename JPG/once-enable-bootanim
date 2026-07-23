@@ -1,9 +1,11 @@
 #!/bin/sh /etc/rc.common
+
 START=5
 
 start() {
-    # 执行启用自启
     /etc/init.d/99-bootanim enable
-    # 执行完毕删除自身，永久不再运行
+    # 删除自身实体脚本
     rm -f "$0"
+    # 顺带删除rc.d内对应的软链接
+    rm -f /etc/rc.d/S05once-enable-bootanim
 }
