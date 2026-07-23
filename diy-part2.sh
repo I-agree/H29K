@@ -40,7 +40,7 @@ fi
 # echo "🔧 给可执行脚本添加运行权限"
 chmod +x files/etc/init.d/99-bootanim
 chmod +x files/usr/sbin/drm_play_arm64
-chmod +x files/usr/bin/bo.py
+chmod +x files/usr/sbin/bo.py
 
 # 编译时直接把开机自启的链接打包进固件，烧录后任意次数开机都会自动跑，enable只需要执行一次，永久生效
 $TARGET_DIR/etc/init.d/99-bootanim enable
