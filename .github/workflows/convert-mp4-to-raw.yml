@@ -23,7 +23,7 @@ jobs:
           echo "Download complete."
           ls -lh apple.mp4
 
-      - name: Convert MP4 to RAW (XRGB8888)
+      - name: Convert MP4 to RGB565（16位色）
         run: |
           # 将 MP4 转换为 DRM 友好的 RGB565（16位色） 裸数据
           # 分辨率保持不变，保留原始帧率
