@@ -42,8 +42,8 @@ chmod +x files/etc/init.d/99-bootanim
 chmod +x files/usr/sbin/drm_play_arm64
 chmod +x files/usr/bin/bo.py
 
-# 写入开机自启命令
-echo "/etc/init.d/99-bootanim enable" >> files/etc/rc.local
+# 编译时直接把开机自启的链接打包进固件，烧录后任意次数开机都会自动跑，enable只需要执行一次，永久生效
+$TARGET_DIR/etc/init.d/99-bootanim enable
 # ==============================================================
 
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
