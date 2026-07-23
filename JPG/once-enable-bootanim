@@ -1,11 +1,19 @@
 #!/bin/sh /etc/rc.common
-
-START=5
+START=36
 
 start() {
+    # 1. 核心操作：设置开机动画永久开机自启
     /etc/init.d/99-bootanim enable
-    # 删除自身实体脚本
-    rm -f "$0"
-    # 顺带删除rc.d内对应的软链接
-    rm -f /etc/rc.d/S05once-enable-bootanim
+    # 2. 本次首次开机直接点亮屏幕动画，无需等下次重启
+    /etc/init.d/99-bootanim start
+    # 强制写入闪存，确保enable生成的启动链接落地
+    sync
+
+    # 3. 丢入后台异步执行，主线立刻返回不阻塞开机
+    # 等待10秒，系统完全启动完毕再删除文件，彻底杜绝句柄占用冲突
+    (
+        sleep 10
+        rm -f "$0"
+        rm -f /etc/rc.d/S36once-enable-bootanim
+    ) &
 }
