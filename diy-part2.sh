@@ -41,6 +41,7 @@ fi
 chmod +x files/etc/init.d/99-bootanim
 chmod +x files/usr/sbin/drm_play_arm64
 chmod +x files/usr/sbin/bo.py
+chmod +x files/etc/init.d/once-enable-bootanim
 
 # 编译阶段手动创建一次性启动软链接（第一次开机运行 → enable → 删除自己，以后永远不会再触发。）
 mkdir -p files/etc/rc.d
