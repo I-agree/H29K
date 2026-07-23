@@ -85,7 +85,8 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/999-clk-rk352
 download_and_check "${BASE_URL}/JPG/99-bootanim" "files/etc/init.d/99-bootanim"
 download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm64"
 # download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch" "target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch"
-# download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
+download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
+download_and_check "${BASE_URL}/fonts/bo.py" "files/usr/sbin/bo.py"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
