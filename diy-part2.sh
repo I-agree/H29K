@@ -40,7 +40,7 @@ fi
 # echo "🔧 给可执行脚本添加运行权限"
 chmod +x files/etc/init.d/99-bootanim
 chmod +x files/usr/sbin/drm_play_arm64
-# chmod +x files/usr/bin/bo.py
+chmod +x files/usr/bin/bo.py
 
 # 写入开机自启命令
 echo "/etc/init.d/99-bootanim enable" >> files/etc/rc.local
