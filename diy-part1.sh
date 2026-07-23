@@ -37,7 +37,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/usr/share/splash \
          files/etc/init.d \
          files/etc/fonts/conf.d \
-         files/usr/bin \
+         files/usr/sbin \
          files/lib/firmware \
          package/boot/uboot-rockchip/patches \
          package/kernel/aic8800/patches \
