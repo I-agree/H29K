@@ -16,7 +16,9 @@ jobs:
 
       # --- 1. 转换 MP4 为 RAW ---
       - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
 
       - name: Download MP4
         run: |
@@ -24,7 +26,6 @@ jobs:
 
       - name: Convert MP4 to RAW (RGB565)
         run: |
-          # 保持 原始分辨率，转换为 RGB565 裸数据
           ffmpeg -i apple.mp4 -f rawvideo -pix_fmt rgb565le apple.raw
           ls -lh apple.raw
 
@@ -34,23 +35,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu
 
-      - name: Setup ARM64 libdrm (from Debian)
+      - name: Setup ARM64 libdrm (Sysroot Method - No Install)
         run: |
-          # 添加 arm64 架构
           sudo dpkg --add-architecture arm64
           
-          # 添加 Debian arm64 源（稳定且包含 arm64 包）
-          echo "deb [arch=arm64] http://deb.debian.org/debian bookworm main" | sudo tee /etc/apt/sources.list.d/debian-arm64.list
+          # 添加 Ubuntu arm64 源，使用 trusted=yes 跳过 GPG 验证
+          UBUNTU_CODENAME=$(lsb_release -cs)
+          echo "deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports $UBUNTU_CODENAME main" | sudo tee /etc/apt/sources.list.d/ubuntu-ports-arm64.list
           
-          # 添加 Debian 的 GPG key
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 648ACFD622F3D138
-          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys 0E98404D386FA1D9
+          # 仅更新这个特定的 arm64 源，避免影响主系统
+          sudo apt-get update -o Dir::Etc::sourcelist="/etc/apt/sources.list.d/ubuntu-ports-arm64.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
           
-          # 只更新 Debian arm64 源
-          sudo apt-get update -o Dir::Etc::sourcelist="/etc/apt/sources.list.d/debian-arm64.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
+          # 创建本地 sysroot 目录
+          mkdir -p /tmp/arm64-sysroot
+          cd /tmp/arm64-sysroot
           
-          # 安装 arm64 的 libdrm 开发库
-          sudo apt-get install -y libdrm-dev:arm64
+          # 只下载 .deb 包，不安装！
+          apt-get download libdrm-dev:arm64 libdrm2:arm64 libdrm-common
+          
+          # 将 .deb 包解压到当前目录
+          for deb in *.deb; do
+            dpkg -x "$deb" .
+          done
+          
+          echo "Sysroot prepared:"
+          ls -la usr/include/
 
       - name: Create DRM Player C Source
         run: |
@@ -136,8 +145,13 @@ jobs:
 
       - name: Cross Compile for ARM64 (RK3528)
         run: |
-          # 使用 aarch64 交叉编译器，链接 arm64 的 libdrm
-          aarch64-linux-gnu-gcc -O3 -o drm_play_arm64 drm_play.c -ldrm
+          # 指定刚才解压的 arm64 头文件和库文件路径进行编译
+          aarch64-linux-gnu-gcc -O3 -o drm_play_arm64 drm_play.c \
+            -I/tmp/arm64-sysroot/usr/include \
+            -I/tmp/arm64-sysroot/usr/include/aarch64-linux-gnu \
+            -L/tmp/arm64-sysroot/usr/lib/aarch64-linux-gnu \
+            -ldrm
+          
           chmod +x drm_play_arm64
           file drm_play_arm64
 
