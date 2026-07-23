@@ -2,9 +2,6 @@ name: Build DRM Player & Convert MP4（开机动画）
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   build-and-convert:
