@@ -24,7 +24,7 @@ jobs:
 
     steps:
     - name: 检出源码
-      uses: actions/checkout@v6.0.3
+      uses: actions/checkout@v7.0.1
 
     - name: 调整磁盘空间
       run: |
