@@ -225,31 +225,27 @@ jobs:
                   sleep_ms(1000 / FPS);
               }
 
-              /* 清屏 */
-              memset(map[0], 0, dumb[0].size);
-              drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
-                             &conn->connector_id, 1, &conn->modes[0]);
+              /* === 关键修改：不清屏，不释放 DRM 资源 === */
+              /* 保持最后一帧显示在屏幕上，直接 fork 运行 bo.py */
+              /* 进程退出时内核会自动回收 fd 和 DRM 资源 */
 
-              /* 释放 DRM 资源 */
-              for (int i = 0; i < 2; i++) {
-                  drmModeRmFB(fd, fb_id[i]);
-                  munmap(map[i], dumb[i].size);
-                  drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dumb[i]);
-              }
-              drmModeFreeCrtc(crtc);
-              drmModeFreeConnector(conn);
-              drmModeFreeResources(res);
-
-              /* 检查并运行 bo.py */
               char bo_path[PATH_MAX];
               snprintf(bo_path, sizeof(bo_path), "%s/bo.py", exe_dir);
               struct stat st;
               if (stat(bo_path, &st) == 0) {
                   pid_t pid = fork();
                   if (pid == 0) {
+                      /* 子进程：关闭继承的 fd */
+                      close(fd);
+                      /* 等待一小段时间让父进程退出释放 DRM */
+                      usleep(500000);  /* 500ms */
                       execlp("python3", "python3", bo_path, NULL);
                       execlp("python", "python", bo_path, NULL);
                       _exit(1);
+                  }
+                  /* 父进程等待子进程启动 */
+                  if (pid > 0) {
+                      sleep(1);
                   }
               }
 
