@@ -50,12 +50,11 @@ jobs:
             dpkg -x "$deb" .
           done
 
-      - name: Create DRM Player C Source (Final Fix)
+      - name: Create DRM Player C Source (Silent Mode, No Logs)
         run: |
           cat << 'ENDOFSOURCE' > drm_play.c
           #include <fcntl.h>
           #include <unistd.h>
-          #include <signal.h>
           #include <sys/mman.h>
           #include <sys/ioctl.h>
           #include <sys/wait.h>
@@ -81,46 +80,6 @@ jobs:
 
           static uint32_t screen_w, screen_h;
 
-          /* ===== 全局清理状态（供信号处理使用）===== */
-          static int            g_fd = -1;
-          static uint32_t       g_crtc_id = 0;
-          static drmModeCrtc   *g_orig_crtc = NULL;   /* 开机前原始 CRTC 状态 */
-          static uint32_t       g_fb_id[2] = {0, 0};
-          static void          *g_map[2] = {MAP_FAILED, MAP_FAILED};
-          static struct drm_mode_create_dumb g_dumb[2];
-          static drmModeConnector *g_conn = NULL;
-          static drmModeRes       *g_res = NULL;
-          static volatile sig_atomic_t g_stop = 0;
-
-          static void sig_handler(int sig) { (void)sig; g_stop = 1; }
-
-          static void cleanup(void) {
-              /* 1) 把 CRTC 还原成开机前的原始状态，彻底交还屏幕 */
-              if (g_fd >= 0 && g_orig_crtc && g_conn) {
-                  drmModeModeInfoPtr m = g_orig_crtc->mode_valid
-                                         ? &g_orig_crtc->mode : NULL;
-                  drmModeSetCrtc(g_fd, g_orig_crtc->crtc_id,
-                                 g_orig_crtc->buffer_id,
-                                 g_orig_crtc->x, g_orig_crtc->y,
-                                 &g_conn->connector_id, 1,
-                                 m);
-              }
-              /* 2) 释放 fb / mmap / dumb */
-              for (int i = 0; i < 2; i++) {
-                  if (g_fd >= 0 && g_fb_id[i])
-                      drmModeRmFB(g_fd, g_fb_id[i]);
-                  if (g_map[i] != MAP_FAILED && g_dumb[i].size)
-                      munmap(g_map[i], g_dumb[i].size);
-                  if (g_fd >= 0 && g_dumb[i].handle)
-                      drmIoctl(g_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &g_dumb[i].handle);
-              }
-              if (g_orig_crtc) drmModeFreeCrtc(g_orig_crtc);
-              if (g_conn)      drmModeFreeConnector(g_conn);
-              if (g_res)       drmModeFreeResources(g_res);
-              if (g_fd >= 0)   close(g_fd);
-              g_fd = -1;
-          }
-
           void sleep_ms(int ms) {
               struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000 };
               nanosleep(&ts, NULL);
@@ -131,7 +90,6 @@ jobs:
               memset(buf, 0, pitch * screen_h);
               int x_offset = (screen_w - VIDEO_W) / 2;
               int y_offset = ((int)screen_h - VIDEO_H) / 2;
-              if (x_offset < 0) x_offset = 0;
               if (y_offset < 0) y_offset = 0;
               uint32_t src_row_bytes = VIDEO_W * (BPP / 8);
               for (int y = 0; y < VIDEO_H; y++) {
@@ -160,13 +118,6 @@ jobs:
           int main(int argc, char *argv[]) {
               const char *drm_device = (argc > 1) ? argv[1] : "/dev/dri/card0";
 
-              /* 注册信号：保证 ^C / kill 也能走 cleanup */
-              struct sigaction sa = {0};
-              sa.sa_handler = sig_handler;
-              sigaction(SIGINT,  &sa, NULL);
-              sigaction(SIGTERM, &sa, NULL);
-              atexit(cleanup);   /* 正常 return 也走 cleanup */
-
               char exe_dir[PATH_MAX] = "/tmp";
               get_exe_dir(exe_dir, sizeof(exe_dir));
 
@@ -174,113 +125,136 @@ jobs:
               long total_frames = (long)(apple_raw_len / frame_size);
               long total_duration_frames = FPS * DURATION;
 
-              printf("[DEBUG] Opening %s ...\n", drm_device);
-              g_fd = open(drm_device, O_RDWR | O_CLOEXEC);
-              if (g_fd < 0) { printf("[ERROR] open: %s\n", strerror(errno)); return 1; }
-
-              /* 主动抢占 DRM master，避免被残留 master 卡住 */
-              drmSetMaster(g_fd);
+              int fd = open(drm_device, O_RDWR | O_CLOEXEC);
+              if (fd < 0) return 1;
 
               uint64_t has_dumb = 0;
-              if (drmGetCap(g_fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || !has_dumb) {
-                  printf("[ERROR] no dumb\n"); return 1;
+              if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || !has_dumb) {
+                  close(fd);
+                  return 1;
               }
 
-              g_res = drmModeGetResources(g_fd);
-              if (!g_res) { printf("[ERROR] GetResources\n"); return 1; }
-              printf("[DEBUG] conn=%d crtc=%d enc=%d\n",
-                     g_res->count_connectors, g_res->count_crtcs, g_res->count_encoders);
+              drmModeRes *res = drmModeGetResources(fd);
+              if (!res) { close(fd); return 1; }
 
+              drmModeConnector *conn = NULL;
               uint32_t crtc_id = 0;
 
-              /* 选 connected 的 connector */
-              for (int i = 0; i < g_res->count_connectors; i++) {
-                  drmModeConnector *c = drmModeGetConnector(g_fd, g_res->connectors[i]);
+              for (int i = 0; i < res->count_connectors; i++) {
+                  drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
                   if (!c) continue;
-                  if (!g_conn && c->connection == DRM_MODE_CONNECTED && c->count_modes > 0) {
-                      g_conn = c;
+                  if (!conn && c->count_modes > 0) {
+                      conn = c;
                       screen_w = c->modes[0].hdisplay;
                       screen_h = c->modes[0].vdisplay;
                   } else {
                       drmModeFreeConnector(c);
                   }
               }
-              if (!g_conn) { printf("[ERROR] no connector\n"); return 1; }
-              printf("[DEBUG] mode %dx%d conn_id=%d\n", screen_w, screen_h, g_conn->connector_id);
+              if (!conn) { drmModeFreeResources(res); close(fd); return 1; }
 
-              /* 用 possible_crtcs 正确匹配 CRTC（修复 encoder_id=0 的情况）*/
-              uint32_t possible = 0;
-              if (g_conn->encoder_id) {
-                  drmModeEncoder *enc = drmModeGetEncoder(g_fd, g_conn->encoder_id);
-                  if (enc) { possible = enc->possible_crtcs; drmModeFreeEncoder(enc); }
-              }
-              if (!possible) {
-                  /* connector 没 encoder：枚举所有 encoder 找匹配本 connector 的 */
-                  for (int i = 0; i < g_res->count_encoders; i++) {
-                      drmModeEncoder *enc = drmModeGetEncoder(g_fd, g_res->encoders[i]);
-                      if (!enc) continue;
-                      /* 没有直接关联信息时，退化为：possible_crtcs 与可用 crtc 取交集 */
-                      possible |= enc->possible_crtcs;
+              drmModeCrtc *crtc = NULL;
+              if (conn->encoder_id) {
+                  drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
+                  if (enc) {
+                      crtc = drmModeGetCrtc(fd, enc->crtc_id);
+                      if (crtc) crtc_id = crtc->crtc_id;
                       drmModeFreeEncoder(enc);
                   }
-                  if (!possible) possible = 0xFFFFFFFFu; /* 实在没有就允许全部 */
               }
-              for (int i = 0; i < g_res->count_crtcs; i++) {
-                  if (possible & (1u << i)) { crtc_id = g_res->crtcs[i]; break; }
+              if (!crtc) {
+                  for (int i = 0; i < res->count_crtcs; i++) {
+                      crtc = drmModeGetCrtc(fd, res->crtcs[i]);
+                      if (crtc) { crtc_id = crtc->crtc_id; break; }
+                  }
               }
-              if (!crtc_id && g_res->count_crtcs) crtc_id = g_res->crtcs[0];
-              g_crtc_id = crtc_id;
-              printf("[DEBUG] crtc_id=%u possible=0x%x\n", crtc_id, possible);
+              if (!crtc) { drmModeFreeResources(res); close(fd); return 1; }
 
-              /* 保存开机前原始 CRTC 状态（退出时还原用）*/
-              g_orig_crtc = drmModeGetCrtc(g_fd, crtc_id);
+              struct drm_mode_create_dumb dumb[2];
+              void *map[2];
+              uint32_t fb_id[2];
 
-              /* 创建双缓冲 */
               for (int i = 0; i < 2; i++) {
-                  memset(&g_dumb[i], 0, sizeof(g_dumb[i]));
-                  g_dumb[i].width = screen_w; g_dumb[i].height = screen_h; g_dumb[i].bpp = BPP;
-                  if (drmIoctl(g_fd, DRM_IOCTL_MODE_CREATE_DUMB, &g_dumb[i]) < 0) {
-                      printf("[ERROR] dumb %d: %s\n", i, strerror(errno)); return 1;
+                  memset(&dumb[i], 0, sizeof(dumb[i]));
+                  dumb[i].width = screen_w;
+                  dumb[i].height = screen_h;
+                  dumb[i].bpp = BPP;
+                  if (drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb[i]) < 0) {
+                      drmModeFreeResources(res); close(fd); return 1;
                   }
-                  uint32_t h[4] = {g_dumb[i].handle,0,0,0};
-                  uint32_t p[4] = {g_dumb[i].pitch,0,0,0};
-                  uint32_t o[4] = {0,0,0,0};
-                  if (drmModeAddFB2(g_fd, screen_w, screen_h, DRM_FORMAT_XRGB8888,
-                                    h, p, o, &g_fb_id[i], 0) < 0) {
-                      printf("[ERROR] addfb %d: %s\n", i, strerror(errno)); return 1;
+                  uint32_t handles[4] = {dumb[i].handle, 0, 0, 0};
+                  uint32_t pitches[4] = {dumb[i].pitch, 0, 0, 0};
+                  uint32_t offsets[4] = {0, 0, 0, 0};
+                  if (drmModeAddFB2(fd, screen_w, screen_h, DRM_FORMAT_XRGB8888,
+                                    handles, pitches, offsets, &fb_id[i], 0) < 0) {
+                      drmModeFreeResources(res); close(fd); return 1;
                   }
-                  struct drm_mode_map_dumb mr = { .handle = g_dumb[i].handle };
-                  drmIoctl(g_fd, DRM_IOCTL_MODE_MAP_DUMB, &mr);
-                  g_map[i] = mmap(0, g_dumb[i].size, PROT_READ|PROT_WRITE, MAP_SHARED, g_fd, mr.offset);
-                  if (g_map[i] == MAP_FAILED) { printf("[ERROR] mmap %d\n", i); return 1; }
-                  memset(g_map[i], 0, g_dumb[i].size);
+                  struct drm_mode_map_dumb map_req;
+                  memset(&map_req, 0, sizeof(map_req));
+                  map_req.handle = dumb[i].handle;
+                  if (drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) < 0) {
+                      drmModeFreeResources(res); close(fd); return 1;
+                  }
+                  map[i] = mmap(0, dumb[i].size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_req.offset);
+                  if (map[i] == MAP_FAILED) {
+                      drmModeFreeResources(res); close(fd); return 1;
+                  }
+                  memset(map[i], 0, dumb[i].size);
               }
 
-              /* 第一帧 */
-              copy_frame_centered(g_map[0], get_frame(0, total_frames), g_dumb[0].pitch);
-              if (drmModeSetCrtc(g_fd, crtc_id, g_fb_id[0], 0, 0,
-                                 &g_conn->connector_id, 1, &g_conn->modes[0]) < 0) {
-                  printf("[ERROR] SetCrtc: %s\n", strerror(errno)); return 1;
+              /* 显示第一帧 */
+              copy_frame_centered(map[0], get_frame(0, total_frames), dumb[0].pitch);
+              if (drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]) < 0) {
+                  drmModeFreeResources(res); close(fd); return 1;
               }
-              printf("[DEBUG] playing... x_off=%d y_off=%d pitch=%d\n",
-                     (screen_w-VIDEO_W)/2, ((int)screen_h-VIDEO_H)/2, g_dumb[0].pitch);
 
-              /* 播放循环：用 g_stop 信号优雅退出 */
+              /* 循环播放 36 秒 */
               int cur = 1;
-              long fc = 1;
-              time_t t0 = time(NULL);
-              while (fc < total_duration_frames && !g_stop) {
-                  if (difftime(time(NULL), t0) >= DURATION) break;
-                  copy_frame_centered(g_map[cur], get_frame(fc, total_frames), g_dumb[cur].pitch);
-                  drmModeSetCrtc(g_fd, crtc_id, g_fb_id[cur], 0, 0,
-                                 &g_conn->connector_id, 1, &g_conn->modes[0]);
-                  cur = 1 - cur; fc++;
+              long frame_count = 1;
+              time_t start_time = time(NULL);
+
+              while (frame_count < total_duration_frames) {
+                  if (difftime(time(NULL), start_time) >= DURATION) break;
+
+                  copy_frame_centered(map[cur], get_frame(frame_count, total_frames), dumb[cur].pitch);
+                  drmModeSetCrtc(fd, crtc_id, fb_id[cur], 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]);
+                  cur = 1 - cur;
+                  frame_count++;
                   sleep_ms(1000 / FPS);
               }
-              printf("[DEBUG] loop end fc=%ld stop=%d\n", fc, (int)g_stop);
 
-              /* 不在这里清屏/塞黑 fb！直接 return，由 cleanup() 还原原始 CRTC */
-              return 0;   /* atexit(cleanup) 会自动执行，彻底交还屏幕 */
+              /* 清屏 */
+              memset(map[0], 0, dumb[0].size);
+              drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                             &conn->connector_id, 1, &conn->modes[0]);
+
+              /* 释放 DRM 资源 */
+              for (int i = 0; i < 2; i++) {
+                  drmModeRmFB(fd, fb_id[i]);
+                  munmap(map[i], dumb[i].size);
+                  drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dumb[i]);
+              }
+              drmModeFreeCrtc(crtc);
+              drmModeFreeConnector(conn);
+              drmModeFreeResources(res);
+
+              /* 检查并运行 bo.py */
+              char bo_path[PATH_MAX];
+              snprintf(bo_path, sizeof(bo_path), "%s/bo.py", exe_dir);
+              struct stat st;
+              if (stat(bo_path, &st) == 0) {
+                  pid_t pid = fork();
+                  if (pid == 0) {
+                      execlp("python3", "python3", bo_path, NULL);
+                      execlp("python", "python", bo_path, NULL);
+                      _exit(1);
+                  }
+              }
+
+              close(fd);
+              return 0;
           }
           ENDOFSOURCE
 
