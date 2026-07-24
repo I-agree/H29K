@@ -422,6 +422,7 @@
 		power-supply = <&vcc_3v3_lcd>;
 		width-mm = <20>;
 		height-mm = <37>;
+		rotation = <270>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_dc_pin>;
 
