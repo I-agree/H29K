@@ -1,4 +1,4 @@
-name: 开机动画
+name: Build DRM Player & Convert MP4（开机动画）
 
 on:
   workflow_dispatch:
@@ -50,7 +50,7 @@ jobs:
             dpkg -x "$deb" .
           done
 
-      - name: Create DRM Player C Source (Animation + Show Mode)
+      - name: Create DRM Player C Source (Animation + Show Mode, Keep Alive)
         run: |
           cat << 'ENDOFSOURCE' > drm_play.c
           #include <fcntl.h>
@@ -66,6 +66,7 @@ jobs:
           #include <errno.h>
           #include <libgen.h>
           #include <limits.h>
+          #include <signal.h>
           #include <xf86drm.h>
           #include <xf86drmMode.h>
           #include <drm_fourcc.h>
@@ -97,8 +98,8 @@ jobs:
           }
 
           /* ============================================================
-           * 通用 DRM 初始化：打开设备，找 connector 和 CRTC
-           * 成功返回 fd，screen_w/screen_h 被填充
+           * 通用 DRM 初始化
+           * 注意：不检查 DRM_MODE_CONNECTED（Rockchip MIPI DSI 可能不报告）
            * ============================================================ */
           static int drm_init(const char *drm_device,
                               drmModeRes **out_res,
@@ -116,11 +117,12 @@ jobs:
               drmModeRes *res = drmModeGetResources(fd);
               if (!res) { close(fd); return -1; }
 
+              /* 找 connector：不要求 DRM_MODE_CONNECTED，只要有 modes 就行 */
               drmModeConnector *conn = NULL;
               for (int i = 0; i < res->count_connectors; i++) {
                   drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
                   if (!c) continue;
-                  if (c->connection == DRM_MODE_CONNECTED && c->count_modes > 0) {
+                  if (c->count_modes > 0) {
                       conn = c;
                       screen_w = c->modes[0].hdisplay;
                       screen_h = c->modes[0].vdisplay;
@@ -130,6 +132,7 @@ jobs:
               }
               if (!conn) { drmModeFreeResources(res); close(fd); return -1; }
 
+              /* 找 CRTC */
               uint32_t crtc_id = 0;
               if (conn->encoder_id) {
                   drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
@@ -201,7 +204,8 @@ jobs:
 
           /* ============================================================
            * --show 模式：从 stdin 读取像素数据，显示到屏幕
-           * 用法: drm_play_arm64 --show <drm_device> [width] [height]
+           * 显示后 pause() 保持画面（fd 不关闭，buffer 不释放）
+           * 被 SIGTERM/SIGKILL 杀死时内核自动清理
            * ============================================================ */
           static int show_mode(const char *drm_device, uint32_t img_w, uint32_t img_h) {
               size_t expected = (size_t)img_w * img_h * 4;
@@ -240,20 +244,24 @@ jobs:
               }
 
               copy_centered(map, dumb.pitch, img_data, img_w, img_h);
+              free(img_data);
 
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0,
                              &conn->connector_id, 1, &conn->modes[0]);
 
-              munmap(map, dumb.size);
-              drmModeFreeConnector(conn);
-              drmModeFreeResources(res);
-              close(fd);
-              free(img_data);
+              /* 不关闭 fd，不退出进程，保持画面显示 */
+              /* 被 kill 时内核自动回收资源 */
+              pause();
+
+              /* 不会执行到这里（除非收到可捕获信号） */
               return 0;
           }
 
           /* ============================================================
-           * 动画播放模式（原有逻辑）
+           * 动画播放模式
+           * 播完后：
+           *   - 有 bo.py → fork 子进程运行 bo.py，父进程 pause() 保持最后一帧
+           *   - 无 bo.py → pause() 保持最后一帧
            * ============================================================ */
           static int play_mode(const char *drm_device) {
               char exe_dir[PATH_MAX] = "/tmp";
@@ -314,7 +322,7 @@ jobs:
                   sleep_ms(1000 / FPS);
               }
 
-              /* 不清屏，保持最后一帧 */
+              /* === 动画播完，保持最后一帧 === */
 
               /* 检测同目录是否有 bo.py */
               char bo_path[PATH_MAX];
@@ -323,26 +331,33 @@ jobs:
               if (stat(bo_path, &st) == 0) {
                   pid_t pid = fork();
                   if (pid == 0) {
+                      /* 子进程：关闭继承的 fd，运行 bo.py */
                       close(fd);
-                      usleep(1000000);
+                      usleep(500000);  /* 等 0.5 秒 */
                       execlp("python3", "python3", bo_path, NULL);
                       execlp("python", "python", bo_path, NULL);
                       _exit(1);
                   }
+                  /* 父进程继续往下走，pause() 保持最后一帧 */
               }
 
-              close(fd);
-              drmModeFreeConnector(conn);
-              drmModeFreeResources(res);
+              /* 不关闭 fd，不释放资源，pause() 永驻 */
+              /* 屏幕持续显示最后一帧（或等 bo.py 的 --show 覆盖） */
+              pause();
+
+              /* 不会执行到这里 */
               return 0;
           }
 
           /* ============================================================
-           * main：根据参数决定模式
+           * main
            *   drm_play_arm64 <drm_device>                    → 动画模式
            *   drm_play_arm64 --show <drm_device> [w] [h]     → 显示模式
            * ============================================================ */
           int main(int argc, char *argv[]) {
+              /* 忽略 SIGPIPE，防止管道写入端提前关闭导致崩溃 */
+              signal(SIGPIPE, SIG_IGN);
+
               if (argc >= 3 && strcmp(argv[1], "--show") == 0) {
                   const char *dev = argv[2];
                   uint32_t w = (argc > 3) ? (uint32_t)atoi(argv[3]) : 320;
@@ -388,7 +403,7 @@ jobs:
               # 短暂等待 DRM 设备就绪
               [ ! -e "$DRM_DEV" ] && sleep 1
               
-              # 静默后台运行，无任何输出，无日志写入
+              # 静默后台运行
               "$PLAYER" "$DRM_DEV" >/dev/null 2>&1 &
           }
 
@@ -435,9 +450,11 @@ jobs:
           reboot
 
           说明:
-          - 动画播完后自动检测同目录 bo.py，有则启动，无则退出
-          - bo.py 通过管道调用 --show 模式显示图片，零 eMMC 写入
-          - 程序完全静默运行，无任何日志输出
+          - 动画播完后进程保持存活（pause），屏幕持续显示最后一帧
+          - 有 bo.py 时自动 fork 运行，bo.py 通过 --show 覆盖画面
+          - 无 bo.py 时保持最后一帧直到被 kill
+          - 重复运行不会冲突（新进程会覆盖旧进程的 CRTC 输出）
+          - 停止: killall drm_play_arm64
 
           卸载:
           /etc/init.d/99-bootanim disable
