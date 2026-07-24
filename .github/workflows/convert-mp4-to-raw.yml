@@ -245,6 +245,15 @@ jobs:
                   }
               }
 
+              /* === 新增：清理 DRM 资源 === */
+              for (int i = 0; i < 2; i++) {
+                  munmap(map[i], dumb[i].size);
+                  drmModeRmFB(fd, fb_id[i]);
+                  struct drm_mode_destroy_dumb destroy = { .handle = dumb[i].handle };
+                  drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+              }
+              drmModeSetCrtc(fd, crtc_id, 0, 0, 0, NULL, 0, NULL);
+
               close(fd);
               return 0;
           }
