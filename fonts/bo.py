@@ -231,7 +231,7 @@ class DRMDisplay:
 
         # 获取 connector 列表
         conn_ids = (ctypes.c_uint32 * res.count_connectors)()
-        res.connector_id_ptr = ctypes.cast(ctypes.pointer(conn_ids), ctypes.c_uint64).value
+        res.connector_id_ptr = ctypes.addressof(conn_ids)
         res.count_connectors = res.count_connectors
         fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETRESOURCES, res)
 
@@ -244,7 +244,7 @@ class DRMDisplay:
             if conn.count_modes > 0 and conn.connection == DRM_MODE_CONNECTED:
                 # 读取 modes
                 modes_buf = (ctypes.c_char * (68 * conn.count_modes))()
-                conn.modes_ptr = ctypes.cast(ctypes.pointer(modes_buf), ctypes.c_uint64).value
+                conn.modes_ptr = ctypes.addressof(modes_buf)
                 fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETCONNECTOR, conn)
 
                 self.connector_id = conn.connector_id
@@ -267,7 +267,7 @@ class DRMDisplay:
         if not crtc_id:
             # 取第一个 CRTC
             crtc_ids = (ctypes.c_uint32 * res.count_crtcs)()
-            res.crtc_id_ptr = ctypes.cast(ctypes.pointer(crtc_ids), ctypes.c_uint64).value
+            res.crtc_id_ptr = ctypes.addressof(crtc_ids)
             fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETRESOURCES, res)
             if res.count_crtcs > 0:
                 crtc_id = crtc_ids[0]
