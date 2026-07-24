@@ -428,8 +428,8 @@
 		panel-timing {
 			hactive = <320>;
 			vactive = <172>;
-			hback-porch = <34>;
-			vback-porch = <0>;
+			hback-porch = <0>;
+			vback-porch = <34>;
 			hfront-porch = <0>;
 			hsync-len = <0>;
 			vfront-porch = <0>;
