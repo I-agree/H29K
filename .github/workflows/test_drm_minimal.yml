@@ -50,7 +50,7 @@ jobs:
             dpkg -x "$deb" .
           done
 
-      - name: Create DRM Player C Source (Animation + Show Mode, Keep Alive)
+      - name: Create DRM Player C Source
         run: |
           cat << 'ENDOFSOURCE' > drm_play.c
           #include <fcntl.h>
@@ -64,7 +64,6 @@ jobs:
           #include <string.h>
           #include <time.h>
           #include <errno.h>
-          #include <libgen.h>
           #include <limits.h>
           #include <signal.h>
           #include <xf86drm.h>
@@ -78,6 +77,7 @@ jobs:
           #define BPP      32
           #define FPS      25
           #define DURATION 36
+          #define BO_PY_PATH "/etc/bo.py"
 
           static uint32_t screen_w, screen_h;
 
@@ -86,20 +86,8 @@ jobs:
               nanosleep(&ts, NULL);
           }
 
-          int get_exe_dir(char *dir_buf, size_t buf_size) {
-              ssize_t len = readlink("/proc/self/exe", dir_buf, buf_size - 1);
-              if (len > 0) {
-                  dir_buf[len] = '\0';
-                  char *d = dirname(dir_buf);
-                  if (d != dir_buf) memmove(dir_buf, d, strlen(d) + 1);
-                  return 0;
-              }
-              return -1;
-          }
-
           /* ============================================================
            * 通用 DRM 初始化
-           * 注意：不检查 DRM_MODE_CONNECTED（Rockchip MIPI DSI 可能不报告）
            * ============================================================ */
           static int drm_init(const char *drm_device,
                               drmModeRes **out_res,
@@ -117,7 +105,6 @@ jobs:
               drmModeRes *res = drmModeGetResources(fd);
               if (!res) { close(fd); return -1; }
 
-              /* 找 connector：不要求 DRM_MODE_CONNECTED，只要有 modes 就行 */
               drmModeConnector *conn = NULL;
               for (int i = 0; i < res->count_connectors; i++) {
                   drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
@@ -132,7 +119,6 @@ jobs:
               }
               if (!conn) { drmModeFreeResources(res); close(fd); return -1; }
 
-              /* 找 CRTC */
               uint32_t crtc_id = 0;
               if (conn->encoder_id) {
                   drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
@@ -203,9 +189,15 @@ jobs:
           }
 
           /* ============================================================
+           * 关闭屏幕（禁用 CRTC 输出）
+           * ============================================================ */
+          static void drm_disable_crtc(int fd, uint32_t crtc_id) {
+              drmModeSetCrtc(fd, 0, 0, 0, 0, 0, 0, NULL);
+          }
+
+          /* ============================================================
            * --show 模式：从 stdin 读取像素数据，显示到屏幕
-           * 显示后 pause() 保持画面（fd 不关闭，buffer 不释放）
-           * 被 SIGTERM/SIGKILL 杀死时内核自动清理
+           * 显示后 pause() 保持画面
            * ============================================================ */
           static int show_mode(const char *drm_device, uint32_t img_w, uint32_t img_h) {
               size_t expected = (size_t)img_w * img_h * 4;
@@ -249,24 +241,19 @@ jobs:
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0,
                              &conn->connector_id, 1, &conn->modes[0]);
 
-              /* 不关闭 fd，不退出进程，保持画面显示 */
-              /* 被 kill 时内核自动回收资源 */
+              /* 不关闭 fd，pause() 保持画面 */
               pause();
 
-              /* 不会执行到这里（除非收到可捕获信号） */
               return 0;
           }
 
           /* ============================================================
            * 动画播放模式
            * 播完后：
-           *   - 有 bo.py → fork 子进程运行 bo.py，父进程 pause() 保持最后一帧
-           *   - 无 bo.py → pause() 保持最后一帧
+           *   - /etc/bo.py 存在 → fork 运行 bo.py，父进程 pause() 保持最后一帧
+           *   - /etc/bo.py 不存在 → 关闭屏幕，进程退出
            * ============================================================ */
           static int play_mode(const char *drm_device) {
-              char exe_dir[PATH_MAX] = "/tmp";
-              get_exe_dir(exe_dir, sizeof(exe_dir));
-
               size_t frame_size = VIDEO_W * VIDEO_H * (BPP / 8);
               long total_frames = (long)(apple_raw_len / frame_size);
               long total_duration_frames = FPS * DURATION;
@@ -322,40 +309,37 @@ jobs:
                   sleep_ms(1000 / FPS);
               }
 
-              /* === 动画播完，保持最后一帧 === */
+              /* === 动画播完 === */
 
-              /* 检测同目录是否有 bo.py */
-              char bo_path[PATH_MAX];
-              snprintf(bo_path, sizeof(bo_path), "%s/bo.py", exe_dir);
               struct stat st;
-              if (stat(bo_path, &st) == 0) {
+              if (stat(BO_PY_PATH, &st) == 0) {
+                  /* /etc/bo.py 存在 → fork 运行，父进程 pause() 保持最后一帧 */
                   pid_t pid = fork();
                   if (pid == 0) {
                       /* 子进程：关闭继承的 fd，运行 bo.py */
                       close(fd);
-                      usleep(500000);  /* 等 0.5 秒 */
-                      execlp("python3", "python3", bo_path, NULL);
-                      execlp("python", "python", bo_path, NULL);
+                      usleep(500000);
+                      execlp("python3", "python3", BO_PY_PATH, NULL);
+                      execlp("python", "python", BO_PY_PATH, NULL);
                       _exit(1);
                   }
-                  /* 父进程继续往下走，pause() 保持最后一帧 */
+                  /* 父进程：pause() 保持最后一帧（作为 bo.py 启动前的过渡） */
+                  pause();
+              } else {
+                  /* /etc/bo.py 不存在 → 关闭屏幕，退出 */
+                  drm_disable_crtc(fd, crtc_id);
+                  drmModeFreeConnector(conn);
+                  drmModeFreeResources(res);
+                  close(fd);
               }
 
-              /* 不关闭 fd，不释放资源，pause() 永驻 */
-              /* 屏幕持续显示最后一帧（或等 bo.py 的 --show 覆盖） */
-              pause();
-
-              /* 不会执行到这里 */
               return 0;
           }
 
           /* ============================================================
            * main
-           *   drm_play_arm64 <drm_device>                    → 动画模式
-           *   drm_play_arm64 --show <drm_device> [w] [h]     → 显示模式
            * ============================================================ */
           int main(int argc, char *argv[]) {
-              /* 忽略 SIGPIPE，防止管道写入端提前关闭导致崩溃 */
               signal(SIGPIPE, SIG_IGN);
 
               if (argc >= 3 && strcmp(argv[1], "--show") == 0) {
@@ -441,25 +425,23 @@ jobs:
           chmod +x /etc/init.d/99-bootanim
           /etc/init.d/99-bootanim enable
 
-          Step 3: 测试
+          Step 3: 上传 bo.py（可选）
           -------------------------
-          /usr/sbin/drm_play_arm64 /dev/dri/card1
-
-          Step 4: 重启验证
-          -------------------------
-          reboot
+          scp bo.py root@192.168.1.1:/etc/bo.py
+          chmod +x /etc/bo.py
 
           说明:
-          - 动画播完后进程保持存活（pause），屏幕持续显示最后一帧
-          - 有 bo.py 时自动 fork 运行，bo.py 通过 --show 覆盖画面
-          - 无 bo.py 时保持最后一帧直到被 kill
-          - 重复运行不会冲突（新进程会覆盖旧进程的 CRTC 输出）
+          - /etc/bo.py 存在 → 动画播完后自动运行 bo.py，屏幕保持最后一帧
+          - /etc/bo.py 不存在 → 动画播完后关闭屏幕，进程退出
+          - 修改 bo.py: vi /etc/bo.py
+          - 删除 bo.py: rm /etc/bo.py（下次开机动画播完自动关屏）
           - 停止: killall drm_play_arm64
 
           卸载:
           /etc/init.d/99-bootanim disable
           rm /usr/sbin/drm_play_arm64
           rm /etc/init.d/99-bootanim
+          rm /etc/bo.py
           EOF
 
       # --- 5. 上传产物 ---
