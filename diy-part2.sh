@@ -40,7 +40,7 @@ fi
 # echo "🔧 给可执行脚本添加运行权限"
 chmod +x files/etc/init.d/99-bootanim
 chmod +x files/usr/sbin/drm_play_arm64
-chmod +x files//etc/bo.py
+chmod +x files/etc/bo.py
 chmod +x files/etc/uci-defaults/once-enable-bootanim
 
 # ==============================================================
