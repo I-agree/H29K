@@ -422,14 +422,13 @@
 		power-supply = <&vcc_3v3_lcd>;
 		width-mm = <20>;
 		height-mm = <37>;
-		rotation = <270>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&lcd_dc_pin>;
 
 		panel-timing {
 			hactive = <320>;
 			vactive = <172>;
-			hback-porch = <0>;
+			hback-porch = <34>;
 			vback-porch = <0>;
 			hfront-porch = <0>;
 			hsync-len = <0>;
