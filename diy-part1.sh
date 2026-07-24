@@ -83,7 +83,7 @@ download_and_check "${BASE_URL}/JPG/99-bootanim" "files/etc/init.d/99-bootanim"
 download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm64"
 # download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch" "target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch"
 download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
-download_and_check "${BASE_URL}/fonts/bo.py" "files/usr/sbin/bo.py"
+download_and_check "${BASE_URL}/fonts/bo.py" "files/etc/bo.py"
 download_and_check "${BASE_URL}/JPG/once-enable-bootanim" "files/etc/uci-defaults/once-enable-bootanim"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
