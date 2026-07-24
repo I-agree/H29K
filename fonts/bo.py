@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""bo.py - 一言 + 随机背景，通过管道调用 drm_show_arm64 显示，零 eMMC 写入"""
+"""bo.py - 一言 + 随机背景，通过管道调用 drm_play_arm64 --show 显示，零 eMMC 写入"""
 
 import requests
 import os
+import signal
 import subprocess
 import threading
 import time
@@ -40,24 +41,33 @@ FALLBACK_TEXT = """山林不向四季起誓，荣枯随缘；
 被你改变的那一部分我，代替了你永远陪在了我的身边。"""
 
 DRM_DEVICE = "/dev/dri/card1"
-DRM_SHOW = "/usr/sbin/drm_show_arm64"
+DRM_PLAY = "/usr/sbin/drm_play_arm64"
 
 # ===================== 内存缓存（全部在 RAM 中） =====================
 _cache = {
-    "bg_bytes": None,          # 背景图片原始数据 (JPEG bytes)
-    "bg_image": None,          # 背景 PIL Image
-    "current_text": None,      # 当前显示文字
-    "next_text": None,         # 预加载的下一句
-    "next_bg_bytes": None,     # 预加载的下一张背景
-    "last_refresh": None,      # 上次刷新时间 (datetime)
+    "bg_bytes": None,
+    "bg_image": None,
+    "current_text": None,
+    "next_text": None,
+    "next_bg_bytes": None,
+    "last_refresh": None,
     "network_available": False,
 }
 _lock = threading.Lock()
 
+# 上一次 --show 子进程的 PID（用于精确 kill，不影响动画父进程）
+_show_pid = None
+
 
 # ===================== 显示函数（管道模式，零文件 I/O） =====================
 def display_image(img):
-    """将 PIL Image 转为 XRGB8888 并通过管道传给 drm_show_arm64"""
+    """将 PIL Image 转为 XRGB8888 并通过管道传给 drm_play_arm64 --show
+    
+    --show 进程显示后会 pause() 保持画面（fd 不关闭，buffer 不释放）。
+    下次刷新时先启动新进程覆盖画面，再 kill 旧进程，避免黑屏闪烁。
+    """
+    global _show_pid
+
     if img.size != (SCREEN_W, SCREEN_H):
         img = img.resize((SCREEN_W, SCREEN_H), Image.Resampling.LANCZOS)
 
@@ -81,14 +91,35 @@ def display_image(img):
             out[i*4+3] = 0xFF
         raw_data = bytes(out)
 
-    # 通过 stdin 管道传给 C 程序，不写任何文件
-    subprocess.run(
-        [DRM_SHOW, DRM_DEVICE, "-", str(SCREEN_W), str(SCREEN_H)],
-        input=raw_data,
+    # 1. 启动新的 --show 进程（它会显示新画面后 pause）
+    proc = subprocess.Popen(
+        [DRM_PLAY, "--show", DRM_DEVICE, str(SCREEN_W), str(SCREEN_H)],
+        stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        timeout=10
+        stderr=subprocess.DEVNULL
     )
+    try:
+        proc.stdin.write(raw_data)
+        proc.stdin.close()
+    except (BrokenPipeError, OSError):
+        pass
+
+    # 2. 等新进程完成显示（给它一点时间调用 drmModeSetCrtc）
+    time.sleep(0.5)
+
+    # 3. 杀掉旧的 --show 进程（此时 CRTC 已指向新 buffer，不会黑屏）
+    if _show_pid is not None:
+        try:
+            os.kill(_show_pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            os.waitpid(_show_pid, 0)
+        except ChildProcessError:
+            pass
+
+    # 4. 记录新进程 PID
+    _show_pid = proc.pid
 
 
 # ===================== 网络检测 =====================
@@ -225,9 +256,25 @@ def main_loop():
     threading.Thread(target=preload_sentence, daemon=True).start()
     threading.Thread(target=preload_background, daemon=True).start()
 
-    time.sleep(5)
+    # 等待预加载完成（最多等 5 秒，有数据就立刻显示）
+    for _ in range(50):
+        with _lock:
+            if _cache["next_text"] is not None:
+                break
+        time.sleep(0.1)
 
+    # 立刻显示第一帧
+    try:
+        bg_canvas = get_background_canvas()
+        show_text = get_display_text()
+        final_img = draw_center_text(bg_canvas, show_text)
+        display_image(final_img)
+    except Exception:
+        pass
+
+    # 之后每 15 分钟刷新
     while True:
+        time.sleep(REFRESH_CYCLE.total_seconds())
         try:
             bg_canvas = get_background_canvas()
             show_text = get_display_text()
@@ -235,8 +282,6 @@ def main_loop():
             display_image(final_img)
         except Exception:
             pass
-
-        time.sleep(REFRESH_CYCLE.total_seconds())
 
 
 if __name__ == "__main__":
