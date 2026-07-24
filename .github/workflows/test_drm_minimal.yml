@@ -31,7 +31,15 @@ jobs:
           xxd -i apple.raw > apple_raw.h
           head -2 apple_raw.h
 
-      # --- 2. 交叉编译 ARM64 DRM 播放程序 ---
+      # --- 2. 下载 stb 单文件库 ---
+      - name: Download stb libraries
+        run: |
+          curl -L -o stb_image.h "https://raw.githubusercontent.com/nothings/stb/master/stb_image.h"
+          curl -L -o stb_truetype.h "https://raw.githubusercontent.com/nothings/stb/master/stb_truetype.h"
+          curl -L -o stb_image_resize2.h "https://raw.githubusercontent.com/nothings/stb/master/stb_image_resize2.h"
+          ls -lh stb_*.h
+
+      # --- 3. 交叉编译 ARM64 DRM 播放程序 ---
       - name: Install ARM64 Cross-Compiler
         run: |
           sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
@@ -53,46 +61,90 @@ jobs:
       - name: Create DRM Player C Source
         run: |
           cat << 'ENDOFSOURCE' > drm_play.c
+          /*
+           * drm_play_arm64 - 开机动画 + 一言信息屏（全合一）
+           *
+           * 核心设计：
+           * - 单进程从头到尾持有 DRM Master，永远不关闭 fd
+           * - 避免 drm_lastclose() 被调用导致 panel 关闭
+           * - 动画播完后，同一进程直接显示一言+背景
+           * - 每 15 分钟刷新一次
+           *
+           * 运行时依赖（设备上）：
+           * - wget 或 curl（用于 HTTP 请求）
+           * - /usr/share/fonts/MiSans-Regular.ttf（中文字体）
+           */
+
+          #define _GNU_SOURCE
           #include <fcntl.h>
           #include <unistd.h>
           #include <sys/mman.h>
           #include <sys/ioctl.h>
-          #include <sys/wait.h>
           #include <sys/stat.h>
+          #include <sys/wait.h>
           #include <stdio.h>
           #include <stdlib.h>
           #include <string.h>
           #include <time.h>
           #include <errno.h>
-          #include <limits.h>
           #include <signal.h>
+          #include <math.h>
           #include <xf86drm.h>
           #include <xf86drmMode.h>
           #include <drm_fourcc.h>
 
+          #define STB_IMAGE_IMPLEMENTATION
+          #define STBI_ONLY_JPEG
+          #define STBI_ONLY_PNG
+          #include "stb_image.h"
+
+          #define STB_TRUETYPE_IMPLEMENTATION
+          #include "stb_truetype.h"
+
+          #define STB_IMAGE_RESIZE_IMPLEMENTATION
+          #include "stb_image_resize2.h"
+
           #include "apple_raw.h"
 
-          #define VIDEO_W  172
-          #define VIDEO_H  172
-          #define BPP      32
-          #define FPS      25
-          #define DURATION 36
-          #define BO_PY_PATH "/etc/bo.py"
+          /* ===================== 配置 ===================== */
+          #define VIDEO_W       172
+          #define VIDEO_H       172
+          #define BPP           32
+          #define FPS           25
+          #define DURATION      36
+          #define SCREEN_W      320
+          #define SCREEN_H      172
+          #define FONT_PATH     "/usr/share/fonts/MiSans-Regular.ttf"
+          #define FONT_SIZE     13.0f
+          #define REFRESH_SEC   (15 * 60)   /* 15 分钟 */
+          #define HTTP_TIMEOUT  8
 
+          #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
+          #define PICSUM_URL    "https://picsum.photos/320/172"
+
+          static const char *FALLBACK_TEXT =
+              "山林不向四季起誓，荣枯随缘；\n"
+              "海洋不需对沙滩承诺，遇合尽兴。\n"
+              "喜欢就处，别问是朋友还是恋人！\n"
+              "关系不是绳子，非要绑住谁的手脚；\n"
+              "缘分就像山风，吹到哪儿都是风景。\n"
+              "能走一段是礼物，能走一生是运气。\n"
+              "被你改变的那一部分我，\n"
+              "代替了你永远陪在了我的身边。";
+
+          /* ===================== 全局状态 ===================== */
           static uint32_t screen_w, screen_h;
           static volatile sig_atomic_t g_running = 1;
 
+          void sig_handler(int sig) { g_running = 0; }
+
           void sleep_ms(int ms) {
-              struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000 };
+              struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000L };
               nanosleep(&ts, NULL);
           }
 
-          void sig_handler(int sig) {
-              g_running = 0;
-          }
-
           /* ============================================================
-           * 通用 DRM 初始化
+           * DRM 初始化
            * ============================================================ */
           static int drm_init(const char *drm_device,
                               drmModeRes **out_res,
@@ -103,8 +155,7 @@ jobs:
 
               uint64_t has_dumb = 0;
               if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || !has_dumb) {
-                  close(fd);
-                  return -1;
+                  close(fd); return -1;
               }
 
               drmModeRes *res = drmModeGetResources(fd);
@@ -133,8 +184,7 @@ jobs:
               if (!crtc_id) {
                   drmModeFreeConnector(conn);
                   drmModeFreeResources(res);
-                  close(fd);
-                  return -1;
+                  close(fd); return -1;
               }
 
               *out_res = res;
@@ -179,7 +229,7 @@ jobs:
           static void copy_centered(void *dst, uint32_t pitch,
                                     const uint8_t *src,
                                     uint32_t img_w, uint32_t img_h) {
-              memset(dst, 0, pitch * screen_h);
+              memset(dst, 0, (size_t)pitch * screen_h);
               int x_off = ((int)screen_w - (int)img_w) / 2;
               int y_off = ((int)screen_h - (int)img_h) / 2;
               if (x_off < 0) x_off = 0;
@@ -188,13 +238,337 @@ jobs:
               uint32_t ch = (img_h > screen_h) ? screen_h : img_h;
               for (uint32_t y = 0; y < ch; y++) {
                   memcpy((uint8_t *)dst + (y + y_off) * pitch + x_off * 4,
-                         src + y * img_w * 4,
-                         cw * 4);
+                         src + y * img_w * 4, cw * 4);
               }
           }
 
           /* ============================================================
-           * Daemon 化：关闭标准 IO，保持进程和 fd 存活
+           * HTTP GET（通过 popen 调用 wget）
+           * 返回 malloc 的数据，调用者 free
+           * ============================================================ */
+          static char *http_get(const char *url, size_t *out_len) {
+              char cmd[512];
+              snprintf(cmd, sizeof(cmd),
+                       "wget -qO- --timeout=%d '%s' 2>/dev/null", HTTP_TIMEOUT, url);
+
+              FILE *fp = popen(cmd, "r");
+              if (!fp) return NULL;
+
+              size_t cap = 65536, len = 0;
+              char *buf = malloc(cap);
+              if (!buf) { pclose(fp); return NULL; }
+
+              size_t n;
+              while ((n = fread(buf + len, 1, cap - len - 1, fp)) > 0) {
+                  len += n;
+                  if (len >= cap - 1) {
+                      cap *= 2;
+                      char *tmp = realloc(buf, cap);
+                      if (!tmp) { free(buf); pclose(fp); return NULL; }
+                      buf = tmp;
+                  }
+              }
+              pclose(fp);
+              buf[len] = '\0';
+              if (out_len) *out_len = len;
+              return buf;
+          }
+
+          /* ============================================================
+           * HTTP GET 到文件（用于下载图片）
+           * ============================================================ */
+          static int http_get_file(const char *url, const char *path) {
+              char cmd[512];
+              snprintf(cmd, sizeof(cmd),
+                       "wget -qO '%s' --timeout=%d '%s' 2>/dev/null",
+                       path, HTTP_TIMEOUT, url);
+              int ret = system(cmd);
+              return (ret == 0) ? 0 : -1;
+          }
+
+          /* ============================================================
+           * 简单 JSON 字段提取
+           * ============================================================ */
+          static int json_get_string(const char *json, const char *key,
+                                     char *out, size_t out_size) {
+              char pattern[128];
+              snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+              const char *p = strstr(json, pattern);
+              if (!p) return -1;
+
+              p = strchr(p + strlen(pattern), ':');
+              if (!p) return -1;
+              p++;
+              while (*p == ' ' || *p == '\t') p++;
+              if (*p != '"') return -1;
+              p++;
+
+              size_t i = 0;
+              while (*p && *p != '"' && i < out_size - 1) {
+                  if (*p == '\\' && *(p+1)) {
+                      p++;
+                      switch (*p) {
+                          case 'n': out[i++] = '\n'; break;
+                          case 't': out[i++] = '\t'; break;
+                          case '"': out[i++] = '"'; break;
+                          case '\\': out[i++] = '\\'; break;
+                          default: out[i++] = *p; break;
+                      }
+                  } else {
+                      out[i++] = *p;
+                  }
+                  p++;
+              }
+              out[i] = '\0';
+              return 0;
+          }
+
+          /* ============================================================
+           * 获取一言文字
+           * ============================================================ */
+          static void fetch_hitokoto(char *text_buf, size_t buf_size) {
+              char *json = http_get(HITOKOTO_URL, NULL);
+              if (!json) {
+                  strncpy(text_buf, FALLBACK_TEXT, buf_size - 1);
+                  text_buf[buf_size - 1] = '\0';
+                  return;
+              }
+
+              char hitokoto[512] = {0};
+              char from[128] = {0};
+
+              if (json_get_string(json, "hitokoto", hitokoto, sizeof(hitokoto)) == 0) {
+                  json_get_string(json, "from", from, sizeof(from));
+                  if (from[0])
+                      snprintf(text_buf, buf_size, "%s\n\n——%s", hitokoto, from);
+                  else
+                      snprintf(text_buf, buf_size, "%s", hitokoto);
+              } else {
+                  strncpy(text_buf, FALLBACK_TEXT, buf_size - 1);
+                  text_buf[buf_size - 1] = '\0';
+              }
+              free(json);
+          }
+
+          /* ============================================================
+           * 下载并解码背景图片
+           * 返回 RGBA 像素数据（调用者 stbi_image_free）
+           * ============================================================ */
+          static uint8_t *fetch_background(int *w, int *h) {
+              const char *tmp_path = "/tmp/.drm_bg_img";
+              if (http_get_file(PICSUM_URL, tmp_path) < 0)
+                  return NULL;
+
+              int channels;
+              uint8_t *data = stbi_load(tmp_path, w, h, &channels, 4);
+              unlink(tmp_path);
+              return data;
+          }
+
+          /* ============================================================
+           * 使用 stb_truetype 渲染文字到 RGBA buffer
+           * ============================================================ */
+          static void render_text_rgba(uint8_t *rgba, int img_w, int img_h,
+                                       const char *text) {
+              /* 加载字体 */
+              FILE *ff = fopen(FONT_PATH, "rb");
+              if (!ff) return;
+
+              fseek(ff, 0, SEEK_END);
+              long fsize = ftell(ff);
+              fseek(ff, 0, SEEK_SET);
+              uint8_t *font_data = malloc(fsize);
+              if (!font_data) { fclose(ff); return; }
+              fread(font_data, 1, fsize, ff);
+              fclose(ff);
+
+              stbtt_fontinfo font;
+              if (!stbtt_InitFont(&font, font_data, 0)) {
+                  free(font_data);
+                  return;
+              }
+
+              float scale = stbtt_ScaleForPixelHeight(&font, FONT_SIZE);
+              int ascent, descent, line_gap;
+              stbtt_GetFontVMetrics(&font, &ascent, &descent, &line_gap);
+              int line_height = (int)((ascent - descent + line_gap) * scale);
+
+              /* 计算总高度 */
+              int num_lines = 1;
+              for (const char *p = text; *p; p++) {
+                  if (*p == '\n') num_lines++;
+              }
+              int total_h = num_lines * line_height;
+              int y_start = (img_h - total_h) / 2;
+              if (y_start < 0) y_start = 0;
+
+              /* 逐行渲染 */
+              const char *line_start = text;
+              int cur_y = y_start;
+
+              while (line_start && *line_start) {
+                  const char *line_end = strchr(line_start, '\n');
+                  size_t line_len = line_end ? (size_t)(line_end - line_start) : strlen(line_start);
+
+                  /* 计算行宽 */
+                  int line_w = 0;
+                  for (size_t i = 0; i < line_len; ) {
+                      int codepoint = 0;
+                      int bytes = 0;
+                      uint8_t c = (uint8_t)line_start[i];
+                      if (c < 0x80) { codepoint = c; bytes = 1; }
+                      else if ((c & 0xE0) == 0xC0) { codepoint = c & 0x1F; bytes = 2; }
+                      else if ((c & 0xF0) == 0xE0) { codepoint = c & 0x0F; bytes = 3; }
+                      else if ((c & 0xF8) == 0xF0) { codepoint = c & 0x07; bytes = 4; }
+                      else { i++; continue; }
+                      for (int b = 1; b < bytes && (i+b) < line_len; b++)
+                          codepoint = (codepoint << 6) | ((uint8_t)line_start[i+b] & 0x3F);
+                      i += bytes;
+
+                      int adv;
+                      stbtt_GetCodepointHMetrics(&font, codepoint, &adv, NULL);
+                      line_w += (int)(adv * scale);
+                  }
+
+                  int x_pos = (img_w - line_w) / 2;
+                  if (x_pos < 0) x_pos = 0;
+
+                  /* 渲染每个字符 */
+                  int pen_x = x_pos;
+                  for (size_t i = 0; i < line_len; ) {
+                      int codepoint = 0;
+                      int bytes = 0;
+                      uint8_t c = (uint8_t)line_start[i];
+                      if (c < 0x80) { codepoint = c; bytes = 1; }
+                      else if ((c & 0xE0) == 0xC0) { codepoint = c & 0x1F; bytes = 2; }
+                      else if ((c & 0xF0) == 0xE0) { codepoint = c & 0x0F; bytes = 3; }
+                      else if ((c & 0xF8) == 0xF0) { codepoint = c & 0x07; bytes = 4; }
+                      else { i++; continue; }
+                      for (int b = 1; b < bytes && (i+b) < line_len; b++)
+                          codepoint = (codepoint << 6) | ((uint8_t)line_start[i+b] & 0x3F);
+                      i += bytes;
+
+                      int x0, y0, x1, y1;
+                      stbtt_GetCodepointBitmapBox(&font, codepoint, scale, scale,
+                                                  &x0, &y0, &x1, &y1);
+                      int gw = x1 - x0, gh = y1 - y0;
+                      if (gw > 0 && gh > 0) {
+                          uint8_t *bitmap = malloc(gw * gh);
+                          if (bitmap) {
+                              stbtt_MakeCodepointBitmap(&font, bitmap, gw, gh, gw,
+                                                        scale, scale, codepoint);
+                              /* 将 bitmap 叠加到 RGBA buffer（白色文字） */
+                              int bx = pen_x + x0;
+                              int by = cur_y + (int)(ascent * scale) + y0;
+                              for (int row = 0; row < gh; row++) {
+                                  for (int col = 0; col < gw; col++) {
+                                      int px = bx + col;
+                                      int py = by + row;
+                                      if (px >= 0 && px < img_w && py >= 0 && py < img_h) {
+                                          uint8_t alpha = bitmap[row * gw + col];
+                                          if (alpha > 0) {
+                                              int idx = (py * img_w + px) * 4;
+                                              /* Alpha blend: white text over background */
+                                              rgba[idx+0] = (uint8_t)((255 * alpha + rgba[idx+0] * (255 - alpha)) / 255);
+                                              rgba[idx+1] = (uint8_t)((255 * alpha + rgba[idx+1] * (255 - alpha)) / 255);
+                                              rgba[idx+2] = (uint8_t)((255 * alpha + rgba[idx+2] * (255 - alpha)) / 255);
+                                              rgba[idx+3] = 255;
+                                          }
+                                      }
+                                  }
+                              }
+                              free(bitmap);
+                          }
+                      }
+
+                      int adv;
+                      stbtt_GetCodepointHMetrics(&font, codepoint, &adv, NULL);
+                      pen_x += (int)(adv * scale);
+                  }
+
+                  cur_y += line_height;
+                  line_start = line_end ? line_end + 1 : NULL;
+              }
+
+              free(font_data);
+          }
+
+          /* ============================================================
+           * 将 RGBA 图像转为 XRGB8888 并写入 framebuffer
+           * ============================================================ */
+          static void rgba_to_fb(void *fb, uint32_t pitch,
+                                 const uint8_t *rgba, int img_w, int img_h) {
+              memset(fb, 0, (size_t)pitch * screen_h);
+              int x_off = ((int)screen_w - img_w) / 2;
+              int y_off = ((int)screen_h - img_h) / 2;
+              if (x_off < 0) x_off = 0;
+              if (y_off < 0) y_off = 0;
+              int cw = (img_w > (int)screen_w) ? (int)screen_w : img_w;
+              int ch = (img_h > (int)screen_h) ? (int)screen_h : img_h;
+
+              for (int y = 0; y < ch; y++) {
+                  uint8_t *dst_row = (uint8_t *)fb + (y + y_off) * pitch + x_off * 4;
+                  const uint8_t *src_row = rgba + y * img_w * 4;
+                  for (int x = 0; x < cw; x++) {
+                      /* RGBA → XRGB8888 (little-endian: B G R X) */
+                      dst_row[x*4 + 0] = src_row[x*4 + 2]; /* B */
+                      dst_row[x*4 + 1] = src_row[x*4 + 1]; /* G */
+                      dst_row[x*4 + 2] = src_row[x*4 + 0]; /* R */
+                      dst_row[x*4 + 3] = 0xFF;             /* X */
+                  }
+              }
+          }
+
+          /* ============================================================
+           * 显示一帧信息（一言 + 背景）
+           * ============================================================ */
+          static void display_info_frame(int fd, uint32_t crtc_id,
+                                         uint32_t conn_id, drmModeModeInfo *mode,
+                                         void *map, uint32_t pitch, uint32_t fb_id) {
+              char text[2048];
+              fetch_hitokoto(text, sizeof(text));
+
+              int bg_w = 0, bg_h = 0;
+              uint8_t *bg_rgba = fetch_background(&bg_w, &bg_h);
+
+              uint8_t *canvas;
+              int canvas_w = SCREEN_W, canvas_h = SCREEN_H;
+
+              if (bg_rgba && bg_w > 0 && bg_h > 0) {
+                  /* 缩放背景到屏幕尺寸 */
+                  canvas = malloc(canvas_w * canvas_h * 4);
+                  if (canvas) {
+                      stbir_resize(bg_rgba, bg_w, bg_h, 0,
+                                   canvas, canvas_w, canvas_h, 0,
+                                   STBIR_RGBA);
+                  } else {
+                      canvas = calloc(canvas_w * canvas_h, 4);
+                  }
+                  stbi_image_free(bg_rgba);
+              } else {
+                  /* 纯黑背景 */
+                  canvas = calloc(canvas_w * canvas_h, 4);
+                  if (canvas) {
+                      for (int i = 0; i < canvas_w * canvas_h; i++)
+                          canvas[i*4 + 3] = 255;
+                  }
+              }
+
+              if (!canvas) return;
+
+              /* 渲染文字 */
+              render_text_rgba(canvas, canvas_w, canvas_h, text);
+
+              /* 写入 framebuffer */
+              rgba_to_fb(map, pitch, canvas, canvas_w, canvas_h);
+              free(canvas);
+
+              /* 设置 CRTC 显示 */
+              drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
+          }
+
+          /* ============================================================
+           * Daemon 化
            * ============================================================ */
           static void daemonize(void) {
               int devnull = open("/dev/null", O_RDWR);
@@ -207,106 +581,16 @@ jobs:
           }
 
           /* ============================================================
-           * --show 模式：从 stdin 读取像素数据，显示到屏幕
-           *
-           * 关键：此进程 open() DRM 设备时，必须确保没有其他进程持有 Master。
-           * 根据 drm_auth.c 的 drm_master_open()：
-           *   - 如果 dev->master == NULL → open 自动成为 Master
-           *   - 如果 dev->master != NULL → 只是引用，不是 Master
-           *
-           * 所以 bo.py 必须确保动画父进程已退出后再启动 --show。
-           * --show 内部会重试 open + SetCrtc，最多等 5 秒。
+           * main - 全部逻辑在一个进程中
            * ============================================================ */
-          static int show_mode(const char *drm_device, uint32_t img_w, uint32_t img_h) {
-              size_t expected = (size_t)img_w * img_h * 4;
-              uint8_t *img_data = malloc(expected);
-              if (!img_data) return 1;
+          int main(int argc, char *argv[]) {
+              signal(SIGPIPE, SIG_IGN);
+              signal(SIGTERM, sig_handler);
+              signal(SIGINT, sig_handler);
 
-              size_t total_read = 0;
-              while (total_read < expected) {
-                  ssize_t n = read(STDIN_FILENO, img_data + total_read,
-                                   expected - total_read);
-                  if (n <= 0) break;
-                  total_read += n;
-              }
-              if (total_read < expected) {
-                  free(img_data);
-                  return 1;
-              }
+              const char *drm_device = (argc > 1) ? argv[1] : "/dev/dri/card0";
 
-              /*
-               * 重试打开 DRM 设备并显示。
-               * 如果当前有其他进程持有 Master，drmModeSetCrtc 会返回 -EACCES。
-               * 我们重试直到成功或超时（5 秒）。
-               */
-              int success = 0;
-              for (int attempt = 0; attempt < 50; attempt++) {
-                  drmModeRes *res;
-                  drmModeConnector *conn;
-                  uint32_t crtc_id;
-
-                  int fd = drm_init(drm_device, &res, &conn, &crtc_id);
-                  if (fd < 0) {
-                      usleep(100000);
-                      continue;
-                  }
-
-                  struct drm_mode_create_dumb dumb;
-                  uint32_t fb_id;
-                  void *map;
-
-                  if (drm_create_fb(fd, &dumb, &fb_id, &map) < 0) {
-                      drmModeFreeConnector(conn);
-                      drmModeFreeResources(res);
-                      close(fd);
-                      usleep(100000);
-                      continue;
-                  }
-
-                  copy_centered(map, dumb.pitch, img_data, img_w, img_h);
-
-                  int ret = drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0,
-                                           &conn->connector_id, 1, &conn->modes[0]);
-
-                  if (ret == 0) {
-                      /* 成功！保持 fd 打开，daemon 化 */
-                      drmModeFreeConnector(conn);
-                      drmModeFreeResources(res);
-                      free(img_data);
-
-                      daemonize();
-                      signal(SIGTERM, sig_handler);
-                      signal(SIGINT, sig_handler);
-                      while (g_running) pause();
-
-                      close(fd);
-                      return 0;
-                  }
-
-                  /* SetCrtc 失败（可能不是 Master），关闭重试 */
-                  drmModeFreeConnector(conn);
-                  drmModeFreeResources(res);
-                  close(fd);
-                  usleep(100000); /* 100ms */
-              }
-
-              free(img_data);
-              return 1;
-          }
-
-          /* ============================================================
-           * 动画播放模式
-           *
-           * 播完后：
-           *   - /etc/bo.py 存在 → fork 运行 bo.py，父进程立即退出释放 Master
-           *     bo.py 启动 --show 时，dev->master 已为 NULL，--show 自动成为 Master
-           *   - /etc/bo.py 不存在 → 清屏，daemon 化保持 CRTC 活跃
-           * ============================================================ */
-          static int play_mode(const char *drm_device) {
-              size_t frame_size = VIDEO_W * VIDEO_H * (BPP / 8);
-              long total_frames = (long)(apple_raw_len / frame_size);
-              long total_duration_frames = FPS * DURATION;
-
+              /* 1. 初始化 DRM（成为 Master） */
               drmModeRes *res;
               drmModeConnector *conn;
               uint32_t crtc_id;
@@ -314,7 +598,7 @@ jobs:
               int fd = drm_init(drm_device, &res, &conn, &crtc_id);
               if (fd < 0) return 1;
 
-              /* 双缓冲 */
+              /* 2. 创建双缓冲 */
               struct drm_mode_create_dumb dumb[2];
               void *map[2];
               uint32_t fb_id[2];
@@ -328,29 +612,25 @@ jobs:
                   }
               }
 
-              /* 显示第一帧 */
-              copy_centered(map[0], dumb[0].pitch,
-                            apple_raw, VIDEO_W, VIDEO_H);
-              if (drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
-                                 &conn->connector_id, 1, &conn->modes[0]) < 0) {
-                  drmModeFreeConnector(conn);
-                  drmModeFreeResources(res);
-                  close(fd);
-                  return 1;
-              }
+              /* 3. 播放开机动画 */
+              size_t frame_size = VIDEO_W * VIDEO_H * (BPP / 8);
+              long total_frames = (long)(apple_raw_len / frame_size);
+              long total_duration_frames = FPS * DURATION;
 
-              /* 循环播放 */
+              copy_centered(map[0], dumb[0].pitch, apple_raw, VIDEO_W, VIDEO_H);
+              drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                             &conn->connector_id, 1, &conn->modes[0]);
+
               int cur = 1;
               long frame_count = 1;
               time_t start_time = time(NULL);
 
-              while (frame_count < total_duration_frames) {
+              while (frame_count < total_duration_frames && g_running) {
                   if (difftime(time(NULL), start_time) >= DURATION) break;
 
                   long fi = frame_count % total_frames;
                   copy_centered(map[cur], dumb[cur].pitch,
-                                apple_raw + fi * frame_size,
-                                VIDEO_W, VIDEO_H);
+                                apple_raw + fi * frame_size, VIDEO_W, VIDEO_H);
                   drmModeSetCrtc(fd, crtc_id, fb_id[cur], 0, 0,
                                  &conn->connector_id, 1, &conn->modes[0]);
                   cur = 1 - cur;
@@ -358,66 +638,31 @@ jobs:
                   sleep_ms(1000 / FPS);
               }
 
-              /* === 动画播完 === */
+              /* 4. 动画播完 → Daemon 化（关闭 stdin/stdout/stderr，但保持 DRM fd） */
+              daemonize();
+
+              /* 5. 信息屏循环（同一进程、同一 fd、同一 Master） */
+              /* 使用 fb[0] 作为信息屏 buffer */
+              uint32_t info_fb = fb_id[0];
+              void *info_map = map[0];
+              uint32_t info_pitch = dumb[0].pitch;
+
+              while (g_running) {
+                  display_info_frame(fd, crtc_id, conn->connector_id,
+                                     &conn->modes[0],
+                                     info_map, info_pitch, info_fb);
+
+                  /* 等待 15 分钟（分段 sleep 以便响应信号） */
+                  for (int i = 0; i < REFRESH_SEC && g_running; i++) {
+                      sleep(1);
+                  }
+              }
+
+              /* 6. 收到 SIGTERM → 清理退出 */
               drmModeFreeConnector(conn);
               drmModeFreeResources(res);
-
-              signal(SIGTERM, sig_handler);
-              signal(SIGINT, sig_handler);
-
-              struct stat st;
-              if (stat(BO_PY_PATH, &st) == 0) {
-                  /*
-                   * /etc/bo.py 存在：
-                   * 1. fork 子进程运行 bo.py
-                   * 2. 父进程立即 close(fd) 退出 → 释放 DRM Master
-                   * 3. bo.py 启动 --show → open() 时 dev->master == NULL → 自动成为 Master
-                   *
-                   * 注意：父进程不能 pause()！必须退出释放 Master！
-                   */
-                  pid_t pid = fork();
-                  if (pid == 0) {
-                      /* 子进程：关闭继承的 DRM fd，运行 bo.py */
-                      close(fd);
-                      /* 短暂等待确保父进程已退出释放 Master */
-                      usleep(200000); /* 200ms */
-                      execlp("python3", "python3", BO_PY_PATH, NULL);
-                      execlp("python", "python", BO_PY_PATH, NULL);
-                      _exit(1);
-                  }
-                  /* 父进程：立即退出，释放 DRM Master */
-                  close(fd);
-                  return 0;
-
-              } else {
-                  /* /etc/bo.py 不存在 → 清屏，daemon 化保持 CRTC 活跃 */
-                  memset(map[0], 0, dumb[0].size);
-                  drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
-                                 &conn->connector_id, 1, &conn->modes[0]);
-
-                  daemonize();
-                  while (g_running) pause();
-              }
-
               close(fd);
               return 0;
-          }
-
-          /* ============================================================
-           * main
-           * ============================================================ */
-          int main(int argc, char *argv[]) {
-              signal(SIGPIPE, SIG_IGN);
-
-              if (argc >= 3 && strcmp(argv[1], "--show") == 0) {
-                  const char *dev = argv[2];
-                  uint32_t w = (argc > 3) ? (uint32_t)atoi(argv[3]) : 320;
-                  uint32_t h = (argc > 4) ? (uint32_t)atoi(argv[4]) : 172;
-                  return show_mode(dev, w, h);
-              }
-
-              const char *drm_device = (argc > 1) ? argv[1] : "/dev/dri/card0";
-              return play_mode(drm_device);
           }
           ENDOFSOURCE
 
@@ -430,323 +675,11 @@ jobs:
             -I/tmp/arm64-sysroot/usr/include/drm \
             -I/tmp/arm64-sysroot/usr/include/aarch64-linux-gnu \
             -L/tmp/arm64-sysroot/usr/lib/aarch64-linux-gnu \
-            -ldrm
+            -ldrm -lm
           
           chmod +x drm_play_arm64
           file drm_play_arm64
           ls -lh drm_play_arm64
-
-      # --- 3. 生成 bo.py ---
-      - name: Create bo.py
-        run: |
-          cat << 'ENDOFPY' > bo.py
-          #!/usr/bin/env python3
-          """bo.py - 一言 + 随机背景，通过管道调用 drm_play_arm64 --show 显示，零 eMMC 写入
-
-          关键机制：
-          - 动画父进程退出后释放 DRM Master（dev->master = NULL）
-          - --show 子进程 open() 时自动成为新 Master（drm_master_open 逻辑）
-          - 每次刷新时：先启动新 --show（成为 Master 并显示），再 kill 旧 --show
-          - 旧 --show 被 kill 后释放 Master，新 --show 已经在显示，不会黑屏
-          """
-
-          import requests
-          import os
-          import signal
-          import subprocess
-          import threading
-          import time
-          from datetime import datetime, timedelta
-          from io import BytesIO
-          from PIL import Image, ImageDraw, ImageFont
-
-          try:
-              import numpy as np
-              HAS_NUMPY = True
-          except ImportError:
-              HAS_NUMPY = False
-
-          # ===================== 配置 =====================
-          SCREEN_W = 320
-          SCREEN_H = 172
-          PICSUM_RAW_URL = "https://picsum.photos/320/172"
-          FONT_PATH = "/usr/share/fonts/MiSans-Regular.ttf"
-          FONT_SIZE = 13
-          BG_COLOR_BLACK = (0, 0, 0)
-          TEXT_COLOR = (255, 255, 255)
-          REQUEST_TIMEOUT = 4
-          REFRESH_CYCLE = timedelta(minutes=15)
-          NETWORK_CHECK_INTERVAL = 60
-
-          HITOKOTO_URL = "https://v1.hitokoto.cn/?c=f&max_length=60"
-          TEST_NET_URL = "https://www.baidu.com"
-
-          FALLBACK_TEXT = """山林不向四季起誓，荣枯随缘；
-          海洋不需对沙滩承诺，遇合尽兴。
-          喜欢就处，别问是朋友还是恋人！
-          关系不是绳子，非要绑住谁的手脚；
-          缘分就像山风，吹到哪儿都是风景。
-          能走一段是礼物，能走一生是运气。
-          被你改变的那一部分我，代替了你永远陪在了我的身边。"""
-
-          DRM_DEVICE = "/dev/dri/card1"
-          DRM_PLAY = "/usr/sbin/drm_play_arm64"
-
-          # ===================== 内存缓存 =====================
-          _cache = {
-              "bg_bytes": None,
-              "bg_image": None,
-              "current_text": None,
-              "next_text": None,
-              "next_bg_bytes": None,
-              "last_refresh": None,
-              "network_available": False,
-          }
-          _lock = threading.Lock()
-
-          # 当前 --show 子进程的 Popen 对象
-          _show_proc = None
-
-
-          # ===================== 显示函数 =====================
-          def display_image(img):
-              """将 PIL Image 转为 XRGB8888 并通过管道传给 drm_play_arm64 --show
-
-              流程：
-              1. 先 kill 旧的 --show 进程（释放 DRM Master）
-              2. 等待 Master 释放（200ms）
-              3. 启动新的 --show 进程（open 时自动成为 Master）
-              4. 写入像素数据
-              5. 等待新进程显示完成
-
-              注意：必须先 kill 旧进程再启动新进程！
-              因为同一时刻只能有一个 Master。
-              旧进程被 kill → close(fd) → drm_master_release → dev->master = NULL
-              新进程 open → dev->master == NULL → 自动成为 Master
-              """
-              global _show_proc
-
-              if img.size != (SCREEN_W, SCREEN_H):
-                  img = img.resize((SCREEN_W, SCREEN_H), Image.Resampling.LANCZOS)
-
-              # 转为 XRGB8888 (内存序 BGRX)
-              if HAS_NUMPY:
-                  arr = np.array(img.convert("RGB"))
-                  bgrx = np.zeros((SCREEN_H, SCREEN_W, 4), dtype=np.uint8)
-                  bgrx[:, :, 0] = arr[:, :, 2]  # B
-                  bgrx[:, :, 1] = arr[:, :, 1]  # G
-                  bgrx[:, :, 2] = arr[:, :, 0]  # R
-                  bgrx[:, :, 3] = 0xFF           # X
-                  raw_data = bgrx.tobytes()
-              else:
-                  img_rgb = img.convert("RGB")
-                  raw = img_rgb.tobytes()
-                  out = bytearray(SCREEN_W * SCREEN_H * 4)
-                  for i in range(SCREEN_W * SCREEN_H):
-                      out[i*4]   = raw[i*3+2]
-                      out[i*4+1] = raw[i*3+1]
-                      out[i*4+2] = raw[i*3]
-                      out[i*4+3] = 0xFF
-                  raw_data = bytes(out)
-
-              # 1. Kill 旧的 --show 进程（释放 DRM Master）
-              if _show_proc is not None:
-                  try:
-                      _show_proc.terminate()  # SIGTERM
-                      _show_proc.wait(timeout=2)
-                  except Exception:
-                      try:
-                          _show_proc.kill()  # SIGKILL
-                          _show_proc.wait(timeout=1)
-                      except Exception:
-                          pass
-                  _show_proc = None
-
-              # 2. 等待 DRM Master 释放
-              time.sleep(0.3)
-
-              # 3. 启动新的 --show 进程
-              proc = subprocess.Popen(
-                  [DRM_PLAY, "--show", DRM_DEVICE, str(SCREEN_W), str(SCREEN_H)],
-                  stdin=subprocess.PIPE,
-                  stdout=subprocess.DEVNULL,
-                  stderr=subprocess.DEVNULL
-              )
-
-              # 4. 写入像素数据
-              try:
-                  proc.stdin.write(raw_data)
-                  proc.stdin.close()
-              except (BrokenPipeError, OSError):
-                  pass
-
-              # 5. 等待新进程完成显示
-              #    --show 内部有重试逻辑（最多 5 秒），这里等 2 秒足够
-              time.sleep(2)
-
-              # 6. 记录新进程
-              _show_proc = proc
-
-
-          # ===================== 网络检测 =====================
-          def network_monitor():
-              while True:
-                  try:
-                      resp = requests.get(TEST_NET_URL, timeout=3)
-                      ok = (resp.status_code == 200)
-                  except Exception:
-                      ok = False
-
-                  with _lock:
-                      was_available = _cache["network_available"]
-                      _cache["network_available"] = ok
-
-                  if ok and not was_available:
-                      threading.Thread(target=preload_sentence, daemon=True).start()
-                      threading.Thread(target=preload_background, daemon=True).start()
-
-                  time.sleep(NETWORK_CHECK_INTERVAL)
-
-
-          # ===================== 素材预加载 =====================
-          def preload_sentence():
-              try:
-                  resp = requests.get(HITOKOTO_URL, timeout=REQUEST_TIMEOUT)
-                  resp.raise_for_status()
-                  data = resp.json()
-                  hitokoto = data.get("hitokoto", "")
-                  src = data.get("from", "")
-                  sentence = f"{hitokoto}\n\n——{src}"
-                  with _lock:
-                      _cache["next_text"] = sentence
-              except Exception:
-                  with _lock:
-                      _cache["next_text"] = FALLBACK_TEXT
-
-
-          def preload_background():
-              try:
-                  resp = requests.get(PICSUM_RAW_URL, timeout=REQUEST_TIMEOUT)
-                  resp.raise_for_status()
-                  with _lock:
-                      _cache["next_bg_bytes"] = resp.content
-              except Exception:
-                  pass
-
-
-          # ===================== 获取背景 =====================
-          def get_background_canvas():
-              with _lock:
-                  need_refresh = _need_refresh()
-
-                  if not need_refresh and _cache["bg_image"] is not None:
-                      return _cache["bg_image"].copy()
-
-                  bg_bytes = _cache["next_bg_bytes"]
-                  if bg_bytes:
-                      try:
-                          img = Image.open(BytesIO(bg_bytes)).convert("RGB")
-                          _cache["bg_image"] = img
-                          _cache["bg_bytes"] = bg_bytes
-                          return img.copy()
-                      except Exception:
-                          pass
-
-                  if _cache["bg_image"] is not None:
-                      return _cache["bg_image"].copy()
-
-              return Image.new("RGB", (SCREEN_W, SCREEN_H), BG_COLOR_BLACK)
-
-
-          # ===================== 获取文字 =====================
-          def get_display_text():
-              with _lock:
-                  need_refresh = _need_refresh()
-
-                  if not need_refresh and _cache["current_text"] is not None:
-                      return _cache["current_text"]
-
-                  new_text = _cache["next_text"] if _cache["next_text"] else FALLBACK_TEXT
-                  _cache["current_text"] = new_text
-                  _cache["last_refresh"] = datetime.now()
-
-              threading.Thread(target=preload_sentence, daemon=True).start()
-              threading.Thread(target=preload_background, daemon=True).start()
-              return new_text
-
-
-          def _need_refresh():
-              if _cache["last_refresh"] is None:
-                  return True
-              return (datetime.now() - _cache["last_refresh"]) >= REFRESH_CYCLE
-
-
-          # ===================== 居中文字 =====================
-          def draw_center_text(bg, text):
-              draw = ImageDraw.Draw(bg)
-              try:
-                  font = ImageFont.truetype(FONT_PATH, FONT_SIZE)
-              except Exception:
-                  font = ImageFont.load_default()
-
-              lines = text.split('\n')
-              line_widths = []
-              line_heights = []
-
-              for line in lines:
-                  bbox = draw.textbbox((0, 0), line, font=font)
-                  line_widths.append(bbox[2] - bbox[0])
-                  line_heights.append(bbox[3] - bbox[1])
-
-              total_height = sum(line_heights) + (len(lines) - 1) * 4
-              y_start = (SCREEN_H - total_height) // 2
-              y_pos = y_start
-
-              for i, line in enumerate(lines):
-                  x_pos = (SCREEN_W - line_widths[i]) // 2
-                  draw.text((x_pos, y_pos), line, font=font, fill=TEXT_COLOR)
-                  y_pos += line_heights[i] + 4
-
-              return bg
-
-
-          # ===================== 主循环 =====================
-          def main_loop():
-              threading.Thread(target=network_monitor, daemon=True).start()
-              threading.Thread(target=preload_sentence, daemon=True).start()
-              threading.Thread(target=preload_background, daemon=True).start()
-
-              # 等待预加载完成（最多等 5 秒）
-              for _ in range(50):
-                  with _lock:
-                      if _cache["next_text"] is not None:
-                          break
-                  time.sleep(0.1)
-
-              # 立刻显示第一帧
-              try:
-                  bg_canvas = get_background_canvas()
-                  show_text = get_display_text()
-                  final_img = draw_center_text(bg_canvas, show_text)
-                  display_image(final_img)
-              except Exception:
-                  pass
-
-              # 每 15 分钟刷新
-              while True:
-                  time.sleep(REFRESH_CYCLE.total_seconds())
-                  try:
-                      bg_canvas = get_background_canvas()
-                      show_text = get_display_text()
-                      final_img = draw_center_text(bg_canvas, show_text)
-                      display_image(final_img)
-                  except Exception:
-                      pass
-
-
-          if __name__ == "__main__":
-              main_loop()
-          ENDOFPY
 
       # --- 4. 生成 init.d 开机脚本 ---
       - name: Create init.d boot script
@@ -775,10 +708,9 @@ jobs:
               
               # 杀掉旧进程
               killall drm_play_arm64 2>/dev/null
-              killall -9 python3 2>/dev/null
               sleep 1
               
-              # unbind/rebind 驱动，强制重新 probe
+              # unbind/rebind 驱动（确保每次启动都是全新状态）
               SPI_DEV=""
               for dev in /sys/bus/spi/devices/*; do
                   if [ -f "$dev/modalias" ]; then
@@ -803,13 +735,12 @@ jobs:
                   done
               fi
               
-              # 启动播放器
-              "$PLAYER" "$DRM_DEV" >/dev/null 2>&1 &
+              # 启动（后台运行，进程永不退出）
+              "$PLAYER" "$DRM_DEV" &
           }
 
           stop() {
               killall drm_play_arm64 2>/dev/null
-              killall -9 python3 2>/dev/null
           }
           EOF
           chmod +x 99-bootanim
@@ -819,53 +750,60 @@ jobs:
         run: |
           cat << 'EOF' > INSTALL.txt
           ============================================
-            Boot Animation Installation Guide
+            Boot Animation + Info Screen (All-in-One)
           ============================================
 
-          Files:
-            drm_play_arm64  - 开机动画 + 图片显示（二合一）
-            bo.py           - 一言+背景显示脚本
+          文件:
+            drm_play_arm64  - 开机动画 + 一言信息屏（全合一，无需 Python）
             99-bootanim     - OpenWrt init.d 开机脚本
+
+          运行时依赖（设备上需要有）:
+            - wget（OpenWrt 自带）
+            - /usr/share/fonts/MiSans-Regular.ttf（中文字体）
 
           Step 1: 上传文件
           -------------------------
           scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
-          scp bo.py root@192.168.1.1:/etc/bo.py
           scp 99-bootanim root@192.168.1.1:/etc/init.d/
 
-          Step 2: 设置权限和启用
+          Step 2: 上传字体（如果还没有）
+          -------------------------
+          scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
+
+          Step 3: 设置权限和启用
           -------------------------
           ssh root@192.168.1.1
           chmod +x /usr/sbin/drm_play_arm64
-          chmod +x /etc/bo.py
           chmod +x /etc/init.d/99-bootanim
           /etc/init.d/99-bootanim enable
 
           工作流程:
           -------------------------
-          1. 开机 → init.d 启动 drm_play_arm64（动画模式）
-          2. 动画播放 36 秒
-          3. 动画播完 → 检测到 /etc/bo.py 存在
-          4. fork 子进程运行 bo.py
-          5. 父进程立即 close(fd) 退出 → 释放 DRM Master (dev->master = NULL)
-          6. bo.py 等待 200ms 后启动 --show 子进程
-          7. --show 子进程 open() → dev->master == NULL → 自动成为 Master
-          8. --show 调用 drmModeSetCrtc() 显示一言+背景 ✅
-          9. 每 15 分钟刷新：kill 旧 --show → 等 300ms → 启动新 --show
+          1. 开机 → init.d 启动 drm_play_arm64
+          2. 播放开机动画（36 秒）
+          3. 动画播完 → 自动切换到一言信息屏
+          4. 从网络获取一言 + 随机背景图片
+          5. 渲染文字到背景上，显示到屏幕
+          6. 每 15 分钟自动刷新
+          7. 进程永不退出，DRM Master 永远保持
+          8. 网络不可用时显示内置 fallback 文字 + 黑色背景
 
-          DRM Master 机制说明:
+          核心设计:
           -------------------------
-          - 同一时刻只能有一个 DRM Master
-          - open() 时如果 dev->master == NULL，自动成为 Master
-          - close() 时如果是当前 Master，dev->master 被设为 NULL
-          - drmModeSetCrtc() 需要 Master 权限，否则返回 -EACCES
-          - 所以必须先释放旧 Master，新进程才能成为 Master
+          - 单进程持有 DRM Master，永远不关闭 fd
+          - 避免 drm_lastclose() 导致 panel 关闭/黑屏
+          - 无需 Python、无需 bo.py、无需 --show 子进程
+          - 所有 HTTP/图片解码/文字渲染都在 C 中完成
+          - 使用 stb_image (图片解码) + stb_truetype (文字渲染)
+          - 零 eMMC 写入（临时文件在 /tmp tmpfs）
+
+          停止:
+          killall drm_play_arm64
 
           卸载:
           /etc/init.d/99-bootanim disable
           rm /usr/sbin/drm_play_arm64
           rm /etc/init.d/99-bootanim
-          rm /etc/bo.py
           EOF
 
       # --- 6. 上传产物 ---
@@ -875,6 +813,5 @@ jobs:
           name: H29K-BootAnimation-Pack
           path: |
             drm_play_arm64
-            bo.py
             99-bootanim
             INSTALL.txt
