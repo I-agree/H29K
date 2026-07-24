@@ -238,7 +238,7 @@ jobs:
                       /* 子进程：关闭继承的 fd */
                       close(fd);
                       /* 等待一小段时间让父进程退出释放 DRM */
-                      usleep(2000000);  /* 2秒 */
+                      usleep(1000000);  /* 1秒 */
                       execlp("python3", "python3", bo_path, NULL);
                       execlp("python", "python", bo_path, NULL);
                       _exit(1);
