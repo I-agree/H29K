@@ -1,11 +1,13 @@
+#!/usr/bin/env python3
+"""bo.py - DRM 显示 + 一言 + 随机背景 (Rockchip AArch64, 纯 bytearray ioctl)"""
+
 import requests
 import json
 import os
-import ctypes
-import ctypes.util
 import struct
 import mmap
 import fcntl
+import ctypes
 import threading
 import time
 from datetime import datetime, timedelta
@@ -48,8 +50,7 @@ preload_next_bg_bytes = None
 network_available = False
 lock = threading.Lock()
 
-# ===================== DRM 常量 =====================
-# ioctl 编号 (AArch64)
+# ===================== ioctl 编号计算 =====================
 _IOC_NRBITS = 8
 _IOC_TYPEBITS = 8
 _IOC_SIZEBITS = 14
@@ -61,149 +62,133 @@ _IOC_DIRSHIFT = _IOC_SIZESHIFT + _IOC_SIZEBITS
 _IOC_WRITE = 1
 _IOC_READ = 2
 
-def _IOC(dir, type, nr, size):
-    return (dir << _IOC_DIRSHIFT) | (type << _IOC_TYPESHIFT) | (nr << _IOC_NRSHIFT) | (size << _IOC_SIZESHIFT)
+def _IOC(d, t, n, s):
+    return (d << _IOC_DIRSHIFT) | (t << _IOC_TYPESHIFT) | (n << _IOC_NRSHIFT) | (s << _IOC_SIZESHIFT)
 
-def _IOWR(type, nr, size):
-    return _IOC(_IOC_READ | _IOC_WRITE, type, nr, size)
+def _IOWR(t, n, s):
+    return _IOC(_IOC_READ | _IOC_WRITE, t, n, s)
 
-def _IOW(type, nr, size):
-    return _IOC(_IOC_WRITE, type, nr, size)
+def _IOW(t, n, s):
+    return _IOC(_IOC_WRITE, t, n, s)
 
-def _IOR(type, nr, size):
-    return _IOC(_IOC_READ, type, nr, size)
+DRM_BASE = ord('d')
 
-DRM_IOCTL_BASE = ord('d')
+# ===================== 结构体大小（从内核 drm_mode.h 精确计算） =====================
+SZ_CARD_RES      = 64   # 4*u64 + 8*u32
+SZ_MODEINFO      = 68   # u32 + 10*u16 + 3*u32 + char[32]
+SZ_CRTC          = 104  # u64 + 7*u32 + modeinfo(68)
+SZ_GET_CONNECTOR = 80   # 4*u64 + 12*u32
+SZ_GET_ENCODER   = 20   # 5*u32
+SZ_CREATE_DUMB   = 32   # 6*u32 + u64
+SZ_MAP_DUMB      = 16   # 2*u32 + u64
+SZ_DESTROY_DUMB  = 4    # u32
+SZ_FB_CMD2       = 104  # 5*u32 + 3*(4*u32) + 4*u64
 
-class drm_mode_card_res(ctypes.Structure):
-    _fields_ = [
-        ("fb_id_ptr", ctypes.c_uint64),
-        ("count_fbs", ctypes.c_uint32),
-        ("crtc_id_ptr", ctypes.c_uint64),
-        ("count_crtcs", ctypes.c_uint32),
-        ("connector_id_ptr", ctypes.c_uint64),
-        ("count_connectors", ctypes.c_uint32),
-        ("encoder_id_ptr", ctypes.c_uint64),
-        ("count_encoders", ctypes.c_uint32),
-        ("min_width", ctypes.c_uint32),
-        ("max_width", ctypes.c_uint32),
-        ("min_height", ctypes.c_uint32),
-        ("max_height", ctypes.c_uint32),
-    ]
+# ===================== ioctl 编号 =====================
+IOCTL_GETRESOURCES  = _IOWR(DRM_BASE, 0xA0, SZ_CARD_RES)
+IOCTL_GETCONNECTOR  = _IOWR(DRM_BASE, 0xA7, SZ_GET_CONNECTOR)
+IOCTL_GETENCODER    = _IOWR(DRM_BASE, 0xA6, SZ_GET_ENCODER)
+IOCTL_GETCRTC       = _IOWR(DRM_BASE, 0xA1, SZ_CRTC)
+IOCTL_SETCRTC       = _IOWR(DRM_BASE, 0xA2, SZ_CRTC)
+IOCTL_CREATE_DUMB   = _IOWR(DRM_BASE, 0xB2, SZ_CREATE_DUMB)
+IOCTL_MAP_DUMB      = _IOWR(DRM_BASE, 0xB3, SZ_MAP_DUMB)
+IOCTL_DESTROY_DUMB  = _IOW(DRM_BASE, 0xB4, SZ_DESTROY_DUMB)
+IOCTL_ADDFB2        = _IOWR(DRM_BASE, 0xB8, SZ_FB_CMD2)
+IOCTL_RMFB          = _IOWR(DRM_BASE, 0xAF, 4)
 
-class drm_mode_crtc(ctypes.Structure):
-    _fields_ = [
-        ("set_connectors_ptr", ctypes.c_uint64),
-        ("count_connectors", ctypes.c_uint32),
-        ("crtc_id", ctypes.c_uint32),
-        ("fb_id", ctypes.c_uint32),
-        ("x", ctypes.c_uint32),
-        ("y", ctypes.c_uint32),
-        ("gamma_size", ctypes.c_uint32),
-        ("mode_valid", ctypes.c_uint32),
-        # drm_mode_modeinfo inline (32 bytes on 64-bit... actually 68 bytes)
-        ("clock", ctypes.c_uint32),
-        ("hdisplay", ctypes.c_uint16),
-        ("hsync_start", ctypes.c_uint16),
-        ("hsync_end", ctypes.c_uint16),
-        ("htotal", ctypes.c_uint16),
-        ("hskew", ctypes.c_uint16),
-        ("vdisplay", ctypes.c_uint16),
-        ("vsync_start", ctypes.c_uint16),
-        ("vsync_end", ctypes.c_uint16),
-        ("vtotal", ctypes.c_uint16),
-        ("vscan", ctypes.c_uint16),
-        ("vrefresh", ctypes.c_uint32),
-        ("flags", ctypes.c_uint32),
-        ("type", ctypes.c_uint32),
-        ("name", ctypes.c_char * 32),
-    ]
-
-class drm_mode_get_connector(ctypes.Structure):
-    _fields_ = [
-        ("encoders_ptr", ctypes.c_uint64),
-        ("modes_ptr", ctypes.c_uint64),
-        ("props_ptr", ctypes.c_uint64),
-        ("prop_values_ptr", ctypes.c_uint64),
-        ("count_modes", ctypes.c_uint32),
-        ("count_props", ctypes.c_uint32),
-        ("count_encoders", ctypes.c_uint32),
-        ("encoder_id", ctypes.c_uint32),
-        ("connector_id", ctypes.c_uint32),
-        ("connector_type", ctypes.c_uint32),
-        ("connector_type_id", ctypes.c_uint32),
-        ("connection", ctypes.c_uint32),
-        ("mm_width", ctypes.c_uint32),
-        ("mm_height", ctypes.c_uint32),
-        ("subpixel", ctypes.c_uint32),
-        ("pad", ctypes.c_uint32),
-    ]
-
-class drm_mode_get_encoder(ctypes.Structure):
-    _fields_ = [
-        ("encoder_id", ctypes.c_uint32),
-        ("encoder_type", ctypes.c_uint32),
-        ("crtc_id", ctypes.c_uint32),
-        ("possible_crtcs", ctypes.c_uint32),
-        ("possible_clones", ctypes.c_uint32),
-    ]
-
-class drm_mode_create_dumb(ctypes.Structure):
-    _fields_ = [
-        ("height", ctypes.c_uint32),
-        ("width", ctypes.c_uint32),
-        ("bpp", ctypes.c_uint32),
-        ("flags", ctypes.c_uint32),
-        ("handle", ctypes.c_uint32),
-        ("pitch", ctypes.c_uint32),
-        ("size", ctypes.c_uint64),
-    ]
-
-class drm_mode_map_dumb(ctypes.Structure):
-    _fields_ = [
-        ("handle", ctypes.c_uint32),
-        ("pad", ctypes.c_uint32),
-        ("offset", ctypes.c_uint64),
-    ]
-
-class drm_mode_destroy_dumb(ctypes.Structure):
-    _fields_ = [
-        ("handle", ctypes.c_uint32),
-    ]
-
-class drm_mode_fb_cmd2(ctypes.Structure):
-    _fields_ = [
-        ("fb_id", ctypes.c_uint32),
-        ("width", ctypes.c_uint32),
-        ("height", ctypes.c_uint32),
-        ("pixel_format", ctypes.c_uint32),
-        ("flags", ctypes.c_uint32),
-        ("handles", ctypes.c_uint32 * 4),
-        ("pitches", ctypes.c_uint32 * 4),
-        ("offsets", ctypes.c_uint32 * 4),
-        ("modifier", ctypes.c_uint64 * 4),
-    ]
-
-# drm_mode_modeinfo size = 68 bytes
-MODEINFO_SIZE = ctypes.sizeof(ctypes.c_uint32) + ctypes.sizeof(ctypes.c_uint16)*10 + \
-                ctypes.sizeof(ctypes.c_uint32)*3 + 32
-
-DRM_IOCTL_MODE_GETRESOURCES = _IOWR(DRM_IOCTL_BASE, 0xA0, ctypes.sizeof(drm_mode_card_res))
-DRM_IOCTL_MODE_GETCONNECTOR = _IOWR(DRM_IOCTL_BASE, 0xA7, ctypes.sizeof(drm_mode_get_connector))
-DRM_IOCTL_MODE_GETENCODER = _IOWR(DRM_IOCTL_BASE, 0xA6, ctypes.sizeof(drm_mode_get_encoder))
-DRM_IOCTL_MODE_GETCRTC = _IOWR(DRM_IOCTL_BASE, 0xA1, ctypes.sizeof(drm_mode_crtc))
-DRM_IOCTL_MODE_SETCRTC = _IOWR(DRM_IOCTL_BASE, 0xA2, ctypes.sizeof(drm_mode_crtc))
-DRM_IOCTL_MODE_CREATE_DUMB = _IOWR(DRM_IOCTL_BASE, 0xB2, ctypes.sizeof(drm_mode_create_dumb))
-DRM_IOCTL_MODE_MAP_DUMB = _IOWR(DRM_IOCTL_BASE, 0xB3, ctypes.sizeof(drm_mode_map_dumb))
-DRM_IOCTL_MODE_DESTROY_DUMB = _IOW(DRM_IOCTL_BASE, 0xB4, ctypes.sizeof(drm_mode_destroy_dumb))
-DRM_IOCTL_MODE_ADDFB2 = _IOWR(DRM_IOCTL_BASE, 0xB8, ctypes.sizeof(drm_mode_fb_cmd2))
-DRM_IOCTL_MODE_RMFB = _IOWR(DRM_IOCTL_BASE, 0xAF, ctypes.sizeof(ctypes.c_uint32))
-DRM_IOCTL_GEM_CLOSE = _IOW(DRM_IOCTL_BASE, 0x09, ctypes.sizeof(ctypes.c_uint32))
-
-# DRM_FORMAT_XRGB8888 = fourcc_code('X','R','2','4')
-DRM_FORMAT_XRGB8888 = (ord('X')) | (ord('R') << 8) | (ord('2') << 16) | (ord('4') << 24)
-
+DRM_FORMAT_XRGB8888 = ord('X') | (ord('R') << 8) | (ord('2') << 16) | (ord('4') << 24)
 DRM_MODE_CONNECTED = 1
+
+# ===================== drm_mode_card_res 字段偏移 =====================
+# offset 0:  fb_id_ptr        (u64)
+# offset 8:  crtc_id_ptr      (u64)
+# offset 16: connector_id_ptr (u64)
+# offset 24: encoder_id_ptr   (u64)
+# offset 32: count_fbs        (u32)
+# offset 36: count_crtcs      (u32)
+# offset 40: count_connectors (u32)
+# offset 44: count_encoders   (u32)
+# offset 48: min_width        (u32)
+# offset 52: max_width        (u32)
+# offset 56: min_height       (u32)
+# offset 60: max_height       (u32)
+
+# ===================== drm_mode_get_connector 字段偏移 =====================
+# offset 0:  encoders_ptr      (u64)
+# offset 8:  modes_ptr         (u64)
+# offset 16: props_ptr         (u64)
+# offset 24: prop_values_ptr   (u64)
+# offset 32: count_modes       (u32)
+# offset 36: count_props       (u32)
+# offset 40: count_encoders    (u32)
+# offset 44: encoder_id        (u32)
+# offset 48: connector_id      (u32)
+# offset 52: connector_type    (u32)
+# offset 56: connector_type_id (u32)
+# offset 60: connection        (u32)
+# offset 64: mm_width          (u32)
+# offset 68: mm_height         (u32)
+# offset 72: subpixel          (u32)
+# offset 76: pad               (u32)
+
+# ===================== drm_mode_crtc 字段偏移 =====================
+# offset 0:  set_connectors_ptr (u64)
+# offset 8:  count_connectors   (u32)
+# offset 12: crtc_id            (u32)
+# offset 16: fb_id              (u32)
+# offset 20: x                  (u32)
+# offset 24: y                  (u32)
+# offset 28: gamma_size         (u32)
+# offset 32: mode_valid         (u32)
+# offset 36: mode (modeinfo)    (68 bytes)
+
+# ===================== drm_mode_modeinfo 字段偏移 =====================
+# offset 0:  clock       (u32)
+# offset 4:  hdisplay    (u16)
+# offset 6:  hsync_start (u16)
+# offset 8:  hsync_end   (u16)
+# offset 10: htotal      (u16)
+# offset 12: hskew       (u16)
+# offset 14: vdisplay    (u16)
+# offset 16: vsync_start (u16)
+# offset 18: vsync_end   (u16)
+# offset 20: vtotal      (u16)
+# offset 22: vscan       (u16)
+# offset 24: vrefresh    (u32)
+# offset 28: flags       (u32)
+# offset 32: type        (u32)
+# offset 36: name        (char[32])
+
+# ===================== drm_mode_create_dumb 字段偏移 =====================
+# offset 0:  height (u32)
+# offset 4:  width  (u32)
+# offset 8:  bpp    (u32)
+# offset 12: flags  (u32)
+# offset 16: handle (u32)
+# offset 20: pitch  (u32)
+# offset 24: size   (u64)
+
+# ===================== drm_mode_map_dumb 字段偏移 =====================
+# offset 0: handle (u32)
+# offset 4: pad    (u32)
+# offset 8: offset (u64)
+
+# ===================== drm_mode_fb_cmd2 字段偏移 =====================
+# offset 0:  fb_id        (u32)
+# offset 4:  width        (u32)
+# offset 8:  height       (u32)
+# offset 12: pixel_format (u32)
+# offset 16: flags        (u32)
+# offset 20: handles[4]   (4*u32)
+# offset 36: pitches[4]   (4*u32)
+# offset 52: offsets[4]   (4*u32)
+# offset 68: modifier[4]  (4*u64)
+
+
+def _get_buf_addr(buf):
+    """获取 bytearray 的内存地址（用于填充 ptr 字段）"""
+    return ctypes.addressof((ctypes.c_char * len(buf)).from_buffer(buf))
+
 
 # ===================== DRM 显示类 =====================
 class DRMDisplay:
@@ -211,10 +196,11 @@ class DRMDisplay:
         self.fd = -1
         self.crtc_id = 0
         self.connector_id = 0
-        self.conn_modes_buf = None  # 保存 modeinfo 用于 SetCrtc
+        self.mode_data = None   # 68 bytes raw modeinfo
         self.screen_w = 0
         self.screen_h = 0
-        self.dumb = [None, None]
+        self.dumb_handle = [0, 0]
+        self.dumb_size = [0, 0]
         self.fb_id = [0, 0]
         self.mm = [None, None]
         self.pitch = 0
@@ -225,155 +211,161 @@ class DRMDisplay:
     def _init_drm(self, device):
         self.fd = os.open(device, os.O_RDWR | os.O_CLOEXEC)
 
-        # 获取资源
-        res = drm_mode_card_res()
-        fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETRESOURCES, res)
+        # === GETRESOURCES 第一次：获取 count ===
+        buf = bytearray(SZ_CARD_RES)
+        fcntl.ioctl(self.fd, IOCTL_GETRESOURCES, buf)
+        count_connectors = struct.unpack_from('<I', buf, 40)[0]
+        count_crtcs = struct.unpack_from('<I', buf, 36)[0]
 
-        # 获取 connector 列表
-        conn_ids = (ctypes.c_uint32 * res.count_connectors)()
-        res.connector_id_ptr = ctypes.addressof(conn_ids)
-        res.count_connectors = res.count_connectors
-        fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETRESOURCES, res)
+        # === GETRESOURCES 第二次：获取 connector IDs ===
+        conn_ids_buf = bytearray(count_connectors * 4)
+        buf2 = bytearray(SZ_CARD_RES)
+        struct.pack_into('<Q', buf2, 16, _get_buf_addr(conn_ids_buf))
+        fcntl.ioctl(self.fd, IOCTL_GETRESOURCES, buf2)
+        conn_ids = struct.unpack_from(f'<{count_connectors}I', conn_ids_buf)
 
-        # 找第一个已连接的 connector
-        for i in range(res.count_connectors):
-            conn = drm_mode_get_connector()
-            conn.connector_id = conn_ids[i]
-            fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETCONNECTOR, conn)
+        # === 遍历 connector ===
+        encoder_id = 0
+        for cid in conn_ids:
+            # 第一次 GETCONNECTOR：获取 count_modes
+            conn_buf = bytearray(SZ_GET_CONNECTOR)
+            struct.pack_into('<I', conn_buf, 48, cid)  # connector_id
+            struct.pack_into('<I', conn_buf, 32, 1)    # count_modes = 1
+            dummy = bytearray(SZ_MODEINFO)
+            struct.pack_into('<Q', conn_buf, 8, _get_buf_addr(dummy))  # modes_ptr
+            fcntl.ioctl(self.fd, IOCTL_GETCONNECTOR, conn_buf)
 
-            if conn.count_modes > 0 and conn.connection == DRM_MODE_CONNECTED:
-                # 读取 modes
-                modes_buf = (ctypes.c_char * (68 * conn.count_modes))()
-                conn.modes_ptr = ctypes.addressof(modes_buf)
-                fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETCONNECTOR, conn)
+            count_modes = struct.unpack_from('<I', conn_buf, 32)[0]
+            connection = struct.unpack_from('<I', conn_buf, 60)[0]
 
-                self.connector_id = conn.connector_id
-                self.conn_modes_buf = modes_buf  # 保存完整 modes 数据
-                self.screen_w = struct.unpack_from('<H', modes_buf, 4)[0]   # hdisplay offset
-                self.screen_h = struct.unpack_from('<H', modes_buf, 14)[0]  # vdisplay offset
+            if count_modes > 0 and connection == DRM_MODE_CONNECTED:
+                # 第二次 GETCONNECTOR：获取实际 modes
+                modes_buf = bytearray(SZ_MODEINFO * count_modes)
+                conn_buf2 = bytearray(SZ_GET_CONNECTOR)
+                struct.pack_into('<I', conn_buf2, 48, cid)
+                struct.pack_into('<I', conn_buf2, 32, count_modes)
+                struct.pack_into('<Q', conn_buf2, 8, _get_buf_addr(modes_buf))
+                fcntl.ioctl(self.fd, IOCTL_GETCONNECTOR, conn_buf2)
+
+                self.connector_id = cid
+                self.mode_data = bytes(modes_buf[:SZ_MODEINFO])
+                self.screen_w = struct.unpack_from('<H', modes_buf, 4)[0]   # hdisplay
+                self.screen_h = struct.unpack_from('<H', modes_buf, 14)[0]  # vdisplay
+                encoder_id = struct.unpack_from('<I', conn_buf2, 44)[0]
                 break
 
         if not self.connector_id:
             raise RuntimeError("No connected DRM connector found")
 
-        # 找 CRTC
+        # === 找 CRTC ===
         crtc_id = 0
-        if conn.encoder_id:
-            enc = drm_mode_get_encoder()
-            enc.encoder_id = conn.encoder_id
-            fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETENCODER, enc)
-            crtc_id = enc.crtc_id
+        if encoder_id:
+            enc_buf = bytearray(SZ_GET_ENCODER)
+            struct.pack_into('<I', enc_buf, 0, encoder_id)
+            fcntl.ioctl(self.fd, IOCTL_GETENCODER, enc_buf)
+            crtc_id = struct.unpack_from('<I', enc_buf, 8)[0]
 
-        if not crtc_id:
-            # 取第一个 CRTC
-            crtc_ids = (ctypes.c_uint32 * res.count_crtcs)()
-            res.crtc_id_ptr = ctypes.addressof(crtc_ids)
-            fcntl.ioctl(self.fd, DRM_IOCTL_MODE_GETRESOURCES, res)
-            if res.count_crtcs > 0:
-                crtc_id = crtc_ids[0]
+        if not crtc_id and count_crtcs > 0:
+            crtc_ids_buf = bytearray(count_crtcs * 4)
+            buf3 = bytearray(SZ_CARD_RES)
+            struct.pack_into('<Q', buf3, 8, _get_buf_addr(crtc_ids_buf))
+            fcntl.ioctl(self.fd, IOCTL_GETRESOURCES, buf3)
+            crtc_id = struct.unpack_from('<I', crtc_ids_buf, 0)[0]
 
         if not crtc_id:
             raise RuntimeError("No CRTC found")
-
         self.crtc_id = crtc_id
 
-        # 创建 dumb buffers
+        # === 创建 dumb buffers + FB + mmap ===
         for i in range(2):
-            d = drm_mode_create_dumb()
-            d.width = self.screen_w
-            d.height = self.screen_h
-            d.bpp = BPP
-            fcntl.ioctl(self.fd, DRM_IOCTL_MODE_CREATE_DUMB, d)
-            self.dumb[i] = d
+            # CREATE_DUMB
+            d_buf = bytearray(SZ_CREATE_DUMB)
+            struct.pack_into('<IIII', d_buf, 0, self.screen_h, self.screen_w, BPP, 0)
+            fcntl.ioctl(self.fd, IOCTL_CREATE_DUMB, d_buf)
+            handle = struct.unpack_from('<I', d_buf, 16)[0]
+            pitch = struct.unpack_from('<I', d_buf, 20)[0]
+            size = struct.unpack_from('<Q', d_buf, 24)[0]
+            self.dumb_handle[i] = handle
+            self.dumb_size[i] = size
+            if i == 0:
+                self.pitch = pitch
+                self.buf_size = size
 
-            # 创建 framebuffer
-            fb = drm_mode_fb_cmd2()
-            fb.width = self.screen_w
-            fb.height = self.screen_h
-            fb.pixel_format = DRM_FORMAT_XRGB8888
-            fb.handles[0] = d.handle
-            fb.pitches[0] = d.pitch
-            fcntl.ioctl(self.fd, DRM_IOCTL_MODE_ADDFB2, fb)
-            self.fb_id[i] = fb.fb_id
+            # ADDFB2
+            fb_buf = bytearray(SZ_FB_CMD2)
+            struct.pack_into('<IIIII', fb_buf, 0, 0, self.screen_w, self.screen_h, DRM_FORMAT_XRGB8888, 0)
+            struct.pack_into('<I', fb_buf, 20, handle)   # handles[0]
+            struct.pack_into('<I', fb_buf, 36, pitch)    # pitches[0]
+            fcntl.ioctl(self.fd, IOCTL_ADDFB2, fb_buf)
+            self.fb_id[i] = struct.unpack_from('<I', fb_buf, 0)[0]
 
-            # mmap
-            mp = drm_mode_map_dumb()
-            mp.handle = d.handle
-            fcntl.ioctl(self.fd, DRM_IOCTL_MODE_MAP_DUMB, mp)
+            # MAP_DUMB
+            m_buf = bytearray(SZ_MAP_DUMB)
+            struct.pack_into('<I', m_buf, 0, handle)
+            fcntl.ioctl(self.fd, IOCTL_MAP_DUMB, m_buf)
+            offset = struct.unpack_from('<Q', m_buf, 8)[0]
+            self.mm[i] = mmap.mmap(self.fd, size, offset=offset)
 
-            self.mm[i] = mmap.mmap(self.fd, d.size, offset=mp.offset)
-
-        self.pitch = self.dumb[0].pitch
-        self.buf_size = self.dumb[0].size
+    def _set_crtc(self):
+        """SetCrtc"""
+        crtc_buf = bytearray(SZ_CRTC)
+        # connector 数组
+        conn_arr = bytearray(4)
+        struct.pack_into('<I', conn_arr, 0, self.connector_id)
+        struct.pack_into('<Q', crtc_buf, 0, _get_buf_addr(conn_arr))  # set_connectors_ptr
+        struct.pack_into('<I', crtc_buf, 8, 1)                        # count_connectors
+        struct.pack_into('<I', crtc_buf, 12, self.crtc_id)            # crtc_id
+        struct.pack_into('<I', crtc_buf, 16, self.fb_id[self.cur])    # fb_id
+        struct.pack_into('<I', crtc_buf, 32, 1)                       # mode_valid
+        crtc_buf[36:36 + SZ_MODEINFO] = self.mode_data                # mode
+        fcntl.ioctl(self.fd, IOCTL_SETCRTC, crtc_buf)
 
     def display_image(self, img):
         """将 PIL Image (RGB) 显示到 DRM 屏幕"""
         if img.size != (self.screen_w, self.screen_h):
             img = img.resize((self.screen_w, self.screen_h), Image.Resampling.LANCZOS)
 
-        # 转为 XRGB8888: PIL 没有 XRGB，用 BGRX 然后调整
-        # 实际上 XRGB8888 在内存中是: B G R X (little-endian)
-        # PIL 的 RGB 转成 XRGB8888 需要: B, G, R, 0xFF
-        img_rgb = img.convert("RGB")
-        raw = img_rgb.tobytes()
-
+        xrgb_data = fast_image_to_xrgb8888(img, self.screen_w, self.screen_h)
         buf = self.mm[self.cur]
 
-        # 逐行写入，处理 pitch 对齐
-        row_bytes = self.screen_w * 4
-        for y in range(self.screen_h):
-            src_offset = y * self.screen_w * 3
-            dst_offset = y * self.pitch
-            for x in range(self.screen_w):
-                r = raw[src_offset + x * 3]
-                g = raw[src_offset + x * 3 + 1]
-                b = raw[src_offset + x * 3 + 2]
-                # XRGB8888 little-endian: B G R X
-                pixel = struct.pack('BBBB', b, g, r, 0xFF)
-                buf[dst_offset + x * 4: dst_offset + x * 4 + 4] = pixel
+        if self.pitch == self.screen_w * 4:
+            buf[:len(xrgb_data)] = xrgb_data
+        else:
+            row_bytes = self.screen_w * 4
+            for y in range(self.screen_h):
+                src = y * row_bytes
+                dst = y * self.pitch
+                buf[dst:dst + row_bytes] = xrgb_data[src:src + row_bytes]
 
-        # 用 modes_buf 设置 CRTC (包含 modeinfo)
-        # 构造 drm_mode_crtc 结构
-        crtc_data = bytearray(ctypes.sizeof(drm_mode_crtc))
-        # 设置 fb_id
-        struct.pack_into('<I', crtc_data, 16, self.fb_id[self.cur])  # fb_id offset
-        # 复制 modeinfo (从 offset 28 开始，32 bytes 的 modeinfo)
-        mode_offset = 28  # offset of modeinfo within drm_mode_crtc
-        crtc_data[mode_offset:mode_offset + 68] = self.conn_modes_buf[:68]
-
-        fcntl.ioctl(self.fd, DRM_IOCTL_MODE_SETCRTC, bytes(crtc_data))
-
+        self._set_crtc()
         self.cur = 1 - self.cur
 
     def clear(self):
-        """清屏"""
         for i in range(2):
             self.mm[i][:] = b'\x00' * self.buf_size
 
     def close(self):
-        """释放资源"""
         for i in range(2):
             if self.mm[i]:
                 self.mm[i].close()
             if self.fb_id[i]:
-                fb_id_buf = struct.pack('<I', self.fb_id[i])
-                fcntl.ioctl(self.fd, DRM_IOCTL_MODE_RMFB, fb_id_buf)
-            if self.dumb[i]:
-                dd = drm_mode_destroy_dumb()
-                dd.handle = self.dumb[i].handle
-                fcntl.ioctl(self.fd, DRM_IOCTL_MODE_DESTROY_DUMB, dd)
+                rmfb_buf = bytearray(4)
+                struct.pack_into('<I', rmfb_buf, 0, self.fb_id[i])
+                fcntl.ioctl(self.fd, IOCTL_RMFB, rmfb_buf)
+            if self.dumb_handle[i]:
+                dd_buf = bytearray(SZ_DESTROY_DUMB)
+                struct.pack_into('<I', dd_buf, 0, self.dumb_handle[i])
+                fcntl.ioctl(self.fd, IOCTL_DESTROY_DUMB, dd_buf)
         if self.fd >= 0:
             os.close(self.fd)
+
 
 # ===================== 高速像素写入 =====================
 def fast_image_to_xrgb8888(img, screen_w, screen_h):
     """将 PIL Image 快速转为 XRGB8888 bytes (BGRX 内存序)"""
-    # 用 numpy 加速如果可用，否则用纯 Python
     try:
         import numpy as np
         arr = np.array(img.convert("RGB").resize((screen_w, screen_h), Image.Resampling.LANCZOS))
-        # arr shape: (H, W, 3) RGB
-        # 目标: BGRX
         bgrx = np.zeros((screen_h, screen_w, 4), dtype=np.uint8)
         bgrx[:, :, 0] = arr[:, :, 2]  # B
         bgrx[:, :, 1] = arr[:, :, 1]  # G
@@ -385,11 +377,12 @@ def fast_image_to_xrgb8888(img, screen_w, screen_h):
         raw = img_rgb.tobytes()
         out = bytearray(screen_w * screen_h * 4)
         for i in range(screen_w * screen_h):
-            out[i * 4] = raw[i * 3 + 2]      # B
+            out[i * 4]     = raw[i * 3 + 2]  # B
             out[i * 4 + 1] = raw[i * 3 + 1]  # G
             out[i * 4 + 2] = raw[i * 3]      # R
             out[i * 4 + 3] = 0xFF             # X
         return bytes(out)
+
 
 # ===================== 内存文件工具 =====================
 def ram_text_read(path):
@@ -415,6 +408,7 @@ def ram_bin_write(path, data):
     except Exception:
         pass
 
+
 # ===================== 网络检测 =====================
 def network_monitor():
     global network_available
@@ -431,6 +425,7 @@ def network_monitor():
         except Exception:
             network_available = False
         time.sleep(NETWORK_CHECK_INTERVAL)
+
 
 # ===================== 素材预加载 =====================
 def thread_preload_sentence():
@@ -460,6 +455,7 @@ def thread_preload_background():
     except Exception:
         with lock:
             preload_next_bg_bytes = None
+
 
 # ===================== 获取背景 =====================
 def get_background_canvas():
@@ -492,6 +488,7 @@ def get_background_canvas():
 
     return Image.new("RGB", (SCREEN_W, SCREEN_H), BG_COLOR_BLACK)
 
+
 # ===================== 获取文字 =====================
 def get_display_text():
     last_ts_str = ram_text_read(TMP_LAST_REFRESH_TS)
@@ -517,6 +514,7 @@ def get_display_text():
     threading.Thread(target=thread_preload_sentence, daemon=True).start()
     threading.Thread(target=thread_preload_background, daemon=True).start()
     return new_text
+
 
 # ===================== 居中文字 =====================
 def draw_center_text(bg, text):
@@ -546,17 +544,15 @@ def draw_center_text(bg, text):
 
     return bg
 
+
 # ===================== 主循环 =====================
 def main_loop():
-    # 初始化 DRM
     display = DRMDisplay(DRM_DEVICE)
 
-    # 启动后台线程
     threading.Thread(target=network_monitor, daemon=True).start()
     threading.Thread(target=thread_preload_sentence, daemon=True).start()
     threading.Thread(target=thread_preload_background, daemon=True).start()
 
-    # 等待预加载
     time.sleep(5)
 
     while True:
@@ -564,34 +560,12 @@ def main_loop():
             bg_canvas = get_background_canvas()
             show_text = get_display_text()
             final_img = draw_center_text(bg_canvas, show_text)
-
-            # 高速转像素并显示
-            xrgb_data = fast_image_to_xrgb8888(final_img, display.screen_w, display.screen_h)
-
-            buf = display.mm[display.cur]
-            # 快速写入整个 buffer（如果 pitch == screen_w * 4）
-            if display.pitch == display.screen_w * 4:
-                buf[:len(xrgb_data)] = xrgb_data
-            else:
-                # pitch 不对齐时逐行写
-                row_bytes = display.screen_w * 4
-                for y in range(display.screen_h):
-                    src = y * row_bytes
-                    dst = y * display.pitch
-                    buf[dst:dst + row_bytes] = xrgb_data[src:src + row_bytes]
-
-            # SetCrtc
-            crtc_data = bytearray(ctypes.sizeof(drm_mode_crtc))
-            struct.pack_into('<I', crtc_data, 16, display.fb_id[display.cur])
-            crtc_data[28:28 + 68] = display.conn_modes_buf[:68]
-            fcntl.ioctl(display.fd, DRM_IOCTL_MODE_SETCRTC, bytes(crtc_data))
-
-            display.cur = 1 - display.cur
-
-        except Exception:
+            display.display_image(final_img)
+        except Exception as e:
             pass
 
         time.sleep(REFRESH_CYCLE.total_seconds())
+
 
 if __name__ == "__main__":
     main_loop()
