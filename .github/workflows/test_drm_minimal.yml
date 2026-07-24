@@ -69,7 +69,7 @@ jobs:
            * - 避免 drm_lastclose() 被调用导致 panel 关闭
            * - 动画播完后，同一进程直接显示一言+背景
            * - 每 15 分钟刷新一次
-           *
+           * - 本地 fallback 文字分 4 组轮播
            * 运行时依赖（设备上）：
            * - wget 或 curl（用于 HTTP 请求）
            * - /usr/share/fonts/MiSans-Regular.ttf（中文字体）
@@ -115,22 +115,32 @@ jobs:
           #define SCREEN_W      320
           #define SCREEN_H      172
           #define FONT_PATH     "/usr/share/fonts/MiSans-Regular.ttf"
-          #define FONT_SIZE     13.0f
+          #define FONT_SIZE     25.0f
           #define REFRESH_SEC   (15 * 60)   /* 15 分钟 */
           #define HTTP_TIMEOUT  8
 
           #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
           #define PICSUM_URL    "https://picsum.photos/320/172"
 
-          static const char *FALLBACK_TEXT =
+          /* ===================== 本地 fallback 文字（4 组轮播） ===================== */
+          #define FALLBACK_COUNT 4
+
+          static const char *FALLBACK_TEXTS[FALLBACK_COUNT] = {
               "山林不向四季起誓，荣枯随缘；\n"
-              "海洋不需对沙滩承诺，遇合尽兴。\n"
+              "海洋不需对沙滩承诺，遇合尽兴。",
+
               "喜欢就处，别问是朋友还是恋人！\n"
-              "关系不是绳子，非要绑住谁的手脚；\n"
+              "关系不是绳子，非要绑住谁的手脚。",
+
               "缘分就像山风，吹到哪儿都是风景。\n"
-              "能走一段是礼物，能走一生是运气。\n"
-              "被你改变的那一部分我，\n"
-              "代替了你永远陪在了我的身边。";
+              "能走一段是礼物，能走一生是运气。",
+
+              "被你改变的那部分我，\n"
+              "代替了你永远陪在了我的身边。"
+          };
+
+          /* 当前 fallback 轮播索引 */
+          static int g_fallback_idx = 0;
 
           /* ===================== 全局状态 ===================== */
           static uint32_t screen_w, screen_h;
@@ -323,28 +333,33 @@ jobs:
           }
 
           /* ============================================================
-           * 获取一言文字
+           * 获取一言文字（网络优先，失败则轮播本地 4 组）
            * ============================================================ */
           static void fetch_hitokoto(char *text_buf, size_t buf_size) {
               char *json = http_get(HITOKOTO_URL, NULL);
               if (!json) {
-                  strncpy(text_buf, FALLBACK_TEXT, buf_size - 1);
+                  /* 网络不可用 → 使用本地 fallback，按顺序轮播 */
+                  strncpy(text_buf, FALLBACK_TEXTS[g_fallback_idx], buf_size - 1);
                   text_buf[buf_size - 1] = '\0';
+                  g_fallback_idx = (g_fallback_idx + 1) % FALLBACK_COUNT;
                   return;
               }
 
               char hitokoto[512] = {0};
               char from[128] = {0};
 
-              if (json_get_string(json, "hitokoto", hitokoto, sizeof(hitokoto)) == 0) {
+              if (json_get_string(json, "hitokoto", hitokoto, sizeof(hitokoto)) == 0
+                  && hitokoto[0]) {
                   json_get_string(json, "from", from, sizeof(from));
                   if (from[0])
                       snprintf(text_buf, buf_size, "%s\n\n——%s", hitokoto, from);
                   else
                       snprintf(text_buf, buf_size, "%s", hitokoto);
               } else {
-                  strncpy(text_buf, FALLBACK_TEXT, buf_size - 1);
+                  /* JSON 解析失败 → 本地 fallback 轮播 */
+                  strncpy(text_buf, FALLBACK_TEXTS[g_fallback_idx], buf_size - 1);
                   text_buf[buf_size - 1] = '\0';
+                  g_fallback_idx = (g_fallback_idx + 1) % FALLBACK_COUNT;
               }
               free(json);
           }
@@ -781,13 +796,23 @@ jobs:
           chmod +x /etc/init.d/99-bootanim
           /etc/init.d/99-bootanim enable
 
-          工作流程:
-          -------------------------
-          1. 开机 → 播放动画 36 秒
-          2. 动画播完 → 自动显示一言+随机背景
-          3. 每 15 分钟刷新
-          4. 进程永不退出，DRM Master 永远保持
-          5. 无网络时显示内置文字 + 黑色背景
+          本地 fallback 文字（4 组轮播，每次只显示 2 行）:
+          --------------------------------------------------
+          第 1 组: 山林不向四季起誓，荣枯随缘；
+                   海洋不需对沙滩承诺，遇合尽兴。
+
+          第 2 组: 喜欢就处，别问是朋友还是恋人！
+                   关系不是绳子，非要绑住谁的手脚。
+
+          第 3 组: 缘分就像山风，吹到哪儿都是风景。
+                   能走一段是礼物，能走一生是运气。
+
+          第 4 组: 被你改变的那部分我，
+                   代替了你永远陪在了我的身边。
+
+          有网络时: 从一言 API 获取随机句子
+          无网络时: 按 1→2→3→4→1→... 顺序轮播本地文字
+          每 15 分钟切换一次
 
           停止: killall drm_play_arm64
           卸载: /etc/init.d/99-bootanim disable && rm /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
