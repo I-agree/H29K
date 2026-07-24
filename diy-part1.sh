@@ -36,7 +36,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          gc9307 \
          files/usr/share/splash \
          files/etc/init.d \
-         files/etc \
+         files/etc/openclash/core \
          files/usr/sbin \
          files/lib/firmware \
          package/boot/uboot-rockchip/patches \
@@ -84,6 +84,7 @@ download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm
 # download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch" "target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch"
 download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
 download_and_check "${BASE_URL}/JPG/once-enable-bootanim" "files/etc/uci-defaults/once-enable-bootanim"
+download_and_check "${BASE_URL}/openclash/core/clash_meta" "files/etc/openclash/core/clash_meta"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
