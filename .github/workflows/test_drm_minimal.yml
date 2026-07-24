@@ -80,97 +80,19 @@ jobs:
           #define BO_PY_PATH "/etc/bo.py"
 
           static uint32_t screen_w, screen_h;
-
-          /* Atomic property IDs (cached per run) */
-          static uint32_t prop_crtc_id;
-          static uint32_t prop_fb_id;
-          static uint32_t prop_active;
-          static uint32_t prop_mode_id;
-          static uint32_t prop_conn_crtc;
+          static volatile sig_atomic_t g_running = 1;
 
           void sleep_ms(int ms) {
               struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000 };
               nanosleep(&ts, NULL);
           }
 
-          /* ============================================================
-           * 查找 property ID by name
-           * ============================================================ */
-          static uint32_t get_prop_id(int fd, uint32_t obj_id, uint32_t obj_type,
-                                      const char *name) {
-              drmModeObjectProperties *props =
-                  drmModeObjectGetProperties(fd, obj_id, obj_type);
-              if (!props) return 0;
-
-              uint32_t id = 0;
-              for (uint32_t i = 0; i < props->count_props; i++) {
-                  drmModePropertyRes *p = drmModeGetProperty(fd, props->props[i]);
-                  if (p) {
-                      if (strcmp(p->name, name) == 0)
-                          id = p->prop_id;
-                      drmModeFreeProperty(p);
-                  }
-                  if (id) break;
-              }
-              drmModeFreeObjectProperties(props);
-              return id;
+          void sig_handler(int sig) {
+              g_running = 0;
           }
 
           /* ============================================================
-           * 创建 blob (mode)
-           * ============================================================ */
-          static uint32_t create_mode_blob(int fd, drmModeModeInfo *mode) {
-              uint32_t blob_id = 0;
-              if (drmModeCreatePropertyBlob(fd, mode, sizeof(*mode), &blob_id) < 0)
-                  return 0;
-              return blob_id;
-          }
-
-          /* ============================================================
-           * Atomic commit: 设置 CRTC 显示指定 FB
-           * ============================================================ */
-          static int atomic_page_flip(int fd, uint32_t crtc_id, uint32_t fb_id,
-                                      uint32_t conn_id, uint32_t mode_blob_id,
-                                      int allow_modeset) {
-              drmModeAtomicReq *req = drmModeAtomicAlloc();
-              if (!req) return -1;
-
-              uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
-              if (!allow_modeset)
-                  flags = 0;
-
-              /* CRTC properties */
-              drmModeAtomicAddProperty(req, crtc_id, prop_active, 1);
-              drmModeAtomicAddProperty(req, crtc_id, prop_mode_id, mode_blob_id);
-              drmModeAtomicAddProperty(req, crtc_id, prop_fb_id, fb_id);
-
-              /* Connector -> CRTC binding */
-              drmModeAtomicAddProperty(req, conn_id, prop_conn_crtc, crtc_id);
-
-              int ret = drmModeAtomicCommit(fd, req, flags, NULL);
-              drmModeAtomicFree(req);
-              return ret;
-          }
-
-          /* ============================================================
-           * Atomic commit: 禁用 CRTC (active=0)
-           * ============================================================ */
-          static int atomic_disable_crtc(int fd, uint32_t crtc_id, uint32_t conn_id) {
-              drmModeAtomicReq *req = drmModeAtomicAlloc();
-              if (!req) return -1;
-
-              drmModeAtomicAddProperty(req, crtc_id, prop_active, 0);
-              drmModeAtomicAddProperty(req, crtc_id, prop_mode_id, 0);
-              drmModeAtomicAddProperty(req, crtc_id, prop_fb_id, 0);
-              drmModeAtomicAddProperty(req, conn_id, prop_conn_crtc, 0);
-
-              int ret = drmModeAtomicCommit(fd, req, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-              drmModeAtomicFree(req);
-              return ret;
-          }
-
-          /* ============================================================
-           * 通用 DRM 初始化 + 获取 Atomic property IDs
+           * 通用 DRM 初始化
            * ============================================================ */
           static int drm_init(const char *drm_device,
                               drmModeRes **out_res,
@@ -178,10 +100,6 @@ jobs:
                               uint32_t *out_crtc_id) {
               int fd = open(drm_device, O_RDWR | O_CLOEXEC);
               if (fd < 0) return -1;
-
-              /* 启用 Atomic 和 Universal Planes */
-              drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
-              drmSetClientCap(fd, DRM_CLIENT_CAP_ATOMIC, 1);
 
               uint64_t has_dumb = 0;
               if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || !has_dumb) {
@@ -213,21 +131,6 @@ jobs:
               }
               if (!crtc_id && res->count_crtcs > 0) crtc_id = res->crtcs[0];
               if (!crtc_id) {
-                  drmModeFreeConnector(conn);
-                  drmModeFreeResources(res);
-                  close(fd);
-                  return -1;
-              }
-
-              /* 缓存 Atomic property IDs */
-              prop_active    = get_prop_id(fd, crtc_id, DRM_MODE_OBJECT_CRTC, "ACTIVE");
-              prop_mode_id   = get_prop_id(fd, crtc_id, DRM_MODE_OBJECT_CRTC, "MODE_ID");
-              prop_fb_id     = get_prop_id(fd, crtc_id, DRM_MODE_OBJECT_CRTC, "FB_ID");
-              prop_conn_crtc = get_prop_id(fd, conn->connector_id,
-                                           DRM_MODE_OBJECT_CONNECTOR, "CRTC_ID");
-
-              if (!prop_active || !prop_mode_id || !prop_fb_id || !prop_conn_crtc) {
-                  fprintf(stderr, "Failed to get atomic properties\n");
                   drmModeFreeConnector(conn);
                   drmModeFreeResources(res);
                   close(fd);
@@ -291,9 +194,10 @@ jobs:
           }
 
           /* ============================================================
-           * Daemon 化：关闭标准 IO，保持进程存活
+           * Daemon 化：关闭标准 IO，保持进程和 fd 存活
+           * 关键：不关闭 DRM fd → CRTC 不会被 disable → regulator 不会关闭
            * ============================================================ */
-          static void daemonize_keep_alive(void) {
+          static void daemonize(void) {
               int devnull = open("/dev/null", O_RDWR);
               if (devnull >= 0) {
                   dup2(devnull, STDIN_FILENO);
@@ -301,8 +205,6 @@ jobs:
                   dup2(devnull, STDERR_FILENO);
                   if (devnull > 2) close(devnull);
               }
-              /* 保持进程存活，CRTC 不会被 disable */
-              while (1) pause();
           }
 
           /* ============================================================
@@ -348,18 +250,8 @@ jobs:
               copy_centered(map, dumb.pitch, img_data, img_w, img_h);
               free(img_data);
 
-              /* 创建 mode blob */
-              uint32_t mode_blob = create_mode_blob(fd, &conn->modes[0]);
-              if (!mode_blob) {
-                  drmModeFreeConnector(conn);
-                  drmModeFreeResources(res);
-                  close(fd);
-                  return 1;
-              }
-
-              /* Atomic commit 显示 */
-              if (atomic_page_flip(fd, crtc_id, fb_id, conn->connector_id,
-                                   mode_blob, 1) < 0) {
+              if (drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]) < 0) {
                   drmModeFreeConnector(conn);
                   drmModeFreeResources(res);
                   close(fd);
@@ -369,17 +261,28 @@ jobs:
               drmModeFreeConnector(conn);
               drmModeFreeResources(res);
 
-              /* Daemon 化保持画面，CRTC 不被 disable */
-              daemonize_keep_alive();
+              /* Daemon 化：保持 fd 打开，CRTC 活跃 */
+              daemonize();
 
+              /* 等待信号退出 */
+              signal(SIGTERM, sig_handler);
+              signal(SIGINT, sig_handler);
+              while (g_running) pause();
+
+              /* 收到退出信号，清理 */
+              close(fd);
               return 0;
           }
 
           /* ============================================================
-           * 动画播放模式 (Atomic API)
+           * 动画播放模式
            * 播完后：
            *   - /etc/bo.py 存在 → fork 运行 bo.py，父进程 daemon 化保持最后一帧
            *   - /etc/bo.py 不存在 → 清屏，daemon 化保持 CRTC 活跃
+           *
+           * 关键改动：永远不调用 drmModeSetCrtc(fd,0,...) 禁用 CRTC
+           *           永远不关闭 DRM fd（除非收到 SIGTERM）
+           *           这样 regulator 不会被关闭，panel 不会被 disable
            * ============================================================ */
           static int play_mode(const char *drm_device) {
               size_t frame_size = VIDEO_W * VIDEO_H * (BPP / 8);
@@ -392,15 +295,6 @@ jobs:
 
               int fd = drm_init(drm_device, &res, &conn, &crtc_id);
               if (fd < 0) return 1;
-
-              /* 创建 mode blob */
-              uint32_t mode_blob = create_mode_blob(fd, &conn->modes[0]);
-              if (!mode_blob) {
-                  drmModeFreeConnector(conn);
-                  drmModeFreeResources(res);
-                  close(fd);
-                  return 1;
-              }
 
               /* 双缓冲 */
               struct drm_mode_create_dumb dumb[2];
@@ -416,18 +310,18 @@ jobs:
                   }
               }
 
-              /* 显示第一帧 (Atomic, allow modeset) */
+              /* 显示第一帧 */
               copy_centered(map[0], dumb[0].pitch,
                             apple_raw, VIDEO_W, VIDEO_H);
-              if (atomic_page_flip(fd, crtc_id, fb_id[0], conn->connector_id,
-                                   mode_blob, 1) < 0) {
+              if (drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]) < 0) {
                   drmModeFreeConnector(conn);
                   drmModeFreeResources(res);
                   close(fd);
                   return 1;
               }
 
-              /* 循环播放 (后续帧不需要 modeset) */
+              /* 循环播放 */
               int cur = 1;
               long frame_count = 1;
               time_t start_time = time(NULL);
@@ -439,8 +333,8 @@ jobs:
                   copy_centered(map[cur], dumb[cur].pitch,
                                 apple_raw + fi * frame_size,
                                 VIDEO_W, VIDEO_H);
-                  atomic_page_flip(fd, crtc_id, fb_id[cur], conn->connector_id,
-                                   mode_blob, 0);
+                  drmModeSetCrtc(fd, crtc_id, fb_id[cur], 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]);
                   cur = 1 - cur;
                   frame_count++;
                   sleep_ms(1000 / FPS);
@@ -449,6 +343,10 @@ jobs:
               /* === 动画播完 === */
               drmModeFreeConnector(conn);
               drmModeFreeResources(res);
+
+              /* 注册信号处理 */
+              signal(SIGTERM, sig_handler);
+              signal(SIGINT, sig_handler);
 
               struct stat st;
               if (stat(BO_PY_PATH, &st) == 0) {
@@ -463,18 +361,22 @@ jobs:
                       _exit(1);
                   }
                   /* 父进程：daemon 化保持最后一帧 */
-                  daemonize_keep_alive();
+                  daemonize();
+                  while (g_running) pause();
               } else {
                   /* /etc/bo.py 不存在 → 清屏，daemon 化保持 CRTC 活跃 */
-                  /* 不调用 atomic_disable_crtc！保持 CRTC active */
+                  /* 注意：不禁用 CRTC！只是显示黑色帧 */
                   memset(map[0], 0, dumb[0].size);
-                  atomic_page_flip(fd, crtc_id, fb_id[0], conn->connector_id,
-                                   mode_blob, 0);
+                  drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]);
 
-                  /* Daemon 化：CRTC 保持活跃，regulator 不会被关闭 */
-                  daemonize_keep_alive();
+                  /* Daemon 化：保持 fd 打开，CRTC 活跃，regulator 不关闭 */
+                  daemonize();
+                  while (g_running) pause();
               }
 
+              /* 收到 SIGTERM 后清理退出 */
+              close(fd);
               return 0;
           }
 
@@ -520,6 +422,8 @@ jobs:
           START=11
           STOP=10
 
+          DRM_DRIVER="panel-mipi-dbi-spi"
+
           start() {
               PLAYER="/usr/sbin/drm_play_arm64"
               DRM_DEV="/dev/dri/card1"
@@ -527,13 +431,46 @@ jobs:
               [ ! -f "$PLAYER" ] && return 1
               
               # 等待 DRM 设备就绪
-              [ ! -e "$DRM_DEV" ] && sleep 2
+              i=0
+              while [ ! -e "$DRM_DEV" ] && [ $i -lt 10 ]; do
+                  sleep 1
+                  i=$((i+1))
+              done
+              [ ! -e "$DRM_DEV" ] && return 1
               
-              # 先杀掉旧进程（如果存在）
+              # 杀掉旧进程（如果存在）
               killall drm_play_arm64 2>/dev/null
               sleep 1
               
-              # 静默后台运行
+              # 关键：unbind/rebind 驱动，强制重新 probe
+              # 这确保每次启动都等同于"第一次运行"的状态
+              # 驱动会重新执行：regulator_enable → soft_reset → 初始化命令序列
+              SPI_DEV=""
+              for dev in /sys/bus/spi/devices/*; do
+                  if [ -f "$dev/modalias" ]; then
+                      ALIAS=$(cat "$dev/modalias" 2>/dev/null)
+                      case "$ALIAS" in
+                          *gc9307*|*panel-mipi-dbi*)
+                              SPI_DEV=$(basename "$dev")
+                              break
+                              ;;
+                      esac
+                  fi
+              done
+              
+              if [ -n "$SPI_DEV" ] && [ -d "/sys/bus/spi/drivers/$DRM_DRIVER" ]; then
+                  echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/unbind" 2>/dev/null
+                  sleep 1
+                  echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/bind" 2>/dev/null
+                  # 等待 DRM 设备重新出现
+                  i=0
+                  while [ ! -e "$DRM_DEV" ] && [ $i -lt 5 ]; do
+                      sleep 1
+                      i=$((i+1))
+                  done
+              fi
+              
+              # 启动播放器
               "$PLAYER" "$DRM_DEV" >/dev/null 2>&1 &
           }
 
@@ -579,16 +516,26 @@ jobs:
           说明:
           - /etc/bo.py 存在 → 动画播完后自动运行 bo.py，屏幕保持最后一帧
           - /etc/bo.py 不存在 → 动画播完后清屏，进程常驻保持 CRTC 活跃
-          - 修改进程常驻后，重复运行 drm_play_arm64 会先 kill 旧进程再启动新进程
+          - 进程常驻后，CRTC 不会被 disable，regulator 不会关闭
+          - 重复运行时，init.d 脚本会先 kill 旧进程 + unbind/rebind 驱动
+          - 这确保每次运行都等同于"第一次运行"
           - 修改 bo.py: vi /etc/bo.py
           - 删除 bo.py: rm /etc/bo.py
           - 停止: killall drm_play_arm64
 
-          重要变化（相比旧版）:
-          - 使用 Atomic API 替代 Legacy drmModeSetCrtc
-          - 动画播完后不再禁用 CRTC，进程 daemon 化常驻
-          - 这确保了每次运行都能正确触发 panel-mipi-dbi 的 enable 流程
-          - 解决了"只有第一次运行才显示"的问题
+          手动重复运行（不通过 init.d）:
+          -------------------------
+          # 先杀旧进程
+          killall drm_play_arm64
+          sleep 1
+          # unbind/rebind 驱动（关键！）
+          SPI_DEV=$(ls /sys/bus/spi/devices/ | head -1)
+          echo "$SPI_DEV" > /sys/bus/spi/drivers/panel-mipi-dbi-spi/unbind
+          sleep 1
+          echo "$SPI_DEV" > /sys/bus/spi/drivers/panel-mipi-dbi-spi/bind
+          sleep 2
+          # 重新运行
+          /usr/sbin/drm_play_arm64 /dev/dri/card1 &
 
           卸载:
           /etc/init.d/99-bootanim disable
