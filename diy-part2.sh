@@ -41,11 +41,8 @@ fi
 chmod +x files/etc/init.d/99-bootanim
 chmod +x files/usr/sbin/drm_play_arm64
 chmod +x files/usr/sbin/bo.py
-chmod +x files/etc/init.d/once-enable-bootanim
+chmod +x files/etc/uci-defaults/once-enable-bootanim
 
-# 编译阶段手动创建一次性启动软链接（第一次开机运行 → enable → 删除自己，以后永远不会再触发。）
-mkdir -p files/etc/rc.d
-ln -sf ../init.d/once-enable-bootanim files/etc/rc.d/S36once-enable-bootanim
 # ==============================================================
 
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
