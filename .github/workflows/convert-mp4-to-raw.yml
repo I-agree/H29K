@@ -514,6 +514,7 @@ jobs:
           - 不会对 eMMC 产生额外读写
           - bo.py 通过管道调用 drm_show_arm64 显示图片，零文件IO
           - 如需运行 bo.py，放到 /usr/sbin/bo.py
+          - START=11 修改数字以调整启动顺序
 
           卸载:
           /etc/init.d/99-bootanim disable
