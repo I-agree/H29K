@@ -97,15 +97,19 @@ jobs:
           static void cleanup(void) {
               /* 1) 把 CRTC 还原成开机前的原始状态，彻底交还屏幕 */
               if (g_fd >= 0 && g_orig_crtc) {
+                  drmModeModeInfoPtr m = g_orig_crtc->mode_valid
+                                         ? &g_orig_crtc->mode : NULL;
                   drmModeSetCrtc(g_fd, g_orig_crtc->crtc_id,
                                  g_orig_crtc->buffer_id,
                                  g_orig_crtc->x, g_orig_crtc->y,
-                                 &g_orig_crtc->connector_id, 1,
-                                 &g_orig_crtc->mode);
+                                 g_orig_crtc->connectors,
+                                 g_orig_crtc->count_connectors,
+                                 m);
               }
               /* 2) 释放 fb / mmap / dumb */
               for (int i = 0; i < 2; i++) {
-                  if (g_fd >= 0 && g_fb_id[i])      drmModeRmFB(g_fd, g_fb_id[i]);
+                  if (g_fd >= 0 && g_fb_id[i])
+                      drmModeRmFB(g_fd, g_fb_id[i]);
                   if (g_map[i] != MAP_FAILED && g_dumb[i].size)
                       munmap(g_map[i], g_dumb[i].size);
                   if (g_fd >= 0 && g_dumb[i].handle)
