@@ -42,7 +42,6 @@ chmod +x files/etc/init.d/99-bootanim
 chmod +x files/usr/sbin/drm_play_arm64
 chmod +x files/usr/sbin/bo.py
 chmod +x files/etc/uci-defaults/once-enable-bootanim
-chmod +x files/usr/sbin/drm_show_arm64
 
 # ==============================================================
 
