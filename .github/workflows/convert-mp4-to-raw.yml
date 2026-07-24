@@ -265,7 +265,188 @@ jobs:
           file drm_play_arm64
           ls -lh drm_play_arm64
 
-      # --- 3. 生成 init.d 开机脚本 ---
+      # --- 3. 交叉编译 drm_show_arm64（供 bo.py 调用显示图片） ---
+      - name: Create DRM Show C Source (stdin pipe mode, zero file IO)
+        run: |
+          cat << 'ENDOFSOURCE' > drm_show.c
+          #include <fcntl.h>
+          #include <unistd.h>
+          #include <sys/mman.h>
+          #include <sys/ioctl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <stdint.h>
+          #include <xf86drm.h>
+          #include <xf86drmMode.h>
+          #include <drm_fourcc.h>
+
+          /*
+           * Usage:
+           *   drm_show_arm64 <drm_device> <raw_file> [width] [height]
+           *   drm_show_arm64 <drm_device> - [width] [height] < raw_data
+           *
+           * When raw_file is "-", reads pixel data from stdin (pipe mode).
+           * Pixel format: XRGB8888 (BGRX in memory order).
+           */
+
+          int main(int argc, char *argv[]) {
+              if (argc < 3) {
+                  fprintf(stderr, "Usage: %s <drm_device> <raw_file|-> [width] [height]\n", argv[0]);
+                  return 1;
+              }
+
+              const char *drm_device = argv[1];
+              const char *raw_file = argv[2];
+              uint32_t img_w = (argc > 3) ? (uint32_t)atoi(argv[3]) : 320;
+              uint32_t img_h = (argc > 4) ? (uint32_t)atoi(argv[4]) : 172;
+
+              size_t expected_size = (size_t)img_w * img_h * 4;
+              uint8_t *img_data = malloc(expected_size);
+              if (!img_data) return 1;
+
+              /* Read pixel data: from file or stdin */
+              if (strcmp(raw_file, "-") == 0) {
+                  size_t total_read = 0;
+                  while (total_read < expected_size) {
+                      ssize_t n = read(STDIN_FILENO, img_data + total_read,
+                                       expected_size - total_read);
+                      if (n <= 0) break;
+                      total_read += n;
+                  }
+                  if (total_read < expected_size) {
+                      fprintf(stderr, "stdin: expected %zu bytes, got %zu\n",
+                              expected_size, total_read);
+                      free(img_data);
+                      return 1;
+                  }
+              } else {
+                  FILE *fp = fopen(raw_file, "rb");
+                  if (!fp) { perror("fopen"); free(img_data); return 1; }
+                  size_t rd = fread(img_data, 1, expected_size, fp);
+                  fclose(fp);
+                  if (rd < expected_size) {
+                      fprintf(stderr, "file: expected %zu bytes, got %zu\n",
+                              expected_size, rd);
+                      free(img_data);
+                      return 1;
+                  }
+              }
+
+              /* Open DRM device */
+              int fd = open(drm_device, O_RDWR | O_CLOEXEC);
+              if (fd < 0) { perror("open drm"); free(img_data); return 1; }
+
+              uint64_t has_dumb = 0;
+              if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || !has_dumb) {
+                  close(fd); free(img_data); return 1;
+              }
+
+              drmModeRes *res = drmModeGetResources(fd);
+              if (!res) { close(fd); free(img_data); return 1; }
+
+              /* Find connector */
+              drmModeConnector *conn = NULL;
+              uint32_t screen_w = 0, screen_h = 0;
+              for (int i = 0; i < res->count_connectors; i++) {
+                  drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
+                  if (!c) continue;
+                  if (c->connection == DRM_MODE_CONNECTED && c->count_modes > 0) {
+                      conn = c;
+                      screen_w = c->modes[0].hdisplay;
+                      screen_h = c->modes[0].vdisplay;
+                      break;
+                  }
+                  drmModeFreeConnector(c);
+              }
+              if (!conn) { drmModeFreeResources(res); close(fd); free(img_data); return 1; }
+
+              /* Find CRTC */
+              uint32_t crtc_id = 0;
+              if (conn->encoder_id) {
+                  drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
+                  if (enc) { crtc_id = enc->crtc_id; drmModeFreeEncoder(enc); }
+              }
+              if (!crtc_id && res->count_crtcs > 0) crtc_id = res->crtcs[0];
+              if (!crtc_id) {
+                  drmModeFreeConnector(conn);
+                  drmModeFreeResources(res);
+                  close(fd); free(img_data); return 1;
+              }
+
+              /* Create dumb buffer */
+              struct drm_mode_create_dumb dumb;
+              memset(&dumb, 0, sizeof(dumb));
+              dumb.width = screen_w;
+              dumb.height = screen_h;
+              dumb.bpp = 32;
+              if (drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb) < 0) goto cleanup;
+
+              /* Create framebuffer */
+              uint32_t fb_id;
+              uint32_t handles[4] = {dumb.handle, 0, 0, 0};
+              uint32_t pitches[4] = {dumb.pitch, 0, 0, 0};
+              uint32_t offsets[4] = {0, 0, 0, 0};
+              if (drmModeAddFB2(fd, screen_w, screen_h, DRM_FORMAT_XRGB8888,
+                                handles, pitches, offsets, &fb_id, 0) < 0) goto cleanup;
+
+              /* mmap framebuffer */
+              struct drm_mode_map_dumb map_req;
+              memset(&map_req, 0, sizeof(map_req));
+              map_req.handle = dumb.handle;
+              if (drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) < 0) goto cleanup;
+
+              void *map = mmap(0, dumb.size, PROT_READ | PROT_WRITE,
+                               MAP_SHARED, fd, map_req.offset);
+              if (map == MAP_FAILED) goto cleanup;
+
+              /* Clear screen */
+              memset(map, 0, dumb.size);
+
+              /* Copy image centered */
+              int x_off = ((int)screen_w - (int)img_w) / 2;
+              int y_off = ((int)screen_h - (int)img_h) / 2;
+              if (x_off < 0) x_off = 0;
+              if (y_off < 0) y_off = 0;
+              uint32_t cw = (img_w > screen_w) ? screen_w : img_w;
+              uint32_t ch = (img_h > screen_h) ? screen_h : img_h;
+
+              for (uint32_t y = 0; y < ch; y++) {
+                  memcpy((uint8_t *)map + (y + y_off) * dumb.pitch + x_off * 4,
+                         img_data + y * img_w * 4,
+                         cw * 4);
+              }
+
+              /* Display */
+              drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0,
+                             &conn->connector_id, 1, &conn->modes[0]);
+
+              munmap(map, dumb.size);
+
+          cleanup:
+              drmModeFreeConnector(conn);
+              drmModeFreeResources(res);
+              close(fd);
+              free(img_data);
+              return 0;
+          }
+          ENDOFSOURCE
+
+      - name: Cross Compile drm_show for ARM64
+        run: |
+          aarch64-linux-gnu-gcc -O2 -static -o drm_show_arm64 drm_show.c \
+            -I/tmp/arm64-sysroot/usr/include \
+            -I/tmp/arm64-sysroot/usr/include/libdrm \
+            -I/tmp/arm64-sysroot/usr/include/drm \
+            -I/tmp/arm64-sysroot/usr/include/aarch64-linux-gnu \
+            -L/tmp/arm64-sysroot/usr/lib/aarch64-linux-gnu \
+            -ldrm
+          
+          chmod +x drm_show_arm64
+          file drm_show_arm64
+          ls -lh drm_show_arm64
+
+      # --- 4. 生成 init.d 开机脚本 ---
       - name: Create init.d boot script
         run: |
           cat << 'EOF' > 99-bootanim
@@ -293,7 +474,7 @@ jobs:
           EOF
           chmod +x 99-bootanim
 
-      # --- 4. 生成安装说明 ---
+      # --- 5. 生成安装说明 ---
       - name: Create install instructions
         run: |
           cat << 'EOF' > INSTALL.txt
@@ -302,18 +483,21 @@ jobs:
           ============================================
 
           Files:
-            drm_play_arm64  - 动画程序（视频数据已嵌入）
+            drm_play_arm64  - 开机动画程序（视频数据已嵌入）
+            drm_show_arm64  - 图片显示程序（供 bo.py 调用）
             99-bootanim     - OpenWrt init.d 开机脚本
 
           Step 1: 上传文件
           -------------------------
           scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
+          scp drm_show_arm64 root@192.168.1.1:/usr/sbin/
           scp 99-bootanim root@192.168.1.1:/etc/init.d/
 
           Step 2: 设置权限和启用
           -------------------------
           ssh root@192.168.1.1
           chmod +x /usr/sbin/drm_play_arm64
+          chmod +x /usr/sbin/drm_show_arm64
           chmod +x /etc/init.d/99-bootanim
           /etc/init.d/99-bootanim enable
 
@@ -328,21 +512,23 @@ jobs:
           说明:
           - 程序完全静默运行，无任何日志输出
           - 不会对 eMMC 产生额外读写
+          - bo.py 通过管道调用 drm_show_arm64 显示图片，零文件IO
           - 如需运行 bo.py，放到 /usr/sbin/bo.py
-          - START=99 可改为更小数字以更早启动（修改为START=11）
 
           卸载:
           /etc/init.d/99-bootanim disable
           rm /usr/sbin/drm_play_arm64
+          rm /usr/sbin/drm_show_arm64
           rm /etc/init.d/99-bootanim
           EOF
 
-      # --- 5. 上传产物 ---
+      # --- 6. 上传产物 ---
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7.0.1
         with:
           name: H29K-BootAnimation-Pack
           path: |
             drm_play_arm64
+            drm_show_arm64
             99-bootanim
             INSTALL.txt
