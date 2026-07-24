@@ -50,7 +50,7 @@ jobs:
             dpkg -x "$deb" .
           done
 
-      - name: Create DRM Player C Source (Silent Mode, No Logs)
+      - name: Create DRM Player C Source (Debug Version)
         run: |
           cat << 'ENDOFSOURCE' > drm_play.c
           #include <fcntl.h>
@@ -91,6 +91,7 @@ jobs:
               int x_offset = (screen_w - VIDEO_W) / 2;
               int y_offset = ((int)screen_h - VIDEO_H) / 2;
               if (y_offset < 0) y_offset = 0;
+              if (x_offset < 0) x_offset = 0;
               uint32_t src_row_bytes = VIDEO_W * (BPP / 8);
               for (int y = 0; y < VIDEO_H; y++) {
                   memcpy(buf + (y + y_offset) * pitch + x_offset * (BPP / 8),
@@ -125,17 +126,30 @@ jobs:
               long total_frames = (long)(apple_raw_len / frame_size);
               long total_duration_frames = FPS * DURATION;
 
+              printf("[DEBUG] Opening %s ...\n", drm_device);
               int fd = open(drm_device, O_RDWR | O_CLOEXEC);
-              if (fd < 0) return 1;
+              if (fd < 0) {
+                  printf("[ERROR] open() failed: %s\n", strerror(errno));
+                  return 1;
+              }
+              printf("[DEBUG] fd=%d OK\n", fd);
 
               uint64_t has_dumb = 0;
               if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || !has_dumb) {
+                  printf("[ERROR] No dumb buffer support\n");
                   close(fd);
                   return 1;
               }
+              printf("[DEBUG] Dumb buffer OK\n");
 
               drmModeRes *res = drmModeGetResources(fd);
-              if (!res) { close(fd); return 1; }
+              if (!res) {
+                  printf("[ERROR] drmModeGetResources failed: %s\n", strerror(errno));
+                  close(fd);
+                  return 1;
+              }
+              printf("[DEBUG] connectors=%d crtcs=%d encoders=%d\n",
+                     res->count_connectors, res->count_crtcs, res->count_encoders);
 
               drmModeConnector *conn = NULL;
               uint32_t crtc_id = 0;
@@ -143,32 +157,50 @@ jobs:
               for (int i = 0; i < res->count_connectors; i++) {
                   drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
                   if (!c) continue;
-                  if (!conn && c->count_modes > 0) {
+                  printf("[DEBUG] connector[%d] id=%d type=%d conn=%d modes=%d\n",
+                         i, c->connector_id, c->connector_type,
+                         c->connection, c->count_modes);
+                  if (!conn && c->count_modes > 0 && c->connection == DRM_MODE_CONNECTED) {
                       conn = c;
                       screen_w = c->modes[0].hdisplay;
                       screen_h = c->modes[0].vdisplay;
+                      printf("[DEBUG] Using mode: %dx%d\n", screen_w, screen_h);
                   } else {
                       drmModeFreeConnector(c);
                   }
               }
-              if (!conn) { drmModeFreeResources(res); close(fd); return 1; }
+              if (!conn) {
+                  printf("[ERROR] No connected connector found\n");
+                  drmModeFreeResources(res); close(fd); return 1;
+              }
 
               drmModeCrtc *crtc = NULL;
               if (conn->encoder_id) {
+                  printf("[DEBUG] encoder_id=%d\n", conn->encoder_id);
                   drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
                   if (enc) {
+                      printf("[DEBUG] enc->crtc_id=%d\n", enc->crtc_id);
                       crtc = drmModeGetCrtc(fd, enc->crtc_id);
                       if (crtc) crtc_id = crtc->crtc_id;
                       drmModeFreeEncoder(enc);
+                  } else {
+                      printf("[DEBUG] GetEncoder failed\n");
+                  }
+              } else {
+                  printf("[DEBUG] No encoder_id on connector\n");
+              }
+              if (!crtc) {
+                  printf("[DEBUG] Trying all CRTCs...\n");
+                  for (int i = 0; i < res->count_crtcs; i++) {
+                      crtc = drmModeGetCrtc(fd, res->crtcs[i]);
+                      if (crtc) { crtc_id = crtc->crtc_id; printf("[DEBUG] Found crtc_id=%d\n", crtc_id); break; }
                   }
               }
               if (!crtc) {
-                  for (int i = 0; i < res->count_crtcs; i++) {
-                      crtc = drmModeGetCrtc(fd, res->crtcs[i]);
-                      if (crtc) { crtc_id = crtc->crtc_id; break; }
-                  }
+                  printf("[ERROR] No CRTC found\n");
+                  drmModeFreeResources(res); close(fd); return 1;
               }
-              if (!crtc) { drmModeFreeResources(res); close(fd); return 1; }
+              printf("[DEBUG] crtc_id=%d\n", crtc_id);
 
               struct drm_mode_create_dumb dumb[2];
               void *map[2];
@@ -179,35 +211,50 @@ jobs:
                   dumb[i].width = screen_w;
                   dumb[i].height = screen_h;
                   dumb[i].bpp = BPP;
+                  printf("[DEBUG] Creating dumb[%d] %dx%d bpp=%d ...\n", i, screen_w, screen_h, BPP);
                   if (drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &dumb[i]) < 0) {
+                      printf("[ERROR] CREATE_DUMB[%d] failed: %s\n", i, strerror(errno));
                       drmModeFreeResources(res); close(fd); return 1;
                   }
+                  printf("[DEBUG] dumb[%d] pitch=%d size=%lld\n", i, dumb[i].pitch, (long long)dumb[i].size);
+
                   uint32_t handles[4] = {dumb[i].handle, 0, 0, 0};
                   uint32_t pitches[4] = {dumb[i].pitch, 0, 0, 0};
                   uint32_t offsets[4] = {0, 0, 0, 0};
                   if (drmModeAddFB2(fd, screen_w, screen_h, DRM_FORMAT_XRGB8888,
                                     handles, pitches, offsets, &fb_id[i], 0) < 0) {
+                      printf("[ERROR] AddFB2[%d] failed: %s\n", i, strerror(errno));
                       drmModeFreeResources(res); close(fd); return 1;
                   }
+                  printf("[DEBUG] fb_id[%d]=%d\n", i, fb_id[i]);
+
                   struct drm_mode_map_dumb map_req;
                   memset(&map_req, 0, sizeof(map_req));
                   map_req.handle = dumb[i].handle;
                   if (drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) < 0) {
+                      printf("[ERROR] MAP_DUMB[%d] failed: %s\n", i, strerror(errno));
                       drmModeFreeResources(res); close(fd); return 1;
                   }
                   map[i] = mmap(0, dumb[i].size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, map_req.offset);
                   if (map[i] == MAP_FAILED) {
+                      printf("[ERROR] mmap[%d] failed: %s\n", i, strerror(errno));
                       drmModeFreeResources(res); close(fd); return 1;
                   }
                   memset(map[i], 0, dumb[i].size);
               }
 
-              /* 显示第一帧 */
+              printf("[DEBUG] Displaying first frame (x_off=%d y_off=%d pitch=%d)...\n",
+                     (screen_w - VIDEO_W) / 2, ((int)screen_h - VIDEO_H) / 2, dumb[0].pitch);
               copy_frame_centered(map[0], get_frame(0, total_frames), dumb[0].pitch);
-              if (drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
-                                 &conn->connector_id, 1, &conn->modes[0]) < 0) {
+
+              printf("[DEBUG] Calling drmModeSetCrtc...\n");
+              int ret = drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]);
+              if (ret < 0) {
+                  printf("[ERROR] SetCrtc failed: %s (ret=%d)\n", strerror(errno), ret);
                   drmModeFreeResources(res); close(fd); return 1;
               }
+              printf("[DEBUG] First frame displayed OK!\n");
 
               /* 循环播放 36 秒 */
               int cur = 1;
@@ -216,7 +263,6 @@ jobs:
 
               while (frame_count < total_duration_frames) {
                   if (difftime(time(NULL), start_time) >= DURATION) break;
-
                   copy_frame_centered(map[cur], get_frame(frame_count, total_frames), dumb[cur].pitch);
                   drmModeSetCrtc(fd, crtc_id, fb_id[cur], 0, 0,
                                  &conn->connector_id, 1, &conn->modes[0]);
@@ -224,6 +270,7 @@ jobs:
                   frame_count++;
                   sleep_ms(1000 / FPS);
               }
+              printf("[DEBUG] Animation done. Played %ld frames.\n", frame_count);
 
               /* 清屏 */
               memset(map[0], 0, dumb[0].size);
@@ -240,6 +287,8 @@ jobs:
               drmModeFreeConnector(conn);
               drmModeFreeResources(res);
 
+              printf("[DEBUG] Cleanup done.\n");
+
               /* 检查并运行 bo.py */
               char bo_path[PATH_MAX];
               snprintf(bo_path, sizeof(bo_path), "%s/bo.py", exe_dir);
@@ -254,6 +303,7 @@ jobs:
               }
 
               close(fd);
+              printf("[DEBUG] Exit OK.\n");
               return 0;
           }
           ENDOFSOURCE
