@@ -136,7 +136,7 @@ jobs:
           static uint32_t screen_w, screen_h;
           static volatile sig_atomic_t g_running = 1;
 
-          void sig_handler(int sig) { g_running = 0; }
+          void sig_handler(int sig) { (void)sig; g_running = 0; }
 
           void sleep_ms(int ms) {
               struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000L };
@@ -244,7 +244,6 @@ jobs:
 
           /* ============================================================
            * HTTP GET（通过 popen 调用 wget）
-           * 返回 malloc 的数据，调用者 free
            * ============================================================ */
           static char *http_get(const char *url, size_t *out_len) {
               char cmd[512];
@@ -352,7 +351,6 @@ jobs:
 
           /* ============================================================
            * 下载并解码背景图片
-           * 返回 RGBA 像素数据（调用者 stbi_image_free）
            * ============================================================ */
           static uint8_t *fetch_background(int *w, int *h) {
               const char *tmp_path = "/tmp/.drm_bg_img";
@@ -370,17 +368,25 @@ jobs:
            * ============================================================ */
           static void render_text_rgba(uint8_t *rgba, int img_w, int img_h,
                                        const char *text) {
-              /* 加载字体 */
               FILE *ff = fopen(FONT_PATH, "rb");
               if (!ff) return;
 
               fseek(ff, 0, SEEK_END);
               long fsize = ftell(ff);
               fseek(ff, 0, SEEK_SET);
-              uint8_t *font_data = malloc(fsize);
+
+              if (fsize <= 0) { fclose(ff); return; }
+
+              uint8_t *font_data = malloc((size_t)fsize);
               if (!font_data) { fclose(ff); return; }
-              fread(font_data, 1, fsize, ff);
+
+              size_t read_bytes = fread(font_data, 1, (size_t)fsize, ff);
               fclose(ff);
+
+              if (read_bytes != (size_t)fsize) {
+                  free(font_data);
+                  return;
+              }
 
               stbtt_fontinfo font;
               if (!stbtt_InitFont(&font, font_data, 0)) {
@@ -392,8 +398,9 @@ jobs:
               int ascent, descent, line_gap;
               stbtt_GetFontVMetrics(&font, &ascent, &descent, &line_gap);
               int line_height = (int)((ascent - descent + line_gap) * scale);
+              if (line_height <= 0) line_height = (int)(FONT_SIZE + 2);
 
-              /* 计算总高度 */
+              /* 计算行数 */
               int num_lines = 1;
               for (const char *p = text; *p; p++) {
                   if (*p == '\n') num_lines++;
@@ -421,9 +428,9 @@ jobs:
                       else if ((c & 0xF0) == 0xE0) { codepoint = c & 0x0F; bytes = 3; }
                       else if ((c & 0xF8) == 0xF0) { codepoint = c & 0x07; bytes = 4; }
                       else { i++; continue; }
-                      for (int b = 1; b < bytes && (i+b) < line_len; b++)
+                      for (int b = 1; b < bytes && (i + (size_t)b) < line_len; b++)
                           codepoint = (codepoint << 6) | ((uint8_t)line_start[i+b] & 0x3F);
-                      i += bytes;
+                      i += (size_t)bytes;
 
                       int adv;
                       stbtt_GetCodepointHMetrics(&font, codepoint, &adv, NULL);
@@ -444,20 +451,19 @@ jobs:
                       else if ((c & 0xF0) == 0xE0) { codepoint = c & 0x0F; bytes = 3; }
                       else if ((c & 0xF8) == 0xF0) { codepoint = c & 0x07; bytes = 4; }
                       else { i++; continue; }
-                      for (int b = 1; b < bytes && (i+b) < line_len; b++)
+                      for (int b = 1; b < bytes && (i + (size_t)b) < line_len; b++)
                           codepoint = (codepoint << 6) | ((uint8_t)line_start[i+b] & 0x3F);
-                      i += bytes;
+                      i += (size_t)bytes;
 
                       int x0, y0, x1, y1;
                       stbtt_GetCodepointBitmapBox(&font, codepoint, scale, scale,
                                                   &x0, &y0, &x1, &y1);
                       int gw = x1 - x0, gh = y1 - y0;
                       if (gw > 0 && gh > 0) {
-                          uint8_t *bitmap = malloc(gw * gh);
+                          uint8_t *bitmap = malloc((size_t)(gw * gh));
                           if (bitmap) {
                               stbtt_MakeCodepointBitmap(&font, bitmap, gw, gh, gw,
                                                         scale, scale, codepoint);
-                              /* 将 bitmap 叠加到 RGBA buffer（白色文字） */
                               int bx = pen_x + x0;
                               int by = cur_y + (int)(ascent * scale) + y0;
                               for (int row = 0; row < gh; row++) {
@@ -468,7 +474,6 @@ jobs:
                                           uint8_t alpha = bitmap[row * gw + col];
                                           if (alpha > 0) {
                                               int idx = (py * img_w + px) * 4;
-                                              /* Alpha blend: white text over background */
                                               rgba[idx+0] = (uint8_t)((255 * alpha + rgba[idx+0] * (255 - alpha)) / 255);
                                               rgba[idx+1] = (uint8_t)((255 * alpha + rgba[idx+1] * (255 - alpha)) / 255);
                                               rgba[idx+2] = (uint8_t)((255 * alpha + rgba[idx+2] * (255 - alpha)) / 255);
@@ -510,7 +515,6 @@ jobs:
                   uint8_t *dst_row = (uint8_t *)fb + (y + y_off) * pitch + x_off * 4;
                   const uint8_t *src_row = rgba + y * img_w * 4;
                   for (int x = 0; x < cw; x++) {
-                      /* RGBA → XRGB8888 (little-endian: B G R X) */
                       dst_row[x*4 + 0] = src_row[x*4 + 2]; /* B */
                       dst_row[x*4 + 1] = src_row[x*4 + 1]; /* G */
                       dst_row[x*4 + 2] = src_row[x*4 + 0]; /* R */
@@ -535,19 +539,24 @@ jobs:
               int canvas_w = SCREEN_W, canvas_h = SCREEN_H;
 
               if (bg_rgba && bg_w > 0 && bg_h > 0) {
-                  /* 缩放背景到屏幕尺寸 */
-                  canvas = malloc(canvas_w * canvas_h * 4);
+                  canvas = malloc((size_t)(canvas_w * canvas_h * 4));
                   if (canvas) {
+                      /*
+                       * stb_image_resize2.h (v2) API:
+                       * stbir_resize(input, in_w, in_h, in_stride,
+                       *              output, out_w, out_h, out_stride,
+                       *              pixel_layout, data_type, edge, filter)
+                       */
                       stbir_resize(bg_rgba, bg_w, bg_h, 0,
                                    canvas, canvas_w, canvas_h, 0,
-                                   STBIR_RGBA);
+                                   STBIR_RGBA, STBIR_TYPE_UINT8,
+                                   STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT);
                   } else {
-                      canvas = calloc(canvas_w * canvas_h, 4);
+                      canvas = calloc((size_t)(canvas_w * canvas_h), 4);
                   }
                   stbi_image_free(bg_rgba);
               } else {
-                  /* 纯黑背景 */
-                  canvas = calloc(canvas_w * canvas_h, 4);
+                  canvas = calloc((size_t)(canvas_w * canvas_h), 4);
                   if (canvas) {
                       for (int i = 0; i < canvas_w * canvas_h; i++)
                           canvas[i*4 + 3] = 255;
@@ -556,14 +565,10 @@ jobs:
 
               if (!canvas) return;
 
-              /* 渲染文字 */
               render_text_rgba(canvas, canvas_w, canvas_h, text);
-
-              /* 写入 framebuffer */
               rgba_to_fb(map, pitch, canvas, canvas_w, canvas_h);
               free(canvas);
 
-              /* 设置 CRTC 显示 */
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
 
@@ -581,7 +586,7 @@ jobs:
           }
 
           /* ============================================================
-           * main - 全部逻辑在一个进程中
+           * main
            * ============================================================ */
           int main(int argc, char *argv[]) {
               signal(SIGPIPE, SIG_IGN);
@@ -590,7 +595,7 @@ jobs:
 
               const char *drm_device = (argc > 1) ? argv[1] : "/dev/dri/card0";
 
-              /* 1. 初始化 DRM（成为 Master） */
+              /* 1. 初始化 DRM */
               drmModeRes *res;
               drmModeConnector *conn;
               uint32_t crtc_id;
@@ -638,11 +643,10 @@ jobs:
                   sleep_ms(1000 / FPS);
               }
 
-              /* 4. 动画播完 → Daemon 化（关闭 stdin/stdout/stderr，但保持 DRM fd） */
+              /* 4. Daemon 化（关闭 stdio，保持 DRM fd） */
               daemonize();
 
-              /* 5. 信息屏循环（同一进程、同一 fd、同一 Master） */
-              /* 使用 fb[0] 作为信息屏 buffer */
+              /* 5. 信息屏循环 */
               uint32_t info_fb = fb_id[0];
               void *info_map = map[0];
               uint32_t info_pitch = dumb[0].pitch;
@@ -652,13 +656,13 @@ jobs:
                                      &conn->modes[0],
                                      info_map, info_pitch, info_fb);
 
-                  /* 等待 15 分钟（分段 sleep 以便响应信号） */
+                  /* 等待 15 分钟（分段 sleep 响应信号） */
                   for (int i = 0; i < REFRESH_SEC && g_running; i++) {
                       sleep(1);
                   }
               }
 
-              /* 6. 收到 SIGTERM → 清理退出 */
+              /* 6. 清理退出 */
               drmModeFreeConnector(conn);
               drmModeFreeResources(res);
               close(fd);
@@ -710,7 +714,7 @@ jobs:
               killall drm_play_arm64 2>/dev/null
               sleep 1
               
-              # unbind/rebind 驱动（确保每次启动都是全新状态）
+              # unbind/rebind 驱动
               SPI_DEV=""
               for dev in /sys/bus/spi/devices/*; do
                   if [ -f "$dev/modalias" ]; then
@@ -735,7 +739,7 @@ jobs:
                   done
               fi
               
-              # 启动（后台运行，进程永不退出）
+              # 启动
               "$PLAYER" "$DRM_DEV" &
           }
 
@@ -754,10 +758,10 @@ jobs:
           ============================================
 
           文件:
-            drm_play_arm64  - 开机动画 + 一言信息屏（全合一，无需 Python）
+            drm_play_arm64  - 开机动画 + 一言信息屏（全合一）
             99-bootanim     - OpenWrt init.d 开机脚本
 
-          运行时依赖（设备上需要有）:
+          运行时依赖:
             - wget（OpenWrt 自带）
             - /usr/share/fonts/MiSans-Regular.ttf（中文字体）
 
@@ -779,31 +783,14 @@ jobs:
 
           工作流程:
           -------------------------
-          1. 开机 → init.d 启动 drm_play_arm64
-          2. 播放开机动画（36 秒）
-          3. 动画播完 → 自动切换到一言信息屏
-          4. 从网络获取一言 + 随机背景图片
-          5. 渲染文字到背景上，显示到屏幕
-          6. 每 15 分钟自动刷新
-          7. 进程永不退出，DRM Master 永远保持
-          8. 网络不可用时显示内置 fallback 文字 + 黑色背景
+          1. 开机 → 播放动画 36 秒
+          2. 动画播完 → 自动显示一言+随机背景
+          3. 每 15 分钟刷新
+          4. 进程永不退出，DRM Master 永远保持
+          5. 无网络时显示内置文字 + 黑色背景
 
-          核心设计:
-          -------------------------
-          - 单进程持有 DRM Master，永远不关闭 fd
-          - 避免 drm_lastclose() 导致 panel 关闭/黑屏
-          - 无需 Python、无需 bo.py、无需 --show 子进程
-          - 所有 HTTP/图片解码/文字渲染都在 C 中完成
-          - 使用 stb_image (图片解码) + stb_truetype (文字渲染)
-          - 零 eMMC 写入（临时文件在 /tmp tmpfs）
-
-          停止:
-          killall drm_play_arm64
-
-          卸载:
-          /etc/init.d/99-bootanim disable
-          rm /usr/sbin/drm_play_arm64
-          rm /etc/init.d/99-bootanim
+          停止: killall drm_play_arm64
+          卸载: /etc/init.d/99-bootanim disable && rm /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
           EOF
 
       # --- 6. 上传产物 ---
