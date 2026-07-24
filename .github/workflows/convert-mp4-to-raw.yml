@@ -88,11 +88,12 @@ jobs:
           void copy_frame_centered(void *dst, const uint8_t *frame_data, uint32_t pitch) {
               uint8_t *buf = (uint8_t *)dst;
               memset(buf, 0, pitch * screen_h);
+              int x_offset = (screen_w - VIDEO_W) / 2;
               int y_offset = ((int)screen_h - VIDEO_H) / 2;
               if (y_offset < 0) y_offset = 0;
               uint32_t src_row_bytes = VIDEO_W * (BPP / 8);
               for (int y = 0; y < VIDEO_H; y++) {
-                  memcpy(buf + (y + y_offset) * pitch,
+                  memcpy(buf + (y + y_offset) * pitch + x_offset * (BPP / 8),
                          frame_data + y * src_row_bytes,
                          src_row_bytes);
               }
