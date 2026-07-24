@@ -3,17 +3,53 @@
 START=11
 STOP=10
 
+DRM_DRIVER="panel-mipi-dbi-spi"
+
 start() {
     PLAYER="/usr/sbin/drm_play_arm64"
     DRM_DEV="/dev/dri/card1"
     
     [ ! -f "$PLAYER" ] && return 1
     
-    # 短暂等待 DRM 设备就绪
-    [ ! -e "$DRM_DEV" ] && sleep 1
+    # 等待 DRM 设备就绪
+    i=0
+    while [ ! -e "$DRM_DEV" ] && [ $i -lt 10 ]; do
+        sleep 1
+        i=$((i+1))
+    done
+    [ ! -e "$DRM_DEV" ] && return 1
     
-    # 静默后台运行，无任何输出，无日志写入
-    "$PLAYER" "$DRM_DEV" >/dev/null 2>&1 &
+    # 杀掉旧进程
+    killall drm_play_arm64 2>/dev/null
+    sleep 1
+    
+    # unbind/rebind 驱动
+    SPI_DEV=""
+    for dev in /sys/bus/spi/devices/*; do
+        if [ -f "$dev/modalias" ]; then
+            ALIAS=$(cat "$dev/modalias" 2>/dev/null)
+            case "$ALIAS" in
+                *gc9307*|*panel-mipi-dbi*)
+                    SPI_DEV=$(basename "$dev")
+                    break
+                    ;;
+            esac
+        fi
+    done
+    
+    if [ -n "$SPI_DEV" ] && [ -d "/sys/bus/spi/drivers/$DRM_DRIVER" ]; then
+        echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/unbind" 2>/dev/null
+        sleep 1
+        echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/bind" 2>/dev/null
+        i=0
+        while [ ! -e "$DRM_DEV" ] && [ $i -lt 5 ]; do
+            sleep 1
+            i=$((i+1))
+        done
+    fi
+    
+    # 启动
+    "$PLAYER" "$DRM_DEV" &
 }
 
 stop() {

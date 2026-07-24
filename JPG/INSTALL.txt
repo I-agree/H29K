@@ -1,38 +1,48 @@
 ============================================
-  Boot Animation Installation Guide
+  Boot Animation + Info Screen (All-in-One)
 ============================================
 
-Files:
-  drm_play_arm64  - 动画程序（视频数据已嵌入）
+文件:
+  drm_play_arm64  - 开机动画 + 一言信息屏（全合一）
   99-bootanim     - OpenWrt init.d 开机脚本
+
+运行时依赖:
+  - wget（OpenWrt 自带）
+  - /usr/share/fonts/MiSans-Regular.ttf（中文字体）
 
 Step 1: 上传文件
 -------------------------
 scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
 scp 99-bootanim root@192.168.1.1:/etc/init.d/
 
-Step 2: 设置权限和启用
+Step 2: 上传字体（如果还没有）
+-------------------------
+scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
+
+Step 3: 设置权限和启用
 -------------------------
 ssh root@192.168.1.1
 chmod +x /usr/sbin/drm_play_arm64
 chmod +x /etc/init.d/99-bootanim
 /etc/init.d/99-bootanim enable
 
-Step 3: 测试
--------------------------
-/usr/sbin/drm_play_arm64 /dev/dri/card1
+本地 fallback 文字（4 组轮播，每次只显示 2 行）:
+--------------------------------------------------
+第 1 组: 山林不向四季起誓，荣枯随缘；
+         海洋不需对沙滩承诺，遇合尽兴。
 
-Step 4: 重启验证
--------------------------
-reboot
+第 2 组: 喜欢就处，别问是朋友还是恋人！
+         关系不是绳子，非要绑住谁的手脚。
 
-说明:
-- 程序完全静默运行，无任何日志输出
-- 不会对 eMMC 产生额外读写
-- 如需运行 bo.py，放到 /usr/sbin/bo.py
-- START=99 可改为更小数字以更早启动（修改为START=11）
+第 3 组: 缘分就像山风，吹到哪儿都是风景。
+         能走一段是礼物，能走一生是运气。
 
-卸载:
-/etc/init.d/99-bootanim disable
-rm /usr/sbin/drm_play_arm64
-rm /etc/init.d/99-bootanim
+第 4 组: 被你改变的那部分我，
+         代替了你永远陪在了我的身边。
+
+有网络时: 从一言 API 获取随机句子
+无网络时: 按 1→2→3→4→1→... 顺序轮播本地文字
+每 15 分钟切换一次
+
+停止: killall drm_play_arm64
+卸载: /etc/init.d/99-bootanim disable && rm /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
