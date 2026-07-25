@@ -400,6 +400,12 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&wl_wake_host>;
 	};
+
+	bluetooth@2 {
+		compatible = "aic,8800-bt";
+		reg = <2>;
+		status = "okay";
+	};
 };
 
 &spi1 {
