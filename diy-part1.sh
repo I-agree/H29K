@@ -205,6 +205,49 @@ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
 CONFIG_THERMAL_NETLINK=y
 
 # =================================================================
+# 🔄 rfkill-modem射频
+# =================================================================
+CONFIG_GPIOLIB=y
+CONFIG_OF=y
+CONFIG_RFKILL=y
+CONFIG_RFKILL_GPIO=y
+CONFIG_RFKILL_LEDS=y
+# CONFIG_RFKILL_INPUT is not set
+
+# =================================================================
+# 🔄 PWM sysfs 相关配置
+# =================================================================
+CONFIG_SYSFS=y
+CONFIG_OF=y
+CONFIG_HAS_IOMEM=y
+CONFIG_PWM=y
+CONFIG_PWM_SYSFS=y
+# CONFIG_PWM_GPIO is not set
+CONFIG_PWM_ROCKCHIP=y
+# CONFIG_PWM_DEBUG is not set
+
+# =================================================================
+# 🔄 RGA 2D 硬件加速
+# =================================================================
+CONFIG_MEDIA_SUPPORT=y
+CONFIG_MEDIA_SUPPORT_FILTER=y
+CONFIG_MEDIA_SUBDRV_AUTOSELECT=y
+CONFIG_MEDIA_PLATFORM_SUPPORT=y
+# CONFIG_MEDIA_CAMERA_SUPPORT is not set
+# CONFIG_MEDIA_ANALOG_TV_SUPPORT is not set
+# CONFIG_MEDIA_DIGITAL_TV_SUPPORT is not set
+# CONFIG_MEDIA_RADIO_SUPPORT is not set
+# CONFIG_MEDIA_SDR_SUPPORT is not set
+# CONFIG_MEDIA_TEST_SUPPORT is not set
+CONFIG_VIDEO_DEV=y
+# CONFIG_MEDIA_CONTROLLER is not set
+CONFIG_V4L_MEM2MEM_DRIVERS=y
+CONFIG_VIDEOBUF2_CORE=y
+CONFIG_VIDEO_ROCKCHIP_RGA=y
+CONFIG_DMA_CMA=y
+CONFIG_DMA_SHARED_BUFFER=y
+
+# =================================================================
 # 🔄 GPU + 小屏幕
 # =================================================================
 CONFIG_DRM=y
