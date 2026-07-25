@@ -12,14 +12,8 @@ echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.defa
 # === 2. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-# === 3. 管理蓝牙设备的LuCI
-git clone https://github.com/I-agree/luci-app-bluetooth.git package/luci-app-bluetooth
-
-# === 4. 磁盘扩容
+# === 3. 磁盘扩容
 git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
-
-# === 5. axs5106触摸驱动
-# git clone https://github.com/I-agree/axs5106.git package/kernel/modules/axs5106
 
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
