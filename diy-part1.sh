@@ -36,7 +36,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          gc9307 \
          files/usr/share/splash \
          files/etc/init.d \
-         files/etc/openclash/core \
+         files/etc/bluetooth \
          files/usr/sbin \
          files/lib/firmware \
          package/boot/uboot-rockchip/patches \
