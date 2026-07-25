@@ -84,6 +84,7 @@ download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm
 # download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch" "target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch"
 download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
 download_and_check "${BASE_URL}/JPG/once-enable-bootanim" "files/etc/uci-defaults/once-enable-bootanim"
+download_and_check "${BASE_URL}/other/main.conf" "files/etc/bluetooth/main.conf"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
