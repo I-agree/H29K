@@ -404,6 +404,7 @@
 	bluetooth@2 {
 		compatible = "aic,8800-bt";
 		reg = <2>;
+		bt-uart = <&uart2>;
 		status = "okay";
 	};
 };
