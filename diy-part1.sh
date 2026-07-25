@@ -9,19 +9,16 @@ set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终�
 # 添加 QModem 软件源
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 
-# === 2. 安装网页端文件管理器
-git clone https://github.com/sbwml/luci-app-quickfile package/quickfile
-
-# === 3. 安装 argon 主题
+# === 2. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-# === 4. 管理蓝牙设备的LuCI
+# === 3. 管理蓝牙设备的LuCI
 git clone https://github.com/I-agree/luci-app-bluetooth.git package/luci-app-bluetooth
 
-# === 5. 磁盘扩容
+# === 4. 磁盘扩容
 git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
 
-# === 6. axs5106触摸驱动
+# === 5. axs5106触摸驱动
 # git clone https://github.com/I-agree/axs5106.git package/kernel/modules/axs5106
 
 # ======================== 【统一下载与文件校验中心】 ========================
@@ -36,7 +33,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          gc9307 \
          files/usr/share/splash \
          files/etc/init.d \
-         files/etc/bluetooth \
+         files \
          files/usr/sbin \
          files/lib/firmware \
          package/boot/uboot-rockchip/patches \
@@ -84,7 +81,6 @@ download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm
 # download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch" "target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch"
 download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
 download_and_check "${BASE_URL}/JPG/once-enable-bootanim" "files/etc/uci-defaults/once-enable-bootanim"
-download_and_check "${BASE_URL}/other/main.conf" "files/etc/bluetooth/main.conf"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
