@@ -202,6 +202,7 @@ CONFIG_CPU_FREQ_THERMAL=y
 CONFIG_DEVFREQ_THERMAL=y
 CONFIG_THERMAL_GOV_STEP_WISE=y
 CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
+CONFIG_THERMAL_NETLINK=y
 
 # =================================================================
 # 🔄 GPU + 小屏幕
