@@ -1,7 +1,7 @@
 适配设备：hinlink_h29k
 兼容5G模块：FM350-GL
-插件汉化以及性能优化（BBR + Irqbalance）
-直接使用OpenWrt官方最新稳定版源码库
+插件汉化以及性能优化（BBR）
+直接使用OpenWrt官方最新源码库
 含小屏幕显示的完整系统镜像
 
 
