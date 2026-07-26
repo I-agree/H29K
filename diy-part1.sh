@@ -15,6 +15,12 @@ git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-a
 # === 3. 磁盘扩容
 git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
 
+# === 4. 磁盘管理Luci-app-diskman
+mkdir -p package/luci-app-diskman && \
+wget https://raw.githubusercontent.com/lisaac/luci-app-diskman/master/applications/luci-app-diskman/Makefile -O package/luci-app-diskman/Makefile
+mkdir -p package/parted && \
+wget https://raw.githubusercontent.com/lisaac/luci-app-diskman/master/Parted.Makefile -O package/parted/Makefile
+
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
