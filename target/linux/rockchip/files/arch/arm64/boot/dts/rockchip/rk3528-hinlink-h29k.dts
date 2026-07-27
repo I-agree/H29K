@@ -68,7 +68,6 @@
 		compatible = "rfkill-gpio";
 		label = "rfkill-modem";
 		radio-type = "wwan";
-		shutdown-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_LOW>;
 		status = "disabled";
 	};
 
@@ -203,6 +202,17 @@
 		regulator-min-microvolt = <746000>;
 		regulator-max-microvolt = <1201000>;
 		regulator-settling-time-up-us = <250>;
+	};
+
+	vcc_4g: vcc-4g {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_4g";
+		gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_LOW>;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <4400000>;
+		vin-supply = <&vcc5v0_sys>;
+		startup-delay-us = <200000>;
+		regulator-boot-on;
 	};
 
 	vdd_logic: vdd-logic {
@@ -502,6 +512,9 @@
 };
 
 &pcie {
-	reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
-	status = "okay";
+    pinctrl-names = "default";
+    pinctrl-0 = <&pcie_reset_pin>;
+    reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
+    vpcie3v3-supply = <&vcc_4g>;
+    status = "okay";
 };
