@@ -285,5 +285,19 @@ CONFIG_REGULATOR=y
 CONFIG_CMA=y
 CONFIG_DMA_CMA=y
 
+# =================================================================
+# 🔄 usb(rndis) 支持
+# =================================================================
+CONFIG_NETDEVICES=y
+CONFIG_USB=y
+CONFIG_USB_HOST=y
+CONFIG_USB_ACM=y
+CONFIG_USB_SERIAL=y
+CONFIG_USB_SERIAL_OPTION=y
+CONFIG_USB_USBNET=y
+CONFIG_USB_NET_RNDIS_HOST=y
+CONFIG_PPP=y
+CONFIG_TUN=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
