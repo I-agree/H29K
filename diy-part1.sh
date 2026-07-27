@@ -285,26 +285,5 @@ CONFIG_REGULATOR=y
 CONFIG_CMA=y
 CONFIG_DMA_CMA=y
 
-# =================================================================
-# 🔄 RK3528 PCIe 支持
-# =================================================================
-CONFIG_PCI=y
-CONFIG_PCI_MSI=y
-CONFIG_PCI_QUIRKS=y
-CONFIG_PCIE_ROCKCHIP_DW_HOST=y
-CONFIG_PHY_ROCKCHIP_NANENG_COMBO_PHY=y
-
-#  FM350-GL Modem 驱动
-CONFIG_WWAN=y
-CONFIG_MTK_T7XX=y
-CONFIG_WWAN_DEBUGFS=y
-
-# CONFIG_PCIE_ROCKCHIP_HOST is not set
-# CONFIG_PHY_ROCKCHIP_PCIE is not set
-# CONFIG_PHY_ROCKCHIP_SNPS_PCIE3 is not set
-# CONFIG_MHI_WWAN_CTRL is not set
-# CONFIG_MHI_WWAN_MBIM is not set
-# CONFIG_IOSM is not set
-
 EOF
 echo "✅ H29K 内核参数注入完成"
