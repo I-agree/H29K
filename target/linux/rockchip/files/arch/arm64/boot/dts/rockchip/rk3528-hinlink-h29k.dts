@@ -69,7 +69,6 @@
 		label = "rfkill-modem";
 		radio-type = "wwan";
 		shutdown-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_LOW>;
-		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
 		status = "disabled";
 	};
 
@@ -321,6 +320,12 @@
 		};
 	};
 
+	pcie {
+		pcie_reset_pin: pcie-reset-pin {
+			rockchip,pins = <4 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
 	wifi {
 		wifi_reg_on: wifi-reg-on {
 			rockchip,pins = <1 RK_PA6 RK_FUNC_GPIO &pcfg_pull_none>;
@@ -492,6 +497,7 @@
 };
 
 &usb_host0_xhci {
+	dr_mode = "host";
 	status = "disabled";
 };
 
