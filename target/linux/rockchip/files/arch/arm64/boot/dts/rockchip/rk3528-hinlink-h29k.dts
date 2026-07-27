@@ -512,9 +512,9 @@
 };
 
 &pcie {
-    pinctrl-names = "default";
-    pinctrl-0 = <&pcie_reset_pin>;
-    reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
-    vpcie3v3-supply = <&vcc_4g>;
-    status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&pcie_reset_pin>;
+	reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
+	vpcie3v3-supply = <&vcc_4g>;
+	status = "okay";
 };
