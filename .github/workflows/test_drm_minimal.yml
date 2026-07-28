@@ -70,6 +70,7 @@ jobs:
            * - 动画播完后，同一进程直接显示一言+背景
            * - 每 15 分钟刷新一次
            * - 本地 fallback 文字分 4 组轮播
+           * - 自动换行：每行最多 16 个字符
            * 运行时依赖（设备上）：
            * - wget 或 curl（用于 HTTP 请求）
            * - /usr/share/fonts/MiSans-Regular.ttf（中文字体）
@@ -115,9 +116,10 @@ jobs:
           #define SCREEN_W      320
           #define SCREEN_H      172
           #define FONT_PATH     "/usr/share/fonts/MiSans-Regular.ttf"
-          #define FONT_SIZE     25.0f
+          #define FONT_SIZE     30.0f
           #define REFRESH_SEC   (15 * 60)   /* 15 分钟 */
           #define HTTP_TIMEOUT  8
+          #define MAX_CHARS_PER_LINE  16   /* 每行最多字符数 */
 
           #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
           #define PICSUM_URL    "https://picsum.photos/320/172"
@@ -139,7 +141,6 @@ jobs:
               "代替了你永远陪在了我的身边。"
           };
 
-          /* 当前 fallback 轮播索引 */
           static int g_fallback_idx = 0;
 
           /* ===================== 全局状态 ===================== */
@@ -151,6 +152,80 @@ jobs:
           void sleep_ms(int ms) {
               struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000L };
               nanosleep(&ts, NULL);
+          }
+
+          /* ============================================================
+           * UTF-8 解码：返回当前字符的字节数，同时输出 codepoint
+           * ============================================================ */
+          static int utf8_decode(const char *s, int *codepoint) {
+              uint8_t c = (uint8_t)s[0];
+              if (c < 0x80) {
+                  *codepoint = c;
+                  return 1;
+              } else if ((c & 0xE0) == 0xC0) {
+                  *codepoint = c & 0x1F;
+                  if (s[1]) *codepoint = (*codepoint << 6) | ((uint8_t)s[1] & 0x3F);
+                  return 2;
+              } else if ((c & 0xF0) == 0xE0) {
+                  *codepoint = c & 0x0F;
+                  if (s[1]) *codepoint = (*codepoint << 6) | ((uint8_t)s[1] & 0x3F);
+                  if (s[2]) *codepoint = (*codepoint << 6) | ((uint8_t)s[2] & 0x3F);
+                  return 3;
+              } else if ((c & 0xF8) == 0xF0) {
+                  *codepoint = c & 0x07;
+                  if (s[1]) *codepoint = (*codepoint << 6) | ((uint8_t)s[1] & 0x3F);
+                  if (s[2]) *codepoint = (*codepoint << 6) | ((uint8_t)s[2] & 0x3F);
+                  if (s[3]) *codepoint = (*codepoint << 6) | ((uint8_t)s[3] & 0x3F);
+                  return 4;
+              }
+              *codepoint = c;
+              return 1;
+          }
+
+          /* ============================================================
+           * 自动换行：每行最多 max_chars 个字符
+           *
+           * 规则：
+           * - 遇到原有 \n 则保留（重置计数）
+           * - 每行累计字符数达到 max_chars 时，插入 \n 换行
+           * - 中文、英文、标点都算 1 个字符
+           *
+           * 输入: src (原始文字)
+           * 输出: dst (换行后的文字)，dst_size 为 dst 缓冲区大小
+           * ============================================================ */
+          static void wrap_text(const char *src, char *dst, size_t dst_size, int max_chars) {
+              size_t di = 0;
+              int char_count = 0;  /* 当前行已有多少个字符 */
+
+              while (*src && di < dst_size - 2) {
+                  /* 遇到原有换行符：保留，重置计数 */
+                  if (*src == '\n') {
+                      dst[di++] = '\n';
+                      char_count = 0;
+                      src++;
+                      continue;
+                  }
+
+                  /* 解码一个 UTF-8 字符 */
+                  int codepoint;
+                  int bytes = utf8_decode(src, &codepoint);
+
+                  /* 检查是否需要换行 */
+                  if (char_count >= max_chars) {
+                      dst[di++] = '\n';
+                      char_count = 0;
+                      if (di >= dst_size - 2) break;
+                  }
+
+                  /* 复制这个字符到输出 */
+                  for (int b = 0; b < bytes && di < dst_size - 1; b++) {
+                      dst[di++] = src[b];
+                  }
+                  char_count++;
+                  src += bytes;
+              }
+
+              dst[di] = '\0';
           }
 
           /* ============================================================
@@ -432,19 +507,12 @@ jobs:
                   const char *line_end = strchr(line_start, '\n');
                   size_t line_len = line_end ? (size_t)(line_end - line_start) : strlen(line_start);
 
-                  /* 计算行宽 */
+                  /* 计算行宽（像素） */
                   int line_w = 0;
                   for (size_t i = 0; i < line_len; ) {
-                      int codepoint = 0;
-                      int bytes = 0;
-                      uint8_t c = (uint8_t)line_start[i];
-                      if (c < 0x80) { codepoint = c; bytes = 1; }
-                      else if ((c & 0xE0) == 0xC0) { codepoint = c & 0x1F; bytes = 2; }
-                      else if ((c & 0xF0) == 0xE0) { codepoint = c & 0x0F; bytes = 3; }
-                      else if ((c & 0xF8) == 0xF0) { codepoint = c & 0x07; bytes = 4; }
-                      else { i++; continue; }
-                      for (int b = 1; b < bytes && (i + (size_t)b) < line_len; b++)
-                          codepoint = (codepoint << 6) | ((uint8_t)line_start[i+b] & 0x3F);
+                      int codepoint;
+                      int bytes = utf8_decode(line_start + i, &codepoint);
+                      if (i + (size_t)bytes > line_len) break;
                       i += (size_t)bytes;
 
                       int adv;
@@ -458,16 +526,9 @@ jobs:
                   /* 渲染每个字符 */
                   int pen_x = x_pos;
                   for (size_t i = 0; i < line_len; ) {
-                      int codepoint = 0;
-                      int bytes = 0;
-                      uint8_t c = (uint8_t)line_start[i];
-                      if (c < 0x80) { codepoint = c; bytes = 1; }
-                      else if ((c & 0xE0) == 0xC0) { codepoint = c & 0x1F; bytes = 2; }
-                      else if ((c & 0xF0) == 0xE0) { codepoint = c & 0x0F; bytes = 3; }
-                      else if ((c & 0xF8) == 0xF0) { codepoint = c & 0x07; bytes = 4; }
-                      else { i++; continue; }
-                      for (int b = 1; b < bytes && (i + (size_t)b) < line_len; b++)
-                          codepoint = (codepoint << 6) | ((uint8_t)line_start[i+b] & 0x3F);
+                      int codepoint;
+                      int bytes = utf8_decode(line_start + i, &codepoint);
+                      if (i + (size_t)bytes > line_len) break;
                       i += (size_t)bytes;
 
                       int x0, y0, x1, y1;
@@ -544,8 +605,13 @@ jobs:
           static void display_info_frame(int fd, uint32_t crtc_id,
                                          uint32_t conn_id, drmModeModeInfo *mode,
                                          void *map, uint32_t pitch, uint32_t fb_id) {
-              char text[2048];
-              fetch_hitokoto(text, sizeof(text));
+              char raw_text[2048];
+              char wrapped_text[4096];
+
+              fetch_hitokoto(raw_text, sizeof(raw_text));
+
+              /* 自动换行：每行最多 16 个字符 */
+              wrap_text(raw_text, wrapped_text, sizeof(wrapped_text), MAX_CHARS_PER_LINE);
 
               int bg_w = 0, bg_h = 0;
               uint8_t *bg_rgba = fetch_background(&bg_w, &bg_h);
@@ -580,7 +646,7 @@ jobs:
 
               if (!canvas) return;
 
-              render_text_rgba(canvas, canvas_w, canvas_h, text);
+              render_text_rgba(canvas, canvas_w, canvas_h, wrapped_text);
               rgba_to_fb(map, pitch, canvas, canvas_w, canvas_h);
               free(canvas);
 
@@ -796,20 +862,11 @@ jobs:
           chmod +x /etc/init.d/99-bootanim
           /etc/init.d/99-bootanim enable
 
-          本地 fallback 文字（4 组轮播，每次只显示 2 行）:
-          --------------------------------------------------
-          第 1 组: 山林不向四季起誓，荣枯随缘；
-                   海洋不需对沙滩承诺，遇合尽兴。
-
-          第 2 组: 喜欢就处，别问是朋友还是恋人！
-                   关系不是绳子，非要绑住谁的手脚。
-
-          第 3 组: 缘分就像山风，吹到哪儿都是风景。
-                   能走一段是礼物，能走一生是运气。
-
-          第 4 组: 被你改变的那部分我，
-                   代替了你永远陪在了我的身边。
-
+          文字显示规则:
+          - 每行最多 16 个字符（中文/英文/标点各算 1 个）
+          - 超过 16 个自动换到下一行
+          - 所有行整体垂直居中
+          - 每行水平居中
           有网络时: 从一言 API 获取随机句子
           无网络时: 按 1→2→3→4→1→... 顺序轮播本地文字
           每 15 分钟切换一次
