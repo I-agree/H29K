@@ -70,7 +70,7 @@ jobs:
            * - 动画播完后，同一进程直接显示一言+背景
            * - 每 15 分钟刷新一次
            * - 本地 fallback 文字分 4 组轮播
-           * - 自动换行：每行最多 16 个字符
+           * - 自动换行：每行最多 15 个字符
            * 运行时依赖（设备上）：
            * - wget 或 curl（用于 HTTP 请求）
            * - /usr/share/fonts/MiSans-Regular.ttf（中文字体）
@@ -119,7 +119,7 @@ jobs:
           #define FONT_SIZE     30.0f
           #define REFRESH_SEC   (15 * 60)   /* 15 分钟 */
           #define HTTP_TIMEOUT  8
-          #define MAX_CHARS_PER_LINE  16   /* 每行最多字符数 */
+          #define MAX_CHARS_PER_LINE  15   /* 每行最多字符数 */
 
           #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
           #define PICSUM_URL    "https://picsum.photos/320/172"
@@ -610,7 +610,7 @@ jobs:
 
               fetch_hitokoto(raw_text, sizeof(raw_text));
 
-              /* 自动换行：每行最多 16 个字符 */
+              /* 自动换行：每行最多 15 个字符 */
               wrap_text(raw_text, wrapped_text, sizeof(wrapped_text), MAX_CHARS_PER_LINE);
 
               int bg_w = 0, bg_h = 0;
@@ -863,8 +863,8 @@ jobs:
           /etc/init.d/99-bootanim enable
 
           文字显示规则:
-          - 每行最多 16 个字符（中文/英文/标点各算 1 个）
-          - 超过 16 个自动换到下一行
+          - 每行最多 15 个字符（中文/英文/标点各算 1 个）
+          - 超过 15 个自动换到下一行
           - 所有行整体垂直居中
           - 每行水平居中
           有网络时: 从一言 API 获取随机句子
