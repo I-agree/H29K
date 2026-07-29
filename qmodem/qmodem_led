@@ -8,5 +8,5 @@ config network_detect 'internet'
 config modem_status 'cellular'
 	option enabled '1'
 	option script 'misectel_modem_status'
-	option bind 'port'  # port or any
-	option port '2-1'   # required when bind is port
+	option bind 'port'
+	option port '2-1'
