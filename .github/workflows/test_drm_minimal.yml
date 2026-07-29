@@ -121,9 +121,9 @@ jobs:
           #define HTTP_TIMEOUT  8
           #define MAX_CHARS_PER_LINE  15   /* 每行最多字符数 */
           /* ★ 文字颜色 (R, G, B)，0~255 ★ */
-          #define TEXT_R   252
-          #define TEXT_G   191
-          #define TEXT_B   108
+          #define TEXT_R   201
+          #define TEXT_G   0
+          #define TEXT_B   78
           #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
           #define PICSUM_URL    "https://picsum.photos/320/172"
 
