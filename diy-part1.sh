@@ -12,9 +12,6 @@ echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.defa
 # === 2. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-# === 3. 磁盘扩容
-git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
-
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
