@@ -73,7 +73,7 @@ get_rsrp()
 
 update_modem_leds()
 {
-	local siminserted cell_info is_nr rsrp signal netstat
+	local siminserted cell_info is_nr rsrp signal netstat active_led
 
 	siminserted="$(sim_inserted)"
 	if [ "$siminserted" = 0 ] && [ "$siminserted" = "$last_siminserted" ]; then
@@ -81,8 +81,9 @@ update_modem_leds()
 	fi
 	last_siminserted="$siminserted"
 	if [ "$siminserted" = 0 ]; then
-		# 无 SIM → 全灭（没卡=没灯）
 		modem_leds_off
+		led_heartbeat "$LED_4G_POOR"
+		led_heartbeat "$LED_5G_POOR"
 		last_netstat=
 		return
 	fi
@@ -102,16 +103,16 @@ update_modem_leds()
 	netstat="${NET_DEV}_${is_nr}_${signal}"
 	[ "$netstat" != "$last_netstat" ] || return
 	last_netstat="$netstat"
-
-	# 状态变了：先回 none 清掉旧触发器(慢闪/心跳)，再关灯
 	modem_leds_off
 	case "${is_nr}_${signal}" in
-		0_0|1_0) ;;                       # 无信号 → 保持灭
-		0_1) led_slowblink "$LED_4G_POOR" ;;  # 4G 弱 → 慢闪
-		1_1) led_slowblink "$LED_5G_POOR" ;;  # 5G 弱 → 慢闪
-		0_2) led_turn "$LED_4G_GOOD" 1 ;;     # 4G 中/强 → 常亮
-		1_2) led_turn "$LED_5G_GOOD" 1 ;;     # 5G 中/强 → 常亮
+		0_0) led_heartbeat "$LED_4G_POOR" ;;
+		1_0) led_heartbeat "$LED_5G_POOR" ;;
+		0_1) active_led="$LED_4G_POOR" ;;
+		1_1) active_led="$LED_5G_POOR" ;;
+		0_2) active_led="$LED_4G_GOOD" ;;
+		1_2) active_led="$LED_5G_GOOD" ;;
 	esac
+	[ -z "$active_led" ] || led_netdev "$active_led" "$NET_DEV"
 }
 
 misectel_led_init || exit 1

@@ -22,18 +22,6 @@ misectel_led_init()
 			LED_INTERNET_BLUE='sys:blue'
 			LED_INTERNET_RED='sys:red'
 			;;
-		hinlink,h29k)
-			# 单色灯：POOR 与 GOOD 指向同一物理灯
-			#   弱信号 → 该灯 timer 慢闪
-			#   中/强  → 该灯常亮
-			#   无信号/无SIM → 不点(灭)
-			LED_4G_POOR='red:4g'
-			LED_4G_GOOD='red:4g'
-			LED_5G_POOR='blue:5g'
-			LED_5G_GOOD='blue:5g'
-			LED_INTERNET_BLUE='green:work'
-			LED_INTERNET_RED='green:work'
-			;;
 		*) return 1 ;;
 	esac
 }
@@ -61,17 +49,6 @@ led_heartbeat()
 	[ -e "$path/brightness" ] || return
 	echo "$(cat "$path/max_brightness")" > "$path/brightness"
 	echo heartbeat > "$path/trigger"
-}
-
-# 慢闪：timer 触发器，1秒亮 / 1秒灭（内核自管，无后台进程）
-led_slowblink()
-{
-	local path="/sys/class/leds/$1"
-
-	[ -e "$path/brightness" ] || return
-	echo timer > "$path/trigger"
-	echo 1000 > "$path/delay_on" 2>/dev/null
-	echo 1000 > "$path/delay_off" 2>/dev/null
 }
 
 led_netdev()
@@ -108,26 +85,12 @@ internet_leds_off()
 
 internet_led_connected()
 {
-	case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
-		hinlink,h29k)
-			led_turn "$LED_INTERNET_BLUE" 1
-			;;
-		*)
-			led_turn "$LED_INTERNET_RED" 0
-			led_turn "$LED_INTERNET_BLUE" 1
-			;;
-	esac
+	led_turn "$LED_INTERNET_RED" 0
+	led_turn "$LED_INTERNET_BLUE" 1
 }
 
 internet_led_disconnected()
 {
-	case "$(cat /tmp/sysinfo/board_name 2>/dev/null)" in
-		hinlink,h29k)
-			led_turn "$LED_INTERNET_BLUE" 0
-			;;
-		*)
-			led_turn "$LED_INTERNET_BLUE" 0
-			led_turn "$LED_INTERNET_RED" 1
-			;;
-	esac
+	led_turn "$LED_INTERNET_BLUE" 0
+	led_turn "$LED_INTERNET_RED" 1
 }
