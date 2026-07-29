@@ -116,7 +116,7 @@ jobs:
           #define SCREEN_W      320
           #define SCREEN_H      172
           #define FONT_PATH     "/usr/share/fonts/MiSans-Regular.ttf"
-          #define FONT_SIZE     30.0f
+          #define FONT_SIZE     28.0f
           #define REFRESH_SEC   (15 * 60)   /* 15 分钟 */
           #define HTTP_TIMEOUT  8
           #define MAX_CHARS_PER_LINE  15   /* 每行最多字符数 */
