@@ -14,6 +14,14 @@ misectel_led_init()
 			LED_INTERNET_BLUE='blue:wan'
 			LED_INTERNET_RED='red:wan'
 			;;
+		hinlink,h29k)
+			LED_4G_POOR='red:4g'
+			LED_4G_GOOD='red:4g'
+			LED_5G_POOR='blue:5g'
+			LED_5G_GOOD='blue:5g'
+			LED_INTERNET_BLUE='green:work'
+			LED_INTERNET_RED=''
+			;;
 		misectel,m02k45)
 			LED_4G_POOR='4g:yellow'
 			LED_4G_GOOD='4g:blue'
