@@ -41,6 +41,7 @@ fi
 chmod +x files/etc/init.d/99-bootanim
 chmod +x files/usr/sbin/drm_play_arm64
 chmod +x files/etc/uci-defaults/once-enable-bootanim
+chmod 0755 files/usr/share/qmodem/led_scripts/misectel_led.sh
 
 # ==============================================================
 
