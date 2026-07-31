@@ -271,13 +271,12 @@
         reg = <0x63>;
         interrupt-parent = <&gpio4>;
         interrupts = <RK_PB2 IRQ_TYPE_EDGE_FALLING>;
-        interrupt-names = "touchscreen";
-        irq-gpios = <&gpio4 RK_PB2 GPIO_ACTIVE_HIGH>;
         reset-gpios = <&gpio4 RK_PB3 GPIO_ACTIVE_HIGH>;
+        touchscreen-size-x = <320>;
+        touchscreen-size-y = <172>;
+        touchscreen-swapped-x-y;
         touchscreen-inverted-x;
         touchscreen-inverted-y;
-        touchscreen-size-x = <172>;
-        touchscreen-size-y = <320>;
         status = "okay";
     };
 };
