@@ -214,7 +214,7 @@ define Device/hinlink_h29k
   DEVICE_MODEL := H29K
   DEVICE_DTS := rk3528-hinlink-h29k
   UBOOT_DEVICE_NAME := hinlink-h29k-rk3528
-  DEVICE_PACKAGES := kmod-aic8800-sdio
+  DEVICE_PACKAGES := kmod-aic8800-sdio kmod-axs5106
 endef
 TARGET_DEVICES += hinlink_h29k
 
