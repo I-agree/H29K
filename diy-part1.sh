@@ -303,5 +303,15 @@ CONFIG_USB_NET_RNDIS_HOST=y
 CONFIG_PPP=y
 CONFIG_TUN=y
 
+# =================================================================
+# 🔄 内核触摸驱动支持
+# =================================================================
+CONFIG_OF=y
+CONFIG_GPIOLIB=y
+CONFIG_I2C=y
+CONFIG_I2C_RK3X=y
+CONFIG_INPUT=y
+CONFIG_INPUT_EVDEV=y
+
 EOF
 echo "✅ H29K 内核参数注入完成"
