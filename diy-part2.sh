@@ -45,4 +45,7 @@ chmod 0755 files/usr/share/qmodem/led_scripts/misectel_led.sh
 
 # ==============================================================
 
+# === 修复BUG
+rm -rf feeds/packages/net/clixon
+
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
