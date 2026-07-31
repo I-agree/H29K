@@ -12,9 +12,6 @@ echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.defa
 # === 2. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-# === 3. 安装 axs5106 触摸驱动
-git clone https://github.com/I-agree/axs5106.git package/kernel/axs5106
-
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
@@ -78,6 +75,9 @@ download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts
 download_and_check "${BASE_URL}/JPG/once-enable-bootanim" "files/etc/uci-defaults/once-enable-bootanim"
 download_and_check "${BASE_URL}/qmodem/misectel_led.sh" "files/usr/share/qmodem/led_scripts/misectel_led.sh"
 download_and_check "${BASE_URL}/qmodem/qmodem_led" "files/etc/config/qmodem_led"
+download_and_check "${BASE_URL}/package/kernel/axs5106/Makefile" "package/kernel/axs5106/Makefile"
+download_and_check "${BASE_URL}/package/kernel/axs5106/src/Makefile" "package/kernel/axs5106/src/Makefile"
+download_and_check "${BASE_URL}/package/kernel/axs5106/src/chipone_axs5106.c" "package/kernel/axs5106/src/chipone_axs5106.c"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
