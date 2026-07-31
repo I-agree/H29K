@@ -15,6 +15,9 @@ git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-a
 # === 3. 安装 axs5106 触摸驱动
 git clone https://github.com/I-agree/axs5106.git package/kernel/axs5106
 
+# === 4. 修复BUG
+rm -rf feeds/packages/net/clixon
+
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
