@@ -110,8 +110,6 @@ jobs:
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         make defconfig
-        echo "CONFIG_PACKAGE_kmod-axs5106=y" >> .config
-        make oldconfig
         for i in {1..3}; do make download -j8 && break || sleep 5; done
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
