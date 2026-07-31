@@ -12,7 +12,7 @@ echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.defa
 # === 2. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-# === 2. 安装 axs5106 触摸驱动
+# === 3. 安装 axs5106 触摸驱动
 git clone https://github.com/I-agree/axs5106.git package/kernel/axs5106
 
 # ======================== 【统一下载与文件校验中心】 ========================
