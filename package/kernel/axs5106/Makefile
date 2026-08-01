@@ -19,7 +19,6 @@ define KernelPackage/axs5106
   SUBMENU:=Input modules
   TITLE:=ChipOne AXS5106 touchscreen driver
   DEPENDS:=+kmod-i2c-core +kmod-input-core
-  KCONFIG:=CONFIG_TOUCHSCREEN_CHIPONE_AXS5106
   FILES:=$(PKG_BUILD_DIR)/chipone_axs5106.ko
   AUTOLOAD:=$(call AutoProbe,chipone_axs5106)
   DEFAULT:=y
