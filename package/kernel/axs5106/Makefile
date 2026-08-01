@@ -18,8 +18,11 @@ include $(INCLUDE_DIR)/package.mk
 define KernelPackage/axs5106
   SUBMENU:=Input modules
   TITLE:=ChipOne AXS5106 touchscreen driver
+  DEPENDS:=+kmod-i2c-core +kmod-input-core
+  KCONFIG:=CONFIG_TOUCHSCREEN_CHIPONE_AXS5106
   FILES:=$(PKG_BUILD_DIR)/chipone_axs5106.ko
   AUTOLOAD:=$(call AutoProbe,chipone_axs5106)
+  DEFAULT:=y
 endef
 
 define KernelPackage/axs5106/description
@@ -28,12 +31,12 @@ define KernelPackage/axs5106/description
 endef
 
 define Build/Prepare
-	mkdir -p $(PKG_BUILD_DIR)
-	$(CP) ./src/* $(PKG_BUILD_DIR)/
+    mkdir -p $(PKG_BUILD_DIR)
+    $(CP) ./src/* $(PKG_BUILD_DIR)/
 endef
 
 define Build/Compile
-	$(KERNEL_MAKE) M=$(PKG_BUILD_DIR) modules
+    $(KERNEL_MAKE) M=$(PKG_BUILD_DIR) modules
 endef
 
-$(eval $(KernelPackage/axs5106))
+$(eval $(call KernelPackage,axs5106))
