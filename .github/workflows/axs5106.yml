@@ -151,7 +151,7 @@ jobs:
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         echo "🔨 [1/4] 编译主机端工具 (tools)..."
-        make tools/compile V=s -j$(nproc) 2>&1 | tee $GITHUB_WORKSPACE/tools.log
+        make tools/compile V=w -j$(nproc) 2>&1 | tee $GITHUB_WORKSPACE/tools.log
         echo "✅ tools 编译完成"
         echo "status=success" >> $GITHUB_OUTPUT
 
@@ -160,7 +160,7 @@ jobs:
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
         echo "🔨 [2/4] 编译交叉工具链 (toolchain)..."
-        make toolchain/compile V=s -j$(nproc) 2>&1 | tee $GITHUB_WORKSPACE/toolchain.log
+        make toolchain/compile V=w -j$(nproc) 2>&1 | tee $GITHUB_WORKSPACE/toolchain.log
         echo "✅ toolchain 编译完成"
         echo "status=success" >> $GITHUB_OUTPUT
 
@@ -170,7 +170,7 @@ jobs:
         cd ${{ env.WORK_DIR }}/openwrt
         echo "🔨 [3/4] 编译内核 (target/linux/compile)..."
         echo "此步骤生成内核头文件、Module.symvers 等外部模块编译所需环境"
-        make target/linux/compile V=s -j$(nproc) 2>&1 | tee $GITHUB_WORKSPACE/kernel.log
+        make target/linux/compile V=w -j$(nproc) 2>&1 | tee $GITHUB_WORKSPACE/kernel.log
         echo "✅ 内核编译完成"
         echo "status=success" >> $GITHUB_OUTPUT
 
