@@ -30,12 +30,12 @@ define KernelPackage/axs5106/description
 endef
 
 define Build/Prepare
-    mkdir -p $(PKG_BUILD_DIR)
-    $(CP) ./src/* $(PKG_BUILD_DIR)/
+	mkdir -p $(PKG_BUILD_DIR)
+	$(CP) ./src/* $(PKG_BUILD_DIR)/
 endef
 
 define Build/Compile
-    $(KERNEL_MAKE) M=$(PKG_BUILD_DIR) modules
+	$(KERNEL_MAKE) M=$(PKG_BUILD_DIR) modules
 endef
 
 $(eval $(call KernelPackage,axs5106))
