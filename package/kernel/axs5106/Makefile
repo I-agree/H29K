@@ -16,17 +16,17 @@ PKG_LICENSE:=GPL-2.0
 include $(INCLUDE_DIR)/package.mk
 
 define KernelPackage/axs5106
-  SUBMENU:=Input modules
-  TITLE:=ChipOne AXS5106 touchscreen driver
-  DEPENDS:=+kmod-i2c-core +kmod-input-core
-  FILES:=$(PKG_BUILD_DIR)/chipone_axs5106.ko
-  AUTOLOAD:=$(call AutoProbe,chipone_axs5106)
-  DEFAULT:=y
+	SUBMENU:=Input modules
+	TITLE:=ChipOne AXS5106 touchscreen driver
+	DEPENDS:=+kmod-i2c-core +kmod-input-core
+	FILES:=$(PKG_BUILD_DIR)/chipone_axs5106.ko
+	AUTOLOAD:=$(call AutoProbe,chipone_axs5106)
+	DEFAULT:=y
 endef
 
 define KernelPackage/axs5106/description
-  ChipOne / AXS Technology AXS5106L capacitive touch controller
-  I2C driver (address 0x63, 8-bit register, 2-point multitouch).
+	ChipOne / AXS Technology AXS5106L capacitive touch controller
+	I2C driver (address 0x63, 8-bit register, 2-point multitouch).
 endef
 
 define Build/Prepare
