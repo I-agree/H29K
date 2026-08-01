@@ -48,22 +48,25 @@ struct axs5106_ts {
  */
 static int axs5106_read(struct i2c_client *client, u8 reg, u8 *buf, size_t len)
 {
-	struct i2c_msg msgs[2];
 	int ret;
 
-	msgs[0].addr  = client->addr;
-	msgs[0].flags = 0;
-	msgs[0].len   = 1;
-	msgs[0].buf   = &reg;
-
-	msgs[1].addr  = client->addr;
-	msgs[1].flags = I2C_M_RD;
-	msgs[1].len   = len;
-	msgs[1].buf   = buf;
-
-	ret = i2c_transfer(client->adapter, msgs, 2);
-	if (ret != 2)
+	/*
+	 * Split into two separate I2C transactions.
+	 * The rk3x I2C controller cannot do a proper REPEATED START,
+	 * so combined write+read (2 msgs in one transfer) fails with
+	 * "unexpected irq in STOP: 0x90".
+	 *
+	 * Transaction 1: [START][addr+W][reg][STOP]
+	 * Transaction 2: [START][addr+R][data...][STOP]
+	 */
+	ret = i2c_master_send(client, &reg, 1);
+	if (ret != 1)
 		return ret < 0 ? ret : -EIO;
+
+	ret = i2c_master_recv(client, buf, len);
+	if (ret != (int)len)
+		return ret < 0 ? ret : -EIO;
+
 	return 0;
 }
 
