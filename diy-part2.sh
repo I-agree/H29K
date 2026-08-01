@@ -45,7 +45,4 @@ chmod 0755 files/usr/share/qmodem/led_scripts/misectel_led.sh
 
 # ==============================================================
 
-# 在 make defconfig 之前触发包扫描，让 Kconfig 系统识别 DEFAULT_kmod-axs5106
-make tmp/.config-package.in 2>/dev/null || true
-
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
