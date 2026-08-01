@@ -1,0 +1,231 @@
+name: 单独编译 AXS5106 内核模块
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: main
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config          # 提供目标架构配置
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  UPLOAD_BIN_DIR: false                             # 不需要完整 bin 目录
+  UPLOAD_FIRMWARE: false                            # 不生成固件
+  UPLOAD_RELEASE: false                             # 不发布 Release
+  UPLOAD_PACKAGE_ARTIFACT: true                     # 上传编译产物和日志
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+    - name: 检出源码
+      uses: actions/checkout@v7.0.1
+
+    - name: 调整磁盘空间
+      run: |
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
+        
+        echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
+        sudo swapoff -a || true
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        sudo sysctl vm.swappiness=10
+        echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
+        
+        echo "📊 扩容系统全局 /tmp 至 10G"
+        sudo umount /tmp || true
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "✅ /tmp 扩容至 10GB 完成"
+        
+        echo "📊 检查当前磁盘空间分布："
+        df -h
+        df -i /tmp
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+
+    - name: 初始化构建环境
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+
+    - name: 查看编译环境硬件规格 (CPU/内存)
+      run: |
+        echo "==================== CPU 核心数 ===================="
+        echo "逻辑核心数: $(nproc)"
+        cat /proc/cpuinfo | grep name | cut -f2 -d: | uniq -c
+        echo -e "\n==================== 内存大小 ===================="
+        free -h
+
+    - name: 克隆 OpenWrt 源码到磁盘
+      run: |
+        cd $WORK_DIR
+        df -hT $PWD
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 加载自定义软件源
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: 更新软件源索引
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
+
+    - name: 安装软件源组件
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
+
+    - name: 复制 AXS5106 第三方驱动到 OpenWrt 源码树
+      run: |
+        # 将仓库中的 AXS5106 包复制到 OpenWrt 的 package/kernel 目录下
+        if [ -d "$GITHUB_WORKSPACE/package/kernel/axs5106" ]; then
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/package/kernel/axs5106
+          cp -r $GITHUB_WORKSPACE/package/kernel/axs5106/* ${{ env.WORK_DIR }}/openwrt/package/kernel/axs5106/
+          echo "✅ AXS5106 驱动源码已复制到 OpenWrt 源码树"
+        else
+          echo "⚠️ 未找到 package/kernel/axs5106 目录，请检查仓库结构"
+          exit 1
+        fi
+
+    - name: 加载自定义配置文件
+      run: |
+        if [ -d files ]; then
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+          cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
+        fi
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: 生成默认配置并强制启用 AXS5106 依赖
+      id: deps
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make defconfig
+        
+        # 强制启用 AXS5106 所需的内核依赖
+        echo "📌 强制启用 I2C 和 Input 内核子系统..."
+        sed -i 's/.*CONFIG_PACKAGE_kmod-i2c-core.*/CONFIG_PACKAGE_kmod-i2c-core=y/' .config
+        sed -i 's/.*CONFIG_PACKAGE_kmod-input-core.*/CONFIG_PACKAGE_kmod-input-core=y/' .config
+        
+        # 重新计算依赖关系，确保配置一致性
+        make defconfig
+        
+        # 验证依赖是否已启用
+        echo "📊 验证关键依赖状态："
+        grep -E 'CONFIG_PACKAGE_kmod-i2c-core|CONFIG_PACKAGE_kmod-input-core|CONFIG_PACKAGE_kmod-axs5106' .config || echo "⚠️ 部分配置未找到"
+        
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 下载依赖软件包
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        for i in {1..3}; do make download -j8 && break || sleep 5; done
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: 单独编译 AXS5106 内核模块
+      id: compile
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo "🔨 开始编译 AXS5106 内核模块..."
+        echo "编译命令: make package/kernel/axs5106/compile V=s"
+        echo "================================================"
+        
+        # 编译并保存完整日志，即使失败也继续
+        set +e
+        make package/kernel/axs5106/compile V=s 2>&1 | tee $GITHUB_WORKSPACE/compile.log
+        COMPILE_EXIT_CODE=${PIPESTATUS[0]}
+        set -e
+        
+        echo "================================================"
+        echo "编译退出码: $COMPILE_EXIT_CODE"
+        
+        if [ $COMPILE_EXIT_CODE -eq 0 ]; then
+          echo "✅ AXS5106 编译成功"
+          echo "status=success" >> $GITHUB_OUTPUT
+        else
+          echo "❌ AXS5106 编译失败，请检查上方编译日志"
+          echo "status=failure" >> $GITHUB_OUTPUT
+        fi
+        
+        # 记录编译产物路径（即使编译失败也尝试查找）
+        echo "📊 查找编译产物..."
+        find build_dir -name "chipone_axs5106.ko" 2>/dev/null | head -5 || echo "未找到 .ko 文件"
+        find bin -name "kmod-axs5106*.ipk" 2>/dev/null | head -5 || echo "未找到 .ipk 文件"
+
+    - name: 整理编译产物
+      id: organize
+      if: (!cancelled())
+      run: |
+        mkdir -p $GITHUB_WORKSPACE/artifacts
+        
+        # 复制编译日志
+        if [ -f "$GITHUB_WORKSPACE/compile.log" ]; then
+          cp $GITHUB_WORKSPACE/compile.log $GITHUB_WORKSPACE/artifacts/
+          echo "✅ 编译日志已保存"
+        fi
+        
+        # 复制 .ko 文件
+        KO_FILE=$(find ${{ env.WORK_DIR }}/openwrt/build_dir -name "chipone_axs5106.ko" 2>/dev/null | head -1)
+        if [ -n "$KO_FILE" ]; then
+          cp "$KO_FILE" $GITHUB_WORKSPACE/artifacts/
+          echo "✅ .ko 文件已保存: $(basename $KO_FILE)"
+        fi
+        
+        # 复制 .ipk 包
+        IPK_FILE=$(find ${{ env.WORK_DIR }}/openwrt/bin -name "kmod-axs5106*.ipk" 2>/dev/null | head -1)
+        if [ -n "$IPK_FILE" ]; then
+          cp "$IPK_FILE" $GITHUB_WORKSPACE/artifacts/
+          echo "✅ .ipk 包已保存: $(basename $IPK_FILE)"
+        fi
+        
+        # 列出收集到的产物
+        echo "📊 编译产物清单："
+        ls -la $GITHUB_WORKSPACE/artifacts/
+        
+        echo "ARTIFACT_DIR=$GITHUB_WORKSPACE/artifacts" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 检查磁盘空间使用情况
+      if: (!cancelled())
+      run: df -hT
+
+    - name: 上传编译产物和日志
+      uses: actions/upload-artifact@v7.0.1
+      if: steps.organize.outputs.status == 'success' && env.UPLOAD_PACKAGE_ARTIFACT == 'true' && !cancelled()
+      with:
+        name: AXS5106_编译产物_$(date +"%Y%m%d%H%M")
+        path: ${{ env.ARTIFACT_DIR }}
+
+    - name: 编译失败时单独上传日志
+      uses: actions/upload-artifact@v7.0.1
+      if: steps.compile.outputs.status == 'failure' && !cancelled()
+      with:
+        name: AXS5106_编译失败日志_$(date +"%Y%m%d%H%M")
+        path: $GITHUB_WORKSPACE/compile.log
+
+    - name: 清理历史工作流运行记录
+      uses: Mattraks/delete-workflow-runs@v2.1.0
+      with:
+        retain_days: 0
+        keep_minimum_runs: 2
