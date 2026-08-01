@@ -17,7 +17,7 @@ echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
 # 创建全局所需的所有目录架构 (新增 files/www 网页容器支撑)
 mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
-         package/boot/uboot-rockchip/configs/hinlink/h29k \
+         package/kernel/axs5106/src \
          target/linux/rockchip/patches-6.18 \
          target/linux/rockchip/image \
          files/etc/uci-defaults \
