@@ -202,8 +202,29 @@ static int axs5106_probe(struct i2c_client *client)
 	__set_bit(EV_KEY, ts->input->evbit);
 	__set_bit(BTN_TOUCH, ts->input->keybit);
 
-	input_set_abs_params(ts->input, ABS_MT_POSITION_X, 0, ts->max_x, 0, 0);
-	input_set_abs_params(ts->input, ABS_MT_POSITION_Y, 0, ts->max_y, 0, 0);
+	/*
+	 * !! COORDINATE-RANGE CONTRACT (read before touching DTS) !!
+	 *
+	 * touchscreen-size-x/y carry the *pixel count* (e.g. 320 / 172),
+	 * i.e. hardware_max + 1. From it we derive:
+	 *   - absinfo range : [0, size-1]   (the values we actually report)
+	 *   - invert mirror : (size-1) - v  (see axs5106_irq)
+	 * Both use (size-1) on purpose, so absinfo max and the invert
+	 * pivot are identical -- matching edt-ft5x06 / goodix convention.
+	 *
+	 * Consequence: size MUST equal hardware_max + 1. If someone writes
+	 * size = hardware_max (e.g. 319 instead of 320), the invert pivot
+	 * becomes 318 while the chip can still emit 319, and (318 - 319)
+	 * underflows the u16 -> garbage at the edge. There is NO clamp by
+	 * design (same as upstream drivers); correctness rests on the DTS
+	 * value. For this panel hardware_max is 319 x 171, so size = 320/172.
+	 *
+	 * Resolution (units/mm) below intentionally keeps using ts->max_x
+	 * (the discrete-value count), not the abs max; off by one there is
+	 * immaterial after rounding.
+	 */
+	input_set_abs_params(ts->input, ABS_MT_POSITION_X, 0, ts->max_x - 1, 0, 0);
+	input_set_abs_params(ts->input, ABS_MT_POSITION_Y, 0, ts->max_y - 1, 0, 0);
 
 	/*
 	 * Physical size (mm) -> evdev resolution (units/mm), so libinput shows
