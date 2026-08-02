@@ -204,6 +204,40 @@ static int axs5106_probe(struct i2c_client *client)
 
 	input_set_abs_params(ts->input, ABS_MT_POSITION_X, 0, ts->max_x, 0, 0);
 	input_set_abs_params(ts->input, ABS_MT_POSITION_Y, 0, ts->max_y, 0, 0);
+
+	/*
+	 * Physical size (mm) -> evdev resolution (units/mm), so libinput shows
+	 * real millimetres instead of misreporting raw pixels as mm.
+	 *
+	 * touchscreen-x-mm / touchscreen-y-mm are *standard* properties
+	 * (see touchscreen.yaml), but this driver parses orientation by hand
+	 * and never calls touchscreen_parse_properties(), so we read them
+	 * manually here. Read-and-use is kept in a block scope on purpose:
+	 * unlike size/inverted/swapped, these values are NOT needed in the
+	 * IRQ, so they need not live in struct axs5106_ts.
+	 *
+	 * Guarded by (x_mm && ts->max_x): if the DT omits the property,
+	 * device_property_read_u32() fails, x_mm stays 0 and we skip,
+	 * preserving the old behaviour (resolution == 0). Backward compatible.
+	 *
+	 * Rounding: (max + mm/2)/mm == DIV_ROUND_CLOSEST(max, mm) for positive
+	 * ints, written out by hand to avoid any <linux/math.h> dependency.
+	 * 320/37 -> 9, 172/20 -> 9 (plain truncation would give 8, less exact).
+	 */
+	{
+		u32 x_mm = 0, y_mm = 0;
+
+		device_property_read_u32(dev, "touchscreen-x-mm", &x_mm);
+		device_property_read_u32(dev, "touchscreen-y-mm", &y_mm);
+
+		if (x_mm && ts->max_x)
+			input_abs_set_res(ts->input, ABS_MT_POSITION_X,
+					  (ts->max_x + x_mm / 2) / x_mm);
+		if (y_mm && ts->max_y)
+			input_abs_set_res(ts->input, ABS_MT_POSITION_Y,
+					  (ts->max_y + y_mm / 2) / y_mm);
+	}
+
 	input_mt_init_slots(ts->input, AXS5106_MAX_POINTS,
 			    INPUT_MT_DIRECT | INPUT_MT_DROP_UNUSED);
 
