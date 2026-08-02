@@ -128,9 +128,9 @@ static irqreturn_t axs5106_irq(int irq, void *dev_id)
 			if (ts->swapped_xy)
 				swap(x, y);
 			if (ts->inverted_x)
-				x = ts->max_x - x;
+				x = (ts->max_x - 1) - x;
 			if (ts->inverted_y)
-				y = ts->max_y - y;
+				y = (ts->max_y - 1) - y;
 
 			input_mt_report_slot_state(ts->input, MT_TOOL_FINGER, true);
 			input_report_abs(ts->input, ABS_MT_POSITION_X, x);
