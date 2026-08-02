@@ -278,6 +278,8 @@
 		touchscreen-x-mm = <37>;
 		touchscreen-y-mm = <20>;
 		touchscreen-swapped-x-y;
+		touchscreen-inverted-x;
+		touchscreen-inverted-y;
 		status = "okay";
 	};
 };
