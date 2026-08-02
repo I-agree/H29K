@@ -69,24 +69,19 @@ jobs:
            *   第 2 页 = QModem 上网模块信息（黑底白字，每 60 秒刷新）
            * 翻页：触摸水平滑动。右→左 = 下一页；左→右 = 上一页。
            *
-           * 第 2 页数据（加固版解析）：
-           *   - ubus call qmodem {base,sim,network}_info
-           *   - 值提取兼容 字符串 / 数字 / 布尔（修"数值带宽提取为空"）
-           *   - 双形态：modem_info[] 数组 + 扁平 key-value 都解析
-           *   - 非空才记 filled；空值不标记，下轮自动重试
-           *   - 原始返回落盘 /tmp/.qmodem_dbg_<method> 供排查
+           * 第 2 页数据（依据真实缓存文件格式定稿）：
+           *   主路径 = 直接读 /tmp/cache_*info* 缓存文件
+           *           （QModem 自身生成，modem_info[] 数组格式）
+           *   兜底   = ubus 探测 + /var/run/qmodem 运行时目录
+           *   字段   = connect_status / temperature / SIM Status / ISP /
+           *            network_mode / UL Bandwidth / DL Bandwidth
+           *   清洗   = 去首尾换行、内部换行转空格、掳C→°C、Yes/No 汉化
            *
-           * 跟手性设计：
-           *   - 网络下载（一言/背景图）在后台子进程，翻页不被网络阻塞
-           *   - 翻页 = 先 blit 内存缓存（瞬时）+ 再本地重画（毫秒级）
+           * 跟手性：网络下载在后台子进程；翻页先 blit 缓存再本地重画。
+           * 触摸：聚合标志 read 循环外累积；状态持久；空闲 140ms 兜底。
            *
-           * 触摸状态机：聚合标志在 read 循环外累积、SYN 帧边界清零；
-           *   接触状态全局持久；坐标空闲 140ms 兜底结算。
-           *
-           * 运行时依赖（设备上，均 OpenWrt 自带 / 已有）：
-           *   - wget、ubus、uci
-           *   - /usr/share/fonts/MiSans-Regular.ttf
-           *   - /dev/input/eventX（触摸屏，可选；无则只能看第 1 页）
+           * 运行时依赖（设备上）：wget、ubus、uci、
+           *   /usr/share/fonts/MiSans-Regular.ttf、/dev/input/eventX(可选)
            */
 
           #define _GNU_SOURCE
@@ -98,6 +93,7 @@ jobs:
           #include <sys/wait.h>
           #include <sys/time.h>
           #include <poll.h>
+          #include <dirent.h>
           #include <stdio.h>
           #include <stdlib.h>
           #include <string.h>
@@ -147,6 +143,8 @@ jobs:
           #define PICSUM_URL    "https://picsum.photos/320/172"
           #define HITOKOTO_CACHE "/tmp/.drm_hitokoto"
           #define BG_CACHE       "/tmp/.drm_bg_img"
+          #define QMODEM_RUNDIR  "/var/run/qmodem"
+          #define QMODEM_DBG     "/tmp/.qmodem_dbg_all"
 
           /* ===================== 触摸 / evdev 自包含常量 ===================== */
           #define MY_EV_SYN   0x00
@@ -163,7 +161,6 @@ jobs:
           #define MY_ABS_MAX  0x3f
           #define MY_KEY_MAX  0x2ff
           #define TEST_BIT(b,arr) ((arr)[(b)/8] & (1u << ((b)%8)))
-          /* 自实现 _IOC，避免依赖架构头文件 */
           #define MY_IOC_NRBITS   8
           #define MY_IOC_TYPEBITS 8
           #define MY_IOC_SIZEBITS 14
@@ -178,12 +175,9 @@ jobs:
                ((nr)   << MY_IOC_NRSHIFT)   | ((size) << MY_IOC_SIZESHIFT))
           #define MY_EVIOCGNAME(len) MY_IOC(MY_IOC_READ, 'E', 0x06, (len))
           #define MY_EVIOCGBIT(ev,len) MY_IOC(MY_IOC_READ, 'E', 0x20 + (ev), (len))
-          /* 读坐标量程（type-B 自适应阈值） */
           struct my_absinfo { int value, minimum, maximum, fuzz, flat, resolution; };
           #define MY_EVIOCGABS(abs) MY_IOC(MY_IOC_READ, 'E', 0x40 + (abs), sizeof(struct my_absinfo))
-          /* ★ 抬起事件丢失兜底：接触中坐标停更超过此毫秒即视为抬起结算 ★ */
           #define TOUCH_IDLE_MS  140
-          /* ★ 方向修正开关（实测 AXS5106 方向正确，默认关；需要时用编译 -D 开启） ★ */
           /* #define TOUCH_INVERT */
           /* #define TOUCH_SWAP   */
 
@@ -213,54 +207,58 @@ jobs:
 
           static int g_fallback_idx = 0;
 
-          /* ===================== QModem 字段表（精确匹配 key / full_name） ===================== */
+          /* ===================== QModem 字段表（按真实缓存文件键名定稿） ===================== */
           #define FIELD_COUNT 7
           typedef struct {
-              const char *cands[16];  /* NULL 结尾的精确候选串 */
+              const char *cands[16];
               char  value[96];
               int   filled;
           } field_t;
 
           static field_t g_fields[FIELD_COUNT] = {
-              { {"connect_status","connection_status","connected","state",
-                 "connect_state","连接状态",NULL}, {0}, 0 },
-              { {"temperature","temp","temperature_c","温度",NULL}, {0}, 0 },
-              { {"sim_status","sim_state","simcard_status","sim_slot_status",
-                 "sim","SIM卡状态","SIM状态",NULL}, {0}, 0 },
-              { {"isp","operator","operator_name","service_provider","spn",
-                 "carrier","carrier_name","provider","运营商",
-                 "互联网服务提供商",NULL}, {0}, 0 },
-              { {"network_mode","network_type","mode","rat","service",
-                 "network","网络模式",NULL}, {0}, 0 },
-              { {"ul_bandwidth","upload_bandwidth","ul","tx","uplink",
-                 "upload","up_bandwidth","上行带宽",NULL}, {0}, 0 },
-              { {"dl_bandwidth","download_bandwidth","dl","rx","downlink",
-                 "download","down_bandwidth","下行带宽",NULL}, {0}, 0 },
+              { {"connect_status","Connect Status","connection_status","connected",
+                 "state","connect_state","link_state","连接状态",NULL}, {0}, 0 },
+              { {"temperature","Temperature","temp","temperature_c","modem_temp",
+                 "温度",NULL}, {0}, 0 },
+              { {"SIM Status","sim_status","sim_state","simcard_status","sim",
+                 "SIM卡状态","SIM状态",NULL}, {0}, 0 },
+              { {"isp","ISP","operator","operator_name","service_provider","spn",
+                 "carrier","carrier_name","provider","plmn_name",
+                 "Internet Service Provider","运营商","互联网服务提供商",NULL}, {0}, 0 },
+              { {"network_mode","Network Mode","Network Type","network_type",
+                 "mode","rat","network","net_mode","网络模式",NULL}, {0}, 0 },
+              { {"UL Bandwidth","ul_bandwidth","upload_bandwidth","ul","tx",
+                 "uplink","upload","up_bandwidth","上行带宽",NULL}, {0}, 0 },
+              { {"DL Bandwidth","dl_bandwidth","download_bandwidth","dl","rx",
+                 "downlink","download","down_bandwidth","下行带宽",NULL}, {0}, 0 },
           };
           static char g_section[64] = {0};
+
+          /* ubus 自动发现缓存（兜底用） */
+          static char g_ubus_obj[32]    = {0};
+          static char g_method_base[32] = {0};
+          static char g_method_sim[32]  = {0};
+          static char g_method_net[32]  = {0};
 
           /* ===================== 全局状态 ===================== */
           static uint32_t screen_w, screen_h;
           static volatile sig_atomic_t g_running = 1;
-          static int g_touch_thresh_x = 30;   /* open_touch 按量程自适应 */
+          static int g_touch_thresh_x = 30;
           static int g_touch_thresh_y = 30;
 
-          /* 页面画布缓存（翻页时先 blit 缓存实现瞬时跟手） */
           static uint8_t *g_page0_rgba = NULL;
           static uint8_t *g_page1_rgba = NULL;
 
-          /* 后台抓取子进程 */
           static pid_t g_fetch_pid = 0;
           static time_t g_last_fetch_try = 0;
 
-          /* 触摸状态：全局静态，跨 wait_touch 调用保留（修"慢滑动腰斩"） */
           typedef struct {
               int  in_contact;
               int  start_pending;
               int  have_last;
               int  start_x, start_y;
               int  last_x, last_y;
-              long last_coord_us;   /* 最后一次收到坐标的时刻 */
+              long last_coord_us;
           } touch_state_t;
           static touch_state_t g_ts;
 
@@ -276,10 +274,8 @@ jobs:
            * ============================================================ */
           static int utf8_decode(const char *s, int *codepoint) {
               uint8_t c = (uint8_t)s[0];
-              if (c < 0x80) {
-                  *codepoint = c;
-                  return 1;
-              } else if ((c & 0xE0) == 0xC0) {
+              if (c < 0x80) { *codepoint = c; return 1; }
+              else if ((c & 0xE0) == 0xC0) {
                   *codepoint = c & 0x1F;
                   if (s[1]) *codepoint = (*codepoint << 6) | ((uint8_t)s[1] & 0x3F);
                   return 2;
@@ -299,43 +295,24 @@ jobs:
               return 1;
           }
 
-          /* ============================================================
-           * 自动换行（第 1 页用）
-           * ============================================================ */
           static void wrap_text(const char *src, char *dst, size_t dst_size, int max_chars) {
               size_t di = 0;
               int char_count = 0;
-
               while (*src && di < dst_size - 2) {
-                  if (*src == '\n') {
-                      dst[di++] = '\n';
-                      char_count = 0;
-                      src++;
-                      continue;
-                  }
-
+                  if (*src == '\n') { dst[di++] = '\n'; char_count = 0; src++; continue; }
                   int codepoint;
                   int bytes = utf8_decode(src, &codepoint);
-
                   if (char_count >= max_chars) {
-                      dst[di++] = '\n';
-                      char_count = 0;
+                      dst[di++] = '\n'; char_count = 0;
                       if (di >= dst_size - 2) break;
                   }
-
-                  for (int b = 0; b < bytes && di < dst_size - 1; b++) {
-                      dst[di++] = src[b];
-                  }
+                  for (int b = 0; b < bytes && di < dst_size - 1; b++) dst[di++] = src[b];
                   char_count++;
                   src += bytes;
               }
-
               dst[di] = '\0';
           }
 
-          /* ============================================================
-           * 大小写无关精确比较 / 字段匹配
-           * ============================================================ */
           static int ieq(const char *a, const char *b) {
               if (!a || !b) return 0;
               while (*a && *b) {
@@ -349,15 +326,47 @@ jobs:
           }
 
           static int field_match(const char *cand, const char *key, const char *full) {
-              if (ieq(cand, key)) return 1;          /* key 大小写无关精确 */
-              if (full && strcmp(cand, full) == 0) return 1;  /* full_name 精确（含中文） */
+              if (ieq(cand, key)) return 1;
+              if (full && strcmp(cand, full) == 0) return 1;
               return 0;
           }
 
           /* ============================================================
-           * JSON 字段提取（★ 兼容字符串 / 数字 / 布尔 ★）
-           *  "key": "str"  → 解转义复制
-           *  "key": 12.5   → 原样复制到 , } ] 为止
+           * 值清洗：去首尾空白/换行，内部换行转空格，掳C→°C
+           * （ISP 值形如 "\nChina Mobile"；温度形如 "45掳C"）
+           * ============================================================ */
+          static void sanitize_value(char *v) {
+              size_t s = 0;
+              while (v[s]==' '||v[s]=='\n'||v[s]=='\r'||v[s]=='\t') s++;
+              if (s) memmove(v, v+s, strlen(v+s)+1);
+              size_t len = strlen(v);
+              while (len>0 && (v[len-1]==' '||v[len-1]=='\n'||v[len-1]=='\r'||v[len-1]=='\t'))
+                  v[--len] = 0;
+              for (char *p=v; *p; p++) if (*p=='\n'||*p=='\r') *p=' ';
+              /* 固件乱码 "掳C" (E6 8E B3 43) → "°C" (C2 B0 43) */
+              char *bad = strstr(v, "\xE6\x8E\xB3""C");
+              if (bad) {
+                  memmove(bad+2, bad+3, strlen(bad+3)+1);
+                  bad[0] = '\xC2'; bad[1] = '\xB0';
+              }
+          }
+
+          /* ============================================================
+           * 采集后汉化：Yes/No、ready
+           * ============================================================ */
+          static void postprocess_fields(void) {
+              if (g_fields[0].filled) {
+                  if (ieq(g_fields[0].value, "yes") || ieq(g_fields[0].value, "connected"))
+                      strcpy(g_fields[0].value, "已连接");
+                  else if (ieq(g_fields[0].value, "no") || ieq(g_fields[0].value, "disconnected"))
+                      strcpy(g_fields[0].value, "未连接");
+              }
+              if (g_fields[2].filled && ieq(g_fields[2].value, "ready"))
+                  strcpy(g_fields[2].value, "就绪");
+          }
+
+          /* ============================================================
+           * JSON 字段提取（兼容字符串 / 数字 / 布尔）
            * ============================================================ */
           static int json_get_field(const char *json, const char *key,
                                     char *out, size_t out_size) {
@@ -365,7 +374,6 @@ jobs:
               snprintf(pattern, sizeof(pattern), "\"%s\"", key);
               const char *p = strstr(json, pattern);
               if (!p) return -1;
-
               p = strchr(p + strlen(pattern), ':');
               if (!p) return -1;
               p++;
@@ -384,26 +392,18 @@ jobs:
                               case '\\': out[i++] = '\\'; break;
                               default: out[i++] = *p; break;
                           }
-                      } else {
-                          out[i++] = *p;
-                      }
+                      } else out[i++] = *p;
                       p++;
                   }
               } else {
-                  /* 原始标量：数字 / true / false / null */
                   while (*p && *p != ',' && *p != '}' && *p != ']' &&
-                         *p != '\n' && i < out_size - 1) {
-                      out[i++] = *p++;
-                  }
-                  while (i > 0 && (out[i-1] == ' ' || out[i-1] == '\t' || out[i-1] == '\r')) i--;
+                         *p != '\n' && i < out_size - 1) out[i++] = *p++;
+                  while (i > 0 && (out[i-1]==' '||out[i-1]=='\t'||out[i-1]=='\r')) i--;
               }
               out[i] = '\0';
               return (i > 0) ? 0 : -1;
           }
 
-          /* ============================================================
-           * popen 读取全部输出
-           * ============================================================ */
           static char *popen_read(const char *cmd) {
               FILE *fp = popen(cmd, "r");
               if (!fp) return NULL;
@@ -425,19 +425,6 @@ jobs:
               return buf;
           }
 
-          /* ============================================================
-           * 诊断落盘：保存 ubus 原始返回，便于排查字段名
-           * ============================================================ */
-          static void dump_dbg(const char *method, const char *json) {
-              char path[64];
-              snprintf(path, sizeof(path), "/tmp/.qmodem_dbg_%s", method);
-              FILE *f = fopen(path, "w");
-              if (f) { fputs(json, f); fclose(f); }
-          }
-
-          /* ============================================================
-           * 获取 config_section（缓存）
-           * ============================================================ */
           static void get_section(void) {
               if (g_section[0]) return;
               char *out = popen_read(
@@ -454,11 +441,20 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * 把一条 key/full/value 尝试填入字段表（★ 非空才记 ★）
-           * ============================================================ */
+          static int fields_filled_count(void) {
+              int c = 0;
+              for (int i = 0; i < FIELD_COUNT; i++) if (g_fields[i].filled) c++;
+              return c;
+          }
+
+          /* ★ 非空才记；存入前清洗 ★ */
           static void try_fill(const char *key, const char *full, const char *val) {
-              if (!val || !val[0]) return;   /* 空值不标记，下轮重试 */
+              if (!val || !val[0]) return;
+              char clean[128];
+              strncpy(clean, val, sizeof(clean) - 1);
+              clean[sizeof(clean) - 1] = 0;
+              sanitize_value(clean);
+              if (!clean[0]) return;
               for (int i = 0; i < FIELD_COUNT; i++) {
                   if (g_fields[i].filled) continue;
                   int hit = 0;
@@ -466,7 +462,7 @@ jobs:
                       if (field_match(g_fields[i].cands[c], key, full)) { hit = 1; break; }
                   }
                   if (hit) {
-                      strncpy(g_fields[i].value, val, sizeof(g_fields[i].value) - 1);
+                      strncpy(g_fields[i].value, clean, sizeof(g_fields[i].value) - 1);
                       g_fields[i].value[sizeof(g_fields[i].value) - 1] = 0;
                       g_fields[i].filled = 1;
                       break;
@@ -475,7 +471,7 @@ jobs:
           }
 
           /* ============================================================
-           * 扫描 modem_info[] 数组形态
+           * 扫描 modem_info[] 数组形态（缓存文件的真实格式）
            * ============================================================ */
           static void scan_array_json(const char *json) {
               const char *mi = strstr(json, "\"modem_info\"");
@@ -483,11 +479,9 @@ jobs:
               const char *p = strchr(mi, '[');
               if (!p) return;
               p++;
-
               while (*p) {
                   while (*p && *p != '{') { if (*p == ']') return; p++; }
                   if (*p != '{') return;
-
                   const char *start = p;
                   int depth = 0, in_str = 0;
                   const char *q = p;
@@ -501,7 +495,6 @@ jobs:
                           else if (*q == '}') { depth--; if (depth == 0) { q++; break; } }
                       }
                   }
-
                   size_t objlen = (size_t)(q - start);
                   char *obj = malloc(objlen + 1);
                   if (!obj) { p = q; continue; }
@@ -511,11 +504,9 @@ jobs:
                   char key[64] = {0}, full[128] = {0}, val[128] = {0};
                   json_get_field(obj, "key", key, sizeof(key));
                   json_get_field(obj, "full_name", full, sizeof(full));
-                  /* ★ value 兼容字符串/数字；并尝试备选值键 ★ */
                   if (json_get_field(obj, "value", val, sizeof(val)) != 0)
                       if (json_get_field(obj, "val", val, sizeof(val)) != 0)
                           json_get_field(obj, "data", val, sizeof(val));
-
                   try_fill(key, full, val);
 
                   free(obj);
@@ -523,9 +514,6 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * 扫描扁平 key-value 形态（顶层直接就是字段）
-           * ============================================================ */
           static void scan_flat_json(const char *json) {
               for (int i = 0; i < FIELD_COUNT; i++) {
                   if (g_fields[i].filled) continue;
@@ -533,9 +521,7 @@ jobs:
                       char val[128] = {0};
                       if (json_get_field(json, g_fields[i].cands[c], val, sizeof(val)) == 0
                           && val[0]) {
-                          strncpy(g_fields[i].value, val, sizeof(g_fields[i].value) - 1);
-                          g_fields[i].value[sizeof(g_fields[i].value) - 1] = 0;
-                          g_fields[i].filled = 1;
+                          try_fill(g_fields[i].cands[c], NULL, val);
                           break;
                       }
                   }
@@ -543,7 +529,143 @@ jobs:
           }
 
           /* ============================================================
-           * 拉取 QModem 全部信息（3 个 ubus 方法，双形态解析 + 落盘）
+           * ★ 主路径：读 /tmp/cache_*info* 缓存文件（QModem 自己生成）
+           * ============================================================ */
+          static void scan_cache_files(FILE *dbg) {
+              DIR *d = opendir("/tmp");
+              if (!d) return;
+              struct dirent *de;
+              while ((de = readdir(d))) {
+                  if (strncmp(de->d_name, "cache_", 6) != 0) continue;
+                  if (!strstr(de->d_name, "info")) continue;
+                  char path[64];
+                  snprintf(path, sizeof(path), "/tmp/%s", de->d_name);
+                  struct stat st;
+                  if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) continue;
+                  if (st.st_size <= 0 || st.st_size > 65536) continue;
+                  FILE *f = fopen(path, "rb");
+                  if (!f) continue;
+                  char *buf = malloc((size_t)st.st_size + 1);
+                  if (!buf) { fclose(f); continue; }
+                  size_t n = fread(buf, 1, (size_t)st.st_size, f);
+                  fclose(f);
+                  buf[n] = 0;
+                  if (dbg) fprintf(dbg, "== cache file %s (%d bytes) ==\n%s\n\n",
+                                   path, (int)n, buf);
+                  scan_array_json(buf);
+                  free(buf);
+              }
+              closedir(d);
+          }
+
+          /* ============================================================
+           * 兜底：ubus 对象/方法自动探测
+           * ============================================================ */
+          static void probe_ubus_obj(FILE *dbg) {
+              static const char *objs[] = {"qmodem", "modem", "modem_scand", "qmodem_scand", NULL};
+              if (g_ubus_obj[0]) return;
+              for (int i = 0; objs[i]; i++) {
+                  char cmd[128];
+                  snprintf(cmd, sizeof(cmd), "ubus -v list %s 2>/dev/null", objs[i]);
+                  char *out = popen_read(cmd);
+                  if (out && out[0]) {
+                      strncpy(g_ubus_obj, objs[i], sizeof(g_ubus_obj) - 1);
+                      if (dbg) fprintf(dbg, "== ubus -v list %s ==\n%s\n", objs[i], out);
+                      free(out);
+                      return;
+                  }
+                  if (out) free(out);
+              }
+          }
+
+          static char *ubus_call_raw(const char *obj, const char *method, const char *sec) {
+              char cmd[320];
+              if (sec && sec[0])
+                  snprintf(cmd, sizeof(cmd),
+                           "ubus call %s %s '{\"config_section\":\"%s\"}' 2>/dev/null",
+                           obj, method, sec);
+              else
+                  snprintf(cmd, sizeof(cmd), "ubus call %s %s 2>/dev/null", obj, method);
+              char *out = popen_read(cmd);
+              if (out && (!out[0] || !strchr(out, '{'))) { free(out); out = NULL; }
+              return out;
+          }
+
+          static void collect_group(FILE *dbg, const char *const methods[], char *cache) {
+              if (!g_ubus_obj[0]) return;
+              const char *list[8];
+              int n = 0;
+              if (cache[0]) list[n++] = cache;
+              for (int i = 0; methods[i] && n < 7; i++) {
+                  int dup = 0;
+                  for (int j = 0; j < n; j++) if (strcmp(list[j], methods[i]) == 0) dup = 1;
+                  if (!dup) list[n++] = methods[i];
+              }
+              int before = fields_filled_count();
+              for (int i = 0; i < n; i++) {
+                  char *json = ubus_call_raw(g_ubus_obj, list[i], g_section);
+                  if (!json) json = ubus_call_raw(g_ubus_obj, list[i], NULL);
+                  if (!json) continue;
+                  if (dbg) fprintf(dbg, "== ubus %s %s ==\n%s\n\n", g_ubus_obj, list[i], json);
+                  scan_array_json(json);
+                  scan_flat_json(json);
+                  free(json);
+                  if (fields_filled_count() > before) {
+                      strncpy(cache, list[i], 31);
+                      cache[31] = 0;
+                      break;
+                  }
+              }
+          }
+
+          /* 兜底：运行时目录 */
+          static void scan_rundir_file(const char *path, const char *name, FILE *dbg) {
+              FILE *f = fopen(path, "rb");
+              if (!f) return;
+              static char buf[4096];
+              size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+              fclose(f);
+              buf[n] = 0;
+              while (n > 0 && (buf[n-1]=='\n'||buf[n-1]=='\r'||buf[n-1]==' '||buf[n-1]=='\t'))
+                  buf[--n] = 0;
+              if (!n) return;
+              if (dbg) fprintf(dbg, "-- file %s = %s\n", path, buf);
+              if (buf[0] == '{') { scan_array_json(buf); scan_flat_json(buf); }
+              try_fill(name, name, buf);
+          }
+
+          static void scan_rundir(FILE *dbg) {
+              DIR *d = opendir(QMODEM_RUNDIR);
+              if (!d) return;
+              struct dirent *de;
+              while ((de = readdir(d))) {
+                  if (de->d_name[0] == '.') continue;
+                  char path[256];
+                  snprintf(path, sizeof(path), QMODEM_RUNDIR "/%s", de->d_name);
+                  struct stat st;
+                  if (stat(path, &st) != 0) continue;
+                  if (S_ISDIR(st.st_mode)) {
+                      DIR *d2 = opendir(path);
+                      if (!d2) continue;
+                      struct dirent *de2;
+                      while ((de2 = readdir(d2))) {
+                          if (de2->d_name[0] == '.') continue;
+                          char p2[320];
+                          snprintf(p2, sizeof(p2), "%s/%s", path, de2->d_name);
+                          struct stat st2;
+                          if (stat(p2, &st2) == 0 && S_ISREG(st2.st_mode) && st2.st_size < 4000)
+                              scan_rundir_file(p2, de2->d_name, dbg);
+                      }
+                      closedir(d2);
+                  } else if (S_ISREG(st.st_mode) && st.st_size < 4000) {
+                      scan_rundir_file(path, de->d_name, dbg);
+                  }
+              }
+              closedir(d);
+          }
+
+          /* ============================================================
+           * 汇总采集：缓存文件(主) → ubus/rundir(兜底) → 汉化
            * ============================================================ */
           static void collect_modem_info(void) {
               for (int i = 0; i < FIELD_COUNT; i++) {
@@ -551,22 +673,31 @@ jobs:
                   g_fields[i].value[0] = 0;
               }
               get_section();
-              if (!g_section[0]) return;   /* 无 section → 全部 "--" */
 
-              static const char *methods[] = {"base_info", "sim_info", "network_info", NULL};
-              for (int m = 0; methods[m]; m++) {
-                  char cmd[256];
-                  snprintf(cmd, sizeof(cmd),
-                           "ubus call qmodem %s '{\"config_section\":\"%s\"}' 2>/dev/null",
-                           methods[m], g_section);
-                  char *json = popen_read(cmd);
-                  if (json) {
-                      dump_dbg(methods[m], json);
-                      scan_array_json(json);
-                      scan_flat_json(json);
-                      free(json);
-                  }
+              FILE *dbg = fopen(QMODEM_DBG, "w");
+
+              /* 1) 主路径：/tmp/cache_*info*（你的真实数据就在这里） */
+              scan_cache_files(dbg);
+
+              /* 2) 兜底：七项没齐才走 ubus + rundir */
+              if (fields_filled_count() < FIELD_COUNT) {
+                  static const char *M_BASE[] = {"base_info","get_base_info","basic_info",
+                                                 "status","get_status",NULL};
+                  static const char *M_SIM[]  = {"sim_info","get_sim_info","sim_status",
+                                                 "get_sim_status",NULL};
+                  static const char *M_NET[]  = {"network_info","get_network_info","cell_info",
+                                                 "network_status","get_cell_info",NULL};
+                  probe_ubus_obj(dbg);
+                  collect_group(dbg, M_BASE, g_method_base);
+                  collect_group(dbg, M_SIM,  g_method_sim);
+                  collect_group(dbg, M_NET,  g_method_net);
+                  scan_rundir(dbg);
               }
+
+              /* 3) 汉化 Yes/No、ready */
+              postprocess_fields();
+
+              if (dbg) fclose(dbg);
           }
 
           /* ============================================================
@@ -619,9 +750,6 @@ jobs:
               return fd;
           }
 
-          /* ============================================================
-           * 创建 dumb buffer + FB + mmap
-           * ============================================================ */
           static int drm_create_fb(int fd, struct drm_mode_create_dumb *dumb,
                                    uint32_t *fb_id, void **map_out) {
               memset(dumb, 0, sizeof(*dumb));
@@ -649,9 +777,6 @@ jobs:
               return 0;
           }
 
-          /* ============================================================
-           * 将图片居中复制到 framebuffer
-           * ============================================================ */
           static void copy_centered(void *dst, uint32_t pitch,
                                     const uint8_t *src,
                                     uint32_t img_w, uint32_t img_h) {
@@ -669,12 +794,11 @@ jobs:
           }
 
           /* ============================================================
-           * 后台抓取：子进程 wget 一言/背景图到 /tmp，mv 原子替换。
-           * 主进程画页只读本地文件 → 翻页永远不被网络阻塞。
+           * 后台抓取一言/背景图
            * ============================================================ */
           static void fetcher_start(void) {
               if (g_fetch_pid > 0) {
-                  if (waitpid(g_fetch_pid, NULL, WNOHANG) == 0) return;  /* 上一次的还在跑 */
+                  if (waitpid(g_fetch_pid, NULL, WNOHANG) == 0) return;
                   g_fetch_pid = 0;
               }
               pid_t p = fork();
@@ -695,7 +819,6 @@ jobs:
               if (p > 0) g_fetch_pid = p;
           }
 
-          /* 返回 1 = 子进程刚刚结束（内容已更新） */
           static int fetcher_poll(void) {
               if (g_fetch_pid > 0 && waitpid(g_fetch_pid, NULL, WNOHANG) == g_fetch_pid) {
                   g_fetch_pid = 0;
@@ -704,9 +827,6 @@ jobs:
               return 0;
           }
 
-          /* ============================================================
-           * 获取一言文字（只读本地缓存文件；无则轮播本地 4 组）
-           * ============================================================ */
           static void fetch_hitokoto(char *text_buf, size_t buf_size) {
               char hitokoto[512] = {0};
               char from[128] = {0};
@@ -735,44 +855,30 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * 读取背景图片（只读本地缓存文件，纯本地解码，毫秒级）
-           * ============================================================ */
           static uint8_t *fetch_background(int *w, int *h) {
               int channels;
               return stbi_load(BG_CACHE, w, h, &channels, 4);
           }
 
           /* ============================================================
-           * 第 1 页：渲染文字到 RGBA buffer（居中 / 多行 / 玫红）
+           * 第 1 页文字渲染
            * ============================================================ */
           static void render_text_rgba(uint8_t *rgba, int img_w, int img_h,
                                        const char *text) {
               FILE *ff = fopen(FONT_PATH, "rb");
               if (!ff) return;
-
               fseek(ff, 0, SEEK_END);
               long fsize = ftell(ff);
               fseek(ff, 0, SEEK_SET);
-
               if (fsize <= 0) { fclose(ff); return; }
-
               uint8_t *font_data = malloc((size_t)fsize);
               if (!font_data) { fclose(ff); return; }
-
               size_t read_bytes = fread(font_data, 1, (size_t)fsize, ff);
               fclose(ff);
-
-              if (read_bytes != (size_t)fsize) {
-                  free(font_data);
-                  return;
-              }
+              if (read_bytes != (size_t)fsize) { free(font_data); return; }
 
               stbtt_fontinfo font;
-              if (!stbtt_InitFont(&font, font_data, 0)) {
-                  free(font_data);
-                  return;
-              }
+              if (!stbtt_InitFont(&font, font_data, 0)) { free(font_data); return; }
 
               float scale = stbtt_ScaleForPixelHeight(&font, FONT_SIZE);
               int ascent, descent, line_gap;
@@ -781,9 +887,7 @@ jobs:
               if (line_height <= 0) line_height = (int)(FONT_SIZE + 2);
 
               int num_lines = 1;
-              for (const char *p = text; *p; p++) {
-                  if (*p == '\n') num_lines++;
-              }
+              for (const char *p = text; *p; p++) if (*p == '\n') num_lines++;
               int total_h = num_lines * line_height;
               int y_start = (img_h - total_h) / 2;
               if (y_start < 0) y_start = 0;
@@ -801,7 +905,6 @@ jobs:
                       int bytes = utf8_decode(line_start + i, &codepoint);
                       if (i + (size_t)bytes > line_len) break;
                       i += (size_t)bytes;
-
                       int adv;
                       stbtt_GetCodepointHMetrics(&font, codepoint, &adv, NULL);
                       line_w += (int)(adv * scale);
@@ -818,20 +921,17 @@ jobs:
                       i += (size_t)bytes;
 
                       int x0, y0, x1, y1;
-                      stbtt_GetCodepointBitmapBox(&font, codepoint, scale, scale,
-                                                  &x0, &y0, &x1, &y1);
+                      stbtt_GetCodepointBitmapBox(&font, codepoint, scale, scale, &x0, &y0, &x1, &y1);
                       int gw = x1 - x0, gh = y1 - y0;
                       if (gw > 0 && gh > 0) {
                           uint8_t *bitmap = malloc((size_t)(gw * gh));
                           if (bitmap) {
-                              stbtt_MakeCodepointBitmap(&font, bitmap, gw, gh, gw,
-                                                        scale, scale, codepoint);
+                              stbtt_MakeCodepointBitmap(&font, bitmap, gw, gh, gw, scale, scale, codepoint);
                               int bx = pen_x + x0;
                               int by = cur_y + (int)(ascent * scale) + y0;
                               for (int row = 0; row < gh; row++) {
                                   for (int col = 0; col < gw; col++) {
-                                      int px = bx + col;
-                                      int py = by + row;
+                                      int px = bx + col, py = by + row;
                                       if (px >= 0 && px < img_w && py >= 0 && py < img_h) {
                                           uint8_t alpha = bitmap[row * gw + col];
                                           if (alpha > 0) {
@@ -847,21 +947,18 @@ jobs:
                               free(bitmap);
                           }
                       }
-
                       int adv;
                       stbtt_GetCodepointHMetrics(&font, codepoint, &adv, NULL);
                       pen_x += (int)(adv * scale);
                   }
-
                   cur_y += line_height;
                   line_start = line_end ? line_end + 1 : NULL;
               }
-
               free(font_data);
           }
 
           /* ============================================================
-           * 第 2 页：左对齐单行绘制（指定颜色 / 可截断 max_x）
+           * 第 2 页单行绘制
            * ============================================================ */
           static void draw_line_rgba(uint8_t *rgba, int W, int H,
                                      stbtt_fontinfo *font, float scale, int ascent,
@@ -872,8 +969,7 @@ jobs:
                   int cp, bytes = utf8_decode(text + i, &cp);
                   i += (size_t)bytes;
                   if (cp == '\n') break;
-
-                  if (max_x > 0 && pen_x >= max_x) break;   /* 防止侵入右列 */
+                  if (max_x > 0 && pen_x >= max_x) break;
 
                   int x0, y0, x1, y1;
                   stbtt_GetCodepointBitmapBox(font, cp, scale, scale, &x0, &y0, &x1, &y1);
@@ -903,7 +999,6 @@ jobs:
                           free(bmp);
                       }
                   }
-
                   int adv;
                   stbtt_GetCodepointHMetrics(font, cp, &adv, NULL);
                   pen_x += (int)(adv * scale);
@@ -911,14 +1006,11 @@ jobs:
           }
 
           /* ============================================================
-           * 第 2 页：黑底白字，还原截图布局
+           * 第 2 页布局
            * ============================================================ */
           static void render_info_page_rgba(uint8_t *rgba, int W, int H) {
               for (int i = 0; i < W * H; i++) {
-                  rgba[i*4+0] = 0;
-                  rgba[i*4+1] = 0;
-                  rgba[i*4+2] = 0;
-                  rgba[i*4+3] = 255;
+                  rgba[i*4+0] = 0; rgba[i*4+1] = 0; rgba[i*4+2] = 0; rgba[i*4+3] = 255;
               }
 
               FILE *ff = fopen(FONT_PATH, "rb");
@@ -983,9 +1075,6 @@ jobs:
               free(font_data);
           }
 
-          /* ============================================================
-           * 将 RGBA 图像转为 XRGB8888 并写入 framebuffer
-           * ============================================================ */
           static void rgba_to_fb(void *fb, uint32_t pitch,
                                  const uint8_t *rgba, int img_w, int img_h) {
               memset(fb, 0, (size_t)pitch * screen_h);
@@ -995,32 +1084,26 @@ jobs:
               if (y_off < 0) y_off = 0;
               int cw = (img_w > (int)screen_w) ? (int)screen_w : img_w;
               int ch = (img_h > (int)screen_h) ? (int)screen_h : img_h;
-
               for (int y = 0; y < ch; y++) {
                   uint8_t *dst_row = (uint8_t *)fb + (y + y_off) * pitch + x_off * 4;
                   const uint8_t *src_row = rgba + y * img_w * 4;
                   for (int x = 0; x < cw; x++) {
-                      dst_row[x*4 + 0] = src_row[x*4 + 2]; /* B */
-                      dst_row[x*4 + 1] = src_row[x*4 + 1]; /* G */
-                      dst_row[x*4 + 2] = src_row[x*4 + 0]; /* R */
-                      dst_row[x*4 + 3] = 0xFF;             /* X */
+                      dst_row[x*4 + 0] = src_row[x*4 + 2];
+                      dst_row[x*4 + 1] = src_row[x*4 + 1];
+                      dst_row[x*4 + 2] = src_row[x*4 + 0];
+                      dst_row[x*4 + 3] = 0xFF;
                   }
               }
           }
 
-          /* ============================================================
-           * 第 1 页：渲染到画布（只读本地缓存文件，纯本地，毫秒级）
-           * ============================================================ */
           static void render_page0_rgba(uint8_t *canvas) {
               char raw_text[2048];
               char wrapped_text[4096];
-
               fetch_hitokoto(raw_text, sizeof(raw_text));
               wrap_text(raw_text, wrapped_text, sizeof(wrapped_text), MAX_CHARS_PER_LINE);
 
               int bg_w = 0, bg_h = 0;
               uint8_t *bg_rgba = fetch_background(&bg_w, &bg_h);
-
               if (bg_rgba && bg_w > 0 && bg_h > 0) {
                   stbir_resize(bg_rgba, bg_w, bg_h, 0,
                                canvas, SCREEN_W, SCREEN_H, 0,
@@ -1029,16 +1112,11 @@ jobs:
                   stbi_image_free(bg_rgba);
               } else {
                   memset(canvas, 0, (size_t)(SCREEN_W * SCREEN_H * 4));
-                  for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
-                      canvas[i*4 + 3] = 255;
+                  for (int i = 0; i < SCREEN_W * SCREEN_H; i++) canvas[i*4 + 3] = 255;
               }
-
               render_text_rgba(canvas, SCREEN_W, SCREEN_H, wrapped_text);
           }
 
-          /* ============================================================
-           * 绘制指定页（0 = 一言页，1 = 模组信息页），并更新画布缓存
-           * ============================================================ */
           static void draw_page(int page, int fd, uint32_t crtc_id, uint32_t conn_id,
                                 drmModeModeInfo *mode, void *map, uint32_t pitch, uint32_t fb_id) {
               if (page == 1) {
@@ -1058,19 +1136,16 @@ jobs:
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
 
-          /* ============================================================
-           * 翻页瞬时直刷：把缓存画布直接 blit 上屏（无渲染、无网络）
-           * ============================================================ */
           static void blit_cached(int page, int fd, uint32_t crtc_id, uint32_t conn_id,
                                   drmModeModeInfo *mode, void *map, uint32_t pitch, uint32_t fb_id) {
               uint8_t *src = (page == 1) ? g_page1_rgba : g_page0_rgba;
-              if (!src) return;   /* 还没有缓存，调用方随后 draw_page */
+              if (!src) return;
               rgba_to_fb(map, pitch, src, SCREEN_W, SCREEN_H);
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
 
           /* ============================================================
-           * 触摸：打开设备（识别 + 读量程自适应阈值）
+           * 触摸：打开设备
            * ============================================================ */
           static int open_touch(void) {
               char path[32];
@@ -1104,12 +1179,11 @@ jobs:
                           if (strstr(name, "touch") || strstr(name, "goodix") ||
                               strstr(name, "ft5x")  || strstr(name, "gt9")   ||
                               strstr(name, "gsl")   || strstr(name, "tsc")   ||
-                              strstr(name, "axs")) is_touch = 1;   /* 匹配 AXS5106 等 */
+                              strstr(name, "axs")) is_touch = 1;
                       }
                   }
 
                   if (is_touch) {
-                      /* 读量程，阈值取量程 1/8，clamp 到 [15,300]，适配任意分辨率触摸芯片 */
                       struct my_absinfo ai;
                       if (ioctl(fd, MY_EVIOCGABS(MY_ABS_X), &ai) == 0 && ai.maximum > ai.minimum)
                           g_touch_thresh_x = (ai.maximum - ai.minimum) / 8;
@@ -1126,9 +1200,6 @@ jobs:
               return -1;
           }
 
-          /* ============================================================
-           * 触摸：结算一次手势（用 last - start），清接触，返回 ±1 / 0
-           * ============================================================ */
           static int touch_settle(touch_state_t *s) {
               int ret = 0;
               if (s->have_last && !s->start_pending) {
@@ -1146,8 +1217,8 @@ jobs:
           #ifdef TOUCH_INVERT
                   delta = -delta;
           #endif
-                  if (valid && delta < 0) ret = -1;   /* 下一页 */
-                  else if (valid && delta > 0) ret = 1;   /* 上一页 */
+                  if (valid && delta < 0) ret = -1;
+                  else if (valid && delta > 0) ret = 1;
               }
               s->in_contact = 0;
               s->start_pending = 0;
@@ -1155,20 +1226,11 @@ jobs:
               return ret;
           }
 
-          /* ============================================================
-           * 触摸：等待/推进一次滑动（持久状态 + 空闲超时兜底）
-           *  语义：poll_ms = 本次最长 poll 间隔（非手势总窗口）。
-           *  状态在 g_ts 中跨调用保留 → 慢滑动不被腰斩。
-           *  抬起边沿丢失时，坐标停更超 TOUCH_IDLE_MS 即结算 → 仍能翻页。
-           *  ★ 聚合标志 fx/fy/ft/ftid 在 read 循环外累积、SYN 帧边界清零 ★
-           * 返回 -1 = 下一页，+1 = 上一页，0 = 本次未产生翻页。
-           * ============================================================ */
           static int wait_touch(int fd, int poll_ms) {
               if (fd < 0) { sleep_ms(poll_ms); return 0; }
               touch_state_t *s = &g_ts;
               struct timeval tv;
 
-              /* 入口先查：上轮残留接触是否已空闲超时（抬起丢失兜底） */
               gettimeofday(&tv, NULL);
               long now_us = (long)tv.tv_sec * 1000000L + tv.tv_usec;
               if (s->in_contact && s->last_coord_us &&
@@ -1181,7 +1243,6 @@ jobs:
               if (pr < 0 && errno != EINTR) return 0;
 
               if (pr > 0) {
-                  /* ★ 累积标志在 read 循环外：跨 event 保留，到 SYN 才用、才清零 ★ */
                   int fx = 0, fy = 0, ft = 0, ftid = 0;
                   int fxv = 0, fyv = 0, ftv = 0, ftidv = 0;
                   struct my_input_event ev;
@@ -1194,7 +1255,6 @@ jobs:
                       } else if (ev.type == MY_EV_KEY) {
                           if (ev.code == MY_BTN_TOUCH) { ft = 1; ftv = ev.value ? 1 : 0; }
                       } else if (ev.type == MY_EV_SYN && ev.code == MY_SYN_REPORT) {
-                          /* 提交本帧坐标（并打时间戳，供空闲检测） */
                           if (fx || fy) {
                               gettimeofday(&tv, NULL);
                               s->last_coord_us = (long)tv.tv_sec * 1000000L + tv.tv_usec;
@@ -1205,15 +1265,11 @@ jobs:
                           int raw_down = (ftid && ftidv >= 0) || (ft && ftv);
                           int raw_up   = (ftid && ftidv <  0) || (ft && !ftv);
 
-                          /* 旧接触未正常抬起就来了新按下：先结算旧的，避免卡死/误判 */
                           if (raw_down && s->in_contact) {
                               int rr = touch_settle(s);
                               if (rr) return rr;
                           }
-
                           if (raw_down) s->in_contact = 1;
-
-                          /* 按下：本帧有坐标则定起点，否则等接触中首个坐标 */
                           if (raw_down) {
                               if (s->have_last) { s->start_x = s->last_x; s->start_y = s->last_y; s->start_pending = 0; }
                               else              { s->start_pending = 1; }
@@ -1221,20 +1277,15 @@ jobs:
                           if (s->in_contact && s->start_pending && s->have_last) {
                               s->start_x = s->last_x; s->start_y = s->last_y; s->start_pending = 0;
                           }
-
-                          /* 抬起：结算 */
                           if (raw_up && s->in_contact) {
                               int rr = touch_settle(s);
                               if (rr) return rr;
                           }
-
-                          /* ★ 一帧结束：清零累积标志，准备聚合下一帧 ★ */
                           fx = fy = ft = ftid = 0;
                       }
                   }
               }
 
-              /* 出口再查一次空闲超时（抬起丢失时，手指停下后这里兜底结算） */
               gettimeofday(&tv, NULL);
               now_us = (long)tv.tv_sec * 1000000L + tv.tv_usec;
               if (s->in_contact && s->last_coord_us &&
@@ -1244,9 +1295,6 @@ jobs:
               return 0;
           }
 
-          /* ============================================================
-           * Daemon 化
-           * ============================================================ */
           static void daemonize(void) {
               int devnull = open("/dev/null", O_RDWR);
               if (devnull >= 0) {
@@ -1257,9 +1305,6 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * main
-           * ============================================================ */
           int main(int argc, char *argv[]) {
               signal(SIGPIPE, SIG_IGN);
               signal(SIGTERM, sig_handler);
@@ -1267,7 +1312,6 @@ jobs:
 
               const char *drm_device = (argc > 1) ? argv[1] : "/dev/dri/card0";
 
-              /* 1. 初始化 DRM */
               drmModeRes *res;
               drmModeConnector *conn;
               uint32_t crtc_id;
@@ -1275,11 +1319,9 @@ jobs:
               int fd = drm_init(drm_device, &res, &conn, &crtc_id);
               if (fd < 0) return 1;
 
-              /* 2. 创建双缓冲 */
               struct drm_mode_create_dumb dumb[2];
               void *map[2];
               uint32_t fb_id[2];
-
               for (int i = 0; i < 2; i++) {
                   if (drm_create_fb(fd, &dumb[i], &fb_id[i], &map[i]) < 0) {
                       drmModeFreeConnector(conn);
@@ -1289,7 +1331,6 @@ jobs:
                   }
               }
 
-              /* 3. 播放开机动画 */
               size_t frame_size = VIDEO_W * VIDEO_H * (BPP / 8);
               long total_frames = (long)(apple_raw_len / frame_size);
               long total_duration_frames = FPS * DURATION;
@@ -1304,7 +1345,6 @@ jobs:
 
               while (frame_count < total_duration_frames && g_running) {
                   if (difftime(time(NULL), start_time) >= DURATION) break;
-
                   long fi = frame_count % total_frames;
                   copy_centered(map[cur], dumb[cur].pitch,
                                 apple_raw + fi * frame_size, VIDEO_W, VIDEO_H);
@@ -1315,10 +1355,8 @@ jobs:
                   sleep_ms(1000 / FPS);
               }
 
-              /* 4. Daemon 化（关闭 stdio，保持 DRM fd） */
               daemonize();
 
-              /* 5. 双页信息屏 + 触摸翻页 */
               int touch_fd = open_touch();
               int cur_page = 0;
 
@@ -1326,7 +1364,6 @@ jobs:
               void *info_map = map[0];
               uint32_t info_pitch = dumb[0].pitch;
 
-              /* 后台抓取一言/背景（不阻塞）；先本地直画一帧，内容到了自动更新 */
               fetcher_start();
               draw_page(0, fd, crtc_id, conn->connector_id, &conn->modes[0],
                         info_map, info_pitch, info_fb);
@@ -1335,22 +1372,19 @@ jobs:
               while (g_running) {
                   int sw = wait_touch(touch_fd, 120);
                   if (sw != 0) {
-                      int np = cur_page + (sw < 0 ? 1 : -1);  /* 左滑→page+1 */
+                      int np = cur_page + (sw < 0 ? 1 : -1);
                       if (np < 0) np = 0;
                       if (np > 1) np = 1;
                       if (np != cur_page) {
                           cur_page = np;
-                          /* ① 缓存直刷：瞬时跟手 */
                           blit_cached(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                       info_map, info_pitch, info_fb);
-                          /* ② 本地重画最新内容（第1页读/tmp文件≈百毫秒；第2页ubus≈半秒） */
                           draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                     info_map, info_pitch, info_fb);
                           last_refresh = time(NULL);
                       }
                   }
 
-                  /* 后台抓取完成 → 第 1 页在屏则立即用新内容重画 */
                   if (fetcher_poll() && cur_page == 0) {
                       draw_page(0, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                 info_map, info_pitch, info_fb);
@@ -1358,8 +1392,6 @@ jobs:
                   }
 
                   time_t now = time(NULL);
-
-                  /* 开机时网还没好：背景图缺失则每 30 秒重试一次后台抓取 */
                   if (cur_page == 0 && g_fetch_pid == 0 &&
                       access(BG_CACHE, R_OK) != 0 &&
                       now - g_last_fetch_try >= 30) {
@@ -1367,7 +1399,6 @@ jobs:
                       fetcher_start();
                   }
 
-                  /* 周期刷新：第 1 页异步抓取不阻塞；第 2 页本地重画 */
                   int interval = (cur_page == 0) ? REFRESH_SEC : INFO_REFRESH_SEC;
                   if (now - last_refresh >= interval) {
                       if (cur_page == 0) fetcher_start();
@@ -1377,7 +1408,6 @@ jobs:
                   }
               }
 
-              /* 6. 清理退出 */
               if (touch_fd >= 0) close(touch_fd);
               drmModeFreeConnector(conn);
               drmModeFreeResources(res);
@@ -1418,7 +1448,6 @@ jobs:
               
               [ ! -f "$PLAYER" ] && return 1
               
-              # 等待 DRM 设备就绪
               i=0
               while [ ! -e "$DRM_DEV" ] && [ $i -lt 10 ]; do
                   sleep 1
@@ -1426,11 +1455,9 @@ jobs:
               done
               [ ! -e "$DRM_DEV" ] && return 1
               
-              # 杀掉旧进程
               killall drm_play_arm64 2>/dev/null
               sleep 1
               
-              # unbind/rebind 驱动
               SPI_DEV=""
               for dev in /sys/bus/spi/devices/*; do
                   if [ -f "$dev/modalias" ]; then
@@ -1455,7 +1482,6 @@ jobs:
                   done
               fi
               
-              # 启动
               "$PLAYER" "$DRM_DEV" &
           }
 
@@ -1480,63 +1506,32 @@ jobs:
           页面:
             第 1 页 = 一言 + 随机背景图（每 15 分钟刷新）
             第 2 页 = 上网模块信息（黑底白字，每 60 秒刷新）
-                      连接状态 / 温度 / SIM卡状态 / 运营商 /
-                      网络模式 / 上行带宽 / 下行带宽
-          翻页:
-            手指 右→左 滑 = 下一页（进第 2 页）
-            手指 左→右 滑 = 上一页（回第 1 页）
-            （瞬时跟手：先缓存直刷，再本地重画最新内容）
+          翻页: 右→左 = 下一页；左→右 = 上一页（瞬时跟手）
 
-          第 2 页解析（本版加固）:
-            - value 兼容 字符串/数字/布尔（带宽等数值不再丢失）
-            - modem_info[] 数组 与 扁平 key-value 两种返回形态都解析
-            - 空值不标记，60 秒后自动重试
-            - 每次 ubus 原始返回落盘到:
-                /tmp/.qmodem_dbg_base_info
-                /tmp/.qmodem_dbg_sim_info
-                /tmp/.qmodem_dbg_network_info
-              若某项仍显示 --，把对应文件内容发出来即可精确补键名。
+          第 2 页数据源（按真实缓存格式定稿）:
+            主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
+                    cache_cell_info_* / cache_network_info_*
+            字段:  connect_status / temperature / SIM Status / ISP /
+                   network_mode / UL Bandwidth / DL Bandwidth
+            清洗:  去首尾换行、掳C→°C、Yes→已连接、No→未连接、ready→就绪
+            兜底:  ubus 探测 + /var/run/qmodem（七项不齐时才走）
 
-          运行时依赖（设备上）:
-            - wget、ubus、uci        （OpenWrt / QModem 自带）
-            - /usr/share/fonts/MiSans-Regular.ttf   （中文字体，两页共用）
-            - /dev/input/eventX      （触摸屏，可选；AXS5106 等已适配）
-            - QModem 已运行          （第 2 页数据来源；未运行时显示 --）
+          安装:
+            scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
+            scp 99-bootanim root@192.168.1.1:/etc/init.d/
+            scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
+            ssh root@192.168.1.1
+            chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
+            /etc/init.d/99-bootanim enable
 
-          Step 1: 上传文件
-          -------------------------
-          scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
-          scp 99-bootanim root@192.168.1.1:/etc/init.d/
+          排查（如有项显示 --）:
+            cat /tmp/.qmodem_dbg_all
 
-          Step 2: 上传字体（如果还没有）
-          -------------------------
-          scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
-
-          Step 3: 设置权限和启用
-          -------------------------
-          ssh root@192.168.1.1
-          chmod +x /usr/sbin/drm_play_arm64
-          chmod +x /etc/init.d/99-bootanim
-          /etc/init.d/99-bootanim enable
-
-          第 1 页文字规则:
-          - 每行最多 15 字符，超出自动换行，整体居中
-          - 有网 = 一言 API；无网 = 本地 4 组轮播
-
-          第 2 页排查（某项显示 -- 时）:
-            cat /tmp/.qmodem_dbg_sim_info
-            cat /tmp/.qmodem_dbg_network_info
-          把输出发出来，即可把真实 key/full_name 补进 g_fields[].cands。
-
-          触摸方向修正（实测 AXS5106 方向正确，通常无需改）:
-            现象 A：横滑没反应、竖滑才翻页 → 编译行加 -DTOUCH_SWAP
-            现象 B：能翻但方向反         → 编译行加 -DTOUCH_INVERT
-            改法：编辑工作流里 aarch64-linux-gnu-gcc 那一行，
-                  在 -O2 -static 后面加上述 -D 宏，重新跑 Actions 即可。
+          触摸方向修正（实测正确，通常无需）:
+            横滑无反应竖滑才翻 → 编译行加 -DTOUCH_SWAP
+            能翻但方向反     → 编译行加 -DTOUCH_INVERT
 
           停止: killall drm_play_arm64
-          卸载: /etc/init.d/99-bootanim disable && \
-                rm /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
           EOF
 
       # --- 6. 上传产物 ---
