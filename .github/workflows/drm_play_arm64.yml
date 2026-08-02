@@ -69,7 +69,8 @@ jobs:
            *   第 2 页 = QModem 上网模块信息（黑底白字，每 60 秒刷新）
            * 翻页：触摸水平滑动。右→左 = 下一页；左→右 = 上一页。
            *
-           * 触摸（针对 AXS5106 / type-B 加固，根治"时而无效"）：
+           * 触摸（针对 AXS5106 / type-B 加固）：
+           *   - 事件聚合标志在 read 循环外累积、SYN 帧边界清零（修"完全翻不动"回归）
            *   - 接触状态为全局静态，跨 wait_touch 调用保留 → 慢滑动不被腰斩
            *   - 坐标空闲超时结算（TOUCH_IDLE_MS）→ 抬起事件丢失也能翻页
            *   - 接触 = TRACKING_ID 与 BTN_TOUCH 双保险
@@ -1085,6 +1086,8 @@ jobs:
            *  语义：poll_ms = 本次最长 poll 间隔（非手势总窗口）。
            *  状态在 g_ts 中跨调用保留 → 慢滑动不被腰斩。
            *  抬起边沿丢失时，坐标停更超 TOUCH_IDLE_MS 即结算 → 仍能翻页。
+           *  ★ 聚合标志 fx/fy/ft/ftid 在 read 循环外累积、SYN 帧边界清零 ★
+           *    （上一版误放进循环体内每轮清零，导致 SYN 看到全 0 = 完全翻不动）
            * 返回 -1 = 下一页，+1 = 上一页，0 = 本次未产生翻页。
            * ============================================================ */
           static int wait_touch(int fd, int poll_ms) {
@@ -1105,12 +1108,12 @@ jobs:
               if (pr < 0 && errno != EINTR) return 0;
 
               if (pr > 0) {
+                  /* ★ 累积标志在 read 循环外：跨 event 保留，到 SYN 才用、才清零 ★ */
+                  int fx = 0, fy = 0, ft = 0, ftid = 0;
+                  int fxv = 0, fyv = 0, ftv = 0, ftidv = 0;
                   struct my_input_event ev;
                   ssize_t r;
                   while ((r = read(fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
-                      int fx = 0, fy = 0, ft = 0, ftid = 0;
-                      int fxv = 0, fyv = 0, ftv = 0, ftidv = 0;
-
                       if (ev.type == MY_EV_ABS) {
                           if (ev.code == MY_ABS_X || ev.code == MY_ABS_MT_POSITION_X)      { fx = 1; fxv = ev.value; }
                           else if (ev.code == MY_ABS_Y || ev.code == MY_ABS_MT_POSITION_Y) { fy = 1; fyv = ev.value; }
@@ -1151,6 +1154,9 @@ jobs:
                               int rr = touch_settle(s);
                               if (rr) return rr;
                           }
+
+                          /* ★ 一帧结束：清零累积标志，准备聚合下一帧 ★ */
+                          fx = fy = ft = ftid = 0;
                       }
                   }
               }
@@ -1405,6 +1411,7 @@ jobs:
             （阈值按触摸量程自适应；无触摸屏则停在第 1 页）
 
           触摸稳定性（本版已修复，正常无需任何调整）:
+            - 修"完全翻不动"回归：事件聚合标志改回 read 循环外累积
             - 慢速滑动不再被"超时腰斩"（状态跨轮保留）
             - 抬起事件丢失也有兜底（坐标停 140ms 即结算）
             - AXS5106 等 type-B 多点屏已适配，方向实测正确
