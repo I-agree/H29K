@@ -69,17 +69,19 @@ jobs:
            *   第 2 页 = QModem 上网模块信息（黑底白字，每 60 秒刷新）
            * 翻页：触摸水平滑动。右→左 = 下一页；左→右 = 上一页。
            *
-           * 跟手性设计（本版重点）：
-           *   - 网络下载（一言/背景图）全部移到 fork 出的后台子进程，
-           *     wget 到 /tmp 临时文件后 mv 原子替换；主进程画页只读本地文件。
-           *   - 翻页 = 先 blit 内存缓存（瞬时跟手）+ 再本地重画（毫秒级）。
-           *   - 开机未联网时先显示本地轮播文字，背景图每 30 秒自动重试拉取。
-           *   - 触摸状态机：聚合标志在 read 循环外累积、SYN 帧边界清零；
-           *     接触状态全局持久（慢滑动不腰斩）；坐标空闲 140ms 兜底结算。
+           * 第 2 页数据（加固版解析）：
+           *   - ubus call qmodem {base,sim,network}_info
+           *   - 值提取兼容 字符串 / 数字 / 布尔（修"数值带宽提取为空"）
+           *   - 双形态：modem_info[] 数组 + 扁平 key-value 都解析
+           *   - 非空才记 filled；空值不标记，下轮自动重试
+           *   - 原始返回落盘 /tmp/.qmodem_dbg_<method> 供排查
            *
-           * 第 2 页数据：popen 调用 ubus call qmodem {base,sim,network}_info，
-           *           解析 modem_info[] 的 key/full_name 精确匹配取 value。
-           *           config_section 由 uci show qmodem 自动获取并缓存。
+           * 跟手性设计：
+           *   - 网络下载（一言/背景图）在后台子进程，翻页不被网络阻塞
+           *   - 翻页 = 先 blit 内存缓存（瞬时）+ 再本地重画（毫秒级）
+           *
+           * 触摸状态机：聚合标志在 read 循环外累积、SYN 帧边界清零；
+           *   接触状态全局持久；坐标空闲 140ms 兜底结算。
            *
            * 运行时依赖（设备上，均 OpenWrt 自带 / 已有）：
            *   - wget、ubus、uci
@@ -139,7 +141,7 @@ jobs:
           #define TEXT_G   255
           #define TEXT_B   255
           /* ★ 第 2 页字体大小 ★ */
-          #define INFO_TITLE_SIZE  21.0f
+          #define INFO_TITLE_SIZE  22.0f
           #define INFO_FONT_SIZE   19.0f
           #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
           #define PICSUM_URL    "https://picsum.photos/320/172"
@@ -214,19 +216,26 @@ jobs:
           /* ===================== QModem 字段表（精确匹配 key / full_name） ===================== */
           #define FIELD_COUNT 7
           typedef struct {
-              const char *cands[8];   /* NULL 结尾的精确候选串 */
+              const char *cands[16];  /* NULL 结尾的精确候选串 */
               char  value[96];
               int   filled;
           } field_t;
 
           static field_t g_fields[FIELD_COUNT] = {
-              { {"connect_status","connection_status","connected","连接状态",NULL}, {0}, 0 },
-              { {"temperature","temp","温度",NULL}, {0}, 0 },
-              { {"sim_status","sim_state","SIM卡状态","SIM状态",NULL}, {0}, 0 },
-              { {"isp","operator","service_provider","spn","互联网服务提供商","运营商",NULL}, {0}, 0 },
-              { {"network_mode","network_type","mode","rat","service","网络模式",NULL}, {0}, 0 },
-              { {"ul_bandwidth","upload_bandwidth","ul","tx","上行带宽",NULL}, {0}, 0 },
-              { {"dl_bandwidth","download_bandwidth","dl","rx","下行带宽",NULL}, {0}, 0 },
+              { {"connect_status","connection_status","connected","state",
+                 "connect_state","连接状态",NULL}, {0}, 0 },
+              { {"temperature","temp","temperature_c","温度",NULL}, {0}, 0 },
+              { {"sim_status","sim_state","simcard_status","sim_slot_status",
+                 "sim","SIM卡状态","SIM状态",NULL}, {0}, 0 },
+              { {"isp","operator","operator_name","service_provider","spn",
+                 "carrier","carrier_name","provider","运营商",
+                 "互联网服务提供商",NULL}, {0}, 0 },
+              { {"network_mode","network_type","mode","rat","service",
+                 "network","网络模式",NULL}, {0}, 0 },
+              { {"ul_bandwidth","upload_bandwidth","ul","tx","uplink",
+                 "upload","up_bandwidth","上行带宽",NULL}, {0}, 0 },
+              { {"dl_bandwidth","download_bandwidth","dl","rx","downlink",
+                 "download","down_bandwidth","下行带宽",NULL}, {0}, 0 },
           };
           static char g_section[64] = {0};
 
@@ -346,10 +355,12 @@ jobs:
           }
 
           /* ============================================================
-           * 简单 JSON 字段提取
+           * JSON 字段提取（★ 兼容字符串 / 数字 / 布尔 ★）
+           *  "key": "str"  → 解转义复制
+           *  "key": 12.5   → 原样复制到 , } ] 为止
            * ============================================================ */
-          static int json_get_string(const char *json, const char *key,
-                                     char *out, size_t out_size) {
+          static int json_get_field(const char *json, const char *key,
+                                    char *out, size_t out_size) {
               char pattern[128];
               snprintf(pattern, sizeof(pattern), "\"%s\"", key);
               const char *p = strstr(json, pattern);
@@ -358,28 +369,36 @@ jobs:
               p = strchr(p + strlen(pattern), ':');
               if (!p) return -1;
               p++;
-              while (*p == ' ' || *p == '\t') p++;
-              if (*p != '"') return -1;
-              p++;
+              while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
 
               size_t i = 0;
-              while (*p && *p != '"' && i < out_size - 1) {
-                  if (*p == '\\' && *(p+1)) {
-                      p++;
-                      switch (*p) {
-                          case 'n': out[i++] = '\n'; break;
-                          case 't': out[i++] = '\t'; break;
-                          case '"': out[i++] = '"'; break;
-                          case '\\': out[i++] = '\\'; break;
-                          default: out[i++] = *p; break;
-                      }
-                  } else {
-                      out[i++] = *p;
-                  }
+              if (*p == '"') {
                   p++;
+                  while (*p && *p != '"' && i < out_size - 1) {
+                      if (*p == '\\' && *(p+1)) {
+                          p++;
+                          switch (*p) {
+                              case 'n': out[i++] = '\n'; break;
+                              case 't': out[i++] = '\t'; break;
+                              case '"': out[i++] = '"'; break;
+                              case '\\': out[i++] = '\\'; break;
+                              default: out[i++] = *p; break;
+                          }
+                      } else {
+                          out[i++] = *p;
+                      }
+                      p++;
+                  }
+              } else {
+                  /* 原始标量：数字 / true / false / null */
+                  while (*p && *p != ',' && *p != '}' && *p != ']' &&
+                         *p != '\n' && i < out_size - 1) {
+                      out[i++] = *p++;
+                  }
+                  while (i > 0 && (out[i-1] == ' ' || out[i-1] == '\t' || out[i-1] == '\r')) i--;
               }
               out[i] = '\0';
-              return 0;
+              return (i > 0) ? 0 : -1;
           }
 
           /* ============================================================
@@ -407,6 +426,16 @@ jobs:
           }
 
           /* ============================================================
+           * 诊断落盘：保存 ubus 原始返回，便于排查字段名
+           * ============================================================ */
+          static void dump_dbg(const char *method, const char *json) {
+              char path[64];
+              snprintf(path, sizeof(path), "/tmp/.qmodem_dbg_%s", method);
+              FILE *f = fopen(path, "w");
+              if (f) { fputs(json, f); fclose(f); }
+          }
+
+          /* ============================================================
            * 获取 config_section（缓存）
            * ============================================================ */
           static void get_section(void) {
@@ -426,9 +455,29 @@ jobs:
           }
 
           /* ============================================================
-           * 扫描单个 ubus 返回 JSON 的 modem_info[]，填充 g_fields
+           * 把一条 key/full/value 尝试填入字段表（★ 非空才记 ★）
            * ============================================================ */
-          static void scan_one_json(const char *json) {
+          static void try_fill(const char *key, const char *full, const char *val) {
+              if (!val || !val[0]) return;   /* 空值不标记，下轮重试 */
+              for (int i = 0; i < FIELD_COUNT; i++) {
+                  if (g_fields[i].filled) continue;
+                  int hit = 0;
+                  for (int c = 0; g_fields[i].cands[c]; c++) {
+                      if (field_match(g_fields[i].cands[c], key, full)) { hit = 1; break; }
+                  }
+                  if (hit) {
+                      strncpy(g_fields[i].value, val, sizeof(g_fields[i].value) - 1);
+                      g_fields[i].value[sizeof(g_fields[i].value) - 1] = 0;
+                      g_fields[i].filled = 1;
+                      break;
+                  }
+              }
+          }
+
+          /* ============================================================
+           * 扫描 modem_info[] 数组形态
+           * ============================================================ */
+          static void scan_array_json(const char *json) {
               const char *mi = strstr(json, "\"modem_info\"");
               if (!mi) return;
               const char *p = strchr(mi, '[');
@@ -460,23 +509,14 @@ jobs:
                   obj[objlen] = 0;
 
                   char key[64] = {0}, full[128] = {0}, val[128] = {0};
-                  json_get_string(obj, "key", key, sizeof(key));
-                  json_get_string(obj, "full_name", full, sizeof(full));
-                  json_get_string(obj, "value", val, sizeof(val));
+                  json_get_field(obj, "key", key, sizeof(key));
+                  json_get_field(obj, "full_name", full, sizeof(full));
+                  /* ★ value 兼容字符串/数字；并尝试备选值键 ★ */
+                  if (json_get_field(obj, "value", val, sizeof(val)) != 0)
+                      if (json_get_field(obj, "val", val, sizeof(val)) != 0)
+                          json_get_field(obj, "data", val, sizeof(val));
 
-                  for (int i = 0; i < FIELD_COUNT; i++) {
-                      if (g_fields[i].filled) continue;
-                      int hit = 0;
-                      for (int c = 0; g_fields[i].cands[c]; c++) {
-                          if (field_match(g_fields[i].cands[c], key, full)) { hit = 1; break; }
-                      }
-                      if (hit) {
-                          strncpy(g_fields[i].value, val, sizeof(g_fields[i].value) - 1);
-                          g_fields[i].value[sizeof(g_fields[i].value) - 1] = 0;
-                          g_fields[i].filled = 1;
-                          break;
-                      }
-                  }
+                  try_fill(key, full, val);
 
                   free(obj);
                   p = q;
@@ -484,7 +524,26 @@ jobs:
           }
 
           /* ============================================================
-           * 拉取 QModem 全部信息（3 个 ubus 方法）
+           * 扫描扁平 key-value 形态（顶层直接就是字段）
+           * ============================================================ */
+          static void scan_flat_json(const char *json) {
+              for (int i = 0; i < FIELD_COUNT; i++) {
+                  if (g_fields[i].filled) continue;
+                  for (int c = 0; g_fields[i].cands[c]; c++) {
+                      char val[128] = {0};
+                      if (json_get_field(json, g_fields[i].cands[c], val, sizeof(val)) == 0
+                          && val[0]) {
+                          strncpy(g_fields[i].value, val, sizeof(g_fields[i].value) - 1);
+                          g_fields[i].value[sizeof(g_fields[i].value) - 1] = 0;
+                          g_fields[i].filled = 1;
+                          break;
+                      }
+                  }
+              }
+          }
+
+          /* ============================================================
+           * 拉取 QModem 全部信息（3 个 ubus 方法，双形态解析 + 落盘）
            * ============================================================ */
           static void collect_modem_info(void) {
               for (int i = 0; i < FIELD_COUNT; i++) {
@@ -501,7 +560,12 @@ jobs:
                            "ubus call qmodem %s '{\"config_section\":\"%s\"}' 2>/dev/null",
                            methods[m], g_section);
                   char *json = popen_read(cmd);
-                  if (json) { scan_one_json(json); free(json); }
+                  if (json) {
+                      dump_dbg(methods[m], json);
+                      scan_array_json(json);
+                      scan_flat_json(json);
+                      free(json);
+                  }
               }
           }
 
@@ -654,9 +718,9 @@ jobs:
                   size_t n = fread(json, 1, sizeof(json) - 1, f);
                   fclose(f);
                   json[n] = '\0';
-                  if (json_get_string(json, "hitokoto", hitokoto, sizeof(hitokoto)) == 0
+                  if (json_get_field(json, "hitokoto", hitokoto, sizeof(hitokoto)) == 0
                       && hitokoto[0]) {
-                      json_get_string(json, "from", from, sizeof(from));
+                      json_get_field(json, "from", from, sizeof(from));
                       ok = 1;
                   }
               }
@@ -1423,12 +1487,15 @@ jobs:
             手指 左→右 滑 = 上一页（回第 1 页）
             （瞬时跟手：先缓存直刷，再本地重画最新内容）
 
-          跟手性说明（本版重点）:
-            - 网络下载（一言/背景图）在后台子进程完成，翻页不被网络阻塞
-            - 翻页瞬间先 blit 缓存画布，随后百毫秒内本地重画
-            - 第 2 页翻过去先显示缓存，约半秒内 ubus 数据刷新
-            - 开机未联网先显示本地轮播文字，联网后自动换上背景/一言
-              （背景图缺失时每 30 秒自动重试拉取）
+          第 2 页解析（本版加固）:
+            - value 兼容 字符串/数字/布尔（带宽等数值不再丢失）
+            - modem_info[] 数组 与 扁平 key-value 两种返回形态都解析
+            - 空值不标记，60 秒后自动重试
+            - 每次 ubus 原始返回落盘到:
+                /tmp/.qmodem_dbg_base_info
+                /tmp/.qmodem_dbg_sim_info
+                /tmp/.qmodem_dbg_network_info
+              若某项仍显示 --，把对应文件内容发出来即可精确补键名。
 
           运行时依赖（设备上）:
             - wget、ubus、uci        （OpenWrt / QModem 自带）
@@ -1457,20 +1524,15 @@ jobs:
           - 有网 = 一言 API；无网 = 本地 4 组轮播
 
           第 2 页排查（某项显示 -- 时）:
-            uci show qmodem | grep modem-device      # 看 section 名
-            ubus call qmodem network_info \
-              '{"config_section":"<上面的名>"}'      # 看真实 key/full_name
-          把输出里的 key 或 full_name 加进源码 g_fields[].cands 即可。
+            cat /tmp/.qmodem_dbg_sim_info
+            cat /tmp/.qmodem_dbg_network_info
+          把输出发出来，即可把真实 key/full_name 补进 g_fields[].cands。
 
           触摸方向修正（实测 AXS5106 方向正确，通常无需改）:
-            现象 A：横滑没反应、竖滑才翻页（坐标轴旋转90°）
-                    → 编译行加 -DTOUCH_SWAP 重编
-            现象 B：能翻但方向反（想下一页却回上一页）
-                    → 编译行加 -DTOUCH_INVERT 重编
-            两个都中招 → 两个都加
+            现象 A：横滑没反应、竖滑才翻页 → 编译行加 -DTOUCH_SWAP
+            现象 B：能翻但方向反         → 编译行加 -DTOUCH_INVERT
             改法：编辑工作流里 aarch64-linux-gnu-gcc 那一行，
-                  在 -O2 -static 后面加上述 -D 宏，重新跑 Actions 即可，
-                  不必改 C 源码。
+                  在 -O2 -static 后面加上述 -D 宏，重新跑 Actions 即可。
 
           停止: killall drm_play_arm64
           卸载: /etc/init.d/99-bootanim disable && \
