@@ -69,16 +69,13 @@ jobs:
            *   第 2 页 = QModem 上网模块信息（黑底白字，每 60 秒刷新）
            * 翻页：触摸水平滑动。右→左 = 下一页；左→右 = 上一页。
            *
-           * 触摸（针对 AXS5106 / type-B 加固）：
-           *   - 事件聚合标志在 read 循环外累积、SYN 帧边界清零（修"完全翻不动"回归）
-           *   - 接触状态为全局静态，跨 wait_touch 调用保留 → 慢滑动不被腰斩
-           *   - 坐标空闲超时结算（TOUCH_IDLE_MS）→ 抬起事件丢失也能翻页
-           *   - 接触 = TRACKING_ID 与 BTN_TOUCH 双保险
-           *   - 起点 = 接触后第一个真实坐标
-           *   - X/Y 双轴跟踪，取显著轴为主轴
-           *   - 阈值按量程自适应
-           *   - 方向修正（实测 AXS5106 方向已正确，默认无需开）：
-           *     编译加 -DTOUCH_INVERT / -DTOUCH_SWAP
+           * 跟手性设计（本版重点）：
+           *   - 网络下载（一言/背景图）全部移到 fork 出的后台子进程，
+           *     wget 到 /tmp 临时文件后 mv 原子替换；主进程画页只读本地文件。
+           *   - 翻页 = 先 blit 内存缓存（瞬时跟手）+ 再本地重画（毫秒级）。
+           *   - 开机未联网时先显示本地轮播文字，背景图每 30 秒自动重试拉取。
+           *   - 触摸状态机：聚合标志在 read 循环外累积、SYN 帧边界清零；
+           *     接触状态全局持久（慢滑动不腰斩）；坐标空闲 140ms 兜底结算。
            *
            * 第 2 页数据：popen 调用 ubus call qmodem {base,sim,network}_info，
            *           解析 modem_info[] 的 key/full_name 精确匹配取 value。
@@ -138,14 +135,16 @@ jobs:
           #define HTTP_TIMEOUT  8
           #define MAX_CHARS_PER_LINE  15
           /* ★ 第 1 页文字颜色 (R, G, B) ★ */
-          #define TEXT_R   201
-          #define TEXT_G   0
-          #define TEXT_B   78
+          #define TEXT_R   0
+          #define TEXT_G   255
+          #define TEXT_B   255
           /* ★ 第 2 页字体大小 ★ */
-          #define INFO_TITLE_SIZE  17.0f
-          #define INFO_FONT_SIZE   15.0f
+          #define INFO_TITLE_SIZE  21.0f
+          #define INFO_FONT_SIZE   19.0f
           #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
           #define PICSUM_URL    "https://picsum.photos/320/172"
+          #define HITOKOTO_CACHE "/tmp/.drm_hitokoto"
+          #define BG_CACHE       "/tmp/.drm_bg_img"
 
           /* ===================== 触摸 / evdev 自包含常量 ===================== */
           #define MY_EV_SYN   0x00
@@ -236,6 +235,14 @@ jobs:
           static volatile sig_atomic_t g_running = 1;
           static int g_touch_thresh_x = 30;   /* open_touch 按量程自适应 */
           static int g_touch_thresh_y = 30;
+
+          /* 页面画布缓存（翻页时先 blit 缓存实现瞬时跟手） */
+          static uint8_t *g_page0_rgba = NULL;
+          static uint8_t *g_page1_rgba = NULL;
+
+          /* 后台抓取子进程 */
+          static pid_t g_fetch_pid = 0;
+          static time_t g_last_fetch_try = 0;
 
           /* 触摸状态：全局静态，跨 wait_touch 调用保留（修"慢滑动腰斩"） */
           typedef struct {
@@ -598,90 +605,78 @@ jobs:
           }
 
           /* ============================================================
-           * HTTP GET（通过 popen 调用 wget）
+           * 后台抓取：子进程 wget 一言/背景图到 /tmp，mv 原子替换。
+           * 主进程画页只读本地文件 → 翻页永远不被网络阻塞。
            * ============================================================ */
-          static char *http_get(const char *url, size_t *out_len) {
-              char cmd[512];
-              snprintf(cmd, sizeof(cmd),
-                       "wget -qO- --timeout=%d '%s' 2>/dev/null", HTTP_TIMEOUT, url);
-
-              FILE *fp = popen(cmd, "r");
-              if (!fp) return NULL;
-
-              size_t cap = 65536, len = 0;
-              char *buf = malloc(cap);
-              if (!buf) { pclose(fp); return NULL; }
-
-              size_t n;
-              while ((n = fread(buf + len, 1, cap - len - 1, fp)) > 0) {
-                  len += n;
-                  if (len >= cap - 1) {
-                      cap *= 2;
-                      char *tmp = realloc(buf, cap);
-                      if (!tmp) { free(buf); pclose(fp); return NULL; }
-                      buf = tmp;
-                  }
+          static void fetcher_start(void) {
+              if (g_fetch_pid > 0) {
+                  if (waitpid(g_fetch_pid, NULL, WNOHANG) == 0) return;  /* 上一次的还在跑 */
+                  g_fetch_pid = 0;
               }
-              pclose(fp);
-              buf[len] = '\0';
-              if (out_len) *out_len = len;
-              return buf;
+              pid_t p = fork();
+              if (p == 0) {
+                  char cmd[512];
+                  int rc;
+                  snprintf(cmd, sizeof(cmd),
+                           "wget -qO /tmp/.ht.new --timeout=%d '%s' 2>/dev/null && mv -f /tmp/.ht.new %s",
+                           HTTP_TIMEOUT, HITOKOTO_URL, HITOKOTO_CACHE);
+                  rc = system(cmd);
+                  snprintf(cmd, sizeof(cmd),
+                           "wget -qO /tmp/.bg.new --timeout=%d '%s' 2>/dev/null && mv -f /tmp/.bg.new %s",
+                           HTTP_TIMEOUT, PICSUM_URL, BG_CACHE);
+                  rc = system(cmd);
+                  (void)rc;
+                  _exit(0);
+              }
+              if (p > 0) g_fetch_pid = p;
+          }
+
+          /* 返回 1 = 子进程刚刚结束（内容已更新） */
+          static int fetcher_poll(void) {
+              if (g_fetch_pid > 0 && waitpid(g_fetch_pid, NULL, WNOHANG) == g_fetch_pid) {
+                  g_fetch_pid = 0;
+                  return 1;
+              }
+              return 0;
           }
 
           /* ============================================================
-           * HTTP GET 到文件（用于下载图片）
-           * ============================================================ */
-          static int http_get_file(const char *url, const char *path) {
-              char cmd[512];
-              snprintf(cmd, sizeof(cmd),
-                       "wget -qO '%s' --timeout=%d '%s' 2>/dev/null",
-                       path, HTTP_TIMEOUT, url);
-              int ret = system(cmd);
-              return (ret == 0) ? 0 : -1;
-          }
-
-          /* ============================================================
-           * 获取一言文字（网络优先，失败则轮播本地 4 组）
+           * 获取一言文字（只读本地缓存文件；无则轮播本地 4 组）
            * ============================================================ */
           static void fetch_hitokoto(char *text_buf, size_t buf_size) {
-              char *json = http_get(HITOKOTO_URL, NULL);
-              if (!json) {
-                  strncpy(text_buf, FALLBACK_TEXTS[g_fallback_idx], buf_size - 1);
-                  text_buf[buf_size - 1] = '\0';
-                  g_fallback_idx = (g_fallback_idx + 1) % FALLBACK_COUNT;
-                  return;
-              }
-
               char hitokoto[512] = {0};
               char from[128] = {0};
+              int ok = 0;
 
-              if (json_get_string(json, "hitokoto", hitokoto, sizeof(hitokoto)) == 0
-                  && hitokoto[0]) {
-                  json_get_string(json, "from", from, sizeof(from));
-                  if (from[0])
-                      snprintf(text_buf, buf_size, "%s\n\n——%s", hitokoto, from);
-                  else
-                      snprintf(text_buf, buf_size, "%s", hitokoto);
+              FILE *f = fopen(HITOKOTO_CACHE, "rb");
+              if (f) {
+                  static char json[8192];
+                  size_t n = fread(json, 1, sizeof(json) - 1, f);
+                  fclose(f);
+                  json[n] = '\0';
+                  if (json_get_string(json, "hitokoto", hitokoto, sizeof(hitokoto)) == 0
+                      && hitokoto[0]) {
+                      json_get_string(json, "from", from, sizeof(from));
+                      ok = 1;
+                  }
+              }
+
+              if (ok) {
+                  if (from[0]) snprintf(text_buf, buf_size, "%s\n\n——%s", hitokoto, from);
+                  else         snprintf(text_buf, buf_size, "%s", hitokoto);
               } else {
                   strncpy(text_buf, FALLBACK_TEXTS[g_fallback_idx], buf_size - 1);
                   text_buf[buf_size - 1] = '\0';
                   g_fallback_idx = (g_fallback_idx + 1) % FALLBACK_COUNT;
               }
-              free(json);
           }
 
           /* ============================================================
-           * 下载并解码背景图片
+           * 读取背景图片（只读本地缓存文件，纯本地解码，毫秒级）
            * ============================================================ */
           static uint8_t *fetch_background(int *w, int *h) {
-              const char *tmp_path = "/tmp/.drm_bg_img";
-              if (http_get_file(PICSUM_URL, tmp_path) < 0)
-                  return NULL;
-
               int channels;
-              uint8_t *data = stbi_load(tmp_path, w, h, &channels, 4);
-              unlink(tmp_path);
-              return data;
+              return stbi_load(BG_CACHE, w, h, &channels, 4);
           }
 
           /* ============================================================
@@ -950,11 +945,9 @@ jobs:
           }
 
           /* ============================================================
-           * 第 1 页：显示一帧信息（一言 + 背景）
+           * 第 1 页：渲染到画布（只读本地缓存文件，纯本地，毫秒级）
            * ============================================================ */
-          static void display_info_frame(int fd, uint32_t crtc_id,
-                                         uint32_t conn_id, drmModeModeInfo *mode,
-                                         void *map, uint32_t pitch, uint32_t fb_id) {
+          static void render_page0_rgba(uint8_t *canvas) {
               char raw_text[2048];
               char wrapped_text[4096];
 
@@ -964,34 +957,51 @@ jobs:
               int bg_w = 0, bg_h = 0;
               uint8_t *bg_rgba = fetch_background(&bg_w, &bg_h);
 
-              uint8_t *canvas;
-              int canvas_w = SCREEN_W, canvas_h = SCREEN_H;
-
               if (bg_rgba && bg_w > 0 && bg_h > 0) {
-                  canvas = malloc((size_t)(canvas_w * canvas_h * 4));
-                  if (canvas) {
-                      stbir_resize(bg_rgba, bg_w, bg_h, 0,
-                                   canvas, canvas_w, canvas_h, 0,
-                                   STBIR_RGBA, STBIR_TYPE_UINT8,
-                                   STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT);
-                  } else {
-                      canvas = calloc((size_t)(canvas_w * canvas_h), 4);
-                  }
+                  stbir_resize(bg_rgba, bg_w, bg_h, 0,
+                               canvas, SCREEN_W, SCREEN_H, 0,
+                               STBIR_RGBA, STBIR_TYPE_UINT8,
+                               STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT);
                   stbi_image_free(bg_rgba);
               } else {
-                  canvas = calloc((size_t)(canvas_w * canvas_h), 4);
-                  if (canvas) {
-                      for (int i = 0; i < canvas_w * canvas_h; i++)
-                          canvas[i*4 + 3] = 255;
-                  }
+                  memset(canvas, 0, (size_t)(SCREEN_W * SCREEN_H * 4));
+                  for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
+                      canvas[i*4 + 3] = 255;
               }
 
-              if (!canvas) return;
+              render_text_rgba(canvas, SCREEN_W, SCREEN_H, wrapped_text);
+          }
 
-              render_text_rgba(canvas, canvas_w, canvas_h, wrapped_text);
-              rgba_to_fb(map, pitch, canvas, canvas_w, canvas_h);
-              free(canvas);
+          /* ============================================================
+           * 绘制指定页（0 = 一言页，1 = 模组信息页），并更新画布缓存
+           * ============================================================ */
+          static void draw_page(int page, int fd, uint32_t crtc_id, uint32_t conn_id,
+                                drmModeModeInfo *mode, void *map, uint32_t pitch, uint32_t fb_id) {
+              if (page == 1) {
+                  if (!g_page1_rgba) g_page1_rgba = malloc((size_t)(SCREEN_W * SCREEN_H) * 4);
+                  if (g_page1_rgba) {
+                      collect_modem_info();
+                      render_info_page_rgba(g_page1_rgba, SCREEN_W, SCREEN_H);
+                      rgba_to_fb(map, pitch, g_page1_rgba, SCREEN_W, SCREEN_H);
+                  }
+              } else {
+                  if (!g_page0_rgba) g_page0_rgba = malloc((size_t)(SCREEN_W * SCREEN_H) * 4);
+                  if (g_page0_rgba) {
+                      render_page0_rgba(g_page0_rgba);
+                      rgba_to_fb(map, pitch, g_page0_rgba, SCREEN_W, SCREEN_H);
+                  }
+              }
+              drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
+          }
 
+          /* ============================================================
+           * 翻页瞬时直刷：把缓存画布直接 blit 上屏（无渲染、无网络）
+           * ============================================================ */
+          static void blit_cached(int page, int fd, uint32_t crtc_id, uint32_t conn_id,
+                                  drmModeModeInfo *mode, void *map, uint32_t pitch, uint32_t fb_id) {
+              uint8_t *src = (page == 1) ? g_page1_rgba : g_page0_rgba;
+              if (!src) return;   /* 还没有缓存，调用方随后 draw_page */
+              rgba_to_fb(map, pitch, src, SCREEN_W, SCREEN_H);
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
 
@@ -1087,7 +1097,6 @@ jobs:
            *  状态在 g_ts 中跨调用保留 → 慢滑动不被腰斩。
            *  抬起边沿丢失时，坐标停更超 TOUCH_IDLE_MS 即结算 → 仍能翻页。
            *  ★ 聚合标志 fx/fy/ft/ftid 在 read 循环外累积、SYN 帧边界清零 ★
-           *    （上一版误放进循环体内每轮清零，导致 SYN 看到全 0 = 完全翻不动）
            * 返回 -1 = 下一页，+1 = 上一页，0 = 本次未产生翻页。
            * ============================================================ */
           static int wait_touch(int fd, int poll_ms) {
@@ -1172,25 +1181,6 @@ jobs:
           }
 
           /* ============================================================
-           * 绘制指定页（0 = 一言页，1 = 模组信息页）
-           * ============================================================ */
-          static void draw_page(int page, int fd, uint32_t crtc_id, uint32_t conn_id,
-                                drmModeModeInfo *mode, void *map, uint32_t pitch, uint32_t fb_id) {
-              if (page == 1) {
-                  collect_modem_info();
-                  uint8_t *canvas = calloc((size_t)(SCREEN_W * SCREEN_H), 4);
-                  if (canvas) {
-                      render_info_page_rgba(canvas, SCREEN_W, SCREEN_H);
-                      rgba_to_fb(map, pitch, canvas, SCREEN_W, SCREEN_H);
-                      free(canvas);
-                  }
-              } else {
-                  display_info_frame(fd, crtc_id, conn_id, mode, map, pitch, fb_id);
-              }
-              drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
-          }
-
-          /* ============================================================
            * Daemon 化
            * ============================================================ */
           static void daemonize(void) {
@@ -1272,12 +1262,13 @@ jobs:
               void *info_map = map[0];
               uint32_t info_pitch = dumb[0].pitch;
 
+              /* 后台抓取一言/背景（不阻塞）；先本地直画一帧，内容到了自动更新 */
+              fetcher_start();
               draw_page(0, fd, crtc_id, conn->connector_id, &conn->modes[0],
                         info_map, info_pitch, info_fb);
               time_t last_refresh = time(NULL);
 
               while (g_running) {
-                  /* 120ms 单次 poll；状态在 g_ts 持久，慢滑动/抬起丢失均能正确结算 */
                   int sw = wait_touch(touch_fd, 120);
                   if (sw != 0) {
                       int np = cur_page + (sw < 0 ? 1 : -1);  /* 左滑→page+1 */
@@ -1285,17 +1276,39 @@ jobs:
                       if (np > 1) np = 1;
                       if (np != cur_page) {
                           cur_page = np;
+                          /* ① 缓存直刷：瞬时跟手 */
+                          blit_cached(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
+                                      info_map, info_pitch, info_fb);
+                          /* ② 本地重画最新内容（第1页读/tmp文件≈百毫秒；第2页ubus≈半秒） */
                           draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                     info_map, info_pitch, info_fb);
                           last_refresh = time(NULL);
                       }
                   }
 
+                  /* 后台抓取完成 → 第 1 页在屏则立即用新内容重画 */
+                  if (fetcher_poll() && cur_page == 0) {
+                      draw_page(0, fd, crtc_id, conn->connector_id, &conn->modes[0],
+                                info_map, info_pitch, info_fb);
+                      last_refresh = time(NULL);
+                  }
+
                   time_t now = time(NULL);
+
+                  /* 开机时网还没好：背景图缺失则每 30 秒重试一次后台抓取 */
+                  if (cur_page == 0 && g_fetch_pid == 0 &&
+                      access(BG_CACHE, R_OK) != 0 &&
+                      now - g_last_fetch_try >= 30) {
+                      g_last_fetch_try = now;
+                      fetcher_start();
+                  }
+
+                  /* 周期刷新：第 1 页异步抓取不阻塞；第 2 页本地重画 */
                   int interval = (cur_page == 0) ? REFRESH_SEC : INFO_REFRESH_SEC;
                   if (now - last_refresh >= interval) {
-                      draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
-                                info_map, info_pitch, info_fb);
+                      if (cur_page == 0) fetcher_start();
+                      else draw_page(1, fd, crtc_id, conn->connector_id, &conn->modes[0],
+                                     info_map, info_pitch, info_fb);
                       last_refresh = now;
                   }
               }
@@ -1408,13 +1421,14 @@ jobs:
           翻页:
             手指 右→左 滑 = 下一页（进第 2 页）
             手指 左→右 滑 = 上一页（回第 1 页）
-            （阈值按触摸量程自适应；无触摸屏则停在第 1 页）
+            （瞬时跟手：先缓存直刷，再本地重画最新内容）
 
-          触摸稳定性（本版已修复，正常无需任何调整）:
-            - 修"完全翻不动"回归：事件聚合标志改回 read 循环外累积
-            - 慢速滑动不再被"超时腰斩"（状态跨轮保留）
-            - 抬起事件丢失也有兜底（坐标停 140ms 即结算）
-            - AXS5106 等 type-B 多点屏已适配，方向实测正确
+          跟手性说明（本版重点）:
+            - 网络下载（一言/背景图）在后台子进程完成，翻页不被网络阻塞
+            - 翻页瞬间先 blit 缓存画布，随后百毫秒内本地重画
+            - 第 2 页翻过去先显示缓存，约半秒内 ubus 数据刷新
+            - 开机未联网先显示本地轮播文字，联网后自动换上背景/一言
+              （背景图缺失时每 30 秒自动重试拉取）
 
           运行时依赖（设备上）:
             - wget、ubus、uci        （OpenWrt / QModem 自带）
