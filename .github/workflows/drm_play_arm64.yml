@@ -69,6 +69,13 @@ jobs:
            *   第 2 页 = QModem 上网模块信息（黑底白字，每 60 秒刷新）
            * 翻页：触摸水平滑动。右→左 = 下一页；左→右 = 上一页。
            *
+           * 触摸（type-B 多点 + 单点兼容，已针对 AXS5106 等加固）：
+           *   - 接触判定 = TRACKING_ID 与 BTN_TOUCH 双保险
+           *   - 起点用接触后第一个真实坐标（修"按下帧无坐标"）
+           *   - X/Y 双轴跟踪，取显著轴为主轴（兼容坐标旋转）
+           *   - 阈值按量程自适应（open_touch 里读 EVIOCGABS 算）
+           *   - 方向修正：编译加 -DTOUCH_INVERT / -DTOUCH_SWAP
+           *
            * 第 2 页数据：popen 调用 ubus call qmodem {base,sim,network}_info，
            *           解析 modem_info[] 的 key/full_name 精确匹配取 value。
            *           config_section 由 uci show qmodem 自动获取并缓存。
@@ -131,8 +138,8 @@ jobs:
           #define TEXT_G   0
           #define TEXT_B   78
           /* ★ 第 2 页字体大小 ★ */
-          #define INFO_TITLE_SIZE  17.0f
-          #define INFO_FONT_SIZE   15.0f
+          #define INFO_TITLE_SIZE  20.0f
+          #define INFO_FONT_SIZE   17.0f
           #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
           #define PICSUM_URL    "https://picsum.photos/320/172"
 
@@ -142,7 +149,9 @@ jobs:
           #define MY_EV_ABS   0x03
           #define MY_SYN_REPORT 0x00
           #define MY_ABS_X    0x00
+          #define MY_ABS_Y    0x01
           #define MY_ABS_MT_POSITION_X  0x35
+          #define MY_ABS_MT_POSITION_Y  0x36
           #define MY_ABS_MT_TRACKING_ID 0x39
           #define MY_BTN_TOUCH 0x14a
           #define MY_EV_MAX   0x1f
@@ -164,7 +173,12 @@ jobs:
                ((nr)   << MY_IOC_NRSHIFT)   | ((size) << MY_IOC_SIZESHIFT))
           #define MY_EVIOCGNAME(len) MY_IOC(MY_IOC_READ, 'E', 0x06, (len))
           #define MY_EVIOCGBIT(ev,len) MY_IOC(MY_IOC_READ, 'E', 0x20 + (ev), (len))
-          #define SWIPE_THRESH 30
+          /* 读坐标量程（type-B 自适应阈值） */
+          struct my_absinfo { int value, minimum, maximum, fuzz, flat, resolution; };
+          #define MY_EVIOCGABS(abs) MY_IOC(MY_IOC_READ, 'E', 0x40 + (abs), sizeof(struct my_absinfo))
+          /* ★ 方向修正开关（默认关，用编译 -D 开启，见 INSTALL.txt） ★ */
+          /* #define TOUCH_INVERT */
+          /* #define TOUCH_SWAP   */
 
           struct my_input_event {
               struct timeval time;
@@ -214,6 +228,8 @@ jobs:
           /* ===================== 全局状态 ===================== */
           static uint32_t screen_w, screen_h;
           static volatile sig_atomic_t g_running = 1;
+          static int g_touch_thresh_x = 30;   /* open_touch 按量程自适应 */
+          static int g_touch_thresh_y = 30;
 
           void sig_handler(int sig) { (void)sig; g_running = 0; }
 
@@ -963,7 +979,7 @@ jobs:
           }
 
           /* ============================================================
-           * 触摸：打开设备
+           * 触摸：打开设备（识别 + 读量程自适应阈值）
            * ============================================================ */
           static int open_touch(void) {
               char path[32];
@@ -996,18 +1012,36 @@ jobs:
                           for (char *p = name; *p; p++) if (*p >= 'A' && *p <= 'Z') *p += 32;
                           if (strstr(name, "touch") || strstr(name, "goodix") ||
                               strstr(name, "ft5x")  || strstr(name, "gt9")   ||
-                              strstr(name, "gsl")   || strstr(name, "tsc")) is_touch = 1;
+                              strstr(name, "gsl")   || strstr(name, "tsc")   ||
+                              strstr(name, "axs")) is_touch = 1;   /* 匹配 AXS5106 等 */
                       }
                   }
 
-                  if (is_touch) return fd;
+                  if (is_touch) {
+                      /* 读量程，阈值取量程 1/8，clamp 到 [15,300]，适配任意分辨率触摸芯片 */
+                      struct my_absinfo ai;
+                      if (ioctl(fd, MY_EVIOCGABS(MY_ABS_X), &ai) == 0 && ai.maximum > ai.minimum)
+                          g_touch_thresh_x = (ai.maximum - ai.minimum) / 8;
+                      if (ioctl(fd, MY_EVIOCGABS(MY_ABS_Y), &ai) == 0 && ai.maximum > ai.minimum)
+                          g_touch_thresh_y = (ai.maximum - ai.minimum) / 8;
+                      if (g_touch_thresh_x < 15)  g_touch_thresh_x = 15;
+                      if (g_touch_thresh_x > 300) g_touch_thresh_x = 300;
+                      if (g_touch_thresh_y < 15)  g_touch_thresh_y = 15;
+                      if (g_touch_thresh_y > 300) g_touch_thresh_y = 300;
+                      return fd;
+                  }
                   close(fd);
               }
               return -1;
           }
 
           /* ============================================================
-           * 触摸：等待一次滑动，返回 -1(左滑/下一页) +1(右滑/上一页) 0(无)
+           * 触摸：等待一次滑动（type-B 加固版）
+           *  - 接触 = TRACKING_ID(>=0/按下 <0/抬起) 与 BTN_TOUCH 双保险
+           *  - 起点 = 接触后第一个真实坐标（修"按下帧无坐标"）
+           *  - X/Y 双轴跟踪，取显著且更大的轴为主轴（兼容坐标旋转）
+           *  - 阈值用量程自适应
+           * 返回 -1 = 下一页，+1 = 上一页，0 = 无/超时
            * ============================================================ */
           static int wait_touch(int fd, int timeout_ms) {
               if (fd < 0) { sleep_ms(timeout_ms); return 0; }
@@ -1016,8 +1050,10 @@ jobs:
               gettimeofday(&tv, NULL);
               long end_us = (long)tv.tv_sec * 1000000L + tv.tv_usec + (long)timeout_ms * 1000L;
 
-              int tracking = 0, have_start = 0, start_x = 0, last_x = 0;
-              int tmp_x = 0, have_x = 0, tmp_touch = 0, have_touch = 0;
+              int in_contact = 0, start_pending = 0, have_last = 0;
+              int start_x = 0, start_y = 0, last_x = 0, last_y = 0;
+              int fx = 0, fy = 0, ft = 0, ftid = 0;
+              int fxv = 0, fyv = 0, ftv = 0, ftidv = 0;
 
               while (g_running) {
                   gettimeofday(&tv, NULL);
@@ -1034,27 +1070,67 @@ jobs:
                   ssize_t r;
                   while ((r = read(fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
                       if (ev.type == MY_EV_ABS) {
-                          if (ev.code == MY_ABS_X || ev.code == MY_ABS_MT_POSITION_X) {
-                              tmp_x = ev.value; have_x = 1;
-                          }
+                          if (ev.code == MY_ABS_X || ev.code == MY_ABS_MT_POSITION_X)      { fx = 1; fxv = ev.value; }
+                          else if (ev.code == MY_ABS_Y || ev.code == MY_ABS_MT_POSITION_Y) { fy = 1; fyv = ev.value; }
+                          else if (ev.code == MY_ABS_MT_TRACKING_ID)                       { ftid = 1; ftidv = ev.value; }
                       } else if (ev.type == MY_EV_KEY) {
-                          if (ev.code == MY_BTN_TOUCH) { tmp_touch = ev.value ? 1 : 0; have_touch = 1; }
+                          if (ev.code == MY_BTN_TOUCH) { ft = 1; ftv = ev.value ? 1 : 0; }
                       } else if (ev.type == MY_EV_SYN && ev.code == MY_SYN_REPORT) {
-                          if (have_x) {
-                              last_x = tmp_x;
-                              if (tracking && !have_start) { start_x = last_x; have_start = 1; }
+                          /* 1) 收坐标 */
+                          if (fx) { last_x = fxv; have_last = 1; }
+                          if (fy) { last_y = fyv; have_last = 1; }
+
+                          /* 2) 接触边沿（TRACKING_ID 与 BTN_TOUCH 任一触发） */
+                          int down = 0, up = 0;
+                          if (ftid) {
+                              if (ftidv >= 0 && !in_contact)      { in_contact = 1; down = 1; }
+                              else if (ftidv < 0 && in_contact)   { in_contact = 0; up = 1; }
                           }
-                          if (have_touch) {
-                              if (tmp_touch && !tracking) {
-                                  tracking = 1; start_x = last_x; have_start = 1;
-                              } else if (!tmp_touch && tracking) {
-                                  tracking = 0; have_start = 0;
+                          if (ft) {
+                              if (ftv && !in_contact)             { in_contact = 1; down = 1; }
+                              else if (!ftv && in_contact)        { in_contact = 0; up = 1; }
+                          }
+
+                          /* 3) 按下：本帧有坐标则定起点，否则等第一个坐标 */
+                          if (down) {
+                              if (have_last) { start_x = last_x; start_y = last_y; start_pending = 0; }
+                              else           { start_pending = 1; }
+                          }
+                          /* 4) 接触中首个坐标补起点（修"按下帧无坐标"缺陷） */
+                          if (in_contact && start_pending && have_last) {
+                              start_x = last_x; start_y = last_y; start_pending = 0;
+                          }
+
+                          /* 5) 抬起：结算位移 */
+                          if (up) {
+                              if (have_last && !start_pending) {
                                   int dx = last_x - start_x;
-                                  if (dx < -SWIPE_THRESH) return -1;  /* 左滑 → 下一页 */
-                                  if (dx >  SWIPE_THRESH) return  1;  /* 右滑 → 上一页 */
+                                  int dy = last_y - start_y;
+                                  int adx = dx < 0 ? -dx : dx;
+                                  int ady = dy < 0 ? -dy : dy;
+                                  int delta = 0, valid = 0;
+          #ifdef TOUCH_SWAP
+                                  /* 触摸坐标与屏幕旋转 90°：水平意图落在 Y 轴，只认 Y */
+                                  if (ady >= g_touch_thresh_y) { delta = dy; valid = 1; }
+          #else
+                                  if (adx >= g_touch_thresh_x && adx >= ady)      { delta = dx; valid = 1; }
+                                  else if (ady >= g_touch_thresh_y)               { delta = dy; valid = 1; }
+          #endif
+          #ifdef TOUCH_INVERT
+                                  delta = -delta;
+          #endif
+                                  have_last = 0; start_pending = 0; in_contact = 0;
+                                  fx = fy = ft = ftid = 0;
+                                  if (valid) {
+                                      if (delta < 0) return -1;   /* 下一页 */
+                                      if (delta > 0) return  1;   /* 上一页 */
+                                  }
+                                  /* valid 但 delta==0 视为无效，继续 */
+                              } else {
+                                  have_last = 0; start_pending = 0;
                               }
                           }
-                          have_x = 0; have_touch = 0;
+                          fx = fy = ft = ftid = 0;
                       }
                   }
               }
@@ -1297,12 +1373,12 @@ jobs:
           翻页:
             手指 右→左 滑 = 下一页（进第 2 页）
             手指 左→右 滑 = 上一页（回第 1 页）
-            （阈值 30px；无触摸屏则停在第 1 页）
+            （阈值按触摸量程自适应；无触摸屏则停在第 1 页）
 
           运行时依赖（设备上）:
             - wget、ubus、uci        （OpenWrt / QModem 自带）
             - /usr/share/fonts/MiSans-Regular.ttf   （中文字体，两页共用）
-            - /dev/input/eventX      （触摸屏，可选）
+            - /dev/input/eventX      （触摸屏，可选；AXS5106 等已适配）
             - QModem 已运行          （第 2 页数据来源；未运行时显示 --）
 
           Step 1: 上传文件
@@ -1330,6 +1406,16 @@ jobs:
             ubus call qmodem network_info \
               '{"config_section":"<上面的名>"}'      # 看真实 key/full_name
           把输出里的 key 或 full_name 加进源码 g_fields[].cands 即可。
+
+          触摸方向修正（默认通常已正常，无需改）:
+            现象 A：横滑没反应、竖滑才翻页（坐标轴旋转90°）
+                    → 编译行加 -DTOUCH_SWAP 重编
+            现象 B：能翻但方向反（想下一页却回上一页）
+                    → 编译行加 -DTOUCH_INVERT 重编
+            两个都中招 → 两个都加
+            改法：编辑 .github 工作流里 aarch64-linux-gnu-gcc 那一行，
+                  在 -O2 -static 后面加上述 -D 宏，重新跑 Actions 即可，
+                  不必改 C 源码。
 
           停止: killall drm_play_arm64
           卸载: /etc/init.d/99-bootanim disable && \
