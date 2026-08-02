@@ -262,14 +262,29 @@ static int axs5106_probe(struct i2c_client *client)
 
 /*
  * Remove callback for 6.18+ kernels: returns void.
- * All resources are managed by devm_* and will be automatically freed.
+ *
+ * The input device is allocated with devm_input_allocate_device() and
+ * registered with input_register_device(); both steps enqueue devres
+ * nodes whose release callbacks (input_put_device / __input_unregister_device)
+ * fire automatically on driver detach. We must NOT call
+ * input_unregister_device() here:
+ *
+ *   - It would remove the devres unregister node (via devres_destroy)
+ *     and unregister the input device *now*, while the devres-managed
+ *     IRQ (#5 on the stack) is still enabled. The remaining devres
+ *     unwind would then run free_irq *after* the input device has
+ *     already been torn down -- inverting the safe LIFO order
+ *     (free_irq → unregister → put) into (unregister → free_irq → put)
+ *     and opening a use-after-free window for axs5106_irq().
+ *
+ *   - Verified against drivers/input/input.c (devres_destroy does NOT
+ *     invoke the release callback) and drivers/base/devres.c
+ *     (release_nodes iterates list_for_each_entry_safe_reverse = LIFO).
+ *
+ * This callback is kept only to log detachment.
  */
 static void axs5106_remove(struct i2c_client *client)
 {
-	struct axs5106_ts *ts = i2c_get_clientdata(client);
-
-	/* Explicitly unregister input device (devm will also do this, but being explicit is good practice) */
-	input_unregister_device(ts->input);
 	dev_info(&client->dev, "AXS5106 removed\n");
 }
 
@@ -300,4 +315,4 @@ module_i2c_driver(axs5106_driver);
 
 MODULE_AUTHOR("Derived from Waveshare AXS5106L demo");
 MODULE_DESCRIPTION("ChipOne AXS5106L capacitive touch controller");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
