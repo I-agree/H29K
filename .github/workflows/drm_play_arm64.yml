@@ -225,7 +225,7 @@ jobs:
               { {"isp","ISP","operator","operator_name","service_provider","spn",
                  "carrier","carrier_name","provider","plmn_name",
                  "Internet Service Provider","运营商","互联网服务提供商",NULL}, {0}, 0 },
-              { {"network_mode","Network Mode","Network Type","network_type",
+              { {"network_mode","Network Mode","Network Mode","network_mode",
                  "mode","rat","network","net_mode","网络模式",NULL}, {0}, 0 },
               { {"UL Bandwidth","ul_bandwidth","upload_bandwidth","ul","tx",
                  "uplink","upload","up_bandwidth","上行带宽",NULL}, {0}, 0 },
