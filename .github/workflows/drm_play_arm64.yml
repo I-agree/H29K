@@ -71,10 +71,7 @@ jobs:
            *
            * 第 2 页数据（依据真实缓存文件格式定稿）：
            *   主路径 = 直接读 /tmp/cache_*info* 缓存文件
-           *           （QModem 自身生成，modem_info[] 数组格式）
            *   兜底   = ubus 探测 + /var/run/qmodem 运行时目录
-           *   字段   = connect_status / temperature / SIM Status / ISP /
-           *            network_mode / UL Bandwidth / DL Bandwidth
            *   清洗   = 去首尾换行、内部换行转空格、掳C→°C、Yes/No 汉化
            *
            * 跟手性：网络下载在后台子进程；翻页先 blit 缓存再本地重画。
@@ -225,8 +222,11 @@ jobs:
               { {"isp","ISP","operator","operator_name","service_provider","spn",
                  "carrier","carrier_name","provider","plmn_name",
                  "Internet Service Provider","运营商","互联网服务提供商",NULL}, {0}, 0 },
-              { {"network_mode","Network Mode","Network Mode","network_mode",
-                 "mode","rat","network","net_mode","网络模式",NULL}, {0}, 0 },
+              /* ★ 刻意不含 "Network Type"/"network_type"：
+                 避免 cache_network_info 的 "NR" 抢先占位，
+                 只显示 cell_info 里更精确的 "NR5G-SA Mode" ★ */
+              { {"network_mode","Network Mode","mode","rat",
+                 "network","net_mode","网络模式",NULL}, {0}, 0 },
               { {"UL Bandwidth","ul_bandwidth","upload_bandwidth","ul","tx",
                  "uplink","upload","up_bandwidth","上行带宽",NULL}, {0}, 0 },
               { {"DL Bandwidth","dl_bandwidth","download_bandwidth","dl","rx",
@@ -333,7 +333,6 @@ jobs:
 
           /* ============================================================
            * 值清洗：去首尾空白/换行，内部换行转空格，掳C→°C
-           * （ISP 值形如 "\nChina Mobile"；温度形如 "45掳C"）
            * ============================================================ */
           static void sanitize_value(char *v) {
               size_t s = 0;
@@ -676,7 +675,7 @@ jobs:
 
               FILE *dbg = fopen(QMODEM_DBG, "w");
 
-              /* 1) 主路径：/tmp/cache_*info*（你的真实数据就在这里） */
+              /* 1) 主路径：/tmp/cache_*info* */
               scan_cache_files(dbg);
 
               /* 2) 兜底：七项没齐才走 ubus + rundir */
