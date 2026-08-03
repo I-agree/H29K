@@ -11,7 +11,6 @@ start() {
     
     [ ! -f "$PLAYER" ] && return 1
     
-    # 等待 DRM 设备就绪
     i=0
     while [ ! -e "$DRM_DEV" ] && [ $i -lt 10 ]; do
         sleep 1
@@ -19,11 +18,9 @@ start() {
     done
     [ ! -e "$DRM_DEV" ] && return 1
     
-    # 杀掉旧进程
     killall drm_play_arm64 2>/dev/null
     sleep 1
     
-    # unbind/rebind 驱动
     SPI_DEV=""
     for dev in /sys/bus/spi/devices/*; do
         if [ -f "$dev/modalias" ]; then
@@ -48,7 +45,6 @@ start() {
         done
     fi
     
-    # 启动
     "$PLAYER" "$DRM_DEV" &
 }
 

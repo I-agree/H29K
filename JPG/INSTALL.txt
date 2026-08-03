@@ -1,39 +1,37 @@
 ============================================
-  Boot Animation + Info Screen (All-in-One)
+  开机动画 + 双页信息屏（全合一）
 ============================================
 
 文件:
-  drm_play_arm64  - 开机动画 + 一言信息屏（全合一）
+  drm_play_arm64  - 开机动画 + 双页信息屏
   99-bootanim     - OpenWrt init.d 开机脚本
 
-运行时依赖:
-  - wget（OpenWrt 自带）
-  - /usr/share/fonts/MiSans-Regular.ttf（中文字体）
+页面:
+  第 1 页 = 一言 + 随机背景图（每 15 分钟刷新）
+  第 2 页 = 上网模块信息（黑底白字，每 60 秒刷新）
+翻页: 右→左 = 下一页；左→右 = 上一页（瞬时跟手）
 
-Step 1: 上传文件
--------------------------
-scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
-scp 99-bootanim root@192.168.1.1:/etc/init.d/
+第 2 页数据源（按真实缓存格式定稿）:
+  主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
+          cache_cell_info_* / cache_network_info_*
+  字段:  connect_status / temperature / SIM Status / ISP /
+         network_mode / UL Bandwidth / DL Bandwidth
+  清洗:  去首尾换行、掳C→°C、Yes→已连接、No→未连接、ready→就绪
+  兜底:  ubus 探测 + /var/run/qmodem（七项不齐时才走）
 
-Step 2: 上传字体（如果还没有）
--------------------------
-scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
+安装:
+  scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
+  scp 99-bootanim root@192.168.1.1:/etc/init.d/
+  scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
+  ssh root@192.168.1.1
+  chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
+  /etc/init.d/99-bootanim enable
 
-Step 3: 设置权限和启用
--------------------------
-ssh root@192.168.1.1
-chmod +x /usr/sbin/drm_play_arm64
-chmod +x /etc/init.d/99-bootanim
-/etc/init.d/99-bootanim enable
+排查（如有项显示 --）:
+  cat /tmp/.qmodem_dbg_all
 
-文字显示规则:
-- 每行最多 15 个字符（中文/英文/标点各算 1 个）
-- 超过 15 个自动换到下一行
-- 所有行整体垂直居中
-- 每行水平居中
-有网络时: 从一言 API 获取随机句子
-无网络时: 按 1→2→3→4→1→... 顺序轮播本地文字
-每 15 分钟切换一次
+触摸方向修正（实测正确，通常无需）:
+  横滑无反应竖滑才翻 → 编译行加 -DTOUCH_SWAP
+  能翻但方向反     → 编译行加 -DTOUCH_INVERT
 
 停止: killall drm_play_arm64
-卸载: /etc/init.d/99-bootanim disable && rm /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
