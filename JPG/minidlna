@@ -1,0 +1,16 @@
+
+config minidlna 'config'
+	option enabled '1'
+	option user 'minidlna'
+	option interface 'br-lan'
+	option friendly_name 'OpenWrt DLNA Server'
+	option db_dir '/var/run/minidlna'
+	option inotify '1'
+	option notify_interval '900'
+	option serial '12345678'
+	option model_number '1'
+	option root_container '.'
+	option album_art_names 'Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg'
+	list media_dir '/data'
+	option uuid '9a5529e7-eecb-4a85-8114-522ef7b31df2'
+
