@@ -1,6 +1,177 @@
 #!/bin/sh
 
-# 启用开机动画（创建 /etc/rc.d 软链接）
-/etc/init.d/99-bootanim enable
+# ==============================================================================
+# OpenWrt 首次启动自动扩容脚本 (f2fs 版本)
+# 功能: 
+# 1. 启用开机动画
+# 2. 检测 eMMC 剩余空间，创建新分区 (mmcblk0p3)
+# 3. 格式化为 f2fs (专为闪存优化，速度快，寿命长)
+# 4. 配置 /etc/config/fstab 实现开机自动挂载到 /data
+# ==============================================================================
+
+LOG_TAG="auto-resize"
+EMMC_DEV="/dev/mmcblk0"
+TARGET_PART="${EMMC_DEV}p3"
+MOUNT_POINT="/data"
+FSTAB_CONFIG="/etc/config/fstab"
+
+log_info() {
+    logger -t "$LOG_TAG" "$1"
+    echo "[Auto-Resize] $1"
+}
+
+# ------------------------------------------------------------------------------
+# 第一部分: 启用开机动画
+# ------------------------------------------------------------------------------
+if [ -f "/etc/init.d/99-bootanim" ]; then
+    /etc/init.d/99-bootanim enable
+    log_info "Boot animation enabled."
+fi
+
+# ------------------------------------------------------------------------------
+# 第二部分: 自动分区与挂载逻辑 (f2fs)
+# ------------------------------------------------------------------------------
+
+# 1. 检查目标分区是否已经存在
+if [ -b "$TARGET_PART" ]; then
+    log_info "Partition $TARGET_PART already exists. Skipping resize."
+else
+    log_info "Starting auto-resize process for $EMMC_DEV (Target: f2fs)..."
+
+    # 2. 获取分区布局信息
+    TOTAL_SECTORS=$(fdisk -l $EMMC_DEV | grep "Disk $EMMC_DEV" | awk '{print $7}')
+    LAST_END_SECTOR=$(fdisk -l $EMMC_DEV | grep "${EMMC_DEV}p" | awk '{print $3}' | sort -n | tail -n 1)
+
+    if [ -z "$LAST_END_SECTOR" ] || [ -z "$TOTAL_SECTORS" ]; then
+        log_info "Error: Could not determine partition layout. Aborting resize."
+        exit 0
+    fi
+
+    START_SECTOR=$((LAST_END_SECTOR + 1))
+    
+    log_info "Creating partition $TARGET_PART from sector $START_SECTOR to end..."
+
+    # 3. 使用 fdisk 非交互式创建分区
+    (
+        echo n
+        echo p
+        echo 3
+        echo $START_SECTOR
+        echo 
+        echo w
+    ) | fdisk $EMMC_DEV > /dev/null 2>&1
+
+    if [ $? -ne 0 ]; then
+        log_info "Error: fdisk failed to create partition."
+        exit 0
+    fi
+
+    # 4. 通知内核重新读取分区表
+    if command -v partprobe > /dev/null; then
+        partprobe $EMMC_DEV
+    else
+        blockdev --rereadpt $EMMC_DEV
+    fi
+    
+    # 等待设备节点生成
+    WAIT_COUNT=0
+    while [ ! -b "$TARGET_PART" ] && [ $WAIT_COUNT -lt 10 ]; do
+        sleep 1
+        WAIT_COUNT=$((WAIT_COUNT + 1))
+    done
+
+    if [ ! -b "$TARGET_PART" ]; then
+        log_info "Error: Partition node $TARGET_PART did not appear after creation."
+        exit 0
+    fi
+
+    # 5. 格式化为 f2fs
+    # -f: force overwrite
+    # -l DATA: label
+    # 注意: f2fs 默认开启 discard (trim)，对 eMMC 寿命友好
+    log_info "Formatting $TARGET_PART as f2fs..."
+    
+    # 检查 mkfs.f2fs 是否存在
+    if command -v mkfs.f2fs > /dev/null; then
+        mkfs.f2fs -f -l DATA $TARGET_PART > /dev/null 2>&1
+    else
+        log_info "Error: mkfs.f2fs not found! Falling back to ext4."
+        mkfs.ext4 -F -L DATA $TARGET_PART > /dev/null 2>&1
+        FS_TYPE="ext4"
+    fi
+    
+    # 如果上面没报错且没降级，则是 f2fs
+    if [ -z "$FS_TYPE" ]; then
+        FS_TYPE="f2fs"
+    fi
+
+    if [ $? -ne 0 ]; then
+        log_info "Error: Failed to format partition."
+        exit 0
+    fi
+
+    # 6. 创建挂载点
+    mkdir -p $MOUNT_POINT
+
+    # 7. 配置 /etc/config/fstab
+    if ! grep -q "option target '$MOUNT_POINT'" $FSTAB_CONFIG 2>/dev/null; then
+        log_info "Configuring fstab for auto-mount ($FS_TYPE)..."
+        
+        PART_UUID=$(blkid -s UUID -o value $TARGET_PART)
+        
+        # f2fs 推荐挂载参数: 
+        # noatime: 不记录访问时间，减少写入，提升性能
+        # background_gc=on: 后台垃圾回收
+        
+        OPTIONS="noatime"
+        if [ "$FS_TYPE" = "f2fs" ]; then
+            OPTIONS="noatime,background_gc=on"
+        fi
+
+        if [ -n "$PART_UUID" ]; then
+            cat >> $FSTAB_CONFIG << EOF
+
+config mount
+	option target '$MOUNT_POINT'
+	option uuid '$PART_UUID'
+	option fstype '$FS_TYPE'
+	option options '$OPTIONS'
+	option enabled '1'
+	option enabled_fsck '0'
+EOF
+        else
+            cat >> $FSTAB_CONFIG << EOF
+
+config mount
+	option target '$MOUNT_POINT'
+	option device '$TARGET_PART'
+	option fstype '$FS_TYPE'
+	option options '$OPTIONS'
+	option enabled '1'
+EOF
+        fi
+        
+        /etc/init.d/fstab reload 2>/dev/null
+    fi
+
+    # 8. 立即手动挂载
+    log_info "Mounting $TARGET_PART ($FS_TYPE) to $MOUNT_POINT..."
+    
+    # 挂载时带上优化参数
+    MOUNT_OPTS=""
+    if [ "$FS_TYPE" = "f2fs" ]; then
+        MOUNT_OPTS="-o noatime,background_gc=on"
+    else
+        MOUNT_OPTS="-o noatime"
+    fi
+    
+    mount $MOUNT_OPTS $TARGET_PART $MOUNT_POINT
+    
+    if [ $? -eq 0 ]; then
+        log_info "Success! $MOUNT_POINT is ready ($FS_TYPE). Size: $(df -h $MOUNT_POINT | tail -1 | awk '{print $2}')"
+    else
+        log_info "Warning: Mount failed, but will try again on next reboot via fstab."
+    fi
+fi
 
 exit 0
