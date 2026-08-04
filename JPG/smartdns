@@ -29,6 +29,16 @@ config server
 
 config server
 	option enabled '1'
+	option name '腾讯DNS'
+	option ip '119.29.29.29'
+
+config server
+	option enabled '1'
+	option name '中国互联网络信息中心 DNS'
+	option ip '1.2.4.8'
+
+config server
+	option enabled '1'
 	option name '百度 BaiduDNS'
 	option ip '180.76.76.76'
 
@@ -36,11 +46,6 @@ config server
 	option enabled '1'
 	option name '114 DNS'
 	option ip '114.114.114.114'
-
-config server
-	option enabled '1'
-	option name '腾讯DNS'
-	option ip '119.29.29.29'
 
 config server
 	option enabled '1'
