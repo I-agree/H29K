@@ -81,6 +81,8 @@ download_and_check "${BASE_URL}/package/kernel/axs5106/src/chipone_axs5106.c" "p
 download_and_check "${BASE_URL}/JPG/system" "files/etc/config/system"
 download_and_check "${BASE_URL}/JPG/wireless" "files/etc/config/wireless"
 download_and_check "${BASE_URL}/JPG/smartdns" "files/etc/config/smartdns"
+download_and_check "${BASE_URL}/JPG/minidlna" "files/etc/config/minidlna"
+download_and_check "${BASE_URL}/JPG/samba4" "files/etc/config/samba4"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
