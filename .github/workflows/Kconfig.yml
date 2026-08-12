@@ -19,7 +19,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-26.04
     # 🔥 【强力注入】显式声明工作流 Token 核心权限，踏平所有 403 权限暗礁
     permissions:
       contents: write   # 允许创建、修改、删除 GitHub Release 固件
@@ -60,14 +60,8 @@ jobs:
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
         sudo docker image prune --all --force
-        # ⚠️ 关键：卸载 runner 预装的冲突包（与 OpenWrt 构建无关）
-        sudo apt-get -qq remove --purge -y firefox podman || true
-        sudo apt-get -qq autoremove --purge -y || true
-        sudo dpkg --configure -a || true
-        sudo apt-get -f install -y || true
         sudo -E apt-get -qq update
-        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev bc file libbsd-dev liblzma-dev mtd-utils meson mold pbzip2 pigz pkg-config time u-boot-tools xsltproc zstd ecj binutils-gold libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev lsb-release software-properties-common gnupg gcc-aarch64-linux-gnu curl
-        wget -qO- https://apt.llvm.org/llvm.sh | sudo bash -s -- 21 all
+        sudo -E apt-get -qq install bzip2 g++ gawk gcc git glibc-source libncurses-dev make
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
         sudo timedatectl set-timezone "$TZ"
