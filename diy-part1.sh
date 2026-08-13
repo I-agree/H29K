@@ -33,6 +33,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/lib/firmware \
          package/boot/uboot-rockchip/patches \
          package/kernel/aic8800/patches \
+         feeds/packages/lang/python/python-charset-normalizer \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
@@ -86,7 +87,7 @@ download_and_check "${BASE_URL}/JPG/wireless" "files/etc/config/wireless"
 download_and_check "${BASE_URL}/JPG/smartdns" "files/etc/config/smartdns"
 download_and_check "${BASE_URL}/JPG/minidlna" "files/etc/config/minidlna"
 download_and_check "${BASE_URL}/JPG/samba4" "files/etc/config/samba4"
-download_and_check "${BASE_URL}/JPG/python-charset-normalizer/Makefile" "package/lang/python/python-charset-normalizer/Makefile"
+download_and_check "${BASE_URL}/JPG/python-charset-normalizer/Makefile" "feeds/packages/lang/python/python-charset-normalizer/Makefile"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
