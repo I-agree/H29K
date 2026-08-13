@@ -13,7 +13,11 @@ PKG_RELEASE:=1
 
 PYPI_NAME:=charset-normalizer
 PYPI_SOURCE_NAME:=charset_normalizer
-PKG_HASH:=skip
+
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/jawah/charset_normalizer.git
+PKG_SOURCE_VERSION:=master
+PKG_MIRROR_HASH:=skip
 
 PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE
