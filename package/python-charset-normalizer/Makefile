@@ -11,8 +11,10 @@ PKG_NAME:=python-charset-normalizer
 PKG_VERSION:=3.5.1
 PKG_RELEASE:=1
 
-PYPI_NAME:=charset-normalizer
-PYPI_SOURCE_NAME:=charset_normalizer
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_URL:=https://github.com/jawah/charset_normalizer.git
+PKG_SOURCE_VERSION:=3.5.1
+PKG_MIRROR_HASH:=skip
 
 PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE
@@ -26,11 +28,10 @@ HOST_BUILD_DEPENDS:= \
 	python-setuptools/host
 PKG_BUILD_DEPENDS:=python-setuptools/host
 
-include ../pypi.mk
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/host-build.mk
-include ../python3-package.mk
-include ../python3-host-build.mk
+include $(TOPDIR)/feeds/packages/lang/python/python3-package.mk
+include $(TOPDIR)/feeds/packages/lang/python/python3-host-build.mk
 
 define Package/python3-charset-normalizer
   SECTION:=lang
