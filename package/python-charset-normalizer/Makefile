@@ -8,12 +8,11 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=python-charset-normalizer
-PKG_VERSION:=3.4.9
+PKG_VERSION:=3.5.1
 PKG_RELEASE:=1
 
 PYPI_NAME:=charset-normalizer
 PYPI_SOURCE_NAME:=charset_normalizer
-PKG_HASH:=673611bbd43f0810bec0b0f028ddeaaa501190339cac411f347ac76917c3ae7b
 
 PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE
