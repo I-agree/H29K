@@ -20,6 +20,8 @@ PKG_LICENSE:=MIT
 PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=Alexandru Ardelean <ardeleanalex@gmail.com>
 
+PYTHON3_PKG_WHEEL_NAME:=charset_normalizer
+
 HOST_BUILD_DEPENDS:= \
 	python3/host \
 	python-build/host \
