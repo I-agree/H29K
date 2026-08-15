@@ -116,7 +116,7 @@ msgstr "顶部状态栏"
 
 #: ucode/template/themes/glass/sysauth.ut:111
 msgid "Invalid username and/or password! Please try again."
-msgstr "用户名和/或密码无效！请重试。"
+msgstr "用户名或密码无效！请重试。"
 
 #: ucode/template/themes/glass/header.ut:211
 msgid "JavaScript required!"
