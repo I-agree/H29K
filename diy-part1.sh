@@ -33,7 +33,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/lib/firmware \
          package/boot/uboot-rockchip/patches \
          package/kernel/aic8800/patches \
-         feeds/packages/lang/python/python-charset-normalizer \
+         feeds/packages/lang/python/python-charset-normalizer/patches \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
