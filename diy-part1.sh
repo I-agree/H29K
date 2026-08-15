@@ -12,8 +12,8 @@ echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.defa
 # === 2. 安装 argon 主题
 git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
-# === 3. 安装 glass 主题
-git clone https://github.com/rchen14b/luci-theme-glass.git package/luci-theme-glass
+# === 3. 安装 glass 主题（原作者停更了）
+git clone https://github.com/I-agree/luci-theme-glass.git package/luci-theme-glass
 
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
@@ -88,7 +88,6 @@ download_and_check "${BASE_URL}/JPG/smartdns" "files/etc/config/smartdns"
 download_and_check "${BASE_URL}/JPG/minidlna" "files/etc/config/minidlna"
 download_and_check "${BASE_URL}/JPG/samba4" "files/etc/config/samba4"
 download_and_check "${BASE_URL}/package/python-charset-normalizer/Makefile" "package/python-charset-normalizer/Makefile"
-download_and_check "${BASE_URL}/JPG/luci-theme-glass/po/zh_Hans/glass.po" "package/luci-theme-glass/po/zh_Hans/glass.po"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
