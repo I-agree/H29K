@@ -1,0 +1,6 @@
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -0,2 +0,2 @@
+ [build-system]
+-requires = ["setuptools>=68,<83.1"]
++requires = ["setuptools>=68,<84.1"]
