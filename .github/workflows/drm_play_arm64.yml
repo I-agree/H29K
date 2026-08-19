@@ -581,6 +581,13 @@ jobs:
                   write_file(g_backlight_path, "1");
           }
 
+          /* ★ 息屏唤醒辅助：禁用 CRTC 触发 panel disable，
+             后续 draw_page 内的 SetCrtc 会触发 panel enable + SPI 重推帧 ★ */
+          static void crtc_disable(int fd, uint32_t crtc_id) {
+              drmModeSetCrtc(fd, crtc_id, 0, 0, 0, NULL, 0, NULL);
+              usleep(50000);   /* 50 ms 等 GC9307 完成 sleep-in */
+          }
+
           /* ================================================================
            * 以下为 modem 信息采集 + DRM + 触摸 + 主循环（与之前相同）
            * ================================================================ */
@@ -1501,13 +1508,14 @@ jobs:
               while (g_running) {
                   int sw = wait_touch(touch_fd, 120);
 
-                  /* ★ 触摸唤醒：只开背光 ★ */
+                  /* ★ 触摸唤醒：disable CRTC → draw_page(重推帧) → 开背光 ★ */
                   if (sw != 0 && screen_off_state) {
-                      backlight_on();
                       screen_off_state = 0;
                       no_client_since = 0;
+                      crtc_disable(fd, crtc_id);
                       draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                 info_map, info_pitch, info_fb);
+                      backlight_on();
                       last_refresh = time(NULL);
                   }
 
@@ -1540,10 +1548,11 @@ jobs:
                       if (clients > 0) {
                           no_client_since = 0;
                           if (screen_off_state) {
-                              backlight_on();
                               screen_off_state = 0;
+                              crtc_disable(fd, crtc_id);
                               draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                         info_map, info_pitch, info_fb);
+                              backlight_on();
                               last_refresh = now;
                           }
                       } else if (!screen_off_state) {
@@ -1691,6 +1700,7 @@ jobs:
           ★ 本版修复 ★
             退出（killall/SIGTERM）时恢复原始 CRTC 状态，
             解决"重复运行只有第一次有画面"的问题。
+            唤醒时先 disable CRTC 再重推帧，解决 GC9307 息屏后 GRAM 丢失问题。
             调试日志: cat /tmp/drm_play.log
 
           安装:
