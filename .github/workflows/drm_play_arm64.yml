@@ -123,7 +123,7 @@ jobs:
           #define QMODEM_DBG     "/tmp/.qmodem_dbg_all"
           /* ★ 息屏相关 ★ */
           #define CLIENT_COUNT_CMD  "/usr/sbin/clients_online.sh"
-          #define CLIENT_CHECK_SEC  30       /* 每 30 秒统计一次客户端 */
+          #define CLIENT_CHECK_SEC  20       /* 每 20 秒统计一次客户端 */
           #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 息屏 */
 
           #ifndef DRM_MODE_DPMS_ON
@@ -1684,7 +1684,7 @@ jobs:
             有线: 只数 br-lan 成员里 eth*(非 eth1) 且 carrier=1 的口
                   —— eth1 是 WAN(2_1) 排除；phy0-ap0 是 WiFi 不按 carrier 算
             无线: 用 ubus network.wireless 找 AP 口(phy0-ap0)，数关联站点
-            每 30 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
+            每 20 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
             设备重连 → 最多 30 秒内自动亮屏；息屏时触摸可立即唤醒
 
           ★★★ 刷机后第一步：验证检测脚本（必做）★★★
@@ -1694,7 +1694,7 @@ jobs:
               cat /tmp/.clients_debug                     # 看每一步数到了什么
             验证息屏:
               拔掉 LAN 线 + 断开所有 WiFi → 应输出 0 → 60 秒后屏幕熄灭
-              重新插线/连 WiFi         → 应 ≥1 → 最多 30 秒内自动亮起
+              重新插线/连 WiFi         → 应 ≥1 → 最多 20 秒内自动亮起
 
           第 2 页数据源（按真实缓存格式定稿）:
             主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
