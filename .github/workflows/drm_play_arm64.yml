@@ -1582,66 +1582,65 @@ jobs:
           file drm_play_arm64
           ls -lh drm_play_arm64
 
-      # --- 4. 生成客户端检测脚本（息屏/亮屏用） ---
+      # --- 4. 生成客户端检测脚本（busybox ash 兼容版，无 sed/无嵌套管道） ---
       - name: Create client detection script
         run: |
           cat << 'EOF' > clients_online.sh
           #!/bin/sh
-          # 统计当前接入的客户端设备数（有线 LAN + WiFi 关联）
-          #
-          # 你的拓扑（已从 LuCI 确认）：
-          #   lan 接口 -> br-lan（成员: eth0 + phy0-ap0）  【LAN，要统计】
-          #   2_1 接口 -> eth1 (10.42.x.x)                【WAN/上联，必须排除】
-          # 所以"有客户端" = br-lan 成员里 carrier=1 的有线口 + WiFi 关联站点
-          #
-          # 调试：CLIENTS_DEBUG=1 /usr/sbin/clients_online.sh 会把每一步写到
-          #       /tmp/.clients_debug，方便定位为什么息不了屏。
+          # 统计接入客户端数（有线 LAN + WiFi）。busybox ash 兼容：
+          # 全程不用 sed、不用 $( cmd | cmd ) 嵌套，避免 "unexpected |" 语法错。
+          # 你的拓扑: lan=br-lan(eth0+phy0-ap0) 计入; eth1=WAN(2_1) 排除。
+          # 调试: CLIENTS_DEBUG=1 /usr/sbin/clients_online.sh 然后看 /tmp/.clients_debug
           n=0
-          DBG=/tmp/.clients_debug
-          [ "$CLIENTS_DEBUG" = "1" ] && { exec 3>"$DBG"; } || { exec 3>/dev/null; }
-          log() { echo "$*" >&3; }
+          if [ "$CLIENTS_DEBUG" = "1" ]; then
+              DBG=/tmp/.clients_debug
+              echo "===== check =====" > "$DBG"
+          else
+              DBG=/dev/null
+          fi
 
-          log "===== $(date) ====="
-
-          # ---------- 有线：ubus 取 lan 接口的 device，展开桥成员，数 carrier=1 ----------
-          wired=0
+          # ---- 取 lan 接口的 device 名（写到临时文件再读，避开命令替换+管道） ----
           lan_dev=""
           if command -v ubus >/dev/null 2>&1; then
-              # 兼容多种 OpenWrt ubus 输出格式：抓 "device" : "xxx"
-              lan_dev=$(ubus call network.interface.lan status 2>/dev/null \
-
-                        | tr -d '\n' | sed -n 's/.*"device"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-              # 有些版本 device 在 l3_device 或 ifname，逐个兜底
-              [ -z "$lan_dev" ] && lan_dev=$(ubus call network.interface.lan status 2>/dev/null \
-
-                        | tr -d '\n' | sed -n 's/.*"l3_device"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-              [ -z "$lan_dev" ] && lan_dev=$(ubus call network.interface.lan status 2>/dev/null \
-
-                        | tr -d '\n' | sed -n 's/.*"ifname"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')
-          fi
-          log "lan_dev from ubus = [$lan_dev]"
-
-          if [ -n "$lan_dev" ]; then
-              members=""
-              if [ -d "/sys/class/net/$lan_dev/brif" ]; then
-                  members=$(ls "/sys/class/net/$lan_dev/brif" 2>/dev/null)
-                  log "br-lan bridge members = [$members]"
-              else
-                  members="$lan_dev"
-                  log "lan_dev is not a bridge, use itself"
+              ubus call network.interface.lan status > /tmp/.lan_status 2>/dev/null
+              # 用 grep -o 抓 "device" : "xxx" 中的 xxx（busybox grep 支持 -o）
+              grep -o '"device" *: *"[^"]*"' /tmp/.lan_status > /tmp/.lan_kv 2>/dev/null
+              if [ ! -s /tmp/.lan_kv ]; then
+                  grep -o '"l3_device" *: *"[^"]*"' /tmp/.lan_status > /tmp/.lan_kv 2>/dev/null
               fi
-              for m in $members; do
-                  # 无线成员(phy0-ap0)在这里不算有线，单独在无线段统计
-                  [ -e "/sys/class/net/$m/wireless" ] && { log "  skip wireless member $m"; continue; }
+              if [ ! -s /tmp/.lan_kv ]; then
+                  grep -o '"ifname" *: *"[^"]*"' /tmp/.lan_status > /tmp/.lan_kv 2>/dev/null
+              fi
+              # 去掉前缀和引号，只留设备名：借助 cut/tr，单条管道，ash 没问题
+              if [ -s /tmp/.lan_kv ]; then
+                  lan_dev=$(cut -d'"' -f4 /tmp/.lan_kv | head -1)
+              fi
+          fi
+          echo "lan_dev=[$lan_dev]" >> "$DBG"
+
+          # ---- 有线：展开桥成员，数 carrier=1 的非无线口 ----
+          wired=0
+          if [ -n "$lan_dev" ]; then
+              if [ -d "/sys/class/net/$lan_dev/brif" ]; then
+                  ls "/sys/class/net/$lan_dev/brif" > /tmp/.br_members 2>/dev/null
+              else
+                  echo "$lan_dev" > /tmp/.br_members
+              fi
+              while read m; do
+                  [ -z "$m" ] && continue
+                  if [ -e "/sys/class/net/$m/wireless" ]; then
+                      echo "  skip wifi member $m" >> "$DBG"
+                      continue
+                  fi
                   c=$(cat "/sys/class/net/$m/carrier" 2>/dev/null)
-                  log "  wired member $m carrier = [$c]"
-                  [ "$c" = "1" ] && wired=$((wired+1))
-              done
+                  echo "  wired $m carrier=[$c]" >> "$DBG"
+                  if [ "$c" = "1" ]; then
+                      wired=$((wired + 1))
+                  fi
+              done < /tmp/.br_members
           else
-              # ubus 完全不可用：保守兜底，明确排除 eth1(WAN) 等已知非客户端口
-              log "ubus unavailable, fallback sysfs scan"
-              wan_dev=$(uci -q get network.wan.device 2>/dev/null)
-              wan2_dev=$(uci -q get network.2_1.device 2>/dev/null)
+              # ubus 不可用兜底：遍历物理口，硬排除 eth1(WAN) 等
+              echo "ubus unavailable, sysfs fallback" >> "$DBG"
               for d in /sys/class/net/*; do
                   i=${d##*/}
                   case "$i" in
@@ -1651,19 +1650,21 @@ jobs:
                   [ -e "$d/wireless" ] && continue
                   [ -e "$d/bridge" ] && continue
                   [ -e "$d/dsa" ] && continue
-                  [ -n "$wan_dev" ]  && [ "$i" = "$wan_dev" ]  && continue
-                  [ -n "$wan2_dev" ] && [ "$i" = "$wan2_dev" ] && continue
-                  # 硬排除：你这台 eth1 是 WAN 上联
-                  [ "$i" = "eth1" ] && { log "  hard-skip WAN eth1"; continue; }
+                  if [ "$i" = "eth1" ]; then
+                      echo "  hard-skip WAN eth1" >> "$DBG"
+                      continue
+                  fi
                   c=$(cat "$d/carrier" 2>/dev/null)
-                  log "  fallback $i carrier = [$c]"
-                  [ "$c" = "1" ] && wired=$((wired+1))
+                  echo "  fallback $i carrier=[$c]" >> "$DBG"
+                  if [ "$c" = "1" ]; then
+                      wired=$((wired + 1))
+                  fi
               done
           fi
-          n=$((n+wired))
-          log "wired clients = $wired"
+          n=$((n + wired))
+          echo "wired=$wired" >> "$DBG"
 
-          # ---------- 无线：关联站点数（多路兜底） ----------
+          # ---- 无线：关联站点数（多路兜底，每条都是单管道） ----
           wifi=0
           for d in /sys/class/net/*; do
               i=${d##*/}
@@ -1671,23 +1672,25 @@ jobs:
               case "$i" in apcli*|wds*|mon.*) continue ;; esac
               c=0
               if command -v hostapd_cli >/dev/null 2>&1; then
-                  c=$(hostapd_cli -i "$i" all_sta_info 2>/dev/null | grep -c "^sta ")
+                  hostapd_cli -i "$i" all_sta_info > /tmp/.sta 2>/dev/null
+                  c=$(grep -c "^sta " /tmp/.sta)
               fi
               if [ -z "$c" ] || [ "$c" = "0" ]; then
                   if command -v iw >/dev/null 2>&1; then
-                      c=$(iw "$i" station dump 2>/dev/null | grep -c "^Station")
+                      iw "$i" station dump > /tmp/.sta 2>/dev/null
+                      c=$(grep -c "^Station" /tmp/.sta)
                   fi
               fi
               if [ -z "$c" ] || [ "$c" = "0" ]; then
-                  c=$(iwinfo "$i" assoclist 2>/dev/null | grep -ci "dBm")
+                  iwinfo "$i" assoclist > /tmp/.sta 2>/dev/null
+                  c=$(grep -ci "dBm" /tmp/.sta)
               fi
               [ -z "$c" ] && c=0
-              log "wifi $i stations = $c"
-              wifi=$((wifi+c))
+              echo "wifi $i sta=$c" >> "$DBG"
+              wifi=$((wifi + c))
           done
-          n=$((n+wifi))
-          log "wifi clients = $wifi"
-          log "TOTAL = $n"
+          n=$((n + wifi))
+          echo "TOTAL=$n" >> "$DBG"
 
           echo $n
           EOF
