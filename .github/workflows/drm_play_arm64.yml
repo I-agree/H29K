@@ -122,8 +122,7 @@ jobs:
           #define BG_CACHE       "/tmp/.drm_bg_img"
           #define QMODEM_RUNDIR  "/var/run/qmodem"
           #define QMODEM_DBG     "/tmp/.qmodem_dbg_all"
-          /* ★ 息屏相关（只控背光开关）★ */
-          #define CLIENT_COUNT_CMD  "/usr/sbin/clients_online.sh"
+          /* ★ 息屏相关（纯背光开关，客户端检测内联）★ */
           #define CLIENT_CHECK_SEC  20       /* 每 20 秒统计一次客户端 */
           #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 关背光 */
 
@@ -169,21 +168,16 @@ jobs:
           };
 
           #define FALLBACK_COUNT 4
-
           static const char *FALLBACK_TEXTS[FALLBACK_COUNT] = {
               "山林不向四季起誓，荣枯随缘；\n"
               "海洋不需对沙滩承诺，遇合尽兴。",
-
               "喜欢就处，别问是朋友还是恋人！\n"
               "关系不是绳子，非要绑住谁的手脚。",
-
               "缘分就像山风，吹到哪儿都是风景。\n"
               "能走一段是礼物，能走一生是运气。",
-
               "被你改变的那部分我，\n"
               "代替了你永远陪在了我的身边。"
           };
-
           static int g_fallback_idx = 0;
 
           #define FIELD_COUNT 7
@@ -214,7 +208,6 @@ jobs:
                  "downlink","download","down_bandwidth","下行带宽",NULL}, {0}, 0 },
           };
           static char g_section[64] = {0};
-
           static char g_ubus_obj[32]    = {0};
           static char g_method_base[32] = {0};
           static char g_method_sim[32]  = {0};
@@ -224,14 +217,10 @@ jobs:
           static volatile sig_atomic_t g_running = 1;
           static int g_touch_thresh_x = 30;
           static int g_touch_thresh_y = 30;
-
           static uint8_t *g_page0_rgba = NULL;
           static uint8_t *g_page1_rgba = NULL;
-
           static pid_t g_fetch_pid = 0;
           static time_t g_last_fetch_try = 0;
-
-          /* ★ 背光路径（只有开/关）★ */
           static char g_backlight_path[PATH_MAX] = {0};
 
           typedef struct {
@@ -347,7 +336,6 @@ jobs:
               if (!p) return -1;
               p++;
               while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
-
               size_t i = 0;
               if (*p == '"') {
                   p++;
@@ -394,15 +382,6 @@ jobs:
               return buf;
           }
 
-          static int count_clients(void) {
-              char *out = popen_read(CLIENT_COUNT_CMD " 2>/dev/null");
-              if (!out) return 1;
-              int n = atoi(out);
-              free(out);
-              if (n < 0) n = 0;
-              return n;
-          }
-
           static void write_file(const char *path, const char *val) {
               FILE *f = fopen(path, "w");
               if (!f) return;
@@ -410,7 +389,169 @@ jobs:
               fclose(f);
           }
 
-          /* ★ 查找背光 sysfs 路径 ★ */
+          /* ================================================================
+           * ★ 内联客户端检测（替代 clients_online.sh）
+           * 逻辑与原脚本完全一致：
+           *   有线 = br-lan 成员中 eth*(非eth1) 且 carrier=1
+           *   无线 = ubus network.wireless 找 AP ifname → hostapd_cli/iw/iwinfo 数站点
+           * ================================================================ */
+
+          /* 从文件读取整数，失败返回 -1 */
+          static int read_int_file(const char *path) {
+              FILE *f = fopen(path, "r");
+              if (!f) return -1;
+              int v = -1;
+              if (fscanf(f, "%d", &v) != 1) v = -1;
+              fclose(f);
+              return v;
+          }
+
+          /* 统计有线客户端：br-lan 桥成员中 eth*(非eth1) carrier=1 */
+          static int count_wired_clients(void) {
+              int count = 0;
+              /* 1) 通过 ubus 获取 lan 接口设备名 */
+              char lan_dev[64] = {0};
+              char *out = popen_read(
+                  "ubus call network.interface.lan status 2>/dev/null | "
+                  "grep -o '\"device\" *: *\"[^\"]*\"' | head -1 | cut -d'\"' -f4");
+              if (out && out[0]) {
+                  strncpy(lan_dev, out, sizeof(lan_dev) - 1);
+                  free(out);
+              } else {
+                  if (out) free(out);
+                  /* 尝试 l3_device */
+                  out = popen_read(
+                      "ubus call network.interface.lan status 2>/dev/null | "
+                      "grep -o '\"l3_device\" *: *\"[^\"]*\"' | head -1 | cut -d'\"' -f4");
+                  if (out && out[0]) {
+                      strncpy(lan_dev, out, sizeof(lan_dev) - 1);
+                  }
+                  if (out) free(out);
+              }
+
+              /* 2) 列出桥成员或所有网口 */
+              char members[32][32];
+              int nm = 0;
+              char brif_path[PATH_MAX];
+              if (lan_dev[0]) {
+                  snprintf(brif_path, sizeof(brif_path), "/sys/class/net/%s/brif", lan_dev);
+              } else {
+                  snprintf(brif_path, sizeof(brif_path), "/sys/class/net");
+              }
+
+              DIR *d = opendir(brif_path);
+              if (!d) return 0;
+              struct dirent *de;
+              while ((de = readdir(d)) && nm < 32) {
+                  if (de->d_name[0] == '.') continue;
+                  /* 只认 eth* 且排除 eth1(WAN) */
+                  if (strncmp(de->d_name, "eth", 3) != 0) continue;
+                  if (strcmp(de->d_name, "eth1") == 0) continue;
+                  strncpy(members[nm], de->d_name, 31);
+                  members[nm][31] = 0;
+                  nm++;
+              }
+              closedir(d);
+
+              /* 3) 检查每个成员的 carrier */
+              for (int i = 0; i < nm; i++) {
+                  char cpath[PATH_MAX];
+                  snprintf(cpath, sizeof(cpath), "/sys/class/net/%s/carrier", members[i]);
+                  if (read_int_file(cpath) == 1) count++;
+              }
+              return count;
+          }
+
+          /* 统计无线客户端：找 AP 接口 → 数关联站点 */
+          static int count_wifi_clients(void) {
+              int total = 0;
+
+              /* 1) 通过 ubus 获取 AP 接口名列表 */
+              char ap_ifaces[16][32];
+              int nap = 0;
+              char *out = popen_read(
+                  "ubus call network.wireless status 2>/dev/null | "
+                  "grep -o '\"ifname\" *: *\"[^\"]*\"' | cut -d'\"' -f4");
+              if (out && out[0]) {
+                  char *line = out;
+                  while (*line && nap < 16) {
+                      char *nl = strchr(line, '\n');
+                      size_t len = nl ? (size_t)(nl - line) : strlen(line);
+                      if (len > 0 && len < 32) {
+                          memcpy(ap_ifaces[nap], line, len);
+                          ap_ifaces[nap][len] = 0;
+                          nap++;
+                      }
+                      line = nl ? nl + 1 : line + len;
+                  }
+                  free(out);
+              } else {
+                  if (out) free(out);
+                  /* 兜底：常见 AP 接口名 */
+                  static const char *cands[] = {"phy0-ap0","wlan0","ath0","ra0","ap0",NULL};
+                  for (int i = 0; cands[i] && nap < 16; i++) {
+                      char p[PATH_MAX];
+                      snprintf(p, sizeof(p), "/sys/class/net/%s", cands[i]);
+                      if (access(p, F_OK) == 0) {
+                          strncpy(ap_ifaces[nap], cands[i], 31);
+                          ap_ifaces[nap][31] = 0;
+                          nap++;
+                      }
+                  }
+              }
+
+              /* 2) 对每个 AP 接口数关联站点 */
+              for (int i = 0; i < nap; i++) {
+                  char p[PATH_MAX];
+                  snprintf(p, sizeof(p), "/sys/class/net/%s", ap_ifaces[i]);
+                  if (access(p, F_OK) != 0) continue;
+
+                  int sta = 0;
+                  char cmd[256];
+                  char *sout;
+
+                  /* 优先 hostapd_cli */
+                  snprintf(cmd, sizeof(cmd),
+                           "hostapd_cli -i %s all_sta_info 2>/dev/null | grep -c '^sta '",
+                           ap_ifaces[i]);
+                  sout = popen_read(cmd);
+                  if (sout) { sta = atoi(sout); free(sout); }
+
+                  /* 其次 iw */
+                  if (sta <= 0) {
+                      snprintf(cmd, sizeof(cmd),
+                               "iw %s station dump 2>/dev/null | grep -c '^Station'",
+                               ap_ifaces[i]);
+                      sout = popen_read(cmd);
+                      if (sout) { sta = atoi(sout); free(sout); }
+                  }
+
+                  /* 最后 iwinfo */
+                  if (sta <= 0) {
+                      snprintf(cmd, sizeof(cmd),
+                               "iwinfo %s assoclist 2>/dev/null | grep -ci 'dBm'",
+                               ap_ifaces[i]);
+                      sout = popen_read(cmd);
+                      if (sout) { sta = atoi(sout); free(sout); }
+                  }
+
+                  if (sta > 0) total += sta;
+              }
+              return total;
+          }
+
+          /* ★ 总客户端数 = 有线 + 无线 ★ */
+          static int count_clients(void) {
+              int wired = count_wired_clients();
+              int wifi  = count_wifi_clients();
+              int total = wired + wifi;
+              return (total > 0) ? total : 0;
+          }
+
+          /* ================================================================
+           * ★ 背光控制（只有开/关）
+           * ================================================================ */
+
           static void find_backlight(void) {
               DIR *d = opendir("/sys/class/backlight");
               if (!d) return;
@@ -426,17 +567,19 @@ jobs:
               closedir(d);
           }
 
-          /* ★ 息屏 = 只关背光 ★ */
           static void backlight_off(void) {
               if (g_backlight_path[0])
                   write_file(g_backlight_path, "0");
           }
 
-          /* ★ 亮屏 = 只开背光 ★ */
           static void backlight_on(void) {
               if (g_backlight_path[0])
                   write_file(g_backlight_path, "1");
           }
+
+          /* ================================================================
+           * 以下为 modem 信息采集 + DRM + 触摸 + 主循环（与之前相同）
+           * ================================================================ */
 
           static void get_section(void) {
               if (g_section[0]) return;
@@ -509,7 +652,6 @@ jobs:
                   if (!obj) { p = q; continue; }
                   memcpy(obj, start, objlen);
                   obj[objlen] = 0;
-
                   char key[64] = {0}, full[128] = {0}, val[128] = {0};
                   json_get_field(obj, "key", key, sizeof(key));
                   json_get_field(obj, "full_name", full, sizeof(full));
@@ -517,7 +659,6 @@ jobs:
                       if (json_get_field(obj, "val", val, sizeof(val)) != 0)
                           json_get_field(obj, "data", val, sizeof(val));
                   try_fill(key, full, val);
-
                   free(obj);
                   p = q;
               }
@@ -672,11 +813,8 @@ jobs:
                   g_fields[i].value[0] = 0;
               }
               get_section();
-
               FILE *dbg = fopen(QMODEM_DBG, "w");
-
               scan_cache_files(dbg);
-
               if (fields_filled_count() < FIELD_COUNT) {
                   static const char *M_BASE[] = {"base_info","get_base_info","basic_info",
                                                  "status","get_status",NULL};
@@ -690,9 +828,7 @@ jobs:
                   collect_group(dbg, M_NET,  g_method_net);
                   scan_rundir(dbg);
               }
-
               postprocess_fields();
-
               if (dbg) fclose(dbg);
           }
 
@@ -702,15 +838,12 @@ jobs:
                               uint32_t *out_crtc_id) {
               int fd = open(drm_device, O_RDWR | O_CLOEXEC);
               if (fd < 0) return -1;
-
               uint64_t has_dumb = 0;
               if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || !has_dumb) {
                   close(fd); return -1;
               }
-
               drmModeRes *res = drmModeGetResources(fd);
               if (!res) { close(fd); return -1; }
-
               drmModeConnector *conn = NULL;
               for (int i = 0; i < res->count_connectors; i++) {
                   drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
@@ -724,7 +857,6 @@ jobs:
                   drmModeFreeConnector(c);
               }
               if (!conn) { drmModeFreeResources(res); close(fd); return -1; }
-
               uint32_t crtc_id = 0;
               if (conn->encoder_id) {
                   drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
@@ -736,7 +868,6 @@ jobs:
                   drmModeFreeResources(res);
                   close(fd); return -1;
               }
-
               *out_res = res;
               *out_conn = conn;
               *out_crtc_id = crtc_id;
@@ -750,22 +881,18 @@ jobs:
               dumb->height = screen_h;
               dumb->bpp = BPP;
               if (drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, dumb) < 0) return -1;
-
               uint32_t handles[4] = {dumb->handle, 0, 0, 0};
               uint32_t pitches[4] = {dumb->pitch, 0, 0, 0};
               uint32_t offsets[4] = {0, 0, 0, 0};
               if (drmModeAddFB2(fd, screen_w, screen_h, DRM_FORMAT_XRGB8888,
                                 handles, pitches, offsets, fb_id, 0) < 0) return -1;
-
               struct drm_mode_map_dumb map_req;
               memset(&map_req, 0, sizeof(map_req));
               map_req.handle = dumb->handle;
               if (drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) < 0) return -1;
-
               *map_out = mmap(0, dumb->size, PROT_READ | PROT_WRITE,
                               MAP_SHARED, fd, map_req.offset);
               if (*map_out == MAP_FAILED) return -1;
-
               memset(*map_out, 0, dumb->size);
               return 0;
           }
@@ -774,23 +901,16 @@ jobs:
                                   struct drm_mode_create_dumb *dumbs, void **maps,
                                   uint32_t *fb_ids, int count) {
               for (int i = 0; i < count; i++) {
-                  if (fb_ids[i]) {
-                      drmModeRmFB(fd, fb_ids[i]);
-                      fb_ids[i] = 0;
-                  }
-                  if (maps[i] && maps[i] != MAP_FAILED) {
-                      munmap(maps[i], dumbs[i].size);
-                      maps[i] = NULL;
-                  }
+                  if (fb_ids[i]) { drmModeRmFB(fd, fb_ids[i]); fb_ids[i] = 0; }
+                  if (maps[i] && maps[i] != MAP_FAILED) { munmap(maps[i], dumbs[i].size); maps[i] = NULL; }
               }
-              if (conn) { drmModeFreeConnector(conn); }
-              if (res) { drmModeFreeResources(res); }
+              if (conn) drmModeFreeConnector(conn);
+              if (res) drmModeFreeResources(res);
               if (fd >= 0) close(fd);
           }
 
           static void copy_centered(void *dst, uint32_t pitch,
-                                    const uint8_t *src,
-                                    uint32_t img_w, uint32_t img_h) {
+                                    const uint8_t *src, uint32_t img_w, uint32_t img_h) {
               memset(dst, 0, (size_t)pitch * screen_h);
               int x_off = ((int)screen_w - (int)img_w) / 2;
               int y_off = ((int)screen_h - (int)img_h) / 2;
@@ -798,10 +918,9 @@ jobs:
               if (y_off < 0) y_off = 0;
               uint32_t cw = (img_w > screen_w) ? screen_w : img_w;
               uint32_t ch = (img_h > screen_h) ? screen_h : img_h;
-              for (uint32_t y = 0; y < ch; y++) {
+              for (uint32_t y = 0; y < ch; y++)
                   memcpy((uint8_t *)dst + (y + y_off) * pitch + x_off * 4,
                          src + y * img_w * 4, cw * 4);
-              }
           }
 
           static void fetcher_start(void) {
@@ -839,7 +958,6 @@ jobs:
               char hitokoto[512] = {0};
               char from[128] = {0};
               int ok = 0;
-
               FILE *f = fopen(HITOKOTO_CACHE, "rb");
               if (f) {
                   static char json[8192];
@@ -852,7 +970,6 @@ jobs:
                       ok = 1;
                   }
               }
-
               if (ok) {
                   if (from[0]) snprintf(text_buf, buf_size, "%s\n\n——%s", hitokoto, from);
                   else         snprintf(text_buf, buf_size, "%s", hitokoto);
@@ -868,8 +985,7 @@ jobs:
               return stbi_load(BG_CACHE, w, h, &channels, 4);
           }
 
-          static void render_text_rgba(uint8_t *rgba, int img_w, int img_h,
-                                       const char *text) {
+          static void render_text_rgba(uint8_t *rgba, int img_w, int img_h, const char *text) {
               FILE *ff = fopen(FONT_PATH, "rb");
               if (!ff) return;
               fseek(ff, 0, SEEK_END);
@@ -881,29 +997,23 @@ jobs:
               size_t read_bytes = fread(font_data, 1, (size_t)fsize, ff);
               fclose(ff);
               if (read_bytes != (size_t)fsize) { free(font_data); return; }
-
               stbtt_fontinfo font;
               if (!stbtt_InitFont(&font, font_data, 0)) { free(font_data); return; }
-
               float scale = stbtt_ScaleForPixelHeight(&font, FONT_SIZE);
               int ascent, descent, line_gap;
               stbtt_GetFontVMetrics(&font, &ascent, &descent, &line_gap);
               int line_height = (int)((ascent - descent + line_gap) * scale);
               if (line_height <= 0) line_height = (int)(FONT_SIZE + 2);
-
               int num_lines = 1;
               for (const char *p = text; *p; p++) if (*p == '\n') num_lines++;
               int total_h = num_lines * line_height;
               int y_start = (img_h - total_h) / 2;
               if (y_start < 0) y_start = 0;
-
               const char *line_start = text;
               int cur_y = y_start;
-
               while (line_start && *line_start) {
                   const char *line_end = strchr(line_start, '\n');
                   size_t line_len = line_end ? (size_t)(line_end - line_start) : strlen(line_start);
-
                   int line_w = 0;
                   for (size_t i = 0; i < line_len; ) {
                       int codepoint;
@@ -914,17 +1024,14 @@ jobs:
                       stbtt_GetCodepointHMetrics(&font, codepoint, &adv, NULL);
                       line_w += (int)(adv * scale);
                   }
-
                   int x_pos = (img_w - line_w) / 2;
                   if (x_pos < 0) x_pos = 0;
-
                   int pen_x = x_pos;
                   for (size_t i = 0; i < line_len; ) {
                       int codepoint;
                       int bytes = utf8_decode(line_start + i, &codepoint);
                       if (i + (size_t)bytes > line_len) break;
                       i += (size_t)bytes;
-
                       int x0, y0, x1, y1;
                       stbtt_GetCodepointBitmapBox(&font, codepoint, scale, scale, &x0, &y0, &x1, &y1);
                       int gw = x1 - x0, gh = y1 - y0;
@@ -972,7 +1079,6 @@ jobs:
                   i += (size_t)bytes;
                   if (cp == '\n') break;
                   if (max_x > 0 && pen_x >= max_x) break;
-
                   int x0, y0, x1, y1;
                   stbtt_GetCodepointBitmapBox(font, cp, scale, scale, &x0, &y0, &x1, &y1);
                   int gw = x1 - x0, gh = y1 - y0;
@@ -1011,7 +1117,6 @@ jobs:
               for (int i = 0; i < W * H; i++) {
                   rgba[i*4+0] = 0; rgba[i*4+1] = 0; rgba[i*4+2] = 0; rgba[i*4+3] = 255;
               }
-
               FILE *ff = fopen(FONT_PATH, "rb");
               if (!ff) return;
               fseek(ff, 0, SEEK_END);
@@ -1024,15 +1129,12 @@ jobs:
                   free(font_data); fclose(ff); return;
               }
               fclose(ff);
-
               stbtt_fontinfo font;
               if (!stbtt_InitFont(&font, font_data, 0)) { free(font_data); return; }
-
               int asc, desc, lg;
               stbtt_GetFontVMetrics(&font, &asc, &desc, &lg);
               float s_title = stbtt_ScaleForPixelHeight(&font, INFO_TITLE_SIZE);
               float s_body  = stbtt_ScaleForPixelHeight(&font, INFO_FONT_SIZE);
-
               const char *conn = g_fields[0].filled ? g_fields[0].value : "--";
               const char *temp = g_fields[1].filled ? g_fields[1].value : "--";
               const char *sim  = g_fields[2].filled ? g_fields[2].value : "--";
@@ -1040,37 +1142,29 @@ jobs:
               const char *mode = g_fields[4].filled ? g_fields[4].value : "--";
               const char *ul   = g_fields[5].filled ? g_fields[5].value : "--";
               const char *dl   = g_fields[6].filled ? g_fields[6].value : "--";
-
               char line[256];
               int y;
-
               draw_line_rgba(rgba, W, H, &font, s_title, asc, 10, 8,
                              "上网模块信息页", 255, 255, 255, 0);
-
               y = 42;
               snprintf(line, sizeof(line), "连接状态：%s", conn);
               draw_line_rgba(rgba, W, H, &font, s_body, asc, 10, y, line, 255, 255, 255, 170);
               snprintf(line, sizeof(line), "温度：%s", temp);
               draw_line_rgba(rgba, W, H, &font, s_body, asc, 175, y, line, 255, 255, 255, 0);
-
               y += 22;
               snprintf(line, sizeof(line), "SIM卡状态：%s", sim);
               draw_line_rgba(rgba, W, H, &font, s_body, asc, 10, y, line, 255, 255, 255, 0);
-
               y += 22;
               snprintf(line, sizeof(line), "互联网服务提供商：%s", isp);
               draw_line_rgba(rgba, W, H, &font, s_body, asc, 10, y, line, 255, 255, 255, 0);
-
               y += 22;
               snprintf(line, sizeof(line), "网络模式：%s", mode);
               draw_line_rgba(rgba, W, H, &font, s_body, asc, 10, y, line, 255, 255, 255, 0);
-
               y += 22;
               snprintf(line, sizeof(line), "上行带宽：%s", ul);
               draw_line_rgba(rgba, W, H, &font, s_body, asc, 10, y, line, 255, 255, 255, 170);
               snprintf(line, sizeof(line), "下行带宽：%s", dl);
               draw_line_rgba(rgba, W, H, &font, s_body, asc, 175, y, line, 255, 255, 255, 0);
-
               free(font_data);
           }
 
@@ -1100,7 +1194,6 @@ jobs:
               char wrapped_text[4096];
               fetch_hitokoto(raw_text, sizeof(raw_text));
               wrap_text(raw_text, wrapped_text, sizeof(wrapped_text), MAX_CHARS_PER_LINE);
-
               int bg_w = 0, bg_h = 0;
               uint8_t *bg_rgba = fetch_background(&bg_w, &bg_h);
               if (bg_rgba && bg_w > 0 && bg_h > 0) {
@@ -1149,18 +1242,14 @@ jobs:
                   snprintf(path, sizeof(path), "/dev/input/event%d", i);
                   int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
                   if (fd < 0) continue;
-
                   uint8_t ev_bits[(MY_EV_MAX/8)+1]  = {0};
                   uint8_t abs_bits[(MY_ABS_MAX/8)+1] = {0};
                   uint8_t key_bits[(MY_KEY_MAX/8)+1] = {0};
-
                   if (ioctl(fd, MY_EVIOCGBIT(0, sizeof(ev_bits)), ev_bits) < 0) { close(fd); continue; }
                   if (!TEST_BIT(MY_EV_ABS, ev_bits)) { close(fd); continue; }
                   if (ioctl(fd, MY_EVIOCGBIT(MY_EV_ABS, sizeof(abs_bits)), abs_bits) < 0) { close(fd); continue; }
-
                   int has_x = TEST_BIT(MY_ABS_X, abs_bits) || TEST_BIT(MY_ABS_MT_POSITION_X, abs_bits);
                   if (!has_x) { close(fd); continue; }
-
                   int is_touch = 0;
                   if (TEST_BIT(MY_ABS_MT_TRACKING_ID, abs_bits)) is_touch = 1;
                   if (!is_touch) {
@@ -1178,7 +1267,6 @@ jobs:
                               strstr(name, "axs")) is_touch = 1;
                       }
                   }
-
                   if (is_touch) {
                       struct my_absinfo ai;
                       if (ioctl(fd, MY_EVIOCGABS(MY_ABS_X), &ai) == 0 && ai.maximum > ai.minimum)
@@ -1226,18 +1314,15 @@ jobs:
               if (fd < 0) { sleep_ms(poll_ms); return 0; }
               touch_state_t *s = &g_ts;
               struct timeval tv;
-
               gettimeofday(&tv, NULL);
               long now_us = (long)tv.tv_sec * 1000000L + tv.tv_usec;
               if (s->in_contact && s->last_coord_us &&
                   (now_us - s->last_coord_us) > (long)TOUCH_IDLE_MS * 1000L) {
                   return touch_settle(s);
               }
-
               struct pollfd pfd = { fd, POLLIN, 0 };
               int pr = poll(&pfd, 1, poll_ms);
               if (pr < 0 && errno != EINTR) return 0;
-
               if (pr > 0) {
                   int fx = 0, fy = 0, ft = 0, ftid = 0;
                   int fxv = 0, fyv = 0, ftv = 0, ftidv = 0;
@@ -1257,10 +1342,8 @@ jobs:
                           }
                           if (fx) { s->last_x = fxv; s->have_last = 1; }
                           if (fy) { s->last_y = fyv; s->have_last = 1; }
-
                           int raw_down = (ftid && ftidv >= 0) || (ft && ftv);
                           int raw_up   = (ftid && ftidv <  0) || (ft && !ftv);
-
                           if (raw_down && s->in_contact) {
                               int rr = touch_settle(s);
                               if (rr) return rr;
@@ -1281,7 +1364,6 @@ jobs:
                       }
                   }
               }
-
               gettimeofday(&tv, NULL);
               now_us = (long)tv.tv_sec * 1000000L + tv.tv_usec;
               if (s->in_contact && s->last_coord_us &&
@@ -1378,7 +1460,6 @@ jobs:
                       backlight_on();
                       screen_off_state = 0;
                       no_client_since = 0;
-                      /* 刷新当前页面内容 */
                       draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                 info_map, info_pitch, info_fb);
                       last_refresh = time(NULL);
@@ -1406,12 +1487,12 @@ jobs:
 
                   time_t now = time(NULL);
 
+                  /* ★ 客户端检测（内联，无需外部脚本）★ */
                   if (now - last_client_check >= CLIENT_CHECK_SEC) {
                       last_client_check = now;
                       int clients = count_clients();
                       if (clients > 0) {
                           no_client_since = 0;
-                          /* ★ 客户端重连唤醒：只开背光 ★ */
                           if (screen_off_state) {
                               backlight_on();
                               screen_off_state = 0;
@@ -1422,7 +1503,6 @@ jobs:
                       } else if (!screen_off_state) {
                           if (no_client_since == 0) no_client_since = now;
                           if (now - no_client_since >= SCREEN_OFF_DELAY) {
-                              /* ★ 息屏 = 只关背光 ★ */
                               backlight_off();
                               screen_off_state = 1;
                           }
@@ -1472,104 +1552,7 @@ jobs:
           file drm_play_arm64
           ls -lh drm_play_arm64
 
-      # --- 4. 生成客户端检测脚本 ---
-      - name: Create client detection script
-        run: |
-          cat << 'EOF' > clients_online.sh
-          #!/bin/sh
-          n=0
-          if [ "$CLIENTS_DEBUG" = "1" ]; then
-              DBG=/tmp/.clients_debug
-              echo "===== check =====" > "$DBG"
-          else
-              DBG=/dev/null
-          fi
-
-          wired=0
-          lan_dev=""
-          if command -v ubus >/dev/null 2>&1; then
-              ubus call network.interface.lan status > /tmp/.lan_status 2>/dev/null
-              grep -o '"device" *: *"[^"]*"' /tmp/.lan_status > /tmp/.lan_kv 2>/dev/null
-              if [ ! -s /tmp/.lan_kv ]; then
-                  grep -o '"l3_device" *: *"[^"]*"' /tmp/.lan_status > /tmp/.lan_kv 2>/dev/null
-              fi
-              if [ -s /tmp/.lan_kv ]; then
-                  lan_dev=$(cut -d'"' -f4 /tmp/.lan_kv | head -1)
-              fi
-          fi
-          echo "lan_dev=[$lan_dev]" >> "$DBG"
-
-          if [ -n "$lan_dev" ] && [ -d "/sys/class/net/$lan_dev/brif" ]; then
-              ls "/sys/class/net/$lan_dev/brif" > /tmp/.br_members 2>/dev/null
-          else
-              ls /sys/class/net > /tmp/.br_members 2>/dev/null
-          fi
-
-          while read m; do
-              [ -z "$m" ] && continue
-              case "$m" in
-                  eth*) ;;
-                  *) echo "  skip non-eth member $m" >> "$DBG"; continue ;;
-              esac
-              if [ "$m" = "eth1" ]; then
-                  echo "  skip WAN eth1" >> "$DBG"
-                  continue
-              fi
-              c=$(cat "/sys/class/net/$m/carrier" 2>/dev/null)
-              echo "  wired $m carrier=[$c]" >> "$DBG"
-              if [ "$c" = "1" ]; then
-                  wired=$((wired + 1))
-              fi
-          done < /tmp/.br_members
-          n=$((n + wired))
-          echo "wired=$wired" >> "$DBG"
-
-          wifi=0
-          : > /tmp/.ap_ifaces
-          if command -v ubus >/dev/null 2>&1; then
-              ubus call network.wireless status > /tmp/.wstatus 2>/dev/null
-              grep -o '"ifname" *: *"[^"]*"' /tmp/.wstatus > /tmp/.ap_ifaces 2>/dev/null
-          fi
-          if [ ! -s /tmp/.ap_ifaces ]; then
-              for cand in phy0-ap0 wlan0 ath0 ra0 ap0; do
-                  if [ -e "/sys/class/net/$cand" ]; then
-                      echo "\"ifname\": \"$cand\"" >> /tmp/.ap_ifaces
-                  fi
-              done
-          fi
-
-          cut -d'"' -f4 /tmp/.ap_ifaces > /tmp/.ap_list 2>/dev/null
-          while read ap; do
-              [ -z "$ap" ] && continue
-              [ -e "/sys/class/net/$ap" ] || continue
-              c=0
-              if command -v hostapd_cli >/dev/null 2>&1; then
-                  hostapd_cli -i "$ap" all_sta_info > /tmp/.sta 2>/dev/null
-                  c=$(grep -c "^sta " /tmp/.sta)
-              fi
-              if [ -z "$c" ] || [ "$c" = "0" ]; then
-                  if command -v iw >/dev/null 2>&1; then
-                      iw "$ap" station dump > /tmp/.sta 2>/dev/null
-                      c=$(grep -c "^Station" /tmp/.sta)
-                  fi
-              fi
-              if [ -z "$c" ] || [ "$c" = "0" ]; then
-                  iwinfo "$ap" assoclist > /tmp/.sta 2>/dev/null
-                  c=$(grep -ci "dBm" /tmp/.sta)
-              fi
-              [ -z "$c" ] && c=0
-              echo "wifi $ap sta=$c" >> "$DBG"
-              wifi=$((wifi + c))
-          done < /tmp/.ap_list
-          n=$((n + wifi))
-          echo "wifi=$wifi" >> "$DBG"
-          echo "TOTAL=$n" >> "$DBG"
-
-          echo $n
-          EOF
-          chmod +x clients_online.sh
-
-      # --- 5. 生成 init.d 开机脚本 ---
+      # --- 4. 生成 init.d 开机脚本 ---
       - name: Create init.d boot script
         run: |
           cat << 'EOF' > 99-bootanim
@@ -1629,7 +1612,7 @@ jobs:
           EOF
           chmod +x 99-bootanim
 
-      # --- 6. 生成安装说明 ---
+      # --- 5. 生成安装说明 ---
       - name: Create install instructions
         run: |
           cat << 'EOF' > INSTALL.txt
@@ -1640,65 +1623,37 @@ jobs:
           文件:
             drm_play_arm64    - 开机动画 + 双页信息屏
             99-bootanim       - OpenWrt init.d 开机脚本
-            clients_online.sh - 客户端检测脚本（息屏用，busybox ash 兼容）
 
           页面:
             第 1 页 = 一言 + 随机背景图（每 15 分钟刷新）
             第 2 页 = 上网模块信息（黑底白字，每 60 秒刷新）
-          翻页: 右→左 = 下一页；左→右 = 上一页（瞬时跟手）
+          翻页: 右→左 = 下一页；左→右 = 上一页
 
           ★ 省电息屏（纯背光开关）★
-            息屏 = 写 0 到 /sys/class/backlight/*/brightness（关背光）
-            亮屏 = 写 1 到 /sys/class/backlight/*/brightness（开背光）
-            不涉及 DPMS、SPI unbind/rebind、DRM 重建。
-            面板和 CRTC 始终保持运行，只是背光熄灭。
-            唤醒瞬间完成，无需等待面板重新初始化。
+            息屏 = 写 0 到 /sys/class/backlight/*/brightness
+            亮屏 = 写 1 到 /sys/class/backlight/*/brightness
+            面板和 CRTC 始终运行，仅背光熄灭，唤醒瞬间完成。
 
-            触发条件:
-              有线: 只数 br-lan 成员里 eth*(非 eth1) 且 carrier=1 的口
-              无线: 用 ubus network.wireless 找 AP 口，数关联站点
-              每 20 秒统计一次；连续 60 秒为 0 → 关背光
+            客户端检测（内联）:
+              有线: br-lan 桥成员中 eth*(非eth1) 且 carrier=1
+              无线: ubus network.wireless → AP ifname → hostapd_cli/iw/iwinfo
+              每 20 秒检测一次；连续 60 秒为 0 → 关背光
               设备重连 → 最多 20 秒内自动开背光
               息屏时触摸 → 立即开背光
 
-          ★★★ 刷机后第一步：验证检测脚本（必做）★★★
-            ssh 上去:
-              /usr/sbin/clients_online.sh                 # 正常应输出当前在线数
-              CLIENTS_DEBUG=1 /usr/sbin/clients_online.sh # 详细日志
-              cat /tmp/.clients_debug                     # 看每一步数到了什么
-            验证息屏:
-              拔掉 LAN 线 + 断开所有 WiFi → 应输出 0 → 60 秒后背光熄灭
-              重新插线/连 WiFi         → 应 ≥1 → 最多 20 秒内背光恢复
-              息屏状态下触摸屏幕       → 背光立即恢复
-
-          第 2 页数据源（按真实缓存格式定稿）:
-            主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
-                    cache_cell_info_* / cache_network_info_*
-            字段:  connect_status / temperature / SIM Status / ISP /
-                   network_mode / UL Bandwidth / DL Bandwidth
-            清洗:  去首尾换行、掳C→°C、Yes→已连接、No→未连接、ready→就绪
-            兜底:  ubus 探测 + /var/run/qmodem（七项不齐时才走）
-
           安装:
             scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
-            scp clients_online.sh root@192.168.1.1:/usr/sbin/
             scp 99-bootanim root@192.168.1.1:/etc/init.d/
             scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
             ssh root@192.168.1.1
-            chmod +x /usr/sbin/drm_play_arm64 /usr/sbin/clients_online.sh /etc/init.d/99-bootanim
+            chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
             /etc/init.d/99-bootanim enable
 
-          排查（如有项显示 --）:
-            cat /tmp/.qmodem_dbg_all
-
-          触摸方向修正（实测正确，通常无需）:
-            横滑无反应竖滑才翻 → 编译行加 -DTOUCH_SWAP
-            能翻但方向反     → 编译行加 -DTOUCH_INVERT
-
+          排查: cat /tmp/.qmodem_dbg_all
           停止: killall drm_play_arm64
           EOF
 
-      # --- 7. 上传产物 ---
+      # --- 6. 上传产物 ---
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -1706,5 +1661,4 @@ jobs:
           path: |
             drm_play_arm64
             99-bootanim
-            clients_online.sh
             INSTALL.txt
