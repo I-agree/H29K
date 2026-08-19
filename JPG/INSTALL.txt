@@ -5,63 +5,32 @@
 文件:
   drm_play_arm64    - 开机动画 + 双页信息屏
   99-bootanim       - OpenWrt init.d 开机脚本
-  clients_online.sh - 客户端检测脚本（息屏用，busybox ash 兼容）
 
 页面:
   第 1 页 = 一言 + 随机背景图（每 15 分钟刷新）
   第 2 页 = 上网模块信息（黑底白字，每 60 秒刷新）
-翻页: 右→左 = 下一页；左→右 = 上一页（瞬时跟手）
+翻页: 右→左 = 下一页；左→右 = 上一页
 
-省电息屏（针对你的拓扑 + 实测 bug 修正）:
-  有线: 只数 br-lan 成员里 eth*(非 eth1) 且 carrier=1 的口
-        —— eth1 是 WAN(2_1) 排除；phy0-ap0 是 WiFi 不按 carrier 算
-  无线: 用 ubus network.wireless 找 AP 口(phy0-ap0)，数关联站点
-  每 20 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
-  设备重连 → 最多 20 秒内自动亮屏；息屏时触摸可立即唤醒
+★ 省电息屏（全黑画面模拟）★
+  无客户端持续 60 秒 → 输出全黑画面
+  CRTC 和面板始终运行，GRAM 不丢失
+  触摸或客户端重连 → 立即恢复
 
-★★★ 息屏唤醒机制（与 99-bootanim 完全对齐）★★★
-  SPI MIPI-DBI 面板在 DPMS OFF 后显示通道会断开，
-  仅靠 SetCrtc 无法恢复。唤醒时必须：
-    1. SPI unbind/rebind（重新初始化面板驱动）
-    2. 等待 /dev/dri/cardX 重新出现
-    3. 关闭旧 DRM fd + 释放所有 FB/mmap
-    4. 重新打开 DRM + 创建新 FB
-    5. 重新探测 DPMS property
-    6. DPMS ON + 背光恢复 + 双次 SetCrtc
-  这与 99-bootanim 启动时的 rebind 流程完全一致。
-
-★★★ 刷机后第一步：验证检测脚本（必做）★★★
-  ssh 上去:
-    /usr/sbin/clients_online.sh                 # 正常应输出当前在线数
-    CLIENTS_DEBUG=1 /usr/sbin/clients_online.sh # 详细日志
-    cat /tmp/.clients_debug                     # 看每一步数到了什么
-  验证息屏:
-    拔掉 LAN 线 + 断开所有 WiFi → 应输出 0 → 60 秒后屏幕熄灭
-    重新插线/连 WiFi         → 应 ≥1 → 最多 20 秒内自动亮起
-    息屏状态下触摸屏幕       → 应立即唤醒
-
-第 2 页数据源（按真实缓存格式定稿）:
-  主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
-          cache_cell_info_* / cache_network_info_*
-  字段:  connect_status / temperature / SIM Status / ISP /
-         network_mode / UL Bandwidth / DL Bandwidth
-  清洗:  去首尾换行、掳C→°C、Yes→已连接、No→未连接、ready→就绪
-  兜底:  ubus 探测 + /var/run/qmodem（七项不齐时才走）
+  有线客户端检测（5 重兜底）:
+    1) /sys/class/net/eth0/carrier
+    2) /sys/class/net/eth0/operstate
+    3) /sys/class/net/eth0/speed
+    4) br-lan/brif/ 枚举 eth* carrier
+    5) ethtool eth0 Link detected
+  无线: ubus → hostapd_cli/iw/iwinfo
+  每 20 秒检测一次
 
 安装:
   scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
-  scp clients_online.sh root@192.168.1.1:/usr/sbin/
   scp 99-bootanim root@192.168.1.1:/etc/init.d/
   scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
   ssh root@192.168.1.1
-  chmod +x /usr/sbin/drm_play_arm64 /usr/sbin/clients_online.sh /etc/init.d/99-bootanim
+  chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
   /etc/init.d/99-bootanim enable
-
-排查（如有项显示 --）:
-  cat /tmp/.qmodem_dbg_all
-
-触摸方向修正（实测正确，通常无需）:
-  横滑无反应竖滑才翻 → 编译行加 -DTOUCH_SWAP
-  能翻但方向反     → 编译行加 -DTOUCH_INVERT
 
 停止: killall drm_play_arm64
