@@ -502,7 +502,7 @@ jobs:
                   snprintf(p, sizeof(p), "/sys/class/net/%s", ap_ifaces[i]);
                   if (access(p, F_OK) != 0) continue;
                   int sta = 0;
-                  char cmd[512];
+                  char cmd[IFNAMSIZ + 128];
                   char *sout;
                   snprintf(cmd, sizeof(cmd),
                            "hostapd_cli -i %s all_sta_info 2>/dev/null | grep -c '^sta '",
@@ -919,7 +919,7 @@ jobs:
               }
               pid_t p = fork();
               if (p == 0) {
-                  char cmd[512];
+                  char cmd[IFNAMSIZ + 128];
                   int rc;
                   snprintf(cmd, sizeof(cmd),
                            "wget -qO /tmp/.ht.new --timeout=%d '%s' 2>/dev/null && mv -f /tmp/.ht.new %s",
