@@ -122,6 +122,7 @@ jobs:
           #define BG_CACHE       "/tmp/.drm_bg_img"
           #define QMODEM_RUNDIR  "/var/run/qmodem"
           #define QMODEM_DBG     "/tmp/.qmodem_dbg_all"
+          #define DRM_PLAY_LOG   "/tmp/drm_play.log"   /* ★ 调试日志 ★ */
           /* ★ 息屏相关（纯背光开关，客户端检测内联）★ */
           #define CLIENT_CHECK_SEC  20       /* 每 20 秒统计一次客户端 */
           #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 关背光 */
@@ -222,6 +223,9 @@ jobs:
           static pid_t g_fetch_pid = 0;
           static time_t g_last_fetch_try = 0;
           static char g_backlight_path[PATH_MAX] = {0};
+          /* ★ 保存进入前的原始 CRTC 状态，退出时恢复，
+             避免 killall 后 CRTC 残留绑定导致下次运行无画面 ★ */
+          static drmModeCrtc *g_saved_crtc = NULL;
 
           typedef struct {
               int  in_contact;
@@ -900,10 +904,40 @@ jobs:
           static void drm_cleanup(int fd, drmModeRes *res, drmModeConnector *conn,
                                   struct drm_mode_create_dumb *dumbs, void **maps,
                                   uint32_t *fb_ids, int count) {
+              /* ★ 1) 先禁用 CRTC，解除与我们的 FB 的绑定 ★ */
+              if (fd >= 0)
+                  drmModeSetCrtc(fd, 0, 0, 0, 0, NULL, 0, NULL);
+
+              /* ★ 2) 删除 FB、解除映射、销毁 dumb buffer ★ */
               for (int i = 0; i < count; i++) {
                   if (fb_ids[i]) { drmModeRmFB(fd, fb_ids[i]); fb_ids[i] = 0; }
-                  if (maps[i] && maps[i] != MAP_FAILED) { munmap(maps[i], dumbs[i].size); maps[i] = NULL; }
+                  if (maps[i] && maps[i] != MAP_FAILED) {
+                      munmap(maps[i], dumbs[i].size);
+                      maps[i] = NULL;
+                  }
+                  if (dumbs[i].handle) {
+                      struct drm_mode_destroy_dumb dreq;
+                      memset(&dreq, 0, sizeof(dreq));
+                      dreq.handle = dumbs[i].handle;
+                      drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
+                      dumbs[i].handle = 0;
+                  }
               }
+
+              /* ★ 3) 恢复进入前的原始 CRTC 状态（关键！
+                 避免 killall 后 CRTC 残留绑定，下次运行无画面）★ */
+              if (g_saved_crtc) {
+                  uint32_t conn_id = conn ? conn->connector_id : 0;
+                  if (g_saved_crtc->buffer_id != 0 && conn) {
+                      drmModeSetCrtc(fd, g_saved_crtc->crtc_id,
+                                     g_saved_crtc->buffer_id,
+                                     g_saved_crtc->x, g_saved_crtc->y,
+                                     &conn_id, 1, &g_saved_crtc->mode);
+                  }
+                  drmModeFreeCrtc(g_saved_crtc);
+                  g_saved_crtc = NULL;
+              }
+
               if (conn) drmModeFreeConnector(conn);
               if (res) drmModeFreeResources(res);
               if (fd >= 0) close(fd);
@@ -1374,11 +1408,17 @@ jobs:
           }
 
           static void daemonize(void) {
+              /* ★ stderr 重定向到日志文件，方便排查 ★ */
+              FILE *logf = fopen(DRM_PLAY_LOG, "a");
+              if (logf) {
+                  setvbuf(logf, NULL, _IOLBF, 0);   /* 行缓冲，掉电也不丢太多 */
+                  dup2(fileno(logf), STDERR_FILENO);
+                  if (fileno(logf) > 2) fclose(logf);
+              }
               int devnull = open("/dev/null", O_RDWR);
               if (devnull >= 0) {
                   dup2(devnull, STDIN_FILENO);
                   dup2(devnull, STDOUT_FILENO);
-                  dup2(devnull, STDERR_FILENO);
                   if (devnull > 2) close(devnull);
               }
           }
@@ -1397,14 +1437,19 @@ jobs:
               int fd = drm_init(drm_device, &res, &conn, &crtc_id);
               if (fd < 0) return 1;
 
+              /* ★ 保存原始 CRTC 状态，退出时恢复，
+                 确保 killall 后下次运行仍有画面 ★ */
+              g_saved_crtc = drmModeGetCrtc(fd, crtc_id);
+
               struct drm_mode_create_dumb dumb[2];
               void *map[2];
               uint32_t fb_id[2];
+              memset(dumb, 0, sizeof(dumb));
+              memset(map, 0, sizeof(map));
+              memset(fb_id, 0, sizeof(fb_id));
               for (int i = 0; i < 2; i++) {
                   if (drm_create_fb(fd, &dumb[i], &fb_id[i], &map[i]) < 0) {
-                      drmModeFreeConnector(conn);
-                      drmModeFreeResources(res);
-                      close(fd);
+                      drm_cleanup(fd, res, conn, dumb, map, fb_id, 2);
                       return 1;
                   }
               }
@@ -1434,6 +1479,7 @@ jobs:
               }
 
               daemonize();
+              fprintf(stderr, "[drm_play] boot anim done, entering main loop\n");
 
               int touch_fd = open_touch();
               find_backlight();
@@ -1531,6 +1577,7 @@ jobs:
                   }
               }
 
+              fprintf(stderr, "[drm_play] exiting, restoring CRTC\n");
               if (touch_fd >= 0) close(touch_fd);
               drm_cleanup(fd, res, conn, dumb, map, fb_id, 2);
               return 0;
@@ -1641,6 +1688,11 @@ jobs:
               设备重连 → 最多 20 秒内自动开背光
               息屏时触摸 → 立即开背光
 
+          ★ 本版修复 ★
+            退出（killall/SIGTERM）时恢复原始 CRTC 状态，
+            解决"重复运行只有第一次有画面"的问题。
+            调试日志: cat /tmp/drm_play.log
+
           安装:
             scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
             scp 99-bootanim root@192.168.1.1:/etc/init.d/
@@ -1649,7 +1701,7 @@ jobs:
             chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
             /etc/init.d/99-bootanim enable
 
-          排查: cat /tmp/.qmodem_dbg_all
+          排查: cat /tmp/.qmodem_dbg_all ; cat /tmp/drm_play.log
           停止: killall drm_play_arm64
           EOF
 
