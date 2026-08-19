@@ -1695,7 +1695,7 @@ jobs:
               cat /tmp/.clients_debug                     # 看每一步数到了什么
             验证息屏:
               拔掉 LAN 线 + 断开所有 WiFi → 应输出 0 → 60 秒后屏幕熄灭
-              重新插线/连 WiFi         → 应 ≥1 → 几秒内自动亮起
+              重新插线/连 WiFi         → 应 ≥1 → 最多 30 秒内自动亮起
 
           第 2 页数据源（按真实缓存格式定稿）:
             主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
