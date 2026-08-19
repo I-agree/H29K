@@ -689,7 +689,7 @@ jobs:
                       struct dirent *de2;
                       while ((de2 = readdir(d2))) {
                           if (de2->d_name[0] == '.') continue;
-                          char p2[PATH_MAX];
+                          char p2[PATH_MAX * 2];
                           snprintf(p2, sizeof(p2), "%s/%s", path, de2->d_name);
                           struct stat st2;
                           if (stat(p2, &st2) == 0 && S_ISREG(st2.st_mode) && st2.st_size < 4000)
