@@ -78,6 +78,7 @@ jobs:
           #include <errno.h>
           #include <signal.h>
           #include <math.h>
+          #include <limits.h>
           #include <xf86drm.h>
           #include <xf86drmMode.h>
           #include <drm_fourcc.h>
@@ -238,7 +239,7 @@ jobs:
           static time_t g_last_fetch_try = 0;
 
           static uint32_t g_dpms_prop_id = 0;
-          static char g_backlight_path[192] = {0};
+          static char g_backlight_path[PATH_MAX] = {0};
           static int  g_backlight_max = 255;
 
           typedef struct {
@@ -429,11 +430,11 @@ jobs:
               struct dirent *de;
               while ((de = readdir(d))) {
                   if (de->d_name[0] == '.') continue;
-                  char p[256];
+                  char p[PATH_MAX];
                   snprintf(p, sizeof(p), "/sys/class/backlight/%s/brightness", de->d_name);
                   if (access(p, W_OK) != 0) continue;
                   snprintf(g_backlight_path, sizeof(g_backlight_path), "%s", p);
-                  char mp[256];
+                  char mp[PATH_MAX];
                   snprintf(mp, sizeof(mp), "/sys/class/backlight/%s/max_brightness", de->d_name);
                   FILE *f = fopen(mp, "r");
                   if (f) {
@@ -580,7 +581,7 @@ jobs:
               while ((de = readdir(d))) {
                   if (strncmp(de->d_name, "cache_", 6) != 0) continue;
                   if (!strstr(de->d_name, "info")) continue;
-                  char path[64];
+                  char path[PATH_MAX];
                   snprintf(path, sizeof(path), "/tmp/%s", de->d_name);
                   struct stat st;
                   if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) continue;
@@ -678,7 +679,7 @@ jobs:
               struct dirent *de;
               while ((de = readdir(d))) {
                   if (de->d_name[0] == '.') continue;
-                  char path[256];
+                  char path[PATH_MAX];
                   snprintf(path, sizeof(path), QMODEM_RUNDIR "/%s", de->d_name);
                   struct stat st;
                   if (stat(path, &st) != 0) continue;
@@ -688,7 +689,7 @@ jobs:
                       struct dirent *de2;
                       while ((de2 = readdir(d2))) {
                           if (de2->d_name[0] == '.') continue;
-                          char p2[320];
+                          char p2[PATH_MAX];
                           snprintf(p2, sizeof(p2), "%s/%s", path, de2->d_name);
                           struct stat st2;
                           if (stat(p2, &st2) == 0 && S_ISREG(st2.st_mode) && st2.st_size < 4000)
@@ -1685,7 +1686,7 @@ jobs:
                   —— eth1 是 WAN(2_1) 排除；phy0-ap0 是 WiFi 不按 carrier 算
             无线: 用 ubus network.wireless 找 AP 口(phy0-ap0)，数关联站点
             每 20 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
-            设备重连 → 最多 30 秒内自动亮屏；息屏时触摸可立即唤醒
+            设备重连 → 最多 20 秒内自动亮屏；息屏时触摸可立即唤醒
 
           ★★★ 刷机后第一步：验证检测脚本（必做）★★★
             ssh 上去:
