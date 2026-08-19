@@ -126,7 +126,6 @@ jobs:
           #define CLIENT_COUNT_CMD  "/usr/sbin/clients_online.sh"
           #define CLIENT_CHECK_SEC  20       /* 每 20 秒统计一次客户端 */
           #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 息屏 */
-          /* ★ SPI rebind 相关（与 99-bootanim 一致）★ */
           #define SPI_DRIVER_NAME  "panel-mipi-dbi-spi"
 
           #ifndef DRM_MODE_DPMS_ON
@@ -423,7 +422,6 @@ jobs:
               fclose(f);
           }
 
-          /* ★ 探测 SPI 设备名（与 99-bootanim 相同逻辑）★ */
           static void find_spi_dev(void) {
               DIR *d = opendir("/sys/bus/spi/devices");
               if (!d) return;
@@ -448,7 +446,6 @@ jobs:
               closedir(d);
           }
 
-          /* ★ SPI unbind/rebind（与 99-bootanim 完全一致）★ */
           static void spi_rebind(void) {
               if (!g_spi_dev[0]) return;
               char path[PATH_MAX];
@@ -508,7 +505,6 @@ jobs:
           }
 
           static void screen_on_prepare(void) {
-              /* Step 1: SPI rebind */
               spi_rebind();
 
               for (int i = 0; i < 20; i++) {
