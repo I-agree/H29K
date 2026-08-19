@@ -69,6 +69,14 @@ jobs:
            *   第 2 页 = QModem 上网模块信息（黑底白字，每 60 秒刷新）
            * 翻页：触摸水平滑动。右→左 = 下一页；左→右 = 上一页。
            *
+           * ★ 省电息屏 ★
+           *   每 600 秒执行 /usr/sbin/clients_online.sh 统计在线客户端：
+           *     = 有线 LAN 口 carrier=1 的端口（排除 DSA master / WAN 上联 /
+           *       桥 / 模块自身 wwan·usb 口）+ WiFi 关联站点数
+           *   连续 60 秒为 0 → 息屏（DPMS OFF + 背光归零 + 黑帧三重保险）
+           *   重新检测到设备 → 自动亮屏并重画当前页
+           *   息屏时触摸也可唤醒；脚本缺失时视为有设备，永不息屏（安全）
+           *
            * 第 2 页数据（依据真实缓存文件格式定稿）：
            *   主路径 = 直接读 /tmp/cache_*info* 缓存文件
            *   兜底   = ubus 探测 + /var/run/qmodem 运行时目录
@@ -77,7 +85,7 @@ jobs:
            * 跟手性：网络下载在后台子进程；翻页先 blit 缓存再本地重画。
            * 触摸：聚合标志 read 循环外累积；状态持久；空闲 140ms 兜底。
            *
-           * 运行时依赖（设备上）：wget、ubus、uci、
+           * 运行时依赖（设备上）：wget、ubus、uci、clients_online.sh、
            *   /usr/share/fonts/MiSans-Regular.ttf、/dev/input/eventX(可选)
            */
 
@@ -142,6 +150,17 @@ jobs:
           #define BG_CACHE       "/tmp/.drm_bg_img"
           #define QMODEM_RUNDIR  "/var/run/qmodem"
           #define QMODEM_DBG     "/tmp/.qmodem_dbg_all"
+          /* ★ 息屏相关 ★ */
+          #define CLIENT_COUNT_CMD  "/usr/sbin/clients_online.sh"
+          #define CLIENT_CHECK_SEC  600       /* 每 600 秒统计一次客户端 */
+          #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 息屏 */
+
+          #ifndef DRM_MODE_DPMS_ON
+          #define DRM_MODE_DPMS_ON  0
+          #endif
+          #ifndef DRM_MODE_DPMS_OFF
+          #define DRM_MODE_DPMS_OFF 3
+          #endif
 
           /* ===================== 触摸 / evdev 自包含常量 ===================== */
           #define MY_EV_SYN   0x00
@@ -251,6 +270,11 @@ jobs:
 
           static pid_t g_fetch_pid = 0;
           static time_t g_last_fetch_try = 0;
+
+          /* ★ 息屏相关全局 ★ */
+          static uint32_t g_dpms_prop_id = 0;
+          static char g_backlight_path[192] = {0};
+          static int  g_backlight_max = 255;
 
           typedef struct {
               int  in_contact;
@@ -422,6 +446,85 @@ jobs:
               pclose(fp);
               buf[len] = '\0';
               return buf;
+          }
+
+          /* ============================================================
+           * ★ 客户端检测 & 息屏/亮屏 ★
+           * ============================================================ */
+          static int count_clients(void) {
+              char *out = popen_read(CLIENT_COUNT_CMD " 2>/dev/null");
+              if (!out) return 1;   /* 脚本缺失 → 视为有设备，永不息屏（安全） */
+              int n = atoi(out);
+              free(out);
+              if (n < 0) n = 0;
+              return n;
+          }
+
+          static void find_dpms_prop(int fd, drmModeConnector *conn) {
+              for (int i = 0; i < conn->count_props; i++) {
+                  drmModePropertyRes *p = drmModeGetProperty(fd, conn->props[i]);
+                  if (!p) continue;
+                  if (strcmp(p->name, "DPMS") == 0) {
+                      g_dpms_prop_id = p->prop_id;
+                      drmModeFreeProperty(p);
+                      break;
+                  }
+                  drmModeFreeProperty(p);
+              }
+          }
+
+          static void find_backlight(void) {
+              DIR *d = opendir("/sys/class/backlight");
+              if (!d) return;
+              struct dirent *de;
+              while ((de = readdir(d))) {
+                  if (de->d_name[0] == '.') continue;
+                  char p[256];
+                  snprintf(p, sizeof(p), "/sys/class/backlight/%s/brightness", de->d_name);
+                  if (access(p, W_OK) != 0) continue;
+                  snprintf(g_backlight_path, sizeof(g_backlight_path), "%s", p);
+                  char mp[256];
+                  snprintf(mp, sizeof(mp), "/sys/class/backlight/%s/max_brightness", de->d_name);
+                  FILE *f = fopen(mp, "r");
+                  if (f) {
+                      if (fscanf(f, "%d", &g_backlight_max) != 1) g_backlight_max = 255;
+                      if (g_backlight_max <= 0) g_backlight_max = 255;
+                      fclose(f);
+                  }
+                  break;
+              }
+              closedir(d);
+          }
+
+          static void write_file(const char *path, const char *val) {
+              FILE *f = fopen(path, "w");
+              if (!f) return;
+              fputs(val, f);
+              fclose(f);
+          }
+
+          static void screen_off(int fd, uint32_t conn_id, uint32_t crtc_id, uint32_t fb_id,
+                                 drmModeModeInfo *mode, void *map, uint32_t pitch) {
+              /* 1) 黑帧刷屏（万一后两招都不生效，至少是纯黑） */
+              memset(map, 0, (size_t)pitch * screen_h);
+              drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
+              /* 2) DPMS OFF（面板驱动支持时真正断电） */
+              if (g_dpms_prop_id)
+                  drmModeConnectorSetProperty(fd, conn_id, g_dpms_prop_id, DRM_MODE_DPMS_OFF);
+              /* 3) 背光归零 */
+              if (g_backlight_path[0]) write_file(g_backlight_path, "0");
+          }
+
+          static void screen_on(int fd, uint32_t conn_id, uint32_t crtc_id, uint32_t fb_id,
+                                drmModeModeInfo *mode) {
+              if (g_dpms_prop_id)
+                  drmModeConnectorSetProperty(fd, conn_id, g_dpms_prop_id, DRM_MODE_DPMS_ON);
+              if (g_backlight_path[0]) {
+                  char v[16];
+                  snprintf(v, sizeof(v), "%d", g_backlight_max);
+                  write_file(g_backlight_path, v);
+              }
+              drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
 
           static void get_section(void) {
@@ -1357,6 +1460,8 @@ jobs:
               daemonize();
 
               int touch_fd = open_touch();
+              find_dpms_prop(fd, conn);
+              find_backlight();
               int cur_page = 0;
 
               uint32_t info_fb = fb_id[0];
@@ -1368,9 +1473,25 @@ jobs:
                         info_map, info_pitch, info_fb);
               time_t last_refresh = time(NULL);
 
+              /* ★ 息屏状态机 ★ */
+              int screen_off_state = 0;
+              time_t no_client_since = 0;
+              time_t last_client_check = 0;
+
               while (g_running) {
                   int sw = wait_touch(touch_fd, 120);
-                  if (sw != 0) {
+
+                  /* 息屏状态下触摸 → 先亮屏 */
+                  if (sw != 0 && screen_off_state) {
+                      screen_on(fd, conn->connector_id, crtc_id, info_fb, &conn->modes[0]);
+                      screen_off_state = 0;
+                      no_client_since = 0;
+                      draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
+                                info_map, info_pitch, info_fb);
+                      last_refresh = time(NULL);
+                  }
+
+                  if (sw != 0 && !screen_off_state) {
                       int np = cur_page + (sw < 0 ? 1 : -1);
                       if (np < 0) np = 0;
                       if (np > 1) np = 1;
@@ -1384,13 +1505,37 @@ jobs:
                       }
                   }
 
-                  if (fetcher_poll() && cur_page == 0) {
+                  if (fetcher_poll() && cur_page == 0 && !screen_off_state) {
                       draw_page(0, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                 info_map, info_pitch, info_fb);
                       last_refresh = time(NULL);
                   }
 
                   time_t now = time(NULL);
+
+                  /* ★ 客户端检测 & 息屏/亮屏 ★ */
+                  if (now - last_client_check >= CLIENT_CHECK_SEC) {
+                      last_client_check = now;
+                      int clients = count_clients();
+                      if (clients > 0) {
+                          no_client_since = 0;
+                          if (screen_off_state) {
+                              screen_on(fd, conn->connector_id, crtc_id, info_fb, &conn->modes[0]);
+                              screen_off_state = 0;
+                              draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
+                                        info_map, info_pitch, info_fb);
+                              last_refresh = now;
+                          }
+                      } else if (!screen_off_state) {
+                          if (no_client_since == 0) no_client_since = now;
+                          if (now - no_client_since >= SCREEN_OFF_DELAY) {
+                              screen_off(fd, conn->connector_id, crtc_id, info_fb,
+                                         &conn->modes[0], info_map, info_pitch);
+                              screen_off_state = 1;
+                          }
+                      }
+                  }
+
                   if (cur_page == 0 && g_fetch_pid == 0 &&
                       access(BG_CACHE, R_OK) != 0 &&
                       now - g_last_fetch_try >= 30) {
@@ -1400,10 +1545,16 @@ jobs:
 
                   int interval = (cur_page == 0) ? REFRESH_SEC : INFO_REFRESH_SEC;
                   if (now - last_refresh >= interval) {
-                      if (cur_page == 0) fetcher_start();
-                      else draw_page(1, fd, crtc_id, conn->connector_id, &conn->modes[0],
-                                     info_map, info_pitch, info_fb);
-                      last_refresh = now;
+                      if (screen_off_state) {
+                          last_refresh = now;   /* 息屏时只重置计时，不绘制 */
+                      } else if (cur_page == 0) {
+                          fetcher_start();
+                          last_refresh = now;
+                      } else {
+                          draw_page(1, fd, crtc_id, conn->connector_id, &conn->modes[0],
+                                    info_map, info_pitch, info_fb);
+                          last_refresh = now;
+                      }
                   }
               }
 
@@ -1430,7 +1581,59 @@ jobs:
           file drm_play_arm64
           ls -lh drm_play_arm64
 
-      # --- 4. 生成 init.d 开机脚本 ---
+      # --- 4. 生成客户端检测脚本（息屏/亮屏用） ---
+      - name: Create client detection script
+        run: |
+          cat << 'EOF' > clients_online.sh
+          #!/bin/sh
+          # 统计当前接入的客户端设备数（有线 LAN + WiFi 关联）
+          # 输出一个整数；>0 表示至少有一台设备接入
+          n=0
+
+          # 收集 DSA master 口（内部恒连通，不算客户端）
+          masters=" "
+          for d in /sys/class/net/*; do
+              t=$(readlink "$d/dsa" 2>/dev/null) || continue
+              m=$(basename "$t")
+              case "$masters" in *" $m "*) ;; *) masters="$masters$m ";; esac
+          done
+
+          wan_dev=$(uci -q get network.wan.device 2>/dev/null)
+
+          # --- 有线：carrier=1 且 非无线/非桥/非master/非WAN上联/非模块口 ---
+          for d in /sys/class/net/*; do
+              i=${d##*/}
+              case "$i" in
+                  lo|br-*|ppp*|tun*|tap*|wg*|vxlan*|gre*|ip6*|sit*|6in4*) continue ;;
+                  wwan*|rmnet*|mbim*|qmi*|usb[0-9]*|modem*) continue ;;
+              esac
+              [ -e "$d/wireless" ] && continue
+              [ -e "$d/bridge" ] && continue
+              case "$masters" in *" $i "*) continue ;; esac
+              [ -n "$wan_dev" ] && [ "$i" = "$wan_dev" ] && continue
+              c=$(cat "$d/carrier" 2>/dev/null) || continue
+              [ "$c" = "1" ] && n=$((n+1))
+          done
+
+          # --- 无线：关联站点数 ---
+          have_iw=$(command -v iw 2>/dev/null)
+          for d in /sys/class/net/*; do
+              i=${d##*/}
+              [ -e "$d/wireless" ] || continue
+              case "$i" in apcli*|wds*|mon.*) continue ;; esac
+              if [ -n "$have_iw" ]; then
+                  c=$(iw "$i" station dump 2>/dev/null | grep -c "^Station")
+              else
+                  c=$(iwinfo "$i" assoclist 2>/dev/null | grep -c "dBm")
+              fi
+              [ -n "$c" ] && n=$((n+c))
+          done
+
+          echo $n
+          EOF
+          chmod +x clients_online.sh
+
+      # --- 5. 生成 init.d 开机脚本 ---
       - name: Create init.d boot script
         run: |
           cat << 'EOF' > 99-bootanim
@@ -1490,7 +1693,7 @@ jobs:
           EOF
           chmod +x 99-bootanim
 
-      # --- 5. 生成安装说明 ---
+      # --- 6. 生成安装说明 ---
       - name: Create install instructions
         run: |
           cat << 'EOF' > INSTALL.txt
@@ -1499,13 +1702,21 @@ jobs:
           ============================================
 
           文件:
-            drm_play_arm64  - 开机动画 + 双页信息屏
-            99-bootanim     - OpenWrt init.d 开机脚本
+            drm_play_arm64    - 开机动画 + 双页信息屏
+            99-bootanim       - OpenWrt init.d 开机脚本
+            clients_online.sh - 客户端检测脚本（息屏用）
 
           页面:
             第 1 页 = 一言 + 随机背景图（每 15 分钟刷新）
             第 2 页 = 上网模块信息（黑底白字，每 60 秒刷新）
           翻页: 右→左 = 下一页；左→右 = 上一页（瞬时跟手）
+
+          省电息屏:
+            每 600 秒统计一次接入设备（有线 LAN 口插线 + WiFi 关联站点）
+            连续 60 秒无设备 → 息屏（DPMS OFF + 背光归零 + 黑帧）
+            设备重新连接 → 3 秒内自动亮屏
+            息屏时触摸也可唤醒
+            手动测试: /usr/sbin/clients_online.sh 输出在线设备数
 
           第 2 页数据源（按真实缓存格式定稿）:
             主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
@@ -1517,10 +1728,11 @@ jobs:
 
           安装:
             scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
+            scp clients_online.sh root@192.168.1.1:/usr/sbin/
             scp 99-bootanim root@192.168.1.1:/etc/init.d/
             scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
             ssh root@192.168.1.1
-            chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
+            chmod +x /usr/sbin/drm_play_arm64 /usr/sbin/clients_online.sh /etc/init.d/99-bootanim
             /etc/init.d/99-bootanim enable
 
           排查（如有项显示 --）:
@@ -1533,7 +1745,7 @@ jobs:
           停止: killall drm_play_arm64
           EOF
 
-      # --- 6. 上传产物 ---
+      # --- 7. 上传产物 ---
       - name: Upload Artifacts
         uses: actions/upload-artifact@v7.0.1
         with:
@@ -1541,4 +1753,5 @@ jobs:
           path: |
             drm_play_arm64
             99-bootanim
+            clients_online.sh
             INSTALL.txt
