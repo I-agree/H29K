@@ -61,7 +61,6 @@ jobs:
       - name: Create DRM Player C Source
         run: |
           cat << 'ENDOFSOURCE' > drm_play.c
-
           #define _GNU_SOURCE
           #include <fcntl.h>
           #include <unistd.h>
