@@ -5,19 +5,28 @@
 文件:
   drm_play_arm64    - 开机动画 + 双页信息屏
   99-bootanim       - OpenWrt init.d 开机脚本
-  clients_online.sh - 客户端检测脚本（息屏用）
+  clients_online.sh - 客户端检测脚本（息屏用，busybox ash 兼容）
 
 页面:
   第 1 页 = 一言 + 随机背景图（每 15 分钟刷新）
   第 2 页 = 上网模块信息（黑底白字，每 60 秒刷新）
 翻页: 右→左 = 下一页；左→右 = 上一页（瞬时跟手）
 
-省电息屏:
-  每 600 秒统计一次接入设备（有线 LAN 口插线 + WiFi 关联站点）
-  连续 60 秒无设备 → 息屏（DPMS OFF + 背光归零 + 黑帧）
-  设备重新连接 → 3 秒内自动亮屏
-  息屏时触摸也可唤醒
-  手动测试: /usr/sbin/clients_online.sh 输出在线设备数
+省电息屏（针对你的拓扑 + 实测 bug 修正）:
+  有线: 只数 br-lan 成员里 eth*(非 eth1) 且 carrier=1 的口
+        —— eth1 是 WAN(2_1) 排除；phy0-ap0 是 WiFi 不按 carrier 算
+  无线: 用 ubus network.wireless 找 AP 口(phy0-ap0)，数关联站点
+  每 20 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
+  设备重连 → 最多 20 秒内自动亮屏；息屏时触摸可立即唤醒
+
+★★★ 刷机后第一步：验证检测脚本（必做）★★★
+  ssh 上去:
+    /usr/sbin/clients_online.sh                 # 正常应输出当前在线数
+    CLIENTS_DEBUG=1 /usr/sbin/clients_online.sh # 详细日志
+    cat /tmp/.clients_debug                     # 看每一步数到了什么
+  验证息屏:
+    拔掉 LAN 线 + 断开所有 WiFi → 应输出 0 → 60 秒后屏幕熄灭
+    重新插线/连 WiFi         → 应 ≥1 → 最多 20 秒内自动亮起
 
 第 2 页数据源（按真实缓存格式定稿）:
   主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
