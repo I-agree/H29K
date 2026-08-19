@@ -88,6 +88,7 @@ download_and_check "${BASE_URL}/JPG/smartdns" "files/etc/config/smartdns"
 download_and_check "${BASE_URL}/JPG/minidlna" "files/etc/config/minidlna"
 download_and_check "${BASE_URL}/JPG/samba4" "files/etc/config/samba4"
 download_and_check "${BASE_URL}/package/python-charset-normalizer/Makefile" "package/python-charset-normalizer/Makefile"
+download_and_check "${BASE_URL}/JPG/clients_online.sh" "files/usr/sbin/clients_online.sh"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
