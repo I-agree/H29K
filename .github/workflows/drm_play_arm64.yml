@@ -158,8 +158,6 @@ jobs:
           struct my_absinfo { int value, minimum, maximum, fuzz, flat, resolution; };
           #define MY_EVIOCGABS(abs) MY_IOC(MY_IOC_READ, 'E', 0x40 + (abs), sizeof(struct my_absinfo))
           #define TOUCH_IDLE_MS  140
-          /* #define TOUCH_INVERT */
-          /* #define TOUCH_SWAP   */
 
           struct my_input_event {
               struct timeval time;
@@ -222,7 +220,6 @@ jobs:
           static uint8_t *g_page1_rgba = NULL;
           static pid_t g_fetch_pid = 0;
           static time_t g_last_fetch_try = 0;
-          /* ★ 保存进入前的原始 CRTC 状态，退出时恢复 ★ */
           static drmModeCrtc *g_saved_crtc = NULL;
 
           typedef struct {
@@ -385,7 +382,18 @@ jobs:
           }
 
           /* ================================================================
-           * ★ 内联客户端检测
+           * ★ 客户端检测（修复版）
+           * 
+           * H29K 硬件布局：
+           *   eth0 = LAN 口（桥接到 br-lan）
+           *   eth1 = WAN 口（排除）
+           *   phy0-ap0 = WiFi AP
+           * 
+           * 有线检测策略（多重兜底）：
+           *   1) /sys/class/net/eth0/carrier == 1
+           *   2) /sys/class/net/eth0/operstate == "up"
+           *   3) /sys/class/net/eth0/speed > 0
+           *   4) br-lan/brif/ 下枚举 eth* 检查 carrier
            * ================================================================ */
 
           static int read_int_file(const char *path) {
@@ -397,51 +405,74 @@ jobs:
               return v;
           }
 
+          static int read_str_file(const char *path, char *buf, size_t sz) {
+              FILE *f = fopen(path, "r");
+              if (!f) return -1;
+              if (!fgets(buf, (int)sz, f)) { fclose(f); return -1; }
+              fclose(f);
+              size_t len = strlen(buf);
+              while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r' || buf[len-1] == ' '))
+                  buf[--len] = 0;
+              return 0;
+          }
+
           static int count_wired_clients(void) {
               int count = 0;
-              char lan_dev[64] = {0};
-              char *out = popen_read(
-                  "ubus call network.interface.lan status 2>/dev/null | "
-                  "grep -o '\"device\" *: *\"[^\"]*\"' | head -1 | cut -d'\"' -f4");
-              if (out && out[0]) {
-                  strncpy(lan_dev, out, sizeof(lan_dev) - 1);
-                  free(out);
-              } else {
-                  if (out) free(out);
-                  out = popen_read(
-                      "ubus call network.interface.lan status 2>/dev/null | "
-                      "grep -o '\"l3_device\" *: *\"[^\"]*\"' | head -1 | cut -d'\"' -f4");
-                  if (out && out[0]) {
-                      strncpy(lan_dev, out, sizeof(lan_dev) - 1);
-                  }
-                  if (out) free(out);
-              }
-              char members[32][32];
-              int nm = 0;
-              char brif_path[PATH_MAX];
-              if (lan_dev[0]) {
-                  snprintf(brif_path, sizeof(brif_path), "/sys/class/net/%s/brif", lan_dev);
-              } else {
-                  snprintf(brif_path, sizeof(brif_path), "/sys/class/net");
+
+              /* ★ 方法 1：直接检查 eth0 carrier ★ */
+              int carrier = read_int_file("/sys/class/net/eth0/carrier");
+              if (carrier == 1) {
+                  count++;
+                  goto done;
               }
 
-              DIR *d = opendir(brif_path);
-              if (!d) return 0;
-              struct dirent *de;
-              while ((de = readdir(d)) && nm < 32) {
-                  if (de->d_name[0] == '.') continue;
-                  if (strncmp(de->d_name, "eth", 3) != 0) continue;
-                  if (strcmp(de->d_name, "eth1") == 0) continue;
-                  strncpy(members[nm], de->d_name, 31);
-                  members[nm][31] = 0;
-                  nm++;
+              /* ★ 方法 2：检查 eth0 operstate ★ */
+              {
+                  char state[32] = {0};
+                  if (read_str_file("/sys/class/net/eth0/operstate", state, sizeof(state)) == 0) {
+                      if (strcmp(state, "up") == 0) {
+                          count++;
+                          goto done;
+                      }
+                  }
               }
-              closedir(d);
-              for (int i = 0; i < nm; i++) {
-                  char cpath[PATH_MAX];
-                  snprintf(cpath, sizeof(cpath), "/sys/class/net/%s/carrier", members[i]);
-                  if (read_int_file(cpath) == 1) count++;
+
+              /* ★ 方法 3：检查 eth0 speed（链路速度 > 0 说明有连接）★ */
+              {
+                  int speed = read_int_file("/sys/class/net/eth0/speed");
+                  if (speed > 0) {
+                      count++;
+                      goto done;
+                  }
               }
+
+              /* ★ 方法 4：遍历 br-lan/brif/ 下的所有 eth* 成员 ★ */
+              {
+                  DIR *d = opendir("/sys/class/net/br-lan/brif");
+                  if (d) {
+                      struct dirent *de;
+                      while ((de = readdir(d))) {
+                          if (de->d_name[0] == '.') continue;
+                          if (strncmp(de->d_name, "eth", 3) != 0) continue;
+                          if (strcmp(de->d_name, "eth1") == 0) continue;
+                          char cpath[PATH_MAX];
+                          snprintf(cpath, sizeof(cpath), "/sys/class/net/%s/carrier", de->d_name);
+                          if (read_int_file(cpath) == 1) count++;
+                      }
+                      closedir(d);
+                  }
+              }
+
+              /* ★ 方法 5：如果以上都失败，用 ethtool 兜底 ★ */
+              if (count == 0) {
+                  char *out = popen_read("ethtool eth0 2>/dev/null | grep 'Link detected' | grep -c 'yes'");
+                  if (out) {
+                      if (atoi(out) > 0) count = 1;
+                      free(out);
+                  }
+              }
+
+          done:
               return count;
           }
 
@@ -772,7 +803,7 @@ jobs:
           }
 
           /* ================================================================
-           * DRM 初始化 / 清理
+           * DRM
            * ================================================================ */
 
           static int drm_init(const char *drm_device,
@@ -876,7 +907,7 @@ jobs:
           }
 
           /* ================================================================
-           * 渲染辅助
+           * 渲染
            * ================================================================ */
 
           static void copy_centered(void *dst, uint32_t pitch,
@@ -1138,7 +1169,6 @@ jobs:
               free(font_data);
           }
 
-          /* ★ 全黑页面（模拟息屏）★ */
           static void render_black_rgba(uint8_t *rgba) {
               memset(rgba, 0, (size_t)(SCREEN_W * SCREEN_H * 4));
               for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
@@ -1202,7 +1232,6 @@ jobs:
                       rgba_to_fb(map, pitch, g_page0_rgba, SCREEN_W, SCREEN_H);
                   }
               } else {
-                  /* page == -1: 全黑（模拟息屏）*/
                   uint8_t black[SCREEN_W * SCREEN_H * 4];
                   render_black_rgba(black);
                   rgba_to_fb(map, pitch, black, SCREEN_W, SCREEN_H);
@@ -1360,7 +1389,7 @@ jobs:
           }
 
           /* ================================================================
-           * daemonize + main
+           * main
            * ================================================================ */
 
           static void daemonize(void) {
@@ -1446,7 +1475,6 @@ jobs:
                         info_map, info_pitch, info_fb);
               time_t last_refresh = time(NULL);
 
-              /* ★ screen_off_state: 0=正常显示, 1=全黑模拟息屏 ★ */
               int screen_off_state = 0;
               time_t no_client_since = 0;
               time_t last_client_check = 0;
@@ -1454,7 +1482,6 @@ jobs:
               while (g_running) {
                   int sw = wait_touch(touch_fd, 120);
 
-                  /* ★ 触摸唤醒：从全黑切回正常页面 ★ */
                   if (sw != 0 && screen_off_state) {
                       screen_off_state = 0;
                       no_client_since = 0;
@@ -1463,7 +1490,6 @@ jobs:
                       last_refresh = time(NULL);
                   }
 
-                  /* ★ 正常状态下触摸翻页 ★ */
                   if (sw != 0 && !screen_off_state) {
                       int np = cur_page + (sw < 0 ? 1 : -1);
                       if (np < 0) np = 0;
@@ -1478,7 +1504,6 @@ jobs:
                       }
                   }
 
-                  /* ★ 后台数据更新后刷新第 0 页 ★ */
                   if (fetcher_poll() && cur_page == 0 && !screen_off_state) {
                       draw_page(0, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                 info_map, info_pitch, info_fb);
@@ -1487,13 +1512,13 @@ jobs:
 
                   time_t now = time(NULL);
 
-                  /* ★ 客户端检测 ★ */
                   if (now - last_client_check >= CLIENT_CHECK_SEC) {
                       last_client_check = now;
                       int clients = count_clients();
+                      fprintf(stderr, "[drm_play] client check: wired+wifi=%d, screen_off=%d\n",
+                              clients, screen_off_state);
                       if (clients > 0) {
                           no_client_since = 0;
-                          /* 有客户端且当前是全黑 → 恢复正常页面 */
                           if (screen_off_state) {
                               screen_off_state = 0;
                               draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
@@ -1502,16 +1527,15 @@ jobs:
                           }
                       } else if (!screen_off_state) {
                           if (no_client_since == 0) no_client_since = now;
-                          /* 无客户端超过阈值 → 显示全黑 */
                           if (now - no_client_since >= SCREEN_OFF_DELAY) {
                               draw_page(-1, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                         info_map, info_pitch, info_fb);
                               screen_off_state = 1;
+                              fprintf(stderr, "[drm_play] screen off (black)\n");
                           }
                       }
                   }
 
-                  /* ★ 背景图重试 ★ */
                   if (cur_page == 0 && g_fetch_pid == 0 &&
                       access(BG_CACHE, R_OK) != 0 &&
                       now - g_last_fetch_try >= 30) {
@@ -1519,11 +1543,9 @@ jobs:
                       fetcher_start();
                   }
 
-                  /* ★ 定时刷新 ★ */
                   int interval = (cur_page == 0) ? REFRESH_SEC : INFO_REFRESH_SEC;
                   if (now - last_refresh >= interval) {
                       if (screen_off_state) {
-                          /* 息屏状态下只更新时间戳，不重绘 */
                           last_refresh = now;
                       } else if (cur_page == 0) {
                           fetcher_start();
@@ -1636,19 +1658,22 @@ jobs:
           翻页: 右→左 = 下一页；左→右 = 上一页
 
           ★ 省电息屏（全黑画面模拟）★
-            无客户端持续 60 秒 → 输出全黑画面（看起来像息屏）
-            CRTC 和面板始终保持运行，GRAM 不会丢失
-            触摸或客户端重连 → 立即恢复正常页面，无闪烁
+            无客户端持续 60 秒 → 输出全黑画面
+            CRTC 和面板始终运行，GRAM 不丢失
+            触摸或客户端重连 → 立即恢复
 
-            客户端检测（内联）:
-              有线: br-lan 桥成员中 eth*(非eth1) 且 carrier=1
-              无线: ubus network.wireless → AP ifname → hostapd_cli/iw/iwinfo
-              每 20 秒检测一次
+            有线客户端检测（5 重兜底）:
+              1) /sys/class/net/eth0/carrier
+              2) /sys/class/net/eth0/operstate
+              3) /sys/class/net/eth0/speed
+              4) br-lan/brif/ 枚举 eth* carrier
+              5) ethtool eth0 Link detected
+            无线: ubus → hostapd_cli/iw/iwinfo
+            每 20 秒检测一次
 
           ★ 本版修复 ★
-            退出（killall/SIGTERM）时恢复原始 CRTC 状态
-            息屏改为全黑画面，彻底避免 GC9307 GRAM 丢失问题
-            调试日志: cat /tmp/drm_play.log
+            有线客户端检测重写，解决只接有线仍黑屏的问题
+            调试日志: cat /tmp/drm_play.log（含客户端计数）
 
           安装:
             scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
@@ -1658,7 +1683,11 @@ jobs:
             chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
             /etc/init.d/99-bootanim enable
 
-          排查: cat /tmp/.qmodem_dbg_all ; cat /tmp/drm_play.log
+          排查:
+            cat /tmp/drm_play.log          ← 看 "client check: wired+wifi=N"
+            cat /sys/class/net/eth0/carrier ← 应为 1
+            cat /sys/class/net/eth0/operstate ← 应为 up
+            cat /sys/class/net/eth0/speed   ← 应 > 0
           停止: killall drm_play_arm64
           EOF
 
