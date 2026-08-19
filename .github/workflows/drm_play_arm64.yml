@@ -504,12 +504,11 @@ jobs:
               if (g_backlight_path[0]) write_file(g_backlight_path, "0");
           }
 
-          static void screen_on_prepare(void) {
+          static void screen_on_prepare(const char *drm_device) {
               spi_rebind();
 
               for (int i = 0; i < 20; i++) {
-                  if (access("/dev/dri/card0", F_OK) == 0 ||
-                      access("/dev/dri/card1", F_OK) == 0)
+                  if (access(drm_device, F_OK) == 0)
                       break;
                   usleep(100000);
               }
@@ -1420,7 +1419,7 @@ jobs:
               signal(SIGTERM, sig_handler);
               signal(SIGINT, sig_handler);
 
-              const char *drm_device = (argc > 1) ? argv[1] : "/dev/dri/card0";
+              const char *drm_device = (argc > 1) ? argv[1] : "/dev/dri/card1";
 
               drmModeRes *res;
               drmModeConnector *conn;
@@ -1490,7 +1489,7 @@ jobs:
                   int sw = wait_touch(touch_fd, 120);
 
                   if (sw != 0 && screen_off_state) {
-                      screen_on_prepare();
+                      screen_on_prepare(drm_device);
 
                       drm_cleanup(fd, res, conn, dumb, map, fb_id, 2);
 
@@ -1550,7 +1549,7 @@ jobs:
                       if (clients > 0) {
                           no_client_since = 0;
                           if (screen_off_state) {
-                              screen_on_prepare();
+                              screen_on_prepare(drm_device);
                               drm_cleanup(fd, res, conn, dumb, map, fb_id, 2);
                               fd = drm_full_reinit(drm_device, &res, &conn, &crtc_id,
                                                    dumb, map, fb_id);
