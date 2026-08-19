@@ -61,36 +61,6 @@ jobs:
       - name: Create DRM Player C Source
         run: |
           cat << 'ENDOFSOURCE' > drm_play.c
-          /*
-           * drm_play_arm64 - 开机动画 + 双页信息屏（全合一）
-           *
-           * 页面：
-           *   第 1 页 = 一言 + 随机背景图（每 15 分钟刷新）
-           *   第 2 页 = QModem 上网模块信息（黑底白字，每 60 秒刷新）
-           * 翻页：触摸水平滑动。右→左 = 下一页；左→右 = 上一页。
-           *
-           * ★ 省电息屏 ★
-           *   每 600 秒执行 /usr/sbin/clients_online.sh 统计在线客户端：
-           *     = LAN 桥(br-lan)成员里 eth* 有线口 carrier=1 的数量（排除 eth1=WAN）
-           *       + WiFi AP(phy0-ap0 等) 关联站点数
-           *     注: WiFi AP 口 carrier 恒为 1，绝不能按 carrier 计入有线；
-           *         无线口也不依赖 /sys/class/net/*/wireless 软链（某些驱动没有），
-           *         改用 ubus network.wireless 权威识别 AP 口。
-           *   连续 60 秒为 0 → 息屏（DPMS OFF + 背光归零 + 黑帧三重保险）
-           *   重新检测到设备 → 自动亮屏并重画当前页
-           *   息屏时触摸也可唤醒；脚本缺失时视为有设备，永不息屏（安全）
-           *
-           * 第 2 页数据（依据真实缓存文件格式定稿）：
-           *   主路径 = 直接读 /tmp/cache_*info* 缓存文件
-           *   兜底   = ubus 探测 + /var/run/qmodem 运行时目录
-           *   清洗   = 去首尾换行、内部换行转空格、掳C→°C、Yes/No 汉化
-           *
-           * 跟手性：网络下载在后台子进程；翻页先 blit 缓存再本地重画。
-           * 触摸：聚合标志 read 循环外累积；状态持久；空闲 140ms 兜底。
-           *
-           * 运行时依赖（设备上）：wget、ubus、uci、clients_online.sh、
-           *   /usr/share/fonts/MiSans-Regular.ttf、/dev/input/eventX(可选)
-           */
 
           #define _GNU_SOURCE
           #include <fcntl.h>
@@ -126,7 +96,6 @@ jobs:
 
           #include "apple_raw.h"
 
-          /* ===================== 配置 ===================== */
           #define VIDEO_W       172
           #define VIDEO_H       172
           #define BPP           32
@@ -155,7 +124,7 @@ jobs:
           #define QMODEM_DBG     "/tmp/.qmodem_dbg_all"
           /* ★ 息屏相关 ★ */
           #define CLIENT_COUNT_CMD  "/usr/sbin/clients_online.sh"
-          #define CLIENT_CHECK_SEC  600       /* 每 600 秒统计一次客户端 */
+          #define CLIENT_CHECK_SEC  30       /* 每 30 秒统计一次客户端 */
           #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 息屏 */
 
           #ifndef DRM_MODE_DPMS_ON
@@ -165,7 +134,6 @@ jobs:
           #define DRM_MODE_DPMS_OFF 3
           #endif
 
-          /* ===================== 触摸 / evdev 自包含常量 ===================== */
           #define MY_EV_SYN   0x00
           #define MY_EV_KEY   0x01
           #define MY_EV_ABS   0x03
@@ -207,7 +175,6 @@ jobs:
               int32_t  value;
           };
 
-          /* ===================== 本地 fallback 文字（4 组轮播） ===================== */
           #define FALLBACK_COUNT 4
 
           static const char *FALLBACK_TEXTS[FALLBACK_COUNT] = {
@@ -226,7 +193,6 @@ jobs:
 
           static int g_fallback_idx = 0;
 
-          /* ===================== QModem 字段表（按真实缓存文件键名定稿） ===================== */
           #define FIELD_COUNT 7
           typedef struct {
               const char *cands[16];
@@ -256,13 +222,11 @@ jobs:
           };
           static char g_section[64] = {0};
 
-          /* ubus 自动发现缓存（兜底用） */
           static char g_ubus_obj[32]    = {0};
           static char g_method_base[32] = {0};
           static char g_method_sim[32]  = {0};
           static char g_method_net[32]  = {0};
 
-          /* ===================== 全局状态 ===================== */
           static uint32_t screen_w, screen_h;
           static volatile sig_atomic_t g_running = 1;
           static int g_touch_thresh_x = 30;
@@ -274,7 +238,6 @@ jobs:
           static pid_t g_fetch_pid = 0;
           static time_t g_last_fetch_try = 0;
 
-          /* ★ 息屏相关全局 ★ */
           static uint32_t g_dpms_prop_id = 0;
           static char g_backlight_path[192] = {0};
           static int  g_backlight_max = 255;
@@ -296,9 +259,6 @@ jobs:
               nanosleep(&ts, NULL);
           }
 
-          /* ============================================================
-           * UTF-8 解码
-           * ============================================================ */
           static int utf8_decode(const char *s, int *codepoint) {
               uint8_t c = (uint8_t)s[0];
               if (c < 0x80) { *codepoint = c; return 1; }
@@ -358,9 +318,6 @@ jobs:
               return 0;
           }
 
-          /* ============================================================
-           * 值清洗：去首尾空白/换行，内部换行转空格，掳C→°C
-           * ============================================================ */
           static void sanitize_value(char *v) {
               size_t s = 0;
               while (v[s]==' '||v[s]=='\n'||v[s]=='\r'||v[s]=='\t') s++;
@@ -377,9 +334,6 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * 采集后汉化：Yes/No、ready
-           * ============================================================ */
           static void postprocess_fields(void) {
               if (g_fields[0].filled) {
                   if (ieq(g_fields[0].value, "yes") || ieq(g_fields[0].value, "connected"))
@@ -391,9 +345,6 @@ jobs:
                   strcpy(g_fields[2].value, "就绪");
           }
 
-          /* ============================================================
-           * JSON 字段提取（兼容字符串 / 数字 / 布尔）
-           * ============================================================ */
           static int json_get_field(const char *json, const char *key,
                                     char *out, size_t out_size) {
               char pattern[128];
@@ -451,12 +402,9 @@ jobs:
               return buf;
           }
 
-          /* ============================================================
-           * ★ 客户端检测 & 息屏/亮屏 ★
-           * ============================================================ */
           static int count_clients(void) {
               char *out = popen_read(CLIENT_COUNT_CMD " 2>/dev/null");
-              if (!out) return 1;   /* 脚本缺失 → 视为有设备，永不息屏（安全） */
+              if (!out) return 1;
               int n = atoi(out);
               free(out);
               if (n < 0) n = 0;
@@ -508,13 +456,10 @@ jobs:
 
           static void screen_off(int fd, uint32_t conn_id, uint32_t crtc_id, uint32_t fb_id,
                                  drmModeModeInfo *mode, void *map, uint32_t pitch) {
-              /* 1) 黑帧刷屏（万一后两招都不生效，至少是纯黑） */
               memset(map, 0, (size_t)pitch * screen_h);
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
-              /* 2) DPMS OFF（面板驱动支持时真正断电） */
               if (g_dpms_prop_id)
                   drmModeConnectorSetProperty(fd, conn_id, g_dpms_prop_id, DRM_MODE_DPMS_OFF);
-              /* 3) 背光归零 */
               if (g_backlight_path[0]) write_file(g_backlight_path, "0");
           }
 
@@ -552,7 +497,6 @@ jobs:
               return c;
           }
 
-          /* ★ 非空才记；存入前清洗 ★ */
           static void try_fill(const char *key, const char *full, const char *val) {
               if (!val || !val[0]) return;
               char clean[128];
@@ -575,9 +519,6 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * 扫描 modem_info[] 数组形态（缓存文件的真实格式）
-           * ============================================================ */
           static void scan_array_json(const char *json) {
               const char *mi = strstr(json, "\"modem_info\"");
               if (!mi) return;
@@ -633,9 +574,6 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * ★ 主路径：读 /tmp/cache_*info* 缓存文件（QModem 自己生成）
-           * ============================================================ */
           static void scan_cache_files(FILE *dbg) {
               DIR *d = opendir("/tmp");
               if (!d) return;
@@ -663,9 +601,6 @@ jobs:
               closedir(d);
           }
 
-          /* ============================================================
-           * 兜底：ubus 对象/方法自动探测
-           * ============================================================ */
           static void probe_ubus_obj(FILE *dbg) {
               static const char *objs[] = {"qmodem", "modem", "modem_scand", "qmodem_scand", NULL};
               if (g_ubus_obj[0]) return;
@@ -723,7 +658,6 @@ jobs:
               }
           }
 
-          /* 兜底：运行时目录 */
           static void scan_rundir_file(const char *path, const char *name, FILE *dbg) {
               FILE *f = fopen(path, "rb");
               if (!f) return;
@@ -769,9 +703,6 @@ jobs:
               closedir(d);
           }
 
-          /* ============================================================
-           * 汇总采集：缓存文件(主) → ubus/rundir(兜底) → 汉化
-           * ============================================================ */
           static void collect_modem_info(void) {
               for (int i = 0; i < FIELD_COUNT; i++) {
                   g_fields[i].filled = 0;
@@ -781,10 +712,8 @@ jobs:
 
               FILE *dbg = fopen(QMODEM_DBG, "w");
 
-              /* 1) 主路径：/tmp/cache_*info* */
               scan_cache_files(dbg);
 
-              /* 2) 兜底：七项没齐才走 ubus + rundir */
               if (fields_filled_count() < FIELD_COUNT) {
                   static const char *M_BASE[] = {"base_info","get_base_info","basic_info",
                                                  "status","get_status",NULL};
@@ -799,15 +728,11 @@ jobs:
                   scan_rundir(dbg);
               }
 
-              /* 3) 汉化 Yes/No、ready */
               postprocess_fields();
 
               if (dbg) fclose(dbg);
           }
 
-          /* ============================================================
-           * DRM 初始化
-           * ============================================================ */
           static int drm_init(const char *drm_device,
                               drmModeRes **out_res,
                               drmModeConnector **out_conn,
@@ -898,9 +823,6 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * 后台抓取一言/背景图
-           * ============================================================ */
           static void fetcher_start(void) {
               if (g_fetch_pid > 0) {
                   if (waitpid(g_fetch_pid, NULL, WNOHANG) == 0) return;
@@ -965,9 +887,6 @@ jobs:
               return stbi_load(BG_CACHE, w, h, &channels, 4);
           }
 
-          /* ============================================================
-           * 第 1 页文字渲染
-           * ============================================================ */
           static void render_text_rgba(uint8_t *rgba, int img_w, int img_h,
                                        const char *text) {
               FILE *ff = fopen(FONT_PATH, "rb");
@@ -1062,9 +981,6 @@ jobs:
               free(font_data);
           }
 
-          /* ============================================================
-           * 第 2 页单行绘制
-           * ============================================================ */
           static void draw_line_rgba(uint8_t *rgba, int W, int H,
                                      stbtt_fontinfo *font, float scale, int ascent,
                                      int x, int y, const char *text,
@@ -1110,9 +1026,6 @@ jobs:
               }
           }
 
-          /* ============================================================
-           * 第 2 页布局
-           * ============================================================ */
           static void render_info_page_rgba(uint8_t *rgba, int W, int H) {
               for (int i = 0; i < W * H; i++) {
                   rgba[i*4+0] = 0; rgba[i*4+1] = 0; rgba[i*4+2] = 0; rgba[i*4+3] = 255;
@@ -1249,9 +1162,6 @@ jobs:
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
 
-          /* ============================================================
-           * 触摸：打开设备
-           * ============================================================ */
           static int open_touch(void) {
               char path[32];
               for (int i = 0; i < 16; i++) {
@@ -1476,7 +1386,6 @@ jobs:
                         info_map, info_pitch, info_fb);
               time_t last_refresh = time(NULL);
 
-              /* ★ 息屏状态机 ★ */
               int screen_off_state = 0;
               time_t no_client_since = 0;
               time_t last_client_check = 0;
@@ -1484,7 +1393,6 @@ jobs:
               while (g_running) {
                   int sw = wait_touch(touch_fd, 120);
 
-                  /* 息屏状态下触摸 → 先亮屏 */
                   if (sw != 0 && screen_off_state) {
                       screen_on(fd, conn->connector_id, crtc_id, info_fb, &conn->modes[0]);
                       screen_off_state = 0;
@@ -1516,7 +1424,6 @@ jobs:
 
                   time_t now = time(NULL);
 
-                  /* ★ 客户端检测 & 息屏/亮屏 ★ */
                   if (now - last_client_check >= CLIENT_CHECK_SEC) {
                       last_client_check = now;
                       int clients = count_clients();
@@ -1549,7 +1456,7 @@ jobs:
                   int interval = (cur_page == 0) ? REFRESH_SEC : INFO_REFRESH_SEC;
                   if (now - last_refresh >= interval) {
                       if (screen_off_state) {
-                          last_refresh = now;   /* 息屏时只重置计时，不绘制 */
+                          last_refresh = now;
                       } else if (cur_page == 0) {
                           fetcher_start();
                           last_refresh = now;
@@ -1594,9 +1501,9 @@ jobs:
           # 你的拓扑: lan=br-lan(eth0 + phy0-ap0); eth1=WAN(2_1)。
           # 关键修正:
           #   1) WiFi AP 口(phy0-ap0) carrier 恒为 1，绝不能按 carrier 计入"有线"。
-          #      → 有线段只数名字以 eth 开头、且不是 eth1(WAN) 的口。
-          #   2) 你这台无线口没有 /sys/class/net/*/wireless 软链，
-          #      → 改用 ubus network.wireless 找出所有 AP 接口名再数关联站点。
+          #      -> 有线段只数名字以 eth 开头、且不是 eth1(WAN) 的口。
+          #   2) 你这台无线口可能没有 wireless sysfs 软链，
+          #      -> 改用 ubus network.wireless 找出所有 AP 接口名再数关联站点。
           # 调试: CLIENTS_DEBUG=1 /usr/sbin/clients_online.sh ; cat /tmp/.clients_debug
           n=0
           if [ "$CLIENTS_DEBUG" = "1" ]; then
@@ -1778,17 +1685,14 @@ jobs:
             有线: 只数 br-lan 成员里 eth*(非 eth1) 且 carrier=1 的口
                   —— eth1 是 WAN(2_1) 排除；phy0-ap0 是 WiFi 不按 carrier 算
             无线: 用 ubus network.wireless 找 AP 口(phy0-ap0)，数关联站点
-                  —— 不依赖 /sys/class/net/*/wireless 软链(你这台没有)
-            每 600 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
-            设备重连 → 3 秒内自动亮屏；息屏时触摸也可唤醒
+            每 30 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
+            设备重连 → 最多 30 秒内自动亮屏；息屏时触摸可立即唤醒
 
           ★★★ 刷机后第一步：验证检测脚本（必做）★★★
             ssh 上去:
               /usr/sbin/clients_online.sh                 # 正常应输出当前在线数
               CLIENTS_DEBUG=1 /usr/sbin/clients_online.sh # 详细日志
               cat /tmp/.clients_debug                     # 看每一步数到了什么
-            预期（你现在连着 WiFi/网线时应 ≥1）:
-              wired=1 (eth0 插线) 或 0；wifi=N (N=连着的无线设备数)；TOTAL=wired+wifi
             验证息屏:
               拔掉 LAN 线 + 断开所有 WiFi → 应输出 0 → 60 秒后屏幕熄灭
               重新插线/连 WiFi         → 应 ≥1 → 几秒内自动亮起
