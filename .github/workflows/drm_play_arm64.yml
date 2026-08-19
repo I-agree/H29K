@@ -122,10 +122,10 @@ jobs:
           #define BG_CACHE       "/tmp/.drm_bg_img"
           #define QMODEM_RUNDIR  "/var/run/qmodem"
           #define QMODEM_DBG     "/tmp/.qmodem_dbg_all"
-          #define DRM_PLAY_LOG   "/tmp/drm_play.log"   /* ★ 调试日志 ★ */
-          /* ★ 息屏相关（纯背光开关，客户端检测内联）★ */
+          #define DRM_PLAY_LOG   "/tmp/drm_play.log"
+          /* ★ 息屏相关（全黑画面模拟息屏）★ */
           #define CLIENT_CHECK_SEC  20       /* 每 20 秒统计一次客户端 */
-          #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 关背光 */
+          #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 显示全黑 */
 
           #define MY_EV_SYN   0x00
           #define MY_EV_KEY   0x01
@@ -222,9 +222,7 @@ jobs:
           static uint8_t *g_page1_rgba = NULL;
           static pid_t g_fetch_pid = 0;
           static time_t g_last_fetch_try = 0;
-          static char g_backlight_path[PATH_MAX] = {0};
-          /* ★ 保存进入前的原始 CRTC 状态，退出时恢复，
-             避免 killall 后 CRTC 残留绑定导致下次运行无画面 ★ */
+          /* ★ 保存进入前的原始 CRTC 状态，退出时恢复 ★ */
           static drmModeCrtc *g_saved_crtc = NULL;
 
           typedef struct {
@@ -386,21 +384,10 @@ jobs:
               return buf;
           }
 
-          static void write_file(const char *path, const char *val) {
-              FILE *f = fopen(path, "w");
-              if (!f) return;
-              fputs(val, f);
-              fclose(f);
-          }
-
           /* ================================================================
-           * ★ 内联客户端检测（替代 clients_online.sh）
-           * 逻辑与原脚本完全一致：
-           *   有线 = br-lan 成员中 eth*(非eth1) 且 carrier=1
-           *   无线 = ubus network.wireless 找 AP ifname → hostapd_cli/iw/iwinfo 数站点
+           * ★ 内联客户端检测
            * ================================================================ */
 
-          /* 从文件读取整数，失败返回 -1 */
           static int read_int_file(const char *path) {
               FILE *f = fopen(path, "r");
               if (!f) return -1;
@@ -410,10 +397,8 @@ jobs:
               return v;
           }
 
-          /* 统计有线客户端：br-lan 桥成员中 eth*(非eth1) carrier=1 */
           static int count_wired_clients(void) {
               int count = 0;
-              /* 1) 通过 ubus 获取 lan 接口设备名 */
               char lan_dev[64] = {0};
               char *out = popen_read(
                   "ubus call network.interface.lan status 2>/dev/null | "
@@ -423,7 +408,6 @@ jobs:
                   free(out);
               } else {
                   if (out) free(out);
-                  /* 尝试 l3_device */
                   out = popen_read(
                       "ubus call network.interface.lan status 2>/dev/null | "
                       "grep -o '\"l3_device\" *: *\"[^\"]*\"' | head -1 | cut -d'\"' -f4");
@@ -432,8 +416,6 @@ jobs:
                   }
                   if (out) free(out);
               }
-
-              /* 2) 列出桥成员或所有网口 */
               char members[32][32];
               int nm = 0;
               char brif_path[PATH_MAX];
@@ -448,7 +430,6 @@ jobs:
               struct dirent *de;
               while ((de = readdir(d)) && nm < 32) {
                   if (de->d_name[0] == '.') continue;
-                  /* 只认 eth* 且排除 eth1(WAN) */
                   if (strncmp(de->d_name, "eth", 3) != 0) continue;
                   if (strcmp(de->d_name, "eth1") == 0) continue;
                   strncpy(members[nm], de->d_name, 31);
@@ -456,8 +437,6 @@ jobs:
                   nm++;
               }
               closedir(d);
-
-              /* 3) 检查每个成员的 carrier */
               for (int i = 0; i < nm; i++) {
                   char cpath[PATH_MAX];
                   snprintf(cpath, sizeof(cpath), "/sys/class/net/%s/carrier", members[i]);
@@ -466,11 +445,8 @@ jobs:
               return count;
           }
 
-          /* 统计无线客户端：找 AP 接口 → 数关联站点 */
           static int count_wifi_clients(void) {
               int total = 0;
-
-              /* 1) 通过 ubus 获取 AP 接口名列表 */
               char ap_ifaces[16][32];
               int nap = 0;
               char *out = popen_read(
@@ -491,7 +467,6 @@ jobs:
                   free(out);
               } else {
                   if (out) free(out);
-                  /* 兜底：常见 AP 接口名 */
                   static const char *cands[] = {"phy0-ap0","wlan0","ath0","ra0","ap0",NULL};
                   for (int i = 0; cands[i] && nap < 16; i++) {
                       char p[PATH_MAX];
@@ -503,25 +478,18 @@ jobs:
                       }
                   }
               }
-
-              /* 2) 对每个 AP 接口数关联站点 */
               for (int i = 0; i < nap; i++) {
                   char p[PATH_MAX];
                   snprintf(p, sizeof(p), "/sys/class/net/%s", ap_ifaces[i]);
                   if (access(p, F_OK) != 0) continue;
-
                   int sta = 0;
                   char cmd[256];
                   char *sout;
-
-                  /* 优先 hostapd_cli */
                   snprintf(cmd, sizeof(cmd),
                            "hostapd_cli -i %s all_sta_info 2>/dev/null | grep -c '^sta '",
                            ap_ifaces[i]);
                   sout = popen_read(cmd);
                   if (sout) { sta = atoi(sout); free(sout); }
-
-                  /* 其次 iw */
                   if (sta <= 0) {
                       snprintf(cmd, sizeof(cmd),
                                "iw %s station dump 2>/dev/null | grep -c '^Station'",
@@ -529,8 +497,6 @@ jobs:
                       sout = popen_read(cmd);
                       if (sout) { sta = atoi(sout); free(sout); }
                   }
-
-                  /* 最后 iwinfo */
                   if (sta <= 0) {
                       snprintf(cmd, sizeof(cmd),
                                "iwinfo %s assoclist 2>/dev/null | grep -ci 'dBm'",
@@ -538,13 +504,11 @@ jobs:
                       sout = popen_read(cmd);
                       if (sout) { sta = atoi(sout); free(sout); }
                   }
-
                   if (sta > 0) total += sta;
               }
               return total;
           }
 
-          /* ★ 总客户端数 = 有线 + 无线 ★ */
           static int count_clients(void) {
               int wired = count_wired_clients();
               int wifi  = count_wifi_clients();
@@ -553,43 +517,7 @@ jobs:
           }
 
           /* ================================================================
-           * ★ 背光控制（只有开/关）
-           * ================================================================ */
-
-          static void find_backlight(void) {
-              DIR *d = opendir("/sys/class/backlight");
-              if (!d) return;
-              struct dirent *de;
-              while ((de = readdir(d))) {
-                  if (de->d_name[0] == '.') continue;
-                  char p[PATH_MAX];
-                  snprintf(p, sizeof(p), "/sys/class/backlight/%s/brightness", de->d_name);
-                  if (access(p, W_OK) != 0) continue;
-                  snprintf(g_backlight_path, sizeof(g_backlight_path), "%s", p);
-                  break;
-              }
-              closedir(d);
-          }
-
-          static void backlight_off(void) {
-              if (g_backlight_path[0])
-                  write_file(g_backlight_path, "0");
-          }
-
-          static void backlight_on(void) {
-              if (g_backlight_path[0])
-                  write_file(g_backlight_path, "1");
-          }
-
-          /* ★ 息屏唤醒辅助：禁用 CRTC 触发 panel disable，
-             后续 draw_page 内的 SetCrtc 会触发 panel enable + SPI 重推帧 ★ */
-          static void crtc_disable(int fd, uint32_t crtc_id) {
-              drmModeSetCrtc(fd, crtc_id, 0, 0, 0, NULL, 0, NULL);
-              usleep(50000);   /* 50 ms 等 GC9307 完成 sleep-in */
-          }
-
-          /* ================================================================
-           * 以下为 modem 信息采集 + DRM + 触摸 + 主循环（与之前相同）
+           * modem 信息采集
            * ================================================================ */
 
           static void get_section(void) {
@@ -843,6 +771,10 @@ jobs:
               if (dbg) fclose(dbg);
           }
 
+          /* ================================================================
+           * DRM 初始化 / 清理
+           * ================================================================ */
+
           static int drm_init(const char *drm_device,
                               drmModeRes **out_res,
                               drmModeConnector **out_conn,
@@ -911,11 +843,8 @@ jobs:
           static void drm_cleanup(int fd, drmModeRes *res, drmModeConnector *conn,
                                   struct drm_mode_create_dumb *dumbs, void **maps,
                                   uint32_t *fb_ids, int count) {
-              /* ★ 1) 先禁用 CRTC，解除与我们的 FB 的绑定 ★ */
               if (fd >= 0)
                   drmModeSetCrtc(fd, 0, 0, 0, 0, NULL, 0, NULL);
-
-              /* ★ 2) 删除 FB、解除映射、销毁 dumb buffer ★ */
               for (int i = 0; i < count; i++) {
                   if (fb_ids[i]) { drmModeRmFB(fd, fb_ids[i]); fb_ids[i] = 0; }
                   if (maps[i] && maps[i] != MAP_FAILED) {
@@ -930,9 +859,6 @@ jobs:
                       dumbs[i].handle = 0;
                   }
               }
-
-              /* ★ 3) 恢复进入前的原始 CRTC 状态（关键！
-                 避免 killall 后 CRTC 残留绑定，下次运行无画面）★ */
               if (g_saved_crtc) {
                   uint32_t conn_id = conn ? conn->connector_id : 0;
                   if (g_saved_crtc->buffer_id != 0 && conn) {
@@ -944,11 +870,14 @@ jobs:
                   drmModeFreeCrtc(g_saved_crtc);
                   g_saved_crtc = NULL;
               }
-
               if (conn) drmModeFreeConnector(conn);
               if (res) drmModeFreeResources(res);
               if (fd >= 0) close(fd);
           }
+
+          /* ================================================================
+           * 渲染辅助
+           * ================================================================ */
 
           static void copy_centered(void *dst, uint32_t pitch,
                                     const uint8_t *src, uint32_t img_w, uint32_t img_h) {
@@ -1209,6 +1138,13 @@ jobs:
               free(font_data);
           }
 
+          /* ★ 全黑页面（模拟息屏）★ */
+          static void render_black_rgba(uint8_t *rgba) {
+              memset(rgba, 0, (size_t)(SCREEN_W * SCREEN_H * 4));
+              for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
+                  rgba[i * 4 + 3] = 255;
+          }
+
           static void rgba_to_fb(void *fb, uint32_t pitch,
                                  const uint8_t *rgba, int img_w, int img_h) {
               memset(fb, 0, (size_t)pitch * screen_h);
@@ -1259,12 +1195,17 @@ jobs:
                       render_info_page_rgba(g_page1_rgba, SCREEN_W, SCREEN_H);
                       rgba_to_fb(map, pitch, g_page1_rgba, SCREEN_W, SCREEN_H);
                   }
-              } else {
+              } else if (page == 0) {
                   if (!g_page0_rgba) g_page0_rgba = malloc((size_t)(SCREEN_W * SCREEN_H) * 4);
                   if (g_page0_rgba) {
                       render_page0_rgba(g_page0_rgba);
                       rgba_to_fb(map, pitch, g_page0_rgba, SCREEN_W, SCREEN_H);
                   }
+              } else {
+                  /* page == -1: 全黑（模拟息屏）*/
+                  uint8_t black[SCREEN_W * SCREEN_H * 4];
+                  render_black_rgba(black);
+                  rgba_to_fb(map, pitch, black, SCREEN_W, SCREEN_H);
               }
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
@@ -1276,6 +1217,10 @@ jobs:
               rgba_to_fb(map, pitch, src, SCREEN_W, SCREEN_H);
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
+
+          /* ================================================================
+           * 触摸
+           * ================================================================ */
 
           static int open_touch(void) {
               char path[32];
@@ -1414,11 +1359,14 @@ jobs:
               return 0;
           }
 
+          /* ================================================================
+           * daemonize + main
+           * ================================================================ */
+
           static void daemonize(void) {
-              /* ★ stderr 重定向到日志文件，方便排查 ★ */
               FILE *logf = fopen(DRM_PLAY_LOG, "a");
               if (logf) {
-                  setvbuf(logf, NULL, _IOLBF, 0);   /* 行缓冲，掉电也不丢太多 */
+                  setvbuf(logf, NULL, _IOLBF, 0);
                   dup2(fileno(logf), STDERR_FILENO);
                   if (fileno(logf) > 2) fclose(logf);
               }
@@ -1444,8 +1392,6 @@ jobs:
               int fd = drm_init(drm_device, &res, &conn, &crtc_id);
               if (fd < 0) return 1;
 
-              /* ★ 保存原始 CRTC 状态，退出时恢复，
-                 确保 killall 后下次运行仍有画面 ★ */
               g_saved_crtc = drmModeGetCrtc(fd, crtc_id);
 
               struct drm_mode_create_dumb dumb[2];
@@ -1489,7 +1435,6 @@ jobs:
               fprintf(stderr, "[drm_play] boot anim done, entering main loop\n");
 
               int touch_fd = open_touch();
-              find_backlight();
               int cur_page = 0;
 
               uint32_t info_fb = fb_id[0];
@@ -1501,6 +1446,7 @@ jobs:
                         info_map, info_pitch, info_fb);
               time_t last_refresh = time(NULL);
 
+              /* ★ screen_off_state: 0=正常显示, 1=全黑模拟息屏 ★ */
               int screen_off_state = 0;
               time_t no_client_since = 0;
               time_t last_client_check = 0;
@@ -1508,17 +1454,16 @@ jobs:
               while (g_running) {
                   int sw = wait_touch(touch_fd, 120);
 
-                  /* ★ 触摸唤醒：disable CRTC → draw_page(重推帧) → 开背光 ★ */
+                  /* ★ 触摸唤醒：从全黑切回正常页面 ★ */
                   if (sw != 0 && screen_off_state) {
                       screen_off_state = 0;
                       no_client_since = 0;
-                      crtc_disable(fd, crtc_id);
                       draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                 info_map, info_pitch, info_fb);
-                      backlight_on();
                       last_refresh = time(NULL);
                   }
 
+                  /* ★ 正常状态下触摸翻页 ★ */
                   if (sw != 0 && !screen_off_state) {
                       int np = cur_page + (sw < 0 ? 1 : -1);
                       if (np < 0) np = 0;
@@ -1533,6 +1478,7 @@ jobs:
                       }
                   }
 
+                  /* ★ 后台数据更新后刷新第 0 页 ★ */
                   if (fetcher_poll() && cur_page == 0 && !screen_off_state) {
                       draw_page(0, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                 info_map, info_pitch, info_fb);
@@ -1541,29 +1487,31 @@ jobs:
 
                   time_t now = time(NULL);
 
-                  /* ★ 客户端检测（内联，无需外部脚本）★ */
+                  /* ★ 客户端检测 ★ */
                   if (now - last_client_check >= CLIENT_CHECK_SEC) {
                       last_client_check = now;
                       int clients = count_clients();
                       if (clients > 0) {
                           no_client_since = 0;
+                          /* 有客户端且当前是全黑 → 恢复正常页面 */
                           if (screen_off_state) {
                               screen_off_state = 0;
-                              crtc_disable(fd, crtc_id);
                               draw_page(cur_page, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                         info_map, info_pitch, info_fb);
-                              backlight_on();
                               last_refresh = now;
                           }
                       } else if (!screen_off_state) {
                           if (no_client_since == 0) no_client_since = now;
+                          /* 无客户端超过阈值 → 显示全黑 */
                           if (now - no_client_since >= SCREEN_OFF_DELAY) {
-                              backlight_off();
+                              draw_page(-1, fd, crtc_id, conn->connector_id, &conn->modes[0],
+                                        info_map, info_pitch, info_fb);
                               screen_off_state = 1;
                           }
                       }
                   }
 
+                  /* ★ 背景图重试 ★ */
                   if (cur_page == 0 && g_fetch_pid == 0 &&
                       access(BG_CACHE, R_OK) != 0 &&
                       now - g_last_fetch_try >= 30) {
@@ -1571,9 +1519,11 @@ jobs:
                       fetcher_start();
                   }
 
+                  /* ★ 定时刷新 ★ */
                   int interval = (cur_page == 0) ? REFRESH_SEC : INFO_REFRESH_SEC;
                   if (now - last_refresh >= interval) {
                       if (screen_off_state) {
+                          /* 息屏状态下只更新时间戳，不重绘 */
                           last_refresh = now;
                       } else if (cur_page == 0) {
                           fetcher_start();
@@ -1685,22 +1635,19 @@ jobs:
             第 2 页 = 上网模块信息（黑底白字，每 60 秒刷新）
           翻页: 右→左 = 下一页；左→右 = 上一页
 
-          ★ 省电息屏（纯背光开关）★
-            息屏 = 写 0 到 /sys/class/backlight/*/brightness
-            亮屏 = 写 1 到 /sys/class/backlight/*/brightness
-            面板和 CRTC 始终运行，仅背光熄灭，唤醒瞬间完成。
+          ★ 省电息屏（全黑画面模拟）★
+            无客户端持续 60 秒 → 输出全黑画面（看起来像息屏）
+            CRTC 和面板始终保持运行，GRAM 不会丢失
+            触摸或客户端重连 → 立即恢复正常页面，无闪烁
 
             客户端检测（内联）:
               有线: br-lan 桥成员中 eth*(非eth1) 且 carrier=1
               无线: ubus network.wireless → AP ifname → hostapd_cli/iw/iwinfo
-              每 20 秒检测一次；连续 60 秒为 0 → 关背光
-              设备重连 → 最多 20 秒内自动开背光
-              息屏时触摸 → 立即开背光
+              每 20 秒检测一次
 
           ★ 本版修复 ★
-            退出（killall/SIGTERM）时恢复原始 CRTC 状态，
-            解决"重复运行只有第一次有画面"的问题。
-            唤醒时先 disable CRTC 再重推帧，解决 GC9307 息屏后 GRAM 丢失问题。
+            退出（killall/SIGTERM）时恢复原始 CRTC 状态
+            息屏改为全黑画面，彻底避免 GC9307 GRAM 丢失问题
             调试日志: cat /tmp/drm_play.log
 
           安装:
