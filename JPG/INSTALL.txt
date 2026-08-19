@@ -3,13 +3,21 @@
 ============================================
 
 文件:
-  drm_play_arm64  - 开机动画 + 双页信息屏
-  99-bootanim     - OpenWrt init.d 开机脚本
+  drm_play_arm64    - 开机动画 + 双页信息屏
+  99-bootanim       - OpenWrt init.d 开机脚本
+  clients_online.sh - 客户端检测脚本（息屏用）
 
 页面:
   第 1 页 = 一言 + 随机背景图（每 15 分钟刷新）
   第 2 页 = 上网模块信息（黑底白字，每 60 秒刷新）
 翻页: 右→左 = 下一页；左→右 = 上一页（瞬时跟手）
+
+省电息屏:
+  每 600 秒统计一次接入设备（有线 LAN 口插线 + WiFi 关联站点）
+  连续 60 秒无设备 → 息屏（DPMS OFF + 背光归零 + 黑帧）
+  设备重新连接 → 3 秒内自动亮屏
+  息屏时触摸也可唤醒
+  手动测试: /usr/sbin/clients_online.sh 输出在线设备数
 
 第 2 页数据源（按真实缓存格式定稿）:
   主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
@@ -21,10 +29,11 @@
 
 安装:
   scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
+  scp clients_online.sh root@192.168.1.1:/usr/sbin/
   scp 99-bootanim root@192.168.1.1:/etc/init.d/
   scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
   ssh root@192.168.1.1
-  chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
+  chmod +x /usr/sbin/drm_play_arm64 /usr/sbin/clients_online.sh /etc/init.d/99-bootanim
   /etc/init.d/99-bootanim enable
 
 排查（如有项显示 --）:
