@@ -19,6 +19,17 @@
   每 20 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
   设备重连 → 最多 20 秒内自动亮屏；息屏时触摸可立即唤醒
 
+★★★ 息屏唤醒机制（与 99-bootanim 完全对齐）★★★
+  SPI MIPI-DBI 面板在 DPMS OFF 后显示通道会断开，
+  仅靠 SetCrtc 无法恢复。唤醒时必须：
+    1. SPI unbind/rebind（重新初始化面板驱动）
+    2. 等待 /dev/dri/cardX 重新出现
+    3. 关闭旧 DRM fd + 释放所有 FB/mmap
+    4. 重新打开 DRM + 创建新 FB
+    5. 重新探测 DPMS property
+    6. DPMS ON + 背光恢复 + 双次 SetCrtc
+  这与 99-bootanim 启动时的 rebind 流程完全一致。
+
 ★★★ 刷机后第一步：验证检测脚本（必做）★★★
   ssh 上去:
     /usr/sbin/clients_online.sh                 # 正常应输出当前在线数
@@ -27,6 +38,7 @@
   验证息屏:
     拔掉 LAN 线 + 断开所有 WiFi → 应输出 0 → 60 秒后屏幕熄灭
     重新插线/连 WiFi         → 应 ≥1 → 最多 20 秒内自动亮起
+    息屏状态下触摸屏幕       → 应立即唤醒
 
 第 2 页数据源（按真实缓存格式定稿）:
   主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
