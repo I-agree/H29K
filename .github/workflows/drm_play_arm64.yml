@@ -382,18 +382,7 @@ jobs:
           }
 
           /* ================================================================
-           * ★ 客户端检测（修复版）
-           * 
-           * H29K 硬件布局：
-           *   eth0 = LAN 口（桥接到 br-lan）
-           *   eth1 = WAN 口（排除）
-           *   phy0-ap0 = WiFi AP
-           * 
-           * 有线检测策略（多重兜底）：
-           *   1) /sys/class/net/eth0/carrier == 1
-           *   2) /sys/class/net/eth0/operstate == "up"
-           *   3) /sys/class/net/eth0/speed > 0
-           *   4) br-lan/brif/ 下枚举 eth* 检查 carrier
+           * ★ 客户端检测
            * ================================================================ */
 
           static int read_int_file(const char *path) {
@@ -419,14 +408,13 @@ jobs:
           static int count_wired_clients(void) {
               int count = 0;
 
-              /* ★ 方法 1：直接检查 eth0 carrier ★ */
-              int carrier = read_int_file("/sys/class/net/eth0/carrier");
-              if (carrier == 1) {
+              /* 方法 1：直接检查 eth0 carrier */
+              if (read_int_file("/sys/class/net/eth0/carrier") == 1) {
                   count++;
                   goto done;
               }
 
-              /* ★ 方法 2：检查 eth0 operstate ★ */
+              /* 方法 2：检查 eth0 operstate */
               {
                   char state[32] = {0};
                   if (read_str_file("/sys/class/net/eth0/operstate", state, sizeof(state)) == 0) {
@@ -437,7 +425,7 @@ jobs:
                   }
               }
 
-              /* ★ 方法 3：检查 eth0 speed（链路速度 > 0 说明有连接）★ */
+              /* 方法 3：检查 eth0 speed */
               {
                   int speed = read_int_file("/sys/class/net/eth0/speed");
                   if (speed > 0) {
@@ -446,7 +434,7 @@ jobs:
                   }
               }
 
-              /* ★ 方法 4：遍历 br-lan/brif/ 下的所有 eth* 成员 ★ */
+              /* 方法 4：遍历 br-lan/brif/ */
               {
                   DIR *d = opendir("/sys/class/net/br-lan/brif");
                   if (d) {
@@ -463,7 +451,7 @@ jobs:
                   }
               }
 
-              /* ★ 方法 5：如果以上都失败，用 ethtool 兜底 ★ */
+              /* 方法 5：ethtool 兜底 */
               if (count == 0) {
                   char *out = popen_read("ethtool eth0 2>/dev/null | grep 'Link detected' | grep -c 'yes'");
                   if (out) {
@@ -514,7 +502,7 @@ jobs:
                   snprintf(p, sizeof(p), "/sys/class/net/%s", ap_ifaces[i]);
                   if (access(p, F_OK) != 0) continue;
                   int sta = 0;
-                  char cmd[256];
+                  char cmd[512];
                   char *sout;
                   snprintf(cmd, sizeof(cmd),
                            "hostapd_cli -i %s all_sta_info 2>/dev/null | grep -c '^sta '",
@@ -1393,16 +1381,11 @@ jobs:
            * ================================================================ */
 
           static void daemonize(void) {
-              FILE *logf = fopen(DRM_PLAY_LOG, "a");
-              if (logf) {
-                  setvbuf(logf, NULL, _IOLBF, 0);
-                  dup2(fileno(logf), STDERR_FILENO);
-                  if (fileno(logf) > 2) fclose(logf);
-              }
               int devnull = open("/dev/null", O_RDWR);
               if (devnull >= 0) {
                   dup2(devnull, STDIN_FILENO);
                   dup2(devnull, STDOUT_FILENO);
+                  dup2(devnull, STDERR_FILENO);
                   if (devnull > 2) close(devnull);
               }
           }
@@ -1461,7 +1444,6 @@ jobs:
               }
 
               daemonize();
-              fprintf(stderr, "[drm_play] boot anim done, entering main loop\n");
 
               int touch_fd = open_touch();
               int cur_page = 0;
@@ -1515,8 +1497,6 @@ jobs:
                   if (now - last_client_check >= CLIENT_CHECK_SEC) {
                       last_client_check = now;
                       int clients = count_clients();
-                      fprintf(stderr, "[drm_play] client check: wired+wifi=%d, screen_off=%d\n",
-                              clients, screen_off_state);
                       if (clients > 0) {
                           no_client_since = 0;
                           if (screen_off_state) {
@@ -1531,7 +1511,6 @@ jobs:
                               draw_page(-1, fd, crtc_id, conn->connector_id, &conn->modes[0],
                                         info_map, info_pitch, info_fb);
                               screen_off_state = 1;
-                              fprintf(stderr, "[drm_play] screen off (black)\n");
                           }
                       }
                   }
@@ -1558,7 +1537,6 @@ jobs:
                   }
               }
 
-              fprintf(stderr, "[drm_play] exiting, restoring CRTC\n");
               if (touch_fd >= 0) close(touch_fd);
               drm_cleanup(fd, res, conn, dumb, map, fb_id, 2);
               return 0;
@@ -1671,10 +1649,6 @@ jobs:
             无线: ubus → hostapd_cli/iw/iwinfo
             每 20 秒检测一次
 
-          ★ 本版修复 ★
-            有线客户端检测重写，解决只接有线仍黑屏的问题
-            调试日志: cat /tmp/drm_play.log（含客户端计数）
-
           安装:
             scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
             scp 99-bootanim root@192.168.1.1:/etc/init.d/
@@ -1683,11 +1657,6 @@ jobs:
             chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
             /etc/init.d/99-bootanim enable
 
-          排查:
-            cat /tmp/drm_play.log          ← 看 "client check: wired+wifi=N"
-            cat /sys/class/net/eth0/carrier ← 应为 1
-            cat /sys/class/net/eth0/operstate ← 应为 up
-            cat /sys/class/net/eth0/speed   ← 应 > 0
           停止: killall drm_play_arm64
           EOF
 
