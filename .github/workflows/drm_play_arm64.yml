@@ -446,17 +446,25 @@ jobs:
               closedir(d);
           }
 
+          /*
+           * ★ 修复：GC9307 初始化序列时序 ★
+           * 面板初始化总耗时:
+           *   30ms(HW reset) + 180ms(SW Reset 0x01) + ~10ms(SPI cmds)
+           *   + 200ms(Sleep Out 0x11) + 20ms(Display On 0x29) = ~440ms
+           * 加上内核 SPI 驱动开销，安全等待 ≥1100ms。
+           * 原值 200+500=700ms 不够，实测 modetest 需要 ~2s 才稳定。
+           */
           static void spi_rebind(void) {
               if (!g_spi_dev[0]) return;
               char path[PATH_MAX];
 
               snprintf(path, sizeof(path), "/sys/bus/spi/drivers/%s/unbind", SPI_DRIVER_NAME);
               write_file(path, g_spi_dev);
-              usleep(200000);
+              usleep(300000);     /* 300ms: 确保驱动完全释放资源 */
 
               snprintf(path, sizeof(path), "/sys/bus/spi/drivers/%s/bind", SPI_DRIVER_NAME);
               write_file(path, g_spi_dev);
-              usleep(500000);
+              usleep(800000);     /* 800ms: probe 执行 GC9307 初始化序列 */
           }
 
           static void find_dpms_prop(int fd, drmModeConnector *conn) {
@@ -504,28 +512,56 @@ jobs:
               if (g_backlight_path[0]) write_file(g_backlight_path, "0");
           }
 
+          /*
+           * ★ 修复：唤醒准备 ★
+           * spi_rebind() 内部已等 300+800=1100ms，覆盖 GC9307 的 440ms 初始化。
+           * 这里再补 500ms 安全余量（应对内核调度抖动、SPI 总线竞争）。
+           * 总计: 1100 + 500 = 1600ms >> 440ms ✓
+           * 与手动测试 "unbind → sleep 1 → bind → sleep 1 → modetest" 对齐。
+           */
           static void screen_on_prepare(const char *drm_device) {
               spi_rebind();
 
-              for (int i = 0; i < 20; i++) {
+              /* ★ 额外等待 500ms，确保面板完成 Sleep Out + Display On ★ */
+              usleep(500000);
+
+              for (int i = 0; i < 30; i++) {
                   if (access(drm_device, F_OK) == 0)
                       break;
                   usleep(100000);
               }
           }
 
+          /*
+           * ★ 修复：唤醒恢复顺序 ★
+           * 原顺序: DPMS ON → 背光 → SetCrtc × 2
+           * 新顺序: SetCrtc → 等待 → DPMS ON → 背光 → SetCrtc
+           * 原因: panel-mipi-dbi 的 drm_panel_enable() 由 SetCrtc 触发，
+           *       先 DPMS ON 不一定触发 enable。必须先 SetCrtc 让面板
+           *       完成 enable 流程，再开 DPMS 和背光。
+           */
           static void screen_on_restore(int fd, uint32_t conn_id, uint32_t crtc_id,
                                         uint32_t fb_id, drmModeModeInfo *mode) {
+              /* ★ 先 SetCrtc：触发 panel enable (Sleep Out + Display On) ★ */
+              drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
+
+              /* ★ 等待面板从 Sleep In 恢复并接收第一帧 ★ */
+              usleep(200000);
+
+              /* ★ 再开 DPMS ★ */
               if (g_dpms_prop_id)
                   drmModeConnectorSetProperty(fd, conn_id, g_dpms_prop_id, DRM_MODE_DPMS_ON);
 
+              usleep(50000);
+
+              /* ★ 最后开背光 ★ */
               if (g_backlight_path[0]) {
                   char v[16];
                   snprintf(v, sizeof(v), "%d", g_backlight_max);
                   write_file(g_backlight_path, v);
               }
 
-              drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
+              /* ★ 再刷一次确保帧缓冲已送达 ★ */
               usleep(50000);
               drmModeSetCrtc(fd, crtc_id, fb_id, 0, 0, &conn_id, 1, mode);
           }
@@ -1488,6 +1524,7 @@ jobs:
               while (g_running) {
                   int sw = wait_touch(touch_fd, 120);
 
+                  /* ★ 触摸唤醒 ★ */
                   if (sw != 0 && screen_off_state) {
                       screen_on_prepare(drm_device);
 
@@ -1548,6 +1585,7 @@ jobs:
                       int clients = count_clients();
                       if (clients > 0) {
                           no_client_since = 0;
+                          /* ★ 客户端重连唤醒 ★ */
                           if (screen_off_state) {
                               screen_on_prepare(drm_device);
                               drm_cleanup(fd, res, conn, dumb, map, fb_id, 2);
@@ -1822,16 +1860,22 @@ jobs:
             每 20 秒统计一次；连续 60 秒为 0 → 息屏(DPMS OFF+背光归零+黑帧)
             设备重连 → 最多 20 秒内自动亮屏；息屏时触摸可立即唤醒
 
-          ★★★ 息屏唤醒机制（与 99-bootanim 完全对齐）★★★
-            SPI MIPI-DBI 面板在 DPMS OFF 后显示通道会断开，
-            仅靠 SetCrtc 无法恢复。唤醒时必须：
-              1. SPI unbind/rebind（重新初始化面板驱动）
-              2. 等待 /dev/dri/cardX 重新出现
-              3. 关闭旧 DRM fd + 释放所有 FB/mmap
-              4. 重新打开 DRM + 创建新 FB
-              5. 重新探测 DPMS property
-              6. DPMS ON + 背光恢复 + 双次 SetCrtc
-            这与 99-bootanim 启动时的 rebind 流程完全一致。
+          ★★★ 息屏唤醒机制（基于 GC9307 初始化序列时序）★★★
+            GC9307 初始化序列耗时:
+              30ms(HW reset) + 180ms(SW Reset) + ~10ms(SPI cmds)
+              + 200ms(Sleep Out) + 20ms(Display On) = ~440ms
+            唤醒流程:
+              1. SPI unbind → 等 300ms
+              2. SPI bind   → 等 800ms（覆盖面板 440ms 初始化）
+              3. 额外等 500ms 安全余量
+              4. 等 /dev/dri/cardX 重新出现
+              5. 关闭旧 DRM fd + 释放所有 FB/mmap
+              6. 重新打开 DRM + 创建新 FB
+              7. 重新探测 DPMS property
+              8. SetCrtc（触发 panel enable）→ 等 200ms
+              9. DPMS ON → 等 50ms → 背光恢复
+             10. 再次 SetCrtc 确保帧送达
+            总唤醒耗时约 2 秒，与手动 modetest 验证对齐。
 
           ★★★ 刷机后第一步：验证检测脚本（必做）★★★
             ssh 上去:
@@ -1841,7 +1885,7 @@ jobs:
             验证息屏:
               拔掉 LAN 线 + 断开所有 WiFi → 应输出 0 → 60 秒后屏幕熄灭
               重新插线/连 WiFi         → 应 ≥1 → 最多 20 秒内自动亮起
-              息屏状态下触摸屏幕       → 应立即唤醒
+              息屏状态下触摸屏幕       → 应立即唤醒（约 2 秒后亮屏）
 
           第 2 页数据源（按真实缓存格式定稿）:
             主路径: 直接读 /tmp/cache_base_info_* / cache_sim_info_* /
