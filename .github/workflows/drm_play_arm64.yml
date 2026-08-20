@@ -1205,8 +1205,8 @@ jobs:
               }
 
               // 2. ★ 新增：绘制底部渐变遮罩 ★
-              // 从屏幕 45% 的高度开始向下渐变，确保覆盖垂直居中的文字
-              int grad_start_y = SCREEN_H * 45 / 100; 
+              // 从屏幕 20% 的高度开始向下渐变，确保覆盖垂直居中的文字
+              int grad_start_y = SCREEN_H * 20 / 100; 
               int grad_height = SCREEN_H - grad_start_y;
               
               for (int y = grad_start_y; y < SCREEN_H; y++) {
