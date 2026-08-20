@@ -1204,7 +1204,7 @@ jobs:
                   for (int i = 0; i < SCREEN_W * SCREEN_H; i++) canvas[i*4 + 3] = 255;
               }
 
-              // 2. ★ 在文字所在区域绘制半透明暗色底板 ★
+              // 2. ★ 逐行绘制半透明暗色底板（每行独立跟随文字宽度）★
               {
                   FILE *ff = fopen(FONT_PATH, "rb");
                   if (ff) {
@@ -1229,14 +1229,17 @@ jobs:
                                   int y_start = (SCREEN_H - total_h) / 2;
                                   if (y_start < 0) y_start = 0;
 
-                                  /* 计算文字整体边界框 */
-                                  int min_x = SCREEN_W, max_x = 0;
-                                  int min_y = y_start;
-                                  int max_y = y_start + total_h;
+                                  int pad_x = 8;   /* 左右内边距 */
+                                  int pad_y = 4;   /* 上下内边距 */
+                                  int ov = 140;    /* 不透明度 140 ≈ 55% */
+
                                   const char *ls = wrapped_text;
+                                  int cur_y = y_start;
                                   while (ls && *ls) {
                                       const char *le = strchr(ls, '\n');
                                       size_t ll = le ? (size_t)(le - ls) : strlen(ls);
+
+                                      /* 计算本行像素宽度 */
                                       int line_w = 0;
                                       for (size_t i = 0; i < ll; ) {
                                           int cp;
@@ -1247,29 +1250,29 @@ jobs:
                                           stbtt_GetCodepointHMetrics(&font, cp, &adv, NULL);
                                           line_w += (int)(adv * scale);
                                       }
+
+                                      /* 本行居中起始 x */
                                       int xp = (SCREEN_W - line_w) / 2;
                                       if (xp < 0) xp = 0;
-                                      if (xp < min_x) min_x = xp;
-                                      if (xp + line_w > max_x) max_x = xp + line_w;
-                                      ls = le ? le + 1 : NULL;
-                                  }
 
-                                  /* 加 padding（上下左右各 8px） */
-                                  int pad = 8;
-                                  min_x -= pad; if (min_x < 0) min_x = 0;
-                                  max_x += pad; if (max_x > SCREEN_W) max_x = SCREEN_W;
-                                  min_y -= pad; if (min_y < 0) min_y = 0;
-                                  max_y += pad; if (max_y > SCREEN_H) max_y = SCREEN_H;
+                                      /* 本行底板矩形 */
+                                      int bx0 = xp - pad_x;       if (bx0 < 0) bx0 = 0;
+                                      int bx1 = xp + line_w + pad_x; if (bx1 > SCREEN_W) bx1 = SCREEN_W;
+                                      int by0 = cur_y - pad_y;     if (by0 < 0) by0 = 0;
+                                      int by1 = cur_y + line_height + pad_y; if (by1 > SCREEN_H) by1 = SCREEN_H;
 
-                                  /* 半透明黑色覆盖（140 ≈ 55% 不透明度） */
-                                  int ov = 140;
-                                  for (int y = min_y; y < max_y; y++) {
-                                      for (int x = min_x; x < max_x; x++) {
-                                          int idx = (y * SCREEN_W + x) * 4;
-                                          canvas[idx+0] = (uint8_t)((canvas[idx+0] * (255-ov)) >> 8);
-                                          canvas[idx+1] = (uint8_t)((canvas[idx+1] * (255-ov)) >> 8);
-                                          canvas[idx+2] = (uint8_t)((canvas[idx+2] * (255-ov)) >> 8);
+                                      /* 绘制本行半透明黑色底板 */
+                                      for (int y = by0; y < by1; y++) {
+                                          for (int x = bx0; x < bx1; x++) {
+                                              int idx = (y * SCREEN_W + x) * 4;
+                                              canvas[idx+0] = (uint8_t)((canvas[idx+0] * (255-ov)) >> 8);
+                                              canvas[idx+1] = (uint8_t)((canvas[idx+1] * (255-ov)) >> 8);
+                                              canvas[idx+2] = (uint8_t)((canvas[idx+2] * (255-ov)) >> 8);
+                                          }
                                       }
+
+                                      cur_y += line_height;
+                                      ls = le ? le + 1 : NULL;
                                   }
                               }
                           }
@@ -1279,7 +1282,7 @@ jobs:
                   }
               }
 
-              // 3. 绘制文字（此时文字会在底板之上，绝对清晰）
+              // 3. 绘制文字（此时文字会在各行底板之上，绝对清晰）
               render_text_rgba(canvas, SCREEN_W, SCREEN_H, wrapped_text);
           }
 
