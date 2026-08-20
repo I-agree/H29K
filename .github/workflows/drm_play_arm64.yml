@@ -1211,8 +1211,8 @@ jobs:
               
               for (int y = grad_start_y; y < SCREEN_H; y++) {
                   // 计算当前行的遮罩强度 (0 ~ 190)，190 约为 75% 不透明度
-                  // 使用整数运算提升嵌入式性能: (y - start) * 128 / height
-                  int darkness = (y - grad_start_y) * 128 / grad_height;
+                  // 使用整数运算提升嵌入式性能: (y - start) * 190 / height
+                  int darkness = (y - grad_start_y) * 190 / grad_height;
                   // 计算保留的背景亮度比例 (255 - darkness)
                   int keep = 255 - darkness;
                   
