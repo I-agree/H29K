@@ -1204,29 +1204,82 @@ jobs:
                   for (int i = 0; i < SCREEN_W * SCREEN_H; i++) canvas[i*4 + 3] = 255;
               }
 
-              // 2. ★ 新增：绘制底部渐变遮罩 ★
-              // 从屏幕 20% 的高度开始向下渐变，确保覆盖垂直居中的文字
-              int grad_start_y = SCREEN_H * 20 / 100; 
-              int grad_height = SCREEN_H - grad_start_y;
-              
-              for (int y = grad_start_y; y < SCREEN_H; y++) {
-                  // 计算当前行的遮罩强度 (0 ~ 190)，190 约为 75% 不透明度
-                  // 使用整数运算提升嵌入式性能: (y - start) * 190 / height
-                  int darkness = (y - grad_start_y) * 190 / grad_height;
-                  // 计算保留的背景亮度比例 (255 - darkness)
-                  int keep = 255 - darkness;
-                  
-                  for (int x = 0; x < SCREEN_W; x++) {
-                      int idx = (y * SCREEN_W + x) * 4;
-                      // 将 RGB 通道与 keep 值相乘并右移 8 位 (相当于除以 255)
-                      canvas[idx + 0] = (uint8_t)((canvas[idx + 0] * keep) >> 8); // R
-                      canvas[idx + 1] = (uint8_t)((canvas[idx + 1] * keep) >> 8); // G
-                      canvas[idx + 2] = (uint8_t)((canvas[idx + 2] * keep) >> 8); // B
-                      // Alpha 通道保持 255 不变
+              // 2. ★ 在文字所在区域绘制半透明暗色底板 ★
+              {
+                  FILE *ff = fopen(FONT_PATH, "rb");
+                  if (ff) {
+                      fseek(ff, 0, SEEK_END);
+                      long fsize = ftell(ff);
+                      fseek(ff, 0, SEEK_SET);
+                      if (fsize > 0) {
+                          uint8_t *fd = malloc((size_t)fsize);
+                          if (fd && fread(fd, 1, (size_t)fsize, ff) == (size_t)fsize) {
+                              stbtt_fontinfo font;
+                              if (stbtt_InitFont(&font, fd, 0)) {
+                                  float scale = stbtt_ScaleForPixelHeight(&font, FONT_SIZE);
+                                  int ascent, descent, line_gap;
+                                  stbtt_GetFontVMetrics(&font, &ascent, &descent, &line_gap);
+                                  int line_height = (int)((ascent - descent + line_gap) * scale);
+                                  if (line_height <= 0) line_height = (int)(FONT_SIZE + 2);
+
+                                  int num_lines = 1;
+                                  for (const char *p = wrapped_text; *p; p++)
+                                      if (*p == '\n') num_lines++;
+                                  int total_h = num_lines * line_height;
+                                  int y_start = (SCREEN_H - total_h) / 2;
+                                  if (y_start < 0) y_start = 0;
+
+                                  /* 计算文字整体边界框 */
+                                  int min_x = SCREEN_W, max_x = 0;
+                                  int min_y = y_start;
+                                  int max_y = y_start + total_h;
+                                  const char *ls = wrapped_text;
+                                  while (ls && *ls) {
+                                      const char *le = strchr(ls, '\n');
+                                      size_t ll = le ? (size_t)(le - ls) : strlen(ls);
+                                      int line_w = 0;
+                                      for (size_t i = 0; i < ll; ) {
+                                          int cp;
+                                          int bytes = utf8_decode(ls + i, &cp);
+                                          if (i + (size_t)bytes > ll) break;
+                                          i += (size_t)bytes;
+                                          int adv;
+                                          stbtt_GetCodepointHMetrics(&font, cp, &adv, NULL);
+                                          line_w += (int)(adv * scale);
+                                      }
+                                      int xp = (SCREEN_W - line_w) / 2;
+                                      if (xp < 0) xp = 0;
+                                      if (xp < min_x) min_x = xp;
+                                      if (xp + line_w > max_x) max_x = xp + line_w;
+                                      ls = le ? le + 1 : NULL;
+                                  }
+
+                                  /* 加 padding（上下左右各 8px） */
+                                  int pad = 8;
+                                  min_x -= pad; if (min_x < 0) min_x = 0;
+                                  max_x += pad; if (max_x > SCREEN_W) max_x = SCREEN_W;
+                                  min_y -= pad; if (min_y < 0) min_y = 0;
+                                  max_y += pad; if (max_y > SCREEN_H) max_y = SCREEN_H;
+
+                                  /* 半透明黑色覆盖（140 ≈ 55% 不透明度） */
+                                  int ov = 140;
+                                  for (int y = min_y; y < max_y; y++) {
+                                      for (int x = min_x; x < max_x; x++) {
+                                          int idx = (y * SCREEN_W + x) * 4;
+                                          canvas[idx+0] = (uint8_t)((canvas[idx+0] * (255-ov)) >> 8);
+                                          canvas[idx+1] = (uint8_t)((canvas[idx+1] * (255-ov)) >> 8);
+                                          canvas[idx+2] = (uint8_t)((canvas[idx+2] * (255-ov)) >> 8);
+                                      }
+                                  }
+                              }
+                          }
+                          free(fd);
+                      }
+                      fclose(ff);
                   }
               }
 
-              // 3. 绘制文字（此时文字会在渐变遮罩之上，绝对清晰）
+              // 3. 绘制文字（此时文字会在底板之上，绝对清晰）
               render_text_rgba(canvas, SCREEN_W, SCREEN_H, wrapped_text);
           }
 
