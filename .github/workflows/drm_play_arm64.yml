@@ -1191,6 +1191,8 @@ jobs:
               wrap_text(raw_text, wrapped_text, sizeof(wrapped_text), MAX_CHARS_PER_LINE);
               int bg_w = 0, bg_h = 0;
               uint8_t *bg_rgba = fetch_background(&bg_w, &bg_h);
+              
+              // 1. 绘制背景图（或纯黑底）
               if (bg_rgba && bg_w > 0 && bg_h > 0) {
                   stbir_resize(bg_rgba, bg_w, bg_h, 0,
                                canvas, SCREEN_W, SCREEN_H, 0,
@@ -1201,6 +1203,30 @@ jobs:
                   memset(canvas, 0, (size_t)(SCREEN_W * SCREEN_H * 4));
                   for (int i = 0; i < SCREEN_W * SCREEN_H; i++) canvas[i*4 + 3] = 255;
               }
+
+              // 2. ★ 新增：绘制底部渐变遮罩 ★
+              // 从屏幕 45% 的高度开始向下渐变，确保覆盖垂直居中的文字
+              int grad_start_y = SCREEN_H * 45 / 100; 
+              int grad_height = SCREEN_H - grad_start_y;
+              
+              for (int y = grad_start_y; y < SCREEN_H; y++) {
+                  // 计算当前行的遮罩强度 (0 ~ 190)，190 约为 75% 不透明度
+                  // 使用整数运算提升嵌入式性能: (y - start) * 128 / height
+                  int darkness = (y - grad_start_y) * 128 / grad_height;
+                  // 计算保留的背景亮度比例 (255 - darkness)
+                  int keep = 255 - darkness;
+                  
+                  for (int x = 0; x < SCREEN_W; x++) {
+                      int idx = (y * SCREEN_W + x) * 4;
+                      // 将 RGB 通道与 keep 值相乘并右移 8 位 (相当于除以 255)
+                      canvas[idx + 0] = (uint8_t)((canvas[idx + 0] * keep) >> 8); // R
+                      canvas[idx + 1] = (uint8_t)((canvas[idx + 1] * keep) >> 8); // G
+                      canvas[idx + 2] = (uint8_t)((canvas[idx + 2] * keep) >> 8); // B
+                      // Alpha 通道保持 255 不变
+                  }
+              }
+
+              // 3. 绘制文字（此时文字会在渐变遮罩之上，绝对清晰）
               render_text_rgba(canvas, SCREEN_W, SCREEN_H, wrapped_text);
           }
 
