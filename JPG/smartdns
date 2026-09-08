@@ -24,8 +24,19 @@ config ip-rule
 
 config server
 	option enabled '1'
-	option name '阿里 AliDNS'
-	option ip '223.5.5.5'
+	option name '腾讯DNS HTTPS'
+	option ip 'https://doh.pub/dns-query'
+	option type 'https'
+
+config server
+	option enabled '1'
+	option name '腾讯DNS IPv6'
+	option ip '2402:4e00::'
+
+config server
+	option enabled '1'
+	option name '阿里DNS IPv6'
+	option ip '2400:3200::1'
 
 config server
 	option enabled '1'
@@ -34,26 +45,31 @@ config server
 
 config server
 	option enabled '1'
-	option name '中国互联网络信息中心 DNS'
-	option ip '1.2.4.8'
+	option name '阿里DNS'
+	option ip '223.5.5.5'
 
 config server
 	option enabled '1'
-	option name '百度 BaiduDNS'
+	option name '百度DNS'
 	option ip '180.76.76.76'
 
 config server
 	option enabled '1'
-	option name '114 DNS'
+	option name '114DNS'
 	option ip '114.114.114.114'
 
 config server
 	option enabled '1'
-	option name 'CloudFlare'
+	option name 'CloudFlare DNS'
 	option ip '1.1.1.1'
 
 config server
 	option enabled '1'
 	option name 'Google DNS'
 	option ip '8.8.8.8'
+
+config server
+	option enabled '1'
+	option name '中国互联网络信息中心DNS'
+	option ip '1.2.4.8'
 
