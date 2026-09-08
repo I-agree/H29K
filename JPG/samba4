@@ -8,7 +8,7 @@ config samba
 
 config sambashare
 	option name 'H29K的共享磁盘'
-	option path '/data'
+	option path '/data/share'
 	option read_only 'no'
 	option guest_ok 'yes'
 	option create_mask '0666'
