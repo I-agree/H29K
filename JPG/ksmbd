@@ -1,0 +1,16 @@
+
+config globals
+	option workgroup 'WORKGROUP'
+	option description 'Ksmbd on OpenWrt'
+	option interface 'lan'
+	option allow_guest_ipc '1'
+
+config share
+	option name 'H29K的共享磁盘'
+	option path '/mnt/mmcblk0p3'
+	option read_only 'no'
+	option guest_ok 'yes'
+	option create_mask '0666'
+	option dir_mask '0777'
+	option force_root '1'
+
