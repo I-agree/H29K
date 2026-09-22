@@ -6,13 +6,13 @@
 # 1. 启用开机动画
 # 2. 检测 eMMC 剩余空间，创建新分区 (mmcblk0p3)
 # 3. 格式化为 f2fs (专为闪存优化，速度快，寿命长)
-# 4. 配置 /etc/config/fstab 实现开机自动挂载到 /data
+# 4. 配置 /etc/config/fstab 实现开机自动挂载到 /mnt/mmcblk0p3
 # ==============================================================================
 
 LOG_TAG="auto-resize"
 EMMC_DEV="/dev/mmcblk0"
 TARGET_PART="${EMMC_DEV}p3"
-MOUNT_POINT="/data"
+MOUNT_POINT="/mnt/mmcblk0p3"
 FSTAB_CONFIG="/etc/config/fstab"
 
 log_info() {
