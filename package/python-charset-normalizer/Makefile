@@ -8,12 +8,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=python-charset-normalizer
-PKG_VERSION:=3.5.1
+PKG_VERSION:=3.5.2
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/jawah/charset_normalizer.git
-PKG_SOURCE_VERSION:=3.5.1
+PKG_SOURCE_VERSION:=3.5.2
 PKG_MIRROR_HASH:=skip
 
 PKG_LICENSE:=MIT
