@@ -81,12 +81,12 @@ _try_pcie_device()
 
 _scan_usb()
 {
-    ( sleep 15; /usr/bin/modem_scanc scan usb >/dev/null 2>&1 ) &
+    ( sleep 1; /usr/bin/modem_scanc scan usb >/dev/null 2>&1 ) &
 }
 
 _scan_pcie()
 {
-    ( sleep 15; /usr/bin/modem_scanc scan pcie >/dev/null 2>&1 ) &
+    ( sleep 1; /usr/bin/modem_scanc scan pcie >/dev/null 2>&1 ) &
 }
 
 _start_scand()
