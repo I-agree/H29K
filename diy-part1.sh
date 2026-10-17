@@ -10,7 +10,7 @@ set -euo pipefail  # 严格报错模式：任一非条件命令失败立即终�
 echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.default
 
 # === 2. 安装 argon 主题
-git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
+# git clone https://github.com/jerrykuku/luci-theme-argon.git package/luci-theme-argon
 
 # === 3. 安装 glass 主题（原作者停更了）
 git clone https://github.com/I-agree/luci-theme-glass.git package/luci-theme-glass
