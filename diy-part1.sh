@@ -78,6 +78,7 @@ download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm
 download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
 download_and_check "${BASE_URL}/JPG/once-enable-bootanim" "files/etc/uci-defaults/once-enable-bootanim"
 download_and_check "${BASE_URL}/qmodem/misectel_led.sh" "files/usr/share/qmodem/led_scripts/misectel_led.sh"
+download_and_check "${BASE_URL}/qmodem/qmodem_init" "files/etc/init.d/qmodem_init"
 download_and_check "${BASE_URL}/qmodem/qmodem_led" "files/etc/config/qmodem_led"
 download_and_check "${BASE_URL}/package/kernel/axs5106/Makefile" "package/kernel/axs5106/Makefile"
 download_and_check "${BASE_URL}/package/kernel/axs5106/src/Makefile" "package/kernel/axs5106/src/Makefile"
