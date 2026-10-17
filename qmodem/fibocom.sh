@@ -803,7 +803,7 @@ fibocom_get_carrier()
     case "$platform" in
         "mediatek")
             carrier=$(cmd_gtcurcar_query "$at_port" | awk -F'"' '/^\+GTCURCAR:/ {print $2; exit}')
-			[ "$carrier" = "Generic" ] && carrier=""
+            [ "$carrier" = "Generic" ] && carrier=""
             ;;
     esac
     [ -n "$carrier" ] || carrier=$(cmd_cops_query "$at_port" | grep "+COPS" | awk -F'"' '{print $2}')
