@@ -28,6 +28,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/usr/share/splash \
          files/etc/init.d \
          files/usr/share/qmodem/led_scripts \
+         files/usr/share/qmodem/vendor \
          files/etc/config \
          files/usr/sbin \
          files/lib/firmware \
