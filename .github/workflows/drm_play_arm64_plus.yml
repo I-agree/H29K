@@ -1,0 +1,2972 @@
+name: （开机动画）+ 四页触摸信息屏
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-convert:
+    runs-on: ubuntu-26.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Install FFmpeg and tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg xxd
+
+      - name: Download MP4
+        run: |
+          curl -L -o apple.mp4 "https://raw.githubusercontent.com/I-agree/H29K/main/JPG/apple.mp4"
+
+      - name: Convert MP4 to RAW (XRGB8888, 172x172)
+        run: |
+          ffmpeg -i apple.mp4 -f rawvideo -pix_fmt bgr0 apple.raw
+          ls -lh apple.raw
+
+      - name: Embed RAW into C header
+        run: |
+          xxd -i apple.raw > apple_raw.h
+          head -2 apple_raw.h
+
+      - name: Download stb libraries
+        run: |
+          curl -L -o stb_image.h "https://raw.githubusercontent.com/nothings/stb/master/stb_image.h"
+          curl -L -o stb_truetype.h "https://raw.githubusercontent.com/nothings/stb/master/stb_truetype.h"
+          curl -L -o stb_image_resize2.h "https://raw.githubusercontent.com/nothings/stb/master/stb_image_resize2.h"
+          ls -lh stb_*.h
+
+      - name: Install ARM64 Cross-Compiler
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu libc6-dev-arm64-cross
+
+      - name: Setup ARM64 libdrm (Sysroot Method)
+        run: |
+          sudo dpkg --add-architecture arm64
+          UBUNTU_CODENAME=$(lsb_release -cs)
+          echo "deb [arch=arm64 trusted=yes] http://ports.ubuntu.com/ubuntu-ports $UBUNTU_CODENAME main" | sudo tee /etc/apt/sources.list.d/ubuntu-ports-arm64.list
+          sudo apt-get update -o Dir::Etc::sourcelist="/etc/apt/sources.list.d/ubuntu-ports-arm64.list" -o Dir::Etc::sourceparts="-" -o APT::Get::List-Cleanup="0"
+
+          mkdir -p /tmp/arm64-sysroot
+          cd /tmp/arm64-sysroot
+          apt-get download libdrm-dev:arm64 libdrm2:arm64 libdrm-common
+          for deb in *.deb; do
+            dpkg -x "$deb" .
+          done
+
+      - name: Create UI logic header (drm_ui_logic.h)
+        run: |
+          cat << 'ENDOFLOGIC' > drm_ui_logic.h
+          /* drm_ui_logic.h — 纯逻辑（无 I/O、无 DRM、无 stb 依赖），可在宿主机单元测试
+           *
+           * 亮度曲线：DTS brightness-levels 为 0..255 恒等线性（已实测 duty = level/255*25000ns），
+           * 但人眼感知非线性，故 UI 百分比 -> level 采用 gamma 2.2 校正，
+           * 并把可用区间压到 [bl_min, bl_max]，避免用户把屏幕调到全黑后误以为死机。
+           */
+          #ifndef DRM_UI_LOGIC_H
+          #define DRM_UI_LOGIC_H
+
+          #include <math.h>
+
+          #define UIL_GAMMA 2.2
+          /* 低亮度端掺入的线性分量：纯 gamma 在 0~6% 行程会塌缩到同一个 level（死区），
+           * 掺 10% 线性后全程单调可分辨，同时保留 gamma 的感知特性。 */
+          #define UIL_LIN_MIX 0.10
+
+          static inline int uil_clampi(int v, int lo, int hi)
+          {
+              if (hi < lo) { int t = lo; lo = hi; hi = t; }
+              if (v < lo) return lo;
+              if (v > hi) return hi;
+              return v;
+          }
+
+          /* UI 百分比(0..100) -> 背光 level(bl_min..bl_max)，gamma 2.2 + 10% 线性混合 */
+          static inline int uil_ui_to_level(int percent, int bl_min, int bl_max)
+          {
+              double p, t;
+              int lv;
+              if (bl_max <= bl_min) return bl_max;
+              percent = uil_clampi(percent, 0, 100);
+              p = (double)percent / 100.0;
+              t = UIL_LIN_MIX * p + (1.0 - UIL_LIN_MIX) * pow(p, UIL_GAMMA);
+              lv = (int)((double)bl_min + (double)(bl_max - bl_min) * t + 0.5);
+              return uil_clampi(lv, bl_min, bl_max);
+          }
+
+          /* 背光 level -> UI 百分比(0..100)。
+           * 混合曲线没有解析逆函数，用二分查找（uil_ui_to_level 单调不减）取最接近的百分比。 */
+          static inline int uil_level_to_ui(int level, int bl_min, int bl_max)
+          {
+              int lo = 0, hi = 100, best = 0, best_err = 0x7fffffff;
+              if (bl_max <= bl_min) return 100;
+              level = uil_clampi(level, bl_min, bl_max);
+              while (lo <= hi) {
+                  int mid = (lo + hi) / 2;
+                  int lv = uil_ui_to_level(mid, bl_min, bl_max);
+                  int err = lv - level;
+                  if (err < 0) err = -err;
+                  if (err < best_err) { best_err = err; best = mid; }
+                  if (lv < level)      lo = mid + 1;
+                  else if (lv > level) hi = mid - 1;
+                  else                 break;   /* 命中，直接返回最小等价百分比 */
+              }
+              return uil_clampi(best, 0, 100);
+          }
+
+          /* 循环翻页：越界环绕，count<=1 时恒返回 0 */
+          static inline int uil_page_step(int cur, int delta, int count)
+          {
+              if (count <= 1) return 0;
+              return ((cur + delta) % count + count) % count;
+          }
+
+          /* 手势判定：仅垂直滑动翻页。
+           * 返回 +1 = 下一页（上滑），-1 = 上一页（下滑），0 = 不构成翻页。
+           * 水平滑动一律返回 0（亮度页改为拖动滑块，不再用左右滑微调）。 */
+          static inline int uil_swipe_pages(int dx, int dy, int thresh)
+          {
+              int adx = dx < 0 ? -dx : dx;
+              int ady = dy < 0 ? -dy : dy;
+              if (thresh < 1) thresh = 1;
+              if (ady < thresh) return 0;
+              if (adx >= ady) return 0;
+              return (dy < 0) ? 1 : -1;
+          }
+
+          /* 拖动位置 -> 百分比(0..100) */
+          static inline int uil_slider_percent(int x, int x0, int x1)
+          {
+              int span = x1 - x0;
+              if (span <= 0) return 0;
+              return uil_clampi((x - x0) * 100 / span, 0, 100);
+          }
+
+          /* 拖动位置 -> 千分比(0..1000)，用于重启滑条 */
+          static inline int uil_drag_permille(int x, int x0, int travel)
+          {
+              if (travel <= 0) return 0;
+              return uil_clampi((x - x0) * 1000 / travel, 0, 1000);
+          }
+
+          /* 重启是否已到位 */
+          static inline int uil_reboot_armed(int permille, int trigger_permille)
+          {
+              return permille >= trigger_permille ? 1 : 0;
+          }
+
+          #endif /* DRM_UI_LOGIC_H */
+          ENDOFLOGIC
+
+      - name: Create logic unit test (test_logic.c)
+        run: |
+          cat << 'ENDOFTEST' > test_logic.c
+          /* 纯逻辑单元测试：亮度曲线 / 循环翻页 / 手势判定 / 重启拖动 */
+          #include <stdio.h>
+          #include <math.h>
+          #include "drm_ui_logic.h"
+
+          static int g_fail = 0;
+          static int g_pass = 0;
+
+          #define EQ(expr, want) do {                                             \
+                  int _got = (expr);                                              \
+                  if (_got != (want)) {                                           \
+                      printf("FAIL %s:%d  %s => %d, 期望 %d\n",                   \
+                             __FILE__, __LINE__, #expr, _got, (want));            \
+                      g_fail++;                                                   \
+                  } else { g_pass++; }                                            \
+              } while (0)
+
+          #define NEAR(expr, want, tol) do {                                      \
+                  int _got = (expr);                                              \
+                  if (fabs((double)_got - (double)(want)) > (double)(tol)) {      \
+                      printf("FAIL %s:%d  %s => %d, 期望 %d±%d\n",                \
+                             __FILE__, __LINE__, #expr, _got, (want), (tol));     \
+                      g_fail++;                                                   \
+                  } else { g_pass++; }                                            \
+              } while (0)
+
+          #define BL_MIN 16
+          #define BL_MAX 255
+
+          static void test_clamp(void)
+          {
+              printf("-- clamp --\n");
+              EQ(uil_clampi(5, 0, 10), 5);
+              EQ(uil_clampi(-5, 0, 10), 0);
+              EQ(uil_clampi(50, 0, 10), 10);
+              EQ(uil_clampi(0, 0, 10), 0);
+              EQ(uil_clampi(10, 0, 10), 10);
+          }
+
+          static void test_ui_to_level_endpoints(void)
+          {
+              printf("-- ui_to_level 端点 --\n");
+              EQ(uil_ui_to_level(0, BL_MIN, BL_MAX), BL_MIN);
+              EQ(uil_ui_to_level(100, BL_MIN, BL_MAX), BL_MAX);
+              /* 越界入参必须被夹住，不能产生越界 level */
+              EQ(uil_ui_to_level(-30, BL_MIN, BL_MAX), BL_MIN);
+              EQ(uil_ui_to_level(999, BL_MIN, BL_MAX), BL_MAX);
+          }
+
+          static void test_ui_to_level_gamma(void)
+          {
+              printf("-- ui_to_level 感知曲线 --\n");
+              /* 线性映射下 50% 会是 level 135；感知校正必须显著低于它 */
+              EQ(uil_ui_to_level(50, BL_MIN, BL_MAX) < 100, 1);
+              /* 25% 处必须远低于线性值 76，说明分辨率被压到了低亮度区 */
+              EQ(uil_ui_to_level(25, BL_MIN, BL_MAX) < 50, 1);
+              /* 曲线整体形状：四分位点严格递增且都落在合理区间 */
+              EQ(uil_ui_to_level(25, BL_MIN, BL_MAX) > BL_MIN, 1);
+              EQ(uil_ui_to_level(75, BL_MIN, BL_MAX) > uil_ui_to_level(50, BL_MIN, BL_MAX), 1);
+              EQ(uil_ui_to_level(75, BL_MIN, BL_MAX) < BL_MAX, 1);
+          }
+
+          static void test_level_to_ui_endpoints(void)
+          {
+              printf("-- level_to_ui 端点 --\n");
+              EQ(uil_level_to_ui(BL_MIN, BL_MIN, BL_MAX), 0);
+              EQ(uil_level_to_ui(BL_MAX, BL_MIN, BL_MAX), 100);
+              EQ(uil_level_to_ui(0, BL_MIN, BL_MAX), 0);        /* 低于下限时归 0，不能出负数 */
+              EQ(uil_level_to_ui(9999, BL_MIN, BL_MAX), 100);
+              /* 用户实测偏好 level 150：应落在滑块的 60%~85% 区间（既不是顶端也不是底端） */
+              EQ(uil_level_to_ui(150, BL_MIN, BL_MAX) >= 60, 1);
+              EQ(uil_level_to_ui(150, BL_MIN, BL_MAX) <= 85, 1);
+              /* 默认亮度 200 应在滑块上半区 */
+              EQ(uil_level_to_ui(200, BL_MIN, BL_MAX) > uil_level_to_ui(150, BL_MIN, BL_MAX), 1);
+          }
+
+          static void test_no_dead_zone(void)
+          {
+              printf("-- 滑块全程无死区（每 5%% 行程都必须改变亮度）--\n");
+              int p, ok = 1;
+              for (p = 0; p <= 95; p += 5) {
+                  int a = uil_ui_to_level(p, BL_MIN, BL_MAX);
+                  int b = uil_ui_to_level(p + 5, BL_MIN, BL_MAX);
+                  if (b <= a) {
+                      printf("  死区: %d%%(level %d) -> %d%%(level %d)\n", p, a, p + 5, b);
+                      ok = 0;
+                  }
+              }
+              EQ(ok, 1);
+          }
+
+          static void test_curve_monotonic(void)
+          {
+              printf("-- 曲线单调性 --\n");
+              int prev = -1, i;
+              int mono = 1;
+              for (i = 0; i <= 100; i++) {
+                  int lv = uil_ui_to_level(i, BL_MIN, BL_MAX);
+                  if (lv < prev) mono = 0;
+                  if (lv < BL_MIN || lv > BL_MAX) mono = 0;
+                  prev = lv;
+              }
+              EQ(mono, 1);
+
+              prev = -1; mono = 1;
+              for (i = BL_MIN; i <= BL_MAX; i++) {
+                  int p = uil_level_to_ui(i, BL_MIN, BL_MAX);
+                  if (p < prev) mono = 0;
+                  if (p < 0 || p > 100) mono = 0;
+                  prev = p;
+              }
+              EQ(mono, 1);
+          }
+
+          static void test_curve_roundtrip(void)
+          {
+              printf("-- 往返一致性（UI -> level -> UI）--\n");
+              int i, ok = 1;
+              for (i = 0; i <= 100; i++) {
+                  int lv = uil_ui_to_level(i, BL_MIN, BL_MAX);
+                  int back = uil_level_to_ui(lv, BL_MIN, BL_MAX);
+                  /* 底部 10% 行程内 1 个 level 约等于 4% 位移，量化天然偏粗，放宽到 5；
+                   * 中上部必须精细，容差 2。 */
+                  int tol = (i < 10) ? 5 : 2;
+                  if (fabs((double)back - (double)i) > (double)tol) {
+                      printf("  roundtrip 偏差过大: %d%% -> level %d -> %d%% (容差 %d)\n",
+                             i, lv, back, tol);
+                      ok = 0;
+                  }
+              }
+              EQ(ok, 1);
+          }
+
+          static void test_degenerate_range(void)
+          {
+              printf("-- 退化区间 bl_max <= bl_min --\n");
+              EQ(uil_ui_to_level(50, 255, 255), 255);
+              EQ(uil_level_to_ui(255, 255, 255), 100);
+              EQ(uil_ui_to_level(50, 100, 10), 10);
+          }
+
+          static void test_page_step_cyclic(void)
+          {
+              printf("-- 循环翻页 --\n");
+              EQ(uil_page_step(0, 1, 4), 1);
+              EQ(uil_page_step(2, 1, 4), 3);
+              EQ(uil_page_step(3, 1, 4), 0);   /* 末页 -> 首页 */
+              EQ(uil_page_step(0, -1, 4), 3);  /* 首页 -> 末页 */
+              EQ(uil_page_step(1, -1, 4), 0);
+              EQ(uil_page_step(0, 0, 4), 0);
+              EQ(uil_page_step(0, 5, 4), 1);   /* 多步 */
+              EQ(uil_page_step(0, -5, 4), 3);
+              EQ(uil_page_step(0, 1, 1), 0);   /* 单页不死循环 */
+          }
+
+          static void test_swipe_vertical_only(void)
+          {
+              printf("-- 手势：仅垂直翻页 --\n");
+              EQ(uil_swipe_pages(0, -40, 24), 1);    /* 上滑 = 下一页 */
+              EQ(uil_swipe_pages(0, 40, 24), -1);    /* 下滑 = 上一页 */
+              EQ(uil_swipe_pages(-100, 5, 24), 0);   /* 纯水平 = 忽略 */
+              EQ(uil_swipe_pages(120, -10, 24), 0);  /* 纯水平 = 忽略 */
+              EQ(uil_swipe_pages(10, 10, 24), 0);    /* 位移不足 = 忽略 */
+              EQ(uil_swipe_pages(-30, -30, 24), 0);  /* 45° 对角，垂直未占优 = 忽略 */
+              EQ(uil_swipe_pages(-20, -60, 24), 1);  /* 斜上滑但垂直占优 = 下一页 */
+              EQ(uil_swipe_pages(0, 0, 24), 0);
+              EQ(uil_swipe_pages(0, -24, 24), 1);    /* 恰好等于阈值 */
+              EQ(uil_swipe_pages(0, -23, 24), 0);    /* 差 1px 不触发 */
+          }
+
+          static void test_slider_percent(void)
+          {
+              printf("-- 滑块 x -> 百分比 --\n");
+              EQ(uil_slider_percent(24, 24, 296), 0);
+              EQ(uil_slider_percent(296, 24, 296), 100);
+              EQ(uil_slider_percent(160, 24, 296), 50);
+              EQ(uil_slider_percent(-50, 24, 296), 0);    /* 拖出屏幕左侧 */
+              EQ(uil_slider_percent(9999, 24, 296), 100); /* 拖出屏幕右侧 */
+              EQ(uil_slider_percent(100, 100, 100), 0);   /* 退化区间不崩 */
+          }
+
+          static void test_reboot_drag(void)
+          {
+              printf("-- 重启拖动进度 --\n");
+              EQ(uil_drag_permille(0, 0, 200), 0);
+              EQ(uil_drag_permille(200, 0, 200), 1000);
+              EQ(uil_drag_permille(100, 0, 200), 500);
+              EQ(uil_drag_permille(-50, 0, 200), 0);      /* 往左拖出界不回绕 */
+              EQ(uil_drag_permille(9999, 0, 200), 1000);
+              EQ(uil_drag_permille(50, 50, 0), 0);        /* travel=0 不除零 */
+
+              EQ(uil_reboot_armed(0, 900), 0);
+              EQ(uil_reboot_armed(899, 900), 0);   /* 差一点不触发 */
+              EQ(uil_reboot_armed(900, 900), 1);   /* 到位触发 */
+              EQ(uil_reboot_armed(1000, 900), 1);
+          }
+
+          int main(void)
+          {
+              test_clamp();
+              test_ui_to_level_endpoints();
+              test_ui_to_level_gamma();
+              test_level_to_ui_endpoints();
+              test_curve_monotonic();
+              test_curve_roundtrip();
+              test_no_dead_zone();
+              test_degenerate_range();
+              test_page_step_cyclic();
+              test_swipe_vertical_only();
+              test_slider_percent();
+              test_reboot_drag();
+
+              printf("\n==== 通过 %d, 失败 %d ====\n", g_pass, g_fail);
+              return g_fail ? 1 : 0;
+          }
+          ENDOFTEST
+
+      - name: Run unit tests on host (build gate)
+        run: |
+          # 构建前置门禁：亮度曲线 / 循环翻页 / 手势判定 / 拖动换算
+          # 任一断言失败即中断构建，不会产出坏固件
+          gcc -O2 -std=gnu11 -Wall -Wextra -o test_logic test_logic.c -lm
+          ./test_logic
+
+      - name: Create DRM Player C Source
+        run: |
+          cat << 'ENDOFSOURCE' > drm_play.c
+          #define _GNU_SOURCE
+          #include <fcntl.h>
+          #include <unistd.h>
+          #include <sys/mman.h>
+          #include <sys/ioctl.h>
+          #include <sys/stat.h>
+          #include <sys/wait.h>
+          #include <sys/time.h>
+          #include <sys/reboot.h>
+          #include <poll.h>
+          #include <dirent.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <stdarg.h>
+          #include <string.h>
+          #include <time.h>
+          #include <errno.h>
+          #include <signal.h>
+          #include <math.h>
+          #include <limits.h>
+          #include <xf86drm.h>
+          #include <xf86drmMode.h>
+          #include <drm_fourcc.h>
+
+          #define STB_IMAGE_IMPLEMENTATION
+          #define STBI_ONLY_JPEG
+          #define STBI_ONLY_PNG
+          #include "stb_image.h"
+
+          #define STB_TRUETYPE_IMPLEMENTATION
+          #include "stb_truetype.h"
+
+          #define STB_IMAGE_RESIZE_IMPLEMENTATION
+          #include "stb_image_resize2.h"
+
+          #include "apple_raw.h"
+          #include "drm_ui_logic.h"
+
+          #define VIDEO_W       172
+          #define VIDEO_H       172
+          #define BPP           32
+          #define FPS           25
+          #define DURATION      36
+          #define SCREEN_W      320
+          #define SCREEN_H      172
+          #define FONT_PATH     "/usr/share/fonts/MiSans-Regular.ttf"
+          #define FONT_SIZE     28.0f
+          #define REFRESH_SEC   (15 * 60)   /* 第 1 页 15 分钟 */
+          #define INFO_REFRESH_SEC  60      /* 第 2 页 60 秒 */
+          #define HTTP_TIMEOUT  8
+          #define MAX_CHARS_PER_LINE  15
+          /* ★ 第 1 页文字颜色 (R, G, B) ★ */
+          #define TEXT_R   0
+          #define TEXT_G   255
+          #define TEXT_B   255
+          /* ★ 第 2 页字体大小 ★ */
+          #define INFO_TITLE_SIZE  22.0f
+          #define INFO_FONT_SIZE   19.0f
+          #define HITOKOTO_URL  "https://v1.hitokoto.cn/?c=f&max_length=60"
+          #define PICSUM_URL    "https://picsum.photos/320/172"
+          #define HITOKOTO_CACHE "/tmp/.drm_hitokoto"
+          #define BG_CACHE       "/tmp/.drm_bg_img"
+          #define QMODEM_RUNDIR  "/var/run/qmodem"
+          #define QMODEM_DBG     "/tmp/.qmodem_dbg_all"
+          #define DRM_PLAY_LOG   "/tmp/drm_play.log"
+          /* ★ 息屏相关 ★ */
+          #define CLIENT_CHECK_SEC  20       /* 每 20 秒统计一次客户端 */
+          #define SCREEN_OFF_DELAY  60      /* 无设备持续 60 秒 → 息屏 */
+
+          /* ================================================================
+           * ★ 新增：页面 / 背光 / 交互 参数
+           * ================================================================ */
+          #define PAGE_COUNT        4
+          #define PAGE_HITOKOTO     0        /* 一言 + 背景 */
+          #define PAGE_MODEM        1        /* 上网模块信息 */
+          #define PAGE_BRIGHTNESS   2        /* 亮度调节 */
+          #define PAGE_DEVICE       3        /* 设备 / 重启 */
+
+          #define BL_SYSFS_DIR      "/sys/class/backlight"
+          #define BL_MIN_LEVEL      16       /* 滑块下限：低于此值屏幕几乎不可读，且用户会误判死机 */
+          #define BL_DEFAULT_LEVEL  150      /* 无配置文件时的默认亮度（实测 200 偏亮） */
+          #define BL_OFF_LEVEL      0        /* 息屏亮度：DTS 极性反转，duty=0 即背光电流为 0 */
+
+          #define CONF_PATH         "/etc/drm_play.conf"
+          #define CONF_TMP          "/etc/drm_play.conf.tmp"
+
+          #define HOME_TIMEOUT_MS   (120 * 1000L)   /* 非首页静止 2 分钟 → 回首页 */
+          #define SWIPE_THRESH_PX   24              /* 翻页手势最小位移（屏幕像素） */
+          #define DRAG_REDRAW_MS    90              /* 拖动时重绘节流，约 11fps */
+          #define INPUT_POLL_MS     25
+          #define REBOOT_TRIGGER    900             /* 重启滑条需拖到 90% */
+
+          /* 实测方向若相反，把对应值改成 1，或编译时加 -DSWIPE_V_INVERT=1 / -DSLIDER_X_INVERT=1。
+           * 内核已按 DTS 的 touchscreen-swapped-x-y / inverted-x / inverted-y 变换过坐标，
+           * 正常情况下两个开关都应为 0。 */
+          #ifndef SWIPE_V_INVERT
+          #define SWIPE_V_INVERT    0
+          #endif
+          #ifndef SLIDER_X_INVERT
+          #define SLIDER_X_INVERT   0
+          #endif
+
+          /* 触摸释放兜底：驱动正常上报 release 时不会触发。
+           * 若发现"手指按住不动滑块就自己松开了"，把这个值调大。 */
+          #define TOUCH_IDLE_MS     500
+
+          /* 亮度页滑块几何 */
+          #define SL_X0        24
+          #define SL_X1        296
+          #define SL_CY        104
+          #define SL_TRACK_H   8
+          #define SL_HANDLE_R  11
+          #define SL_HIT_PAD_X 20
+          #define SL_HIT_PAD_Y 30
+
+          /* 设备页重启滑条几何 */
+          #define RB_X0        20
+          #define RB_X1        300
+          #define RB_Y0        78
+          #define RB_H         36
+          #define RB_PAD       3
+          #define RB_HANDLE_W  28
+          #define RB_HIT_PAD_X 10
+          #define RB_HIT_PAD_Y 18
+
+          #define MY_EV_SYN   0x00
+          #define MY_EV_KEY   0x01
+          #define MY_EV_ABS   0x03
+          #define MY_SYN_REPORT 0x00
+          #define MY_ABS_X    0x00
+          #define MY_ABS_Y    0x01
+          #define MY_ABS_MT_POSITION_X  0x35
+          #define MY_ABS_MT_POSITION_Y  0x36
+          #define MY_ABS_MT_TRACKING_ID 0x39
+          #define MY_BTN_TOUCH 0x14a
+          #define MY_EV_MAX   0x1f
+          #define MY_ABS_MAX  0x3f
+          #define MY_KEY_MAX  0x2ff
+          #define TEST_BIT(b,arr) ((arr)[(b)/8] & (1u << ((b)%8)))
+          #define MY_IOC_NRBITS   8
+          #define MY_IOC_TYPEBITS 8
+          #define MY_IOC_SIZEBITS 14
+          #define MY_IOC_DIRBITS  2
+          #define MY_IOC_NRSHIFT   0
+          #define MY_IOC_TYPESHIFT (MY_IOC_NRSHIFT + MY_IOC_NRBITS)
+          #define MY_IOC_SIZESHIFT (MY_IOC_TYPESHIFT + MY_IOC_TYPEBITS)
+          #define MY_IOC_DIRSHIFT  (MY_IOC_SIZESHIFT + MY_IOC_SIZEBITS)
+          #define MY_IOC_READ 2U
+          #define MY_IOC(dir,type,nr,size) \
+              (((dir)  << MY_IOC_DIRSHIFT)  | ((type) << MY_IOC_TYPESHIFT) | \
+               ((nr)   << MY_IOC_NRSHIFT)   | ((size) << MY_IOC_SIZESHIFT))
+          #define MY_EVIOCGNAME(len) MY_IOC(MY_IOC_READ, 'E', 0x06, (len))
+          #define MY_EVIOCGBIT(ev,len) MY_IOC(MY_IOC_READ, 'E', 0x20 + (ev), (len))
+          struct my_absinfo { int value, minimum, maximum, fuzz, flat, resolution; };
+          #define MY_EVIOCGABS(abs) MY_IOC(MY_IOC_READ, 'E', 0x40 + (abs), sizeof(struct my_absinfo))
+
+          struct my_input_event {
+              struct timeval time;
+              uint16_t type;
+              uint16_t code;
+              int32_t  value;
+          };
+
+          /* ================================================================ */
+
+          #define FALLBACK_COUNT 4
+          static const char *FALLBACK_TEXTS[FALLBACK_COUNT] = {
+              "山林不向四季起誓，荣枯随缘；\n"
+              "海洋不需对沙滩承诺，遇合尽兴。",
+              "喜欢就处，别问是朋友还是恋人！\n"
+              "关系不是绳子，非要绑住谁的手脚。",
+              "缘分就像山风，吹到哪儿都是风景。\n"
+              "能走一段是礼物，能走一生是运气。",
+              "被你改变的那部分我，\n"
+              "代替了你永远陪在了我的身边。"
+          };
+          static int g_fallback_idx = 0;
+
+          #define FIELD_COUNT 7
+          typedef struct {
+              const char *cands[16];
+              char  value[96];
+              int   filled;
+          } field_t;
+
+          static field_t g_fields[FIELD_COUNT] = {
+              { {"connect_status","Connect Status","connection_status","connected",
+                 "state","connect_state","link_state","连接状态",NULL}, {0}, 0 },
+              { {"temperature","Temperature","temp","temperature_c","modem_temp",
+                 "温度",NULL}, {0}, 0 },
+              { {"SIM Status","sim_status","sim_state","simcard_status","sim",
+                 "SIM卡状态","SIM状态",NULL}, {0}, 0 },
+              { {"isp","ISP","operator","operator_name","service_provider","spn",
+                 "carrier","carrier_name","provider","plmn_name",
+                 "Internet Service Provider","运营商","互联网服务提供商",NULL}, {0}, 0 },
+              /* ★ 刻意不含 "Network Type"/"network_type"：
+                 避免 cache_network_info 的 "NR" 抢先占位，
+                 只显示 cell_info 里更精确的 "NR5G-SA Mode" ★ */
+              { {"network_mode","Network Mode","mode","rat",
+                 "network","net_mode","网络模式",NULL}, {0}, 0 },
+              { {"UL Bandwidth","ul_bandwidth","upload_bandwidth","ul","tx",
+                 "uplink","upload","up_bandwidth","上行带宽",NULL}, {0}, 0 },
+              { {"DL Bandwidth","dl_bandwidth","download_bandwidth","dl","rx",
+                 "downlink","download","下行带宽",NULL}, {0}, 0 },
+          };
+          static char g_section[64] = {0};
+          static char g_ubus_obj[32]    = {0};
+          static char g_method_base[32] = {0};
+          static char g_method_sim[32]  = {0};
+          static char g_method_net[32]  = {0};
+
+          static uint32_t screen_w, screen_h;
+          static volatile sig_atomic_t g_running = 1;
+          static uint8_t *g_canvas[PAGE_COUNT];
+          static long g_canvas_ms[PAGE_COUNT];
+          static uint8_t *g_scratch = NULL;
+          static pid_t g_fetch_pid = 0;
+          static time_t g_last_fetch_try = 0;
+          static drmModeCrtc *g_saved_crtc = NULL;
+
+          /* 字体缓存：避免每帧重复读盘 + 初始化 */
+          static stbtt_fontinfo g_font;
+          static uint8_t *g_font_data = NULL;
+          static int g_font_ok = 0;
+          static int g_font_asc = 0;
+
+          /* 背光状态 */
+          static char g_bl_path[PATH_MAX];
+          static int  g_bl_avail = 0;
+          static int  g_bl_max   = 255;
+          static int  g_bl_level = BL_DEFAULT_LEVEL;
+          static int  g_bl_dirty = 0;
+          static int  g_disp_percent = 0;
+
+          /* 交互状态 */
+          static int  g_drag_mode = 0;      /* 0=无 1=亮度滑块 2=重启滑条 */
+          static int  g_rb_permille = 0;    /* 重启滑条进度 0..1000 */
+
+          typedef struct {
+              int fd;
+              uint32_t crtc_id;
+              uint32_t conn_id;
+              drmModeModeInfo *mode;
+              void *map;
+              uint32_t pitch;
+              uint32_t fb_id;
+          } disp_t;
+
+          void sig_handler(int sig) { (void)sig; g_running = 0; }
+
+          /* ================================================================
+           * 通用工具
+           * ================================================================ */
+
+          static long now_ms(void) {
+              struct timespec ts;
+              clock_gettime(CLOCK_MONOTONIC, &ts);
+              return (long)ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
+          }
+
+          void sleep_ms(int ms) {
+              struct timespec ts = { .tv_sec = ms / 1000, .tv_nsec = (ms % 1000) * 1000000L };
+              nanosleep(&ts, NULL);
+          }
+
+          static void logmsg(const char *fmt, ...) {
+              FILE *f = fopen(DRM_PLAY_LOG, "a");
+              va_list ap;
+              if (!f) return;
+              {
+                  time_t t = time(NULL);
+                  struct tm tmv;
+                  localtime_r(&t, &tmv);
+                  fprintf(f, "[%02d:%02d:%02d] ", tmv.tm_hour, tmv.tm_min, tmv.tm_sec);
+              }
+              va_start(ap, fmt);
+              vfprintf(f, fmt, ap);
+              va_end(ap);
+              fputc('\n', f);
+              fclose(f);
+          }
+
+          static int utf8_decode(const char *s, int *codepoint) {
+              uint8_t c = (uint8_t)s[0];
+              if (c < 0x80) { *codepoint = c; return 1; }
+              else if ((c & 0xE0) == 0xC0) {
+                  *codepoint = c & 0x1F;
+                  if (s[1]) *codepoint = (*codepoint << 6) | ((uint8_t)s[1] & 0x3F);
+                  return 2;
+              } else if ((c & 0xF0) == 0xE0) {
+                  *codepoint = c & 0x0F;
+                  if (s[1]) *codepoint = (*codepoint << 6) | ((uint8_t)s[1] & 0x3F);
+                  if (s[2]) *codepoint = (*codepoint << 6) | ((uint8_t)s[2] & 0x3F);
+                  return 3;
+              } else if ((c & 0xF8) == 0xF0) {
+                  *codepoint = c & 0x07;
+                  if (s[1]) *codepoint = (*codepoint << 6) | ((uint8_t)s[1] & 0x3F);
+                  if (s[2]) *codepoint = (*codepoint << 6) | ((uint8_t)s[2] & 0x3F);
+                  if (s[3]) *codepoint = (*codepoint << 6) | ((uint8_t)s[3] & 0x3F);
+                  return 4;
+              }
+              *codepoint = c;
+              return 1;
+          }
+
+          static void wrap_text(const char *src, char *dst, size_t dst_size, int max_chars) {
+              size_t di = 0;
+              int char_count = 0;
+              while (*src && di < dst_size - 2) {
+                  if (*src == '\n') { dst[di++] = '\n'; char_count = 0; src++; continue; }
+                  int codepoint;
+                  int bytes = utf8_decode(src, &codepoint);
+                  if (char_count >= max_chars) {
+                      dst[di++] = '\n'; char_count = 0;
+                      if (di >= dst_size - 2) break;
+                  }
+                  for (int b = 0; b < bytes && di < dst_size - 1; b++) dst[di++] = src[b];
+                  char_count++;
+                  src += bytes;
+              }
+              dst[di] = '\0';
+          }
+
+          static int ieq(const char *a, const char *b) {
+              if (!a || !b) return 0;
+              while (*a && *b) {
+                  unsigned char x = (unsigned char)*a, y = (unsigned char)*b;
+                  if (x >= 'A' && x <= 'Z') x += 32;
+                  if (y >= 'A' && y <= 'Z') y += 32;
+                  if (x != y) return 0;
+                  a++; b++;
+              }
+              return *a == 0 && *b == 0;
+          }
+
+          static int field_match(const char *cand, const char *key, const char *full) {
+              if (ieq(cand, key)) return 1;
+              if (full && strcmp(cand, full) == 0) return 1;
+              return 0;
+          }
+
+          static void sanitize_value(char *v) {
+              size_t s = 0;
+              while (v[s]==' '||v[s]=='\n'||v[s]=='\r'||v[s]=='\t') s++;
+              if (s) memmove(v, v+s, strlen(v+s)+1);
+              size_t len = strlen(v);
+              while (len>0 && (v[len-1]==' '||v[len-1]=='\n'||v[len-1]=='\r'||v[len-1]=='\t'))
+                  v[--len] = 0;
+              for (char *p=v; *p; p++) if (*p=='\n'||*p=='\r') *p=' ';
+              /* 固件乱码 "掳C" (E6 8E B3 43) → "°C" (C2 B0 43) */
+              char *bad = strstr(v, "\xE6\x8E\xB3""C");
+              if (bad) {
+                  memmove(bad+2, bad+3, strlen(bad+3)+1);
+                  bad[0] = '\xC2'; bad[1] = '\xB0';
+              }
+          }
+
+          static void postprocess_fields(void) {
+              if (g_fields[0].filled) {
+                  if (ieq(g_fields[0].value, "yes") || ieq(g_fields[0].value, "connected"))
+                      strcpy(g_fields[0].value, "已连接");
+                  else if (ieq(g_fields[0].value, "no") || ieq(g_fields[0].value, "disconnected"))
+                      strcpy(g_fields[0].value, "未连接");
+              }
+              if (g_fields[2].filled && ieq(g_fields[2].value, "ready"))
+                  strcpy(g_fields[2].value, "就绪");
+          }
+
+          static int json_get_field(const char *json, const char *key,
+                                    char *out, size_t out_size) {
+              char pattern[128];
+              snprintf(pattern, sizeof(pattern), "\"%s\"", key);
+              const char *p = strstr(json, pattern);
+              if (!p) return -1;
+              p = strchr(p + strlen(pattern), ':');
+              if (!p) return -1;
+              p++;
+              while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+              size_t i = 0;
+              if (*p == '"') {
+                  p++;
+                  while (*p && *p != '"' && i < out_size - 1) {
+                      if (*p == '\\' && *(p+1)) {
+                          p++;
+                          switch (*p) {
+                              case 'n': out[i++] = '\n'; break;
+                              case 't': out[i++] = '\t'; break;
+                              case '"': out[i++] = '"'; break;
+                              case '\\': out[i++] = '\\'; break;
+                              default: out[i++] = *p; break;
+                          }
+                      } else out[i++] = *p;
+                      p++;
+                  }
+              } else {
+                  while (*p && *p != ',' && *p != '}' && *p != ']' &&
+                         *p != '\n' && i < out_size - 1) out[i++] = *p++;
+                  while (i > 0 && (out[i-1]==' '||out[i-1]=='\t'||out[i-1]=='\r')) i--;
+              }
+              out[i] = '\0';
+              return (i > 0) ? 0 : -1;
+          }
+
+          static char *popen_read(const char *cmd) {
+              FILE *fp = popen(cmd, "r");
+              if (!fp) return NULL;
+              size_t cap = 8192, len = 0;
+              char *buf = malloc(cap);
+              if (!buf) { pclose(fp); return NULL; }
+              size_t n;
+              while ((n = fread(buf + len, 1, cap - len - 1, fp)) > 0) {
+                  len += n;
+                  if (len >= cap - 1) {
+                      cap *= 2;
+                      char *t = realloc(buf, cap);
+                      if (!t) { free(buf); pclose(fp); return NULL; }
+                      buf = t;
+                  }
+              }
+              pclose(fp);
+              buf[len] = '\0';
+              return buf;
+          }
+
+          /* ================================================================
+           * ★ 客户端检测
+           * ================================================================ */
+
+          static int read_int_file(const char *path) {
+              FILE *f = fopen(path, "r");
+              if (!f) return -1;
+              int v = -1;
+              if (fscanf(f, "%d", &v) != 1) v = -1;
+              fclose(f);
+              return v;
+          }
+
+          static int read_str_file(const char *path, char *buf, size_t sz) {
+              FILE *f = fopen(path, "r");
+              if (!f) return -1;
+              if (!fgets(buf, (int)sz, f)) { fclose(f); return -1; }
+              fclose(f);
+              size_t len = strlen(buf);
+              while (len > 0 && (buf[len-1] == '\n' || buf[len-1] == '\r' || buf[len-1] == ' '))
+                  buf[--len] = 0;
+              return 0;
+          }
+
+          static int count_wired_clients(void) {
+              int count = 0;
+
+              /* 方法 1：直接检查 eth0 carrier */
+              if (read_int_file("/sys/class/net/eth0/carrier") == 1) {
+                  count++;
+                  goto done;
+              }
+
+              /* 方法 2：检查 eth0 operstate */
+              {
+                  char state[32] = {0};
+                  if (read_str_file("/sys/class/net/eth0/operstate", state, sizeof(state)) == 0) {
+                      if (strcmp(state, "up") == 0) {
+                          count++;
+                          goto done;
+                      }
+                  }
+              }
+
+              /* 方法 3：检查 eth0 speed */
+              {
+                  int speed = read_int_file("/sys/class/net/eth0/speed");
+                  if (speed > 0) {
+                      count++;
+                      goto done;
+                  }
+              }
+
+              /* 方法 4：遍历 br-lan/brif/ */
+              {
+                  DIR *d = opendir("/sys/class/net/br-lan/brif");
+                  if (d) {
+                      struct dirent *de;
+                      while ((de = readdir(d))) {
+                          if (de->d_name[0] == '.') continue;
+                          if (strncmp(de->d_name, "eth", 3) != 0) continue;
+                          if (strcmp(de->d_name, "eth1") == 0) continue;
+                          char cpath[PATH_MAX];
+                          snprintf(cpath, sizeof(cpath), "/sys/class/net/%s/carrier", de->d_name);
+                          if (read_int_file(cpath) == 1) count++;
+                      }
+                      closedir(d);
+                  }
+              }
+
+              /* 方法 5：ethtool 兜底 */
+              if (count == 0) {
+                  char *out = popen_read("ethtool eth0 2>/dev/null | grep 'Link detected' | grep -c 'yes'");
+                  if (out) {
+                      if (atoi(out) > 0) count = 1;
+                      free(out);
+                  }
+              }
+
+          done:
+              return count;
+          }
+
+          static int count_wifi_clients(void) {
+              int total = 0;
+              char ap_ifaces[16][32];
+              int nap = 0;
+              char *out = popen_read(
+                  "ubus call network.wireless status 2>/dev/null | "
+                  "grep -o '\"ifname\" *: *\"[^\"]*\"' | cut -d'\"' -f4");
+              if (out && out[0]) {
+                  char *line = out;
+                  while (*line && nap < 16) {
+                      char *nl = strchr(line, '\n');
+                      size_t len = nl ? (size_t)(nl - line) : strlen(line);
+                      if (len > 0 && len < 32) {
+                          memcpy(ap_ifaces[nap], line, len);
+                          ap_ifaces[nap][len] = 0;
+                          nap++;
+                      }
+                      line = nl ? nl + 1 : line + len;
+                  }
+                  free(out);
+              } else {
+                  if (out) free(out);
+                  static const char *cands[] = {"phy0-ap0","wlan0","ath0","ra0","ap0",NULL};
+                  for (int i = 0; cands[i] && nap < 16; i++) {
+                      char p[PATH_MAX];
+                      snprintf(p, sizeof(p), "/sys/class/net/%s", cands[i]);
+                      if (access(p, F_OK) == 0) {
+                          strncpy(ap_ifaces[nap], cands[i], 31);
+                          ap_ifaces[nap][31] = 0;
+                          nap++;
+                      }
+                  }
+              }
+              for (int i = 0; i < nap; i++) {
+                  char p[PATH_MAX];
+                  snprintf(p, sizeof(p), "/sys/class/net/%s", ap_ifaces[i]);
+                  if (access(p, F_OK) != 0) continue;
+                  int sta = 0;
+                  char cmd[1024];
+                  char *sout;
+                  snprintf(cmd, sizeof(cmd),
+                           "hostapd_cli -i %s all_sta_info 2>/dev/null | grep -c '^sta '",
+                           ap_ifaces[i]);
+                  sout = popen_read(cmd);
+                  if (sout) { sta = atoi(sout); free(sout); }
+                  if (sta <= 0) {
+                      snprintf(cmd, sizeof(cmd),
+                               "iw %s station dump 2>/dev/null | grep -c '^Station'",
+                               ap_ifaces[i]);
+                      sout = popen_read(cmd);
+                      if (sout) { sta = atoi(sout); free(sout); }
+                  }
+                  if (sta <= 0) {
+                      snprintf(cmd, sizeof(cmd),
+                               "iwinfo %s assoclist 2>/dev/null | grep -ci 'dBm'",
+                               ap_ifaces[i]);
+                      sout = popen_read(cmd);
+                      if (sout) { sta = atoi(sout); free(sout); }
+                  }
+                  if (sta > 0) total += sta;
+              }
+              return total;
+          }
+
+          static int count_clients(void) {
+              int wired = count_wired_clients();
+              int wifi  = count_wifi_clients();
+              int total = wired + wifi;
+              return (total > 0) ? total : 0;
+          }
+
+          /* ================================================================
+           * ★ 背光控制
+           *
+           * 实测结论（H29K / OpenWrt 25.12 / 内核 6.18）：
+           *   - 节点 /sys/class/backlight/pinctrl:backlight，驱动 pwm-backlight
+           *   - DTS brightness-levels 为 0..255 恒等线性，duty = level/255 * 25000ns
+           *   - DTS pwms 极性反转 → level 0 时引脚恒高 = LED 驱动关闭 = 背光电流为 0
+           *   - bl_power 由面板驱动（backlight phandle）独占：进程退出关 CRTC 时
+           *     驱动会自动写 bl_power=4。因此本程序【只写 brightness，绝不碰 bl_power】，
+           *     避免与内核驱动互相覆盖。
+           * ================================================================ */
+
+          static int bl_write_raw(int level) {
+              char f[PATH_MAX + 32];
+              FILE *fp;
+              if (!g_bl_avail) return -1;
+              level = uil_clampi(level, 0, g_bl_max);
+              snprintf(f, sizeof(f), "%s/brightness", g_bl_path);
+              fp = fopen(f, "w");
+              if (!fp) return -1;
+              fprintf(fp, "%d", level);
+              fclose(fp);
+              return 0;
+          }
+
+          static int bl_find(void) {
+              DIR *d = opendir(BL_SYSFS_DIR);
+              struct dirent *de;
+              char f[PATH_MAX + 32];
+              int cur;
+
+              if (!d) return 0;
+              while ((de = readdir(d))) {
+                  if (de->d_name[0] == '.') continue;
+                  snprintf(g_bl_path, sizeof(g_bl_path), BL_SYSFS_DIR "/%s", de->d_name);
+                  snprintf(f, sizeof(f), "%s/brightness", g_bl_path);
+                  if (access(f, W_OK) == 0) break;
+                  g_bl_path[0] = 0;
+              }
+              closedir(d);
+              if (!g_bl_path[0]) return 0;
+
+              snprintf(f, sizeof(f), "%s/max_brightness", g_bl_path);
+              cur = read_int_file(f);
+              if (cur > 0) g_bl_max = cur;
+
+              g_bl_avail = 1;
+              snprintf(f, sizeof(f), "%s/brightness", g_bl_path);
+              cur = read_int_file(f);
+              if (cur >= 0 && cur <= g_bl_max) g_bl_level = cur;
+              return 1;
+          }
+
+          /* 设定用户亮度（会写入 sysfs 并更新 g_bl_level） */
+          static void bl_set_level(int level) {
+              level = uil_clampi(level, BL_MIN_LEVEL, g_bl_max);
+              g_bl_level = level;
+              bl_write_raw(level);
+              g_disp_percent = uil_level_to_ui(level, BL_MIN_LEVEL, g_bl_max);
+          }
+
+          /* 息屏：亮度打到 0（背光电流归零）。不动 g_bl_level，唤醒时用它恢复。 */
+          static void bl_screen_off(void) { bl_write_raw(BL_OFF_LEVEL); }
+          /* 亮屏：恢复用户亮度 */
+          static void bl_screen_on(void)  { bl_write_raw(g_bl_level); }
+
+          /* ================================================================
+           * ★ 亮度配置持久化
+           *
+           * 只在拖动结束时写一次，避免拖动过程中上百次写 flash。
+           * 采用 tmp + rename 原子替换，掉电不会留下半个文件。
+           * ================================================================ */
+
+          static void str_trim(char *s) {
+              size_t len;
+              char *p = s;
+              while (*p==' '||*p=='\t'||*p=='\r'||*p=='\n') p++;
+              if (p != s) memmove(s, p, strlen(p) + 1);
+              len = strlen(s);
+              while (len > 0 && (s[len-1]==' '||s[len-1]=='\t'||s[len-1]=='\r'||s[len-1]=='\n'))
+                  s[--len] = 0;
+          }
+
+          static int conf_load(void) {
+              FILE *f = fopen(CONF_PATH, "r");
+              char line[128];
+              int got = -1;
+              if (!f) return -1;
+              while (fgets(line, sizeof(line), f)) {
+                  char *eq = strchr(line, '=');
+                  if (!eq) continue;
+                  *eq = 0;
+                  str_trim(line);
+                  str_trim(eq + 1);
+                  if (strcmp(line, "brightness") == 0) got = atoi(eq + 1);
+              }
+              fclose(f);
+              return got;
+          }
+
+          static int conf_save(int level) {
+              FILE *f = fopen(CONF_TMP, "w");
+              if (!f) return -1;
+              fprintf(f, "# drm_play_arm64 显示配置\nbrightness=%d\n", level);
+              fflush(f);
+              fsync(fileno(f));
+              fclose(f);
+              if (rename(CONF_TMP, CONF_PATH) != 0) {
+                  unlink(CONF_TMP);
+                  return -1;
+              }
+              sync();
+              g_bl_dirty = 0;
+              return 0;
+          }
+
+          /* 启动时初始化背光：先探测节点，再应用配置或默认值。
+           * 必须在第一次 drmModeSetCrtc 之前调用——否则开机动画会以 DTS 默认的
+           * default-brightness-level=200 亮度播放 36 秒。 */
+          static void bl_init_startup(void) {
+              int saved;
+              if (!bl_find()) {
+                  g_bl_level = BL_DEFAULT_LEVEL;
+                  g_disp_percent = uil_level_to_ui(g_bl_level, BL_MIN_LEVEL, 255);
+                  logmsg("backlight: 未找到 %s 下可写节点，亮度调节不可用", BL_SYSFS_DIR);
+                  return;
+              }
+              saved = conf_load();
+              bl_set_level(saved >= 0 ? saved : BL_DEFAULT_LEVEL);
+              g_bl_dirty = 0;
+              logmsg("backlight: %s max=%d 应用 level=%d (%d%%) 来源=%s",
+                     g_bl_path, g_bl_max, g_bl_level, g_disp_percent,
+                     (saved >= 0) ? CONF_PATH : "默认值");
+          }
+
+          /* ================================================================
+           * modem 信息采集
+           * ================================================================ */
+
+          static void get_section(void) {
+              if (g_section[0]) return;
+              char *out = popen_read(
+                  "uci show qmodem 2>/dev/null | "
+                  "sed -n 's/^qmodem\\.\\([^.]*\\)=modem-device$/\\1/p' | head -1");
+              if (out) {
+                  char *nl = strchr(out, '\n'); if (nl) *nl = 0;
+                  char *cr = strchr(out, '\r'); if (cr) *cr = 0;
+                  char *p = out;
+                  while (*p == ' ' || *p == '\t') p++;
+                  strncpy(g_section, p, sizeof(g_section) - 1);
+                  g_section[sizeof(g_section) - 1] = 0;
+                  free(out);
+              }
+          }
+
+          static int fields_filled_count(void) {
+              int c = 0;
+              for (int i = 0; i < FIELD_COUNT; i++) if (g_fields[i].filled) c++;
+              return c;
+          }
+
+          static void try_fill(const char *key, const char *full, const char *val) {
+              if (!val || !val[0]) return;
+              char clean[128];
+              strncpy(clean, val, sizeof(clean) - 1);
+              clean[sizeof(clean) - 1] = 0;
+              sanitize_value(clean);
+              if (!clean[0]) return;
+              for (int i = 0; i < FIELD_COUNT; i++) {
+                  if (g_fields[i].filled) continue;
+                  int hit = 0;
+                  for (int c = 0; g_fields[i].cands[c]; c++) {
+                      if (field_match(g_fields[i].cands[c], key, full)) { hit = 1; break; }
+                  }
+                  if (hit) {
+                      strncpy(g_fields[i].value, clean, sizeof(g_fields[i].value) - 1);
+                      g_fields[i].value[sizeof(g_fields[i].value) - 1] = 0;
+                      g_fields[i].filled = 1;
+                      break;
+                  }
+              }
+          }
+
+          static void scan_array_json(const char *json) {
+              const char *mi = strstr(json, "\"modem_info\"");
+              if (!mi) return;
+              const char *p = strchr(mi, '[');
+              if (!p) return;
+              p++;
+              while (*p) {
+                  while (*p && *p != '{') { if (*p == ']') return; p++; }
+                  if (*p != '{') return;
+                  const char *start = p;
+                  int depth = 0, in_str = 0;
+                  const char *q = p;
+                  for (; *q; q++) {
+                      if (in_str) {
+                          if (*q == '\\' && q[1]) { q++; continue; }
+                          if (*q == '"') in_str = 0;
+                      } else {
+                          if (*q == '"') in_str = 1;
+                          else if (*q == '{') depth++;
+                          else if (*q == '}') { depth--; if (depth == 0) { q++; break; } }
+                      }
+                  }
+                  size_t objlen = (size_t)(q - start);
+                  char *obj = malloc(objlen + 1);
+                  if (!obj) { p = q; continue; }
+                  memcpy(obj, start, objlen);
+                  obj[objlen] = 0;
+                  char key[64] = {0}, full[128] = {0}, val[128] = {0};
+                  json_get_field(obj, "key", key, sizeof(key));
+                  json_get_field(obj, "full_name", full, sizeof(full));
+                  if (json_get_field(obj, "value", val, sizeof(val)) != 0)
+                      if (json_get_field(obj, "val", val, sizeof(val)) != 0)
+                          json_get_field(obj, "data", val, sizeof(val));
+                  try_fill(key, full, val);
+                  free(obj);
+                  p = q;
+              }
+          }
+
+          static void scan_flat_json(const char *json) {
+              for (int i = 0; i < FIELD_COUNT; i++) {
+                  if (g_fields[i].filled) continue;
+                  for (int c = 0; g_fields[i].cands[c]; c++) {
+                      char val[128] = {0};
+                      if (json_get_field(json, g_fields[i].cands[c], val, sizeof(val)) == 0
+                          && val[0]) {
+                          try_fill(g_fields[i].cands[c], NULL, val);
+                          break;
+                      }
+                  }
+              }
+          }
+
+          static void scan_cache_files(FILE *dbg) {
+              DIR *d = opendir("/tmp");
+              if (!d) return;
+              struct dirent *de;
+              while ((de = readdir(d))) {
+                  if (strncmp(de->d_name, "cache_", 6) != 0) continue;
+                  if (!strstr(de->d_name, "info")) continue;
+                  char path[PATH_MAX];
+                  snprintf(path, sizeof(path), "/tmp/%s", de->d_name);
+                  struct stat st;
+                  if (stat(path, &st) != 0 || !S_ISREG(st.st_mode)) continue;
+                  if (st.st_size <= 0 || st.st_size > 65536) continue;
+                  FILE *f = fopen(path, "rb");
+                  if (!f) continue;
+                  char *buf = malloc((size_t)st.st_size + 1);
+                  if (!buf) { fclose(f); continue; }
+                  size_t n = fread(buf, 1, (size_t)st.st_size, f);
+                  fclose(f);
+                  buf[n] = 0;
+                  if (dbg) fprintf(dbg, "== cache file %s (%d bytes) ==\n%s\n\n",
+                                   path, (int)n, buf);
+                  scan_array_json(buf);
+                  free(buf);
+              }
+              closedir(d);
+          }
+
+          static void probe_ubus_obj(FILE *dbg) {
+              static const char *objs[] = {"qmodem", "modem", "modem_scand", "qmodem_scand", NULL};
+              if (g_ubus_obj[0]) return;
+              for (int i = 0; objs[i]; i++) {
+                  char cmd[128];
+                  snprintf(cmd, sizeof(cmd), "ubus -v list %s 2>/dev/null", objs[i]);
+                  char *out = popen_read(cmd);
+                  if (out && out[0]) {
+                      strncpy(g_ubus_obj, objs[i], sizeof(g_ubus_obj) - 1);
+                      if (dbg) fprintf(dbg, "== ubus -v list %s ==\n%s\n", objs[i], out);
+                      free(out);
+                      return;
+                  }
+                  if (out) free(out);
+              }
+          }
+
+          static char *ubus_call_raw(const char *obj, const char *method, const char *sec) {
+              char cmd[320];
+              if (sec && sec[0])
+                  snprintf(cmd, sizeof(cmd),
+                           "ubus call %s %s '{\"config_section\":\"%s\"}' 2>/dev/null",
+                           obj, method, sec);
+              else
+                  snprintf(cmd, sizeof(cmd), "ubus call %s %s 2>/dev/null", obj, method);
+              char *out = popen_read(cmd);
+              if (out && (!out[0] || !strchr(out, '{'))) { free(out); out = NULL; }
+              return out;
+          }
+
+          static void collect_group(FILE *dbg, const char *const methods[], char *cache) {
+              if (!g_ubus_obj[0]) return;
+              const char *list[8];
+              int n = 0;
+              if (cache[0]) list[n++] = cache;
+              for (int i = 0; methods[i] && n < 7; i++) {
+                  int dup = 0;
+                  for (int j = 0; j < n; j++) if (strcmp(list[j], methods[i]) == 0) dup = 1;
+                  if (!dup) list[n++] = methods[i];
+              }
+              int before = fields_filled_count();
+              for (int i = 0; i < n; i++) {
+                  char *json = ubus_call_raw(g_ubus_obj, list[i], g_section);
+                  if (!json) json = ubus_call_raw(g_ubus_obj, list[i], NULL);
+                  if (!json) continue;
+                  if (dbg) fprintf(dbg, "== ubus %s %s ==\n%s\n\n", g_ubus_obj, list[i], json);
+                  scan_array_json(json);
+                  scan_flat_json(json);
+                  free(json);
+                  if (fields_filled_count() > before) {
+                      strncpy(cache, list[i], 31);
+                      cache[31] = 0;
+                      break;
+                  }
+              }
+          }
+
+          static void scan_rundir_file(const char *path, const char *name, FILE *dbg) {
+              FILE *f = fopen(path, "rb");
+              if (!f) return;
+              static char buf[4096];
+              size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+              fclose(f);
+              buf[n] = 0;
+              while (n > 0 && (buf[n-1]=='\n'||buf[n-1]=='\r'||buf[n-1]==' '||buf[n-1]=='\t'))
+                  buf[--n] = 0;
+              if (!n) return;
+              if (dbg) fprintf(dbg, "-- file %s = %s\n", path, buf);
+              if (buf[0] == '{') { scan_array_json(buf); scan_flat_json(buf); }
+              try_fill(name, name, buf);
+          }
+
+          static void scan_rundir(FILE *dbg) {
+              DIR *d = opendir(QMODEM_RUNDIR);
+              if (!d) return;
+              struct dirent *de;
+              while ((de = readdir(d))) {
+                  if (de->d_name[0] == '.') continue;
+                  char path[PATH_MAX];
+                  snprintf(path, sizeof(path), QMODEM_RUNDIR "/%s", de->d_name);
+                  struct stat st;
+                  if (stat(path, &st) != 0) continue;
+                  if (S_ISDIR(st.st_mode)) {
+                      DIR *d2 = opendir(path);
+                      if (!d2) continue;
+                      struct dirent *de2;
+                      while ((de2 = readdir(d2))) {
+                          if (de2->d_name[0] == '.') continue;
+                          char p2[PATH_MAX * 2];
+                          snprintf(p2, sizeof(p2), "%s/%s", path, de2->d_name);
+                          struct stat st2;
+                          if (stat(p2, &st2) == 0 && S_ISREG(st2.st_mode) && st2.st_size < 4000)
+                              scan_rundir_file(p2, de2->d_name, dbg);
+                      }
+                      closedir(d2);
+                  } else if (S_ISREG(st.st_mode) && st.st_size < 4000) {
+                      scan_rundir_file(path, de->d_name, dbg);
+                  }
+              }
+              closedir(d);
+          }
+
+          static void collect_modem_info(void) {
+              for (int i = 0; i < FIELD_COUNT; i++) {
+                  g_fields[i].filled = 0;
+                  g_fields[i].value[0] = 0;
+              }
+              get_section();
+              FILE *dbg = fopen(QMODEM_DBG, "w");
+              scan_cache_files(dbg);
+              if (fields_filled_count() < FIELD_COUNT) {
+                  static const char *M_BASE[] = {"base_info","get_base_info","basic_info",
+                                                 "status","get_status",NULL};
+                  static const char *M_SIM[]  = {"sim_info","get_sim_info","sim_status",
+                                                 "get_sim_status",NULL};
+                  static const char *M_NET[]  = {"network_info","get_network_info","cell_info",
+                                                 "network_status","get_cell_info",NULL};
+                  probe_ubus_obj(dbg);
+                  collect_group(dbg, M_BASE, g_method_base);
+                  collect_group(dbg, M_SIM,  g_method_sim);
+                  collect_group(dbg, M_NET,  g_method_net);
+                  scan_rundir(dbg);
+              }
+              postprocess_fields();
+              if (dbg) fclose(dbg);
+          }
+
+          /* ================================================================
+           * DRM
+           * ================================================================ */
+
+          static int drm_init(const char *drm_device,
+                              drmModeRes **out_res,
+                              drmModeConnector **out_conn,
+                              uint32_t *out_crtc_id) {
+              int fd = open(drm_device, O_RDWR | O_CLOEXEC);
+              if (fd < 0) return -1;
+              uint64_t has_dumb = 0;
+              if (drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &has_dumb) < 0 || !has_dumb) {
+                  close(fd); return -1;
+              }
+              drmModeRes *res = drmModeGetResources(fd);
+              if (!res) { close(fd); return -1; }
+              drmModeConnector *conn = NULL;
+              for (int i = 0; i < res->count_connectors; i++) {
+                  drmModeConnector *c = drmModeGetConnector(fd, res->connectors[i]);
+                  if (!c) continue;
+                  if (c->count_modes > 0) {
+                      conn = c;
+                      screen_w = c->modes[0].hdisplay;
+                      screen_h = c->modes[0].vdisplay;
+                      break;
+                  }
+                  drmModeFreeConnector(c);
+              }
+              if (!conn) { drmModeFreeResources(res); close(fd); return -1; }
+              uint32_t crtc_id = 0;
+              if (conn->encoder_id) {
+                  drmModeEncoder *enc = drmModeGetEncoder(fd, conn->encoder_id);
+                  if (enc) { crtc_id = enc->crtc_id; drmModeFreeEncoder(enc); }
+              }
+              if (!crtc_id && res->count_crtcs > 0) crtc_id = res->crtcs[0];
+              if (!crtc_id) {
+                  drmModeFreeConnector(conn);
+                  drmModeFreeResources(res);
+                  close(fd); return -1;
+              }
+              *out_res = res;
+              *out_conn = conn;
+              *out_crtc_id = crtc_id;
+              return fd;
+          }
+
+          static int drm_create_fb(int fd, struct drm_mode_create_dumb *dumb,
+                                   uint32_t *fb_id, void **map_out) {
+              memset(dumb, 0, sizeof(*dumb));
+              dumb->width = screen_w;
+              dumb->height = screen_h;
+              dumb->bpp = BPP;
+              if (drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, dumb) < 0) return -1;
+              uint32_t handles[4] = {dumb->handle, 0, 0, 0};
+              uint32_t pitches[4] = {dumb->pitch, 0, 0, 0};
+              uint32_t offsets[4] = {0, 0, 0, 0};
+              if (drmModeAddFB2(fd, screen_w, screen_h, DRM_FORMAT_XRGB8888,
+                                handles, pitches, offsets, fb_id, 0) < 0) return -1;
+              struct drm_mode_map_dumb map_req;
+              memset(&map_req, 0, sizeof(map_req));
+              map_req.handle = dumb->handle;
+              if (drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &map_req) < 0) return -1;
+              *map_out = mmap(0, dumb->size, PROT_READ | PROT_WRITE,
+                              MAP_SHARED, fd, map_req.offset);
+              if (*map_out == MAP_FAILED) return -1;
+              memset(*map_out, 0, dumb->size);
+              return 0;
+          }
+
+          static void drm_cleanup(int fd, uint32_t crtc_id, drmModeRes *res,
+                                  drmModeConnector *conn,
+                                  struct drm_mode_create_dumb *dumbs, void **maps,
+                                  uint32_t *fb_ids, int count) {
+              /* 正确关闭 CRTC（原先传 crtc_id=0 会被内核拒为 ENOENT，等于没关）。
+               * 关闭后面板驱动会自行调 backlight_disable()，退出即灭屏。 */
+              if (fd >= 0 && crtc_id)
+                  drmModeSetCrtc(fd, crtc_id, 0, 0, 0, NULL, 0, NULL);
+              for (int i = 0; i < count; i++) {
+                  if (fb_ids[i]) { drmModeRmFB(fd, fb_ids[i]); fb_ids[i] = 0; }
+                  if (maps[i] && maps[i] != MAP_FAILED) {
+                      munmap(maps[i], dumbs[i].size);
+                      maps[i] = NULL;
+                  }
+                  if (dumbs[i].handle) {
+                      struct drm_mode_destroy_dumb dreq;
+                      memset(&dreq, 0, sizeof(dreq));
+                      dreq.handle = dumbs[i].handle;
+                      drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &dreq);
+                      dumbs[i].handle = 0;
+                  }
+              }
+              if (g_saved_crtc) {
+                  uint32_t conn_id = conn ? conn->connector_id : 0;
+                  if (g_saved_crtc->buffer_id != 0 && conn) {
+                      drmModeSetCrtc(fd, g_saved_crtc->crtc_id,
+                                     g_saved_crtc->buffer_id,
+                                     g_saved_crtc->x, g_saved_crtc->y,
+                                     &conn_id, 1, &g_saved_crtc->mode);
+                  }
+                  drmModeFreeCrtc(g_saved_crtc);
+                  g_saved_crtc = NULL;
+              }
+              if (conn) drmModeFreeConnector(conn);
+              if (res) drmModeFreeResources(res);
+              if (fd >= 0) close(fd);
+          }
+
+          /* ================================================================
+           * 绘图原语
+           * ================================================================ */
+
+          static void blend_px(uint8_t *buf, int W, int H, int x, int y,
+                               int r, int g, int b, int a) {
+              int i;
+              if (x < 0 || y < 0 || x >= W || y >= H || a <= 0) return;
+              i = (y * W + x) * 4;
+              if (a >= 255) {
+                  buf[i] = (uint8_t)r; buf[i+1] = (uint8_t)g;
+                  buf[i+2] = (uint8_t)b; buf[i+3] = 255;
+                  return;
+              }
+              buf[i]   = (uint8_t)((r * a + buf[i]   * (255 - a)) / 255);
+              buf[i+1] = (uint8_t)((g * a + buf[i+1] * (255 - a)) / 255);
+              buf[i+2] = (uint8_t)((b * a + buf[i+2] * (255 - a)) / 255);
+              buf[i+3] = 255;
+          }
+
+          static void fill_rect_a(uint8_t *buf, int W, int H, int x, int y, int w, int h,
+                                  int r, int g, int b, int a) {
+              int i, j;
+              for (j = 0; j < h; j++)
+                  for (i = 0; i < w; i++)
+                      blend_px(buf, W, H, x + i, y + j, r, g, b, a);
+          }
+
+          static void fill_round_a(uint8_t *buf, int W, int H, int x, int y, int w, int h,
+                                   int rad, int r, int g, int b, int a) {
+              int i, j;
+              if (w <= 0 || h <= 0) return;
+              if (rad < 0) rad = 0;
+              if (rad > w / 2) rad = w / 2;
+              if (rad > h / 2) rad = h / 2;
+              for (j = 0; j < h; j++) {
+                  for (i = 0; i < w; i++) {
+                      int dx = 0, dy = 0;
+                      if (i < rad && j < rad)                     { dx = rad - i;          dy = rad - j; }
+                      else if (i >= w - rad && j < rad)           { dx = i - (w - rad - 1); dy = rad - j; }
+                      else if (i < rad && j >= h - rad)           { dx = rad - i;          dy = j - (h - rad - 1); }
+                      else if (i >= w - rad && j >= h - rad)      { dx = i - (w - rad - 1); dy = j - (h - rad - 1); }
+                      if ((dx || dy) && (dx * dx + dy * dy) > rad * rad) continue;
+                      blend_px(buf, W, H, x + i, y + j, r, g, b, a);
+                  }
+              }
+          }
+
+          static void fill_circle_a(uint8_t *buf, int W, int H, int cx, int cy, int rad,
+                                    int r, int g, int b, int a) {
+              int i, j;
+              if (rad <= 0) return;
+              for (j = -rad; j <= rad; j++)
+                  for (i = -rad; i <= rad; i++)
+                      if (i * i + j * j <= rad * rad)
+                          blend_px(buf, W, H, cx + i, cy + j, r, g, b, a);
+          }
+
+          static void fill_tri_a(uint8_t *buf, int W, int H,
+                                 int ax, int ay, int bx, int by, int cx, int cy,
+                                 int r, int g, int b, int a) {
+              int minx = ax, maxx = ax, miny = ay, maxy = ay, x, y;
+              double d;
+              if (bx < minx) minx = bx;
+              if (cx < minx) minx = cx;
+              if (bx > maxx) maxx = bx;
+              if (cx > maxx) maxx = cx;
+              if (by < miny) miny = by;
+              if (cy < miny) miny = cy;
+              if (by > maxy) maxy = by;
+              if (cy > maxy) maxy = cy;
+              d = (double)(by - cy) * (ax - cx) + (double)(cx - bx) * (ay - cy);
+              if (d == 0.0) return;
+              for (y = miny; y <= maxy; y++) {
+                  for (x = minx; x <= maxx; x++) {
+                      double u = ((double)(by - cy) * (x - cx) + (double)(cx - bx) * (y - cy)) / d;
+                      double v = ((double)(cy - ay) * (x - cx) + (double)(ax - cx) * (y - cy)) / d;
+                      if (u >= 0.0 && v >= 0.0 && (u + v) <= 1.0)
+                          blend_px(buf, W, H, x, y, r, g, b, a);
+                  }
+              }
+          }
+
+          static void vgrad(uint8_t *buf, int W, int H,
+                            int tr, int tg, int tb, int br, int bg, int bb) {
+              int x, y;
+              int dh = (H > 1) ? (H - 1) : 1;
+              for (y = 0; y < H; y++) {
+                  int r = tr + (br - tr) * y / dh;
+                  int g = tg + (bg - tg) * y / dh;
+                  int b = tb + (bb - tb) * y / dh;
+                  for (x = 0; x < W; x++) {
+                      int i = (y * W + x) * 4;
+                      buf[i] = (uint8_t)r; buf[i+1] = (uint8_t)g;
+                      buf[i+2] = (uint8_t)b; buf[i+3] = 255;
+                  }
+              }
+          }
+
+          static int font_init(void) {
+              FILE *ff;
+              long fsize;
+              uint8_t *data;
+              int desc, lg;
+              if (g_font_ok) return 1;
+              ff = fopen(FONT_PATH, "rb");
+              if (!ff) { logmsg("font: 打不开 %s", FONT_PATH); return 0; }
+              fseek(ff, 0, SEEK_END);
+              fsize = ftell(ff);
+              fseek(ff, 0, SEEK_SET);
+              if (fsize <= 0) { fclose(ff); return 0; }
+              data = malloc((size_t)fsize);
+              if (!data) { fclose(ff); return 0; }
+              if (fread(data, 1, (size_t)fsize, ff) != (size_t)fsize) {
+                  free(data); fclose(ff); return 0;
+              }
+              fclose(ff);
+              if (!stbtt_InitFont(&g_font, data, 0)) { free(data); return 0; }
+              g_font_data = data;
+              stbtt_GetFontVMetrics(&g_font, &g_font_asc, &desc, &lg);
+              g_font_ok = 1;
+              return 1;
+          }
+
+          static void draw_line_rgba(uint8_t *rgba, int W, int H,
+                                     stbtt_fontinfo *font, float scale, int ascent,
+                                     int x, int y, const char *text,
+                                     int r, int g, int b, int max_x) {
+              int pen_x = x;
+              for (size_t i = 0; text[i]; ) {
+                  int cp, bytes = utf8_decode(text + i, &cp);
+                  i += (size_t)bytes;
+                  if (cp == '\n') break;
+                  if (max_x > 0 && pen_x >= max_x) break;
+                  int x0, y0, x1, y1;
+                  stbtt_GetCodepointBitmapBox(font, cp, scale, scale, &x0, &y0, &x1, &y1);
+                  int gw = x1 - x0, gh = y1 - y0;
+                  if (gw > 0 && gh > 0) {
+                      uint8_t *bmp = malloc((size_t)(gw * gh));
+                      if (bmp) {
+                          stbtt_MakeCodepointBitmap(font, bmp, gw, gh, gw, scale, scale, cp);
+                          int bx = pen_x + x0;
+                          int by = y + (int)(ascent * scale) + y0;
+                          for (int row = 0; row < gh; row++) {
+                              for (int col = 0; col < gw; col++) {
+                                  int px = bx + col, py = by + row;
+                                  if (px >= 0 && px < W && py >= 0 && py < H) {
+                                      if (max_x > 0 && px >= max_x) continue;
+                                      uint8_t a = bmp[row * gw + col];
+                                      if (a > 0) {
+                                          int idx = (py * W + px) * 4;
+                                          rgba[idx+0] = (uint8_t)((r * a + rgba[idx+0] * (255 - a)) / 255);
+                                          rgba[idx+1] = (uint8_t)((g * a + rgba[idx+1] * (255 - a)) / 255);
+                                          rgba[idx+2] = (uint8_t)((b * a + rgba[idx+2] * (255 - a)) / 255);
+                                          rgba[idx+3] = 255;
+                                      }
+                                  }
+                              }
+                          }
+                          free(bmp);
+                      }
+                  }
+                  int adv;
+                  stbtt_GetCodepointHMetrics(font, cp, &adv, NULL);
+                  pen_x += (int)(adv * scale);
+              }
+          }
+
+          static int text_width(stbtt_fontinfo *font, float scale, const char *s) {
+              int w = 0;
+              for (size_t i = 0; s[i]; ) {
+                  int cp, bytes = utf8_decode(s + i, &cp);
+                  int adv;
+                  i += (size_t)bytes;
+                  if (cp == '\n') break;
+                  stbtt_GetCodepointHMetrics(font, cp, &adv, NULL);
+                  w += (int)(adv * scale);
+              }
+              return w;
+          }
+
+          static float font_scale(float size) {
+              return stbtt_ScaleForPixelHeight(&g_font, size);
+          }
+
+          /* 左对齐文本 */
+          static void txt_l(uint8_t *buf, int W, int H, float size, int x, int y,
+                            const char *s, int r, int g, int b) {
+              if (!g_font_ok) return;
+              draw_line_rgba(buf, W, H, &g_font, font_scale(size), g_font_asc,
+                             x, y, s, r, g, b, 0);
+          }
+
+          /* 水平居中文本（cx 为中心） */
+          static void txt_c(uint8_t *buf, int W, int H, float size, int cx, int y,
+                            const char *s, int r, int g, int b) {
+              int w;
+              if (!g_font_ok) return;
+              w = text_width(&g_font, font_scale(size), s);
+              draw_line_rgba(buf, W, H, &g_font, font_scale(size), g_font_asc,
+                             cx - w / 2, y, s, r, g, b, 0);
+          }
+
+          /* 右对齐文本（rx 为右边界） */
+          static void txt_r(uint8_t *buf, int W, int H, float size, int rx, int y,
+                            const char *s, int r, int g, int b) {
+              int w;
+              if (!g_font_ok) return;
+              w = text_width(&g_font, font_scale(size), s);
+              draw_line_rgba(buf, W, H, &g_font, font_scale(size), g_font_asc,
+                             rx - w, y, s, r, g, b, 0);
+          }
+
+          /* 页面统一外框：渐变底 + 标题 + 页码 + 分隔线 + 底部提示 */
+          static void page_chrome(uint8_t *buf, int W, int H, const char *title,
+                                  int page_idx, const char *hint) {
+              char pn[16];
+              vgrad(buf, W, H, 22, 25, 32, 8, 9, 13);
+              fill_rect_a(buf, W, H, 0, 0, W, 34, 255, 255, 255, 10);
+              if (!g_font_ok) return;
+              txt_l(buf, W, H, 20.0f, 14, 7, title, 236, 240, 246);
+              snprintf(pn, sizeof(pn), "%d / %d", page_idx + 1, PAGE_COUNT);
+              txt_r(buf, W, H, 20.0f, W - 14, 7, pn, 140, 148, 162);
+              fill_rect_a(buf, W, H, 14, 35, W - 28, 1, 255, 255, 255, 28);
+              if (hint && hint[0])
+                  txt_c(buf, W, H, 12.0f, W / 2, H - 22, hint, 132, 140, 154);
+          }
+
+          /* ================================================================
+           * 网络抓取
+           * ================================================================ */
+
+          static void copy_centered(void *dst, uint32_t pitch,
+                                    const uint8_t *src, uint32_t img_w, uint32_t img_h) {
+              memset(dst, 0, (size_t)pitch * screen_h);
+              int x_off = ((int)screen_w - (int)img_w) / 2;
+              int y_off = ((int)screen_h - (int)img_h) / 2;
+              if (x_off < 0) x_off = 0;
+              if (y_off < 0) y_off = 0;
+              uint32_t cw = (img_w > screen_w) ? screen_w : img_w;
+              uint32_t ch = (img_h > screen_h) ? screen_h : img_h;
+              for (uint32_t y = 0; y < ch; y++)
+                  memcpy((uint8_t *)dst + (y + y_off) * pitch + x_off * 4,
+                         src + y * img_w * 4, cw * 4);
+          }
+
+          static void fetcher_start(void) {
+              if (g_fetch_pid > 0) {
+                  if (waitpid(g_fetch_pid, NULL, WNOHANG) == 0) return;
+                  g_fetch_pid = 0;
+              }
+              pid_t p = fork();
+              if (p == 0) {
+                  char cmd[1024];
+                  int rc;
+                  snprintf(cmd, sizeof(cmd),
+                           "wget -qO /tmp/.ht.new --timeout=%d '%s' 2>/dev/null && mv -f /tmp/.ht.new %s",
+                           HTTP_TIMEOUT, HITOKOTO_URL, HITOKOTO_CACHE);
+                  rc = system(cmd);
+                  snprintf(cmd, sizeof(cmd),
+                           "wget -qO /tmp/.bg.new --timeout=%d '%s' 2>/dev/null && mv -f /tmp/.bg.new %s",
+                           HTTP_TIMEOUT, PICSUM_URL, BG_CACHE);
+                  rc = system(cmd);
+                  (void)rc;
+                  _exit(0);
+              }
+              if (p > 0) g_fetch_pid = p;
+          }
+
+          static int fetcher_poll(void) {
+              if (g_fetch_pid > 0 && waitpid(g_fetch_pid, NULL, WNOHANG) == g_fetch_pid) {
+                  g_fetch_pid = 0;
+                  return 1;
+              }
+              return 0;
+          }
+
+          static void fetch_hitokoto(char *text_buf, size_t buf_size) {
+              char hitokoto[512] = {0};
+              char from[128] = {0};
+              int ok = 0;
+              FILE *f = fopen(HITOKOTO_CACHE, "rb");
+              if (f) {
+                  static char json[8192];
+                  size_t n = fread(json, 1, sizeof(json) - 1, f);
+                  fclose(f);
+                  json[n] = '\0';
+                  if (json_get_field(json, "hitokoto", hitokoto, sizeof(hitokoto)) == 0
+                      && hitokoto[0]) {
+                      json_get_field(json, "from", from, sizeof(from));
+                      ok = 1;
+                  }
+              }
+              if (ok) {
+                  if (from[0]) snprintf(text_buf, buf_size, "%s\n\n——%s", hitokoto, from);
+                  else         snprintf(text_buf, buf_size, "%s", hitokoto);
+              } else {
+                  strncpy(text_buf, FALLBACK_TEXTS[g_fallback_idx], buf_size - 1);
+                  text_buf[buf_size - 1] = '\0';
+                  g_fallback_idx = (g_fallback_idx + 1) % FALLBACK_COUNT;
+              }
+          }
+
+          static uint8_t *fetch_background(int *w, int *h) {
+              int channels;
+              return stbi_load(BG_CACHE, w, h, &channels, 4);
+          }
+
+          /* ================================================================
+           * 各页渲染
+           * ================================================================ */
+
+          /* 第 1 页：一言 + 随机背景（保留原逻辑，字体改为全局缓存） */
+          static void render_text_rgba(uint8_t *rgba, int img_w, int img_h, const char *text) {
+              float scale;
+              int ascent, descent, line_gap, line_height, num_lines, total_h, y_start, cur_y;
+              const char *line_start;
+              char tmp[512];
+
+              if (!g_font_ok) return;
+              scale = font_scale(FONT_SIZE);
+              stbtt_GetFontVMetrics(&g_font, &ascent, &descent, &line_gap);
+              line_height = (int)((ascent - descent + line_gap) * scale);
+              if (line_height <= 0) line_height = (int)(FONT_SIZE + 2);
+              num_lines = 1;
+              for (const char *p = text; *p; p++) if (*p == '\n') num_lines++;
+              total_h = num_lines * line_height;
+              y_start = (img_h - total_h) / 2;
+              if (y_start < 0) y_start = 0;
+
+              line_start = text;
+              cur_y = y_start;
+              while (line_start && *line_start) {
+                  const char *line_end = strchr(line_start, '\n');
+                  size_t line_len = line_end ? (size_t)(line_end - line_start) : strlen(line_start);
+                  size_t cl = (line_len < sizeof(tmp) - 1) ? line_len : sizeof(tmp) - 1;
+                  int x_pos, line_w;
+
+                  memcpy(tmp, line_start, cl);
+                  tmp[cl] = '\0';
+                  line_w = text_width(&g_font, scale, tmp);
+                  x_pos = (img_w - line_w) / 2;
+                  if (x_pos < 0) x_pos = 0;
+                  draw_line_rgba(rgba, img_w, img_h, &g_font, scale, ascent,
+                                 x_pos, cur_y, tmp, TEXT_R, TEXT_G, TEXT_B, 0);
+                  cur_y += line_height;
+                  line_start = line_end ? line_end + 1 : NULL;
+              }
+          }
+
+          static void render_page0_rgba(uint8_t *canvas) {
+              char raw_text[2048];
+              char wrapped_text[4096];
+              fetch_hitokoto(raw_text, sizeof(raw_text));
+              wrap_text(raw_text, wrapped_text, sizeof(wrapped_text), MAX_CHARS_PER_LINE);
+              int bg_w = 0, bg_h = 0;
+              uint8_t *bg_rgba = fetch_background(&bg_w, &bg_h);
+
+              /* 1. 背景图（或纯黑底） */
+              if (bg_rgba && bg_w > 0 && bg_h > 0) {
+                  stbir_resize(bg_rgba, bg_w, bg_h, 0,
+                               canvas, SCREEN_W, SCREEN_H, 0,
+                               STBIR_RGBA, STBIR_TYPE_UINT8,
+                               STBIR_EDGE_CLAMP, STBIR_FILTER_DEFAULT);
+                  stbi_image_free(bg_rgba);
+              } else {
+                  memset(canvas, 0, (size_t)(SCREEN_W * SCREEN_H * 4));
+                  for (int i = 0; i < SCREEN_W * SCREEN_H; i++) canvas[i*4 + 3] = 255;
+              }
+
+              /* 2. 逐行半透明暗色底板（每行独立跟随文字宽度） */
+              if (g_font_ok) {
+                  float scale = font_scale(FONT_SIZE);
+                  int ascent, descent, line_gap;
+                  stbtt_GetFontVMetrics(&g_font, &ascent, &descent, &line_gap);
+                  int line_height = (int)((ascent - descent + line_gap) * scale);
+                  if (line_height <= 0) line_height = (int)(FONT_SIZE + 2);
+
+                  int num_lines = 1;
+                  for (const char *p = wrapped_text; *p; p++) if (*p == '\n') num_lines++;
+                  int total_h = num_lines * line_height;
+                  int y_start = (SCREEN_H - total_h) / 2;
+                  if (y_start < 0) y_start = 0;
+
+                  int pad_x = 8, pad_y = 4, ov = 140;
+                  const char *ls = wrapped_text;
+                  int cur_y = y_start;
+                  while (ls && *ls) {
+                      const char *le = strchr(ls, '\n');
+                      size_t ll = le ? (size_t)(le - ls) : strlen(ls);
+                      int line_w = 0;
+                      for (size_t i = 0; i < ll; ) {
+                          int cp, bytes = utf8_decode(ls + i, &cp);
+                          int adv;
+                          if (i + (size_t)bytes > ll) break;
+                          i += (size_t)bytes;
+                          stbtt_GetCodepointHMetrics(&g_font, cp, &adv, NULL);
+                          line_w += (int)(adv * scale);
+                      }
+                      int xp = (SCREEN_W - line_w) / 2;
+                      if (xp < 0) xp = 0;
+                      int bx0 = xp - pad_x;              if (bx0 < 0) bx0 = 0;
+                      int bx1 = xp + line_w + pad_x;     if (bx1 > SCREEN_W) bx1 = SCREEN_W;
+                      int by0 = cur_y - pad_y;           if (by0 < 0) by0 = 0;
+                      int by1 = cur_y + line_height + pad_y; if (by1 > SCREEN_H) by1 = SCREEN_H;
+                      for (int y = by0; y < by1; y++) {
+                          for (int x = bx0; x < bx1; x++) {
+                              int idx = (y * SCREEN_W + x) * 4;
+                              canvas[idx+0] = (uint8_t)((canvas[idx+0] * (255-ov)) >> 8);
+                              canvas[idx+1] = (uint8_t)((canvas[idx+1] * (255-ov)) >> 8);
+                              canvas[idx+2] = (uint8_t)((canvas[idx+2] * (255-ov)) >> 8);
+                          }
+                      }
+                      cur_y += line_height;
+                      ls = le ? le + 1 : NULL;
+                  }
+              }
+
+              /* 3. 文字 */
+              render_text_rgba(canvas, SCREEN_W, SCREEN_H, wrapped_text);
+          }
+
+          /* 第 2 页：上网模块信息 */
+          static void render_info_page_rgba(uint8_t *rgba, int W, int H) {
+              int y;
+              char line[256];
+              const char *conn = g_fields[0].filled ? g_fields[0].value : "--";
+              const char *temp = g_fields[1].filled ? g_fields[1].value : "--";
+              const char *sim  = g_fields[2].filled ? g_fields[2].value : "--";
+              const char *isp  = g_fields[3].filled ? g_fields[3].value : "--";
+              const char *mode = g_fields[4].filled ? g_fields[4].value : "--";
+              const char *ul   = g_fields[5].filled ? g_fields[5].value : "--";
+              const char *dl   = g_fields[6].filled ? g_fields[6].value : "--";
+
+              for (int i = 0; i < W * H; i++) {
+                  rgba[i*4+0] = 0; rgba[i*4+1] = 0; rgba[i*4+2] = 0; rgba[i*4+3] = 255;
+              }
+              if (!g_font_ok) return;
+              float s_title = font_scale(INFO_TITLE_SIZE);
+              float s_body  = font_scale(INFO_FONT_SIZE);
+
+              draw_line_rgba(rgba, W, H, &g_font, s_title, g_font_asc, 10, 8,
+                             "上网模块信息页", 255, 255, 255, 0);
+              y = 42;
+              snprintf(line, sizeof(line), "连接状态：%s", conn);
+              draw_line_rgba(rgba, W, H, &g_font, s_body, g_font_asc, 10, y, line, 255, 255, 255, 170);
+              snprintf(line, sizeof(line), "温度：%s", temp);
+              draw_line_rgba(rgba, W, H, &g_font, s_body, g_font_asc, 175, y, line, 255, 255, 255, 0);
+              y += 22;
+              snprintf(line, sizeof(line), "SIM卡状态：%s", sim);
+              draw_line_rgba(rgba, W, H, &g_font, s_body, g_font_asc, 10, y, line, 255, 255, 255, 0);
+              y += 22;
+              snprintf(line, sizeof(line), "互联网服务提供商：%s", isp);
+              draw_line_rgba(rgba, W, H, &g_font, s_body, g_font_asc, 10, y, line, 255, 255, 255, 0);
+              y += 22;
+              snprintf(line, sizeof(line), "网络模式：%s", mode);
+              draw_line_rgba(rgba, W, H, &g_font, s_body, g_font_asc, 10, y, line, 255, 255, 255, 0);
+              y += 22;
+              snprintf(line, sizeof(line), "上行带宽：%s", ul);
+              draw_line_rgba(rgba, W, H, &g_font, s_body, g_font_asc, 10, y, line, 255, 255, 255, 170);
+              snprintf(line, sizeof(line), "下行带宽：%s", dl);
+              draw_line_rgba(rgba, W, H, &g_font, s_body, g_font_asc, 175, y, line, 255, 255, 255, 0);
+          }
+
+          /* 第 3 页：亮度调节
+           * percent 为 UI 百分比；dragging=1 时手柄高亮、提示语切换。
+           * 亮度本身通过 sysfs 即时生效，本函数只负责把状态画出来。 */
+          static void render_brightness_page(uint8_t *buf, int W, int H,
+                                            int percent, int dragging) {
+              int tx0 = SL_X0, tx1 = SL_X1;
+              int ty = SL_CY - SL_TRACK_H / 2;
+              int hx, i;
+              char num[16];
+              static const char *const ticks[5] = {"0%", "25%", "50%", "75%", "100%"};
+
+              page_chrome(buf, W, H, "亮度调节", PAGE_BRIGHTNESS,
+                          dragging ? "松手后自动保存" : "上下滑动翻页 · 拖动滑块调节亮度");
+              if (!g_font_ok) return;
+
+              /* 中央大号百分比 */
+              snprintf(num, sizeof(num), "%d%%", uil_clampi(percent, 0, 100));
+              txt_c(buf, W, H, 40.0f, W / 2, 44, num, 0, 220, 235);
+
+              /* 轨道 */
+              fill_round_a(buf, W, H, tx0, ty, tx1 - tx0, SL_TRACK_H, SL_TRACK_H / 2,
+                           58, 62, 72, 255);
+              hx = tx0 + (int)((double)(tx1 - tx0) * uil_clampi(percent, 0, 100) / 100.0 + 0.5);
+              hx = uil_clampi(hx, tx0, tx1);
+              if (hx > tx0)
+                  fill_round_a(buf, W, H, tx0, ty, hx - tx0, SL_TRACK_H, SL_TRACK_H / 2,
+                               0, 220, 235, 255);
+
+              /* 手柄（带阴影） */
+              fill_circle_a(buf, W, H, hx + 1, SL_CY + 2, SL_HANDLE_R, 0, 0, 0, 110);
+              fill_circle_a(buf, W, H, hx, SL_CY, SL_HANDLE_R, 245, 248, 252, 255);
+              fill_circle_a(buf, W, H, hx, SL_CY, SL_HANDLE_R - 5, 0, 220, 235,
+                            dragging ? 255 : 150);
+
+              /* 刻度 */
+              for (i = 0; i <= 4; i++) {
+                  int x = tx0 + (int)((double)(tx1 - tx0) * i / 4.0 + 0.5);
+                  fill_rect_a(buf, W, H, x - 1, SL_CY + 17, 2, 4, 255, 255, 255, 60);
+                  txt_c(buf, W, H, 10.0f, x, SL_CY + 24, ticks[i], 120, 128, 142);
+              }
+
+              /* 背光不可用时给出明确提示，避免用户以为坏了 */
+              if (!g_bl_avail)
+                  txt_c(buf, W, H, 12.0f, W / 2, 88, "未找到背光设备，调节无效",
+                        255, 170, 90);
+          }
+
+          /* 第 4 页：设备 / 重启（拖动滑条到最右触发） */
+          static void render_device_page(uint8_t *buf, int W, int H,
+                                        int permille, int dragging) {
+              int x0 = RB_X0, y0 = RB_Y0, w = RB_X1 - RB_X0, h = RB_H;
+              int travel = w - 2 * RB_PAD - RB_HANDLE_W;
+              int hxp, armed, k;
+
+              permille = uil_clampi(permille, 0, 1000);
+              armed = uil_reboot_armed(permille, REBOOT_TRIGGER);
+
+              page_chrome(buf, W, H, "设备", PAGE_DEVICE, "上下滑动翻页");
+              if (!g_font_ok) return;
+
+              txt_c(buf, W, H, 12.0f, W / 2, 48, "重启会中断当前所有网络连接",
+                    140, 148, 162);
+
+              /* 轨道 */
+              fill_round_a(buf, W, H, x0, y0, w, h, h / 2, 44, 48, 58, 255);
+
+              hxp = x0 + RB_PAD + (int)((double)travel * permille / 1000.0 + 0.5);
+              hxp = uil_clampi(hxp, x0 + RB_PAD, x0 + RB_PAD + travel);
+
+              /* 已拖过的部分 */
+              if (hxp > x0 + RB_PAD) {
+                  if (armed)
+                      fill_round_a(buf, W, H, x0 + RB_PAD, y0 + RB_PAD,
+                                   hxp + RB_HANDLE_W - (x0 + RB_PAD), h - 2 * RB_PAD,
+                                   (h - 2 * RB_PAD) / 2, 198, 44, 44, 255);
+                  else
+                      fill_round_a(buf, W, H, x0 + RB_PAD, y0 + RB_PAD,
+                                   hxp + RB_HANDLE_W - (x0 + RB_PAD), h - 2 * RB_PAD,
+                                   (h - 2 * RB_PAD) / 2, 96, 104, 120, 255);
+              }
+
+              /* 手柄 + 三个箭头 */
+              fill_round_a(buf, W, H, hxp, y0 + RB_PAD, RB_HANDLE_W, h - 2 * RB_PAD,
+                           (h - 2 * RB_PAD) / 2, 235, 240, 248, 255);
+              for (k = 0; k < 3; k++) {
+                  int ax = hxp + 6 + k * 6;
+                  int cy = y0 + h / 2;
+                  int cr = armed ? 90 : 120;
+                  int cg = armed ? 40 : 128;
+                  int cb = armed ? 40 : 140;
+                  fill_tri_a(buf, W, H, ax, cy - 5, ax + 5, cy, ax, cy + 5,
+                             cr, cg, cb, 255);
+              }
+
+              /* 文案 */
+              if (!dragging && permille <= 0) {
+                  txt_c(buf, W, H, 13.0f, (x0 + RB_PAD + RB_HANDLE_W + RB_X1 - RB_PAD) / 2,
+                        y0 + h / 2 - 8, "按住滑块拖到最右以重启设备", 168, 176, 190);
+              } else if (armed) {
+                  txt_c(buf, W, H, 14.0f, W / 2, y0 + h + 14, "松手立即重启",
+                        255, 120, 110);
+              } else {
+                  char ptxt[32];
+                  snprintf(ptxt, sizeof(ptxt), "松开取消 · 已拖动 %d%%", permille / 10);
+                  txt_c(buf, W, H, 13.0f, W / 2, y0 + h + 14, ptxt, 210, 216, 226);
+              }
+          }
+
+          /* 重启确认画面 */
+          static void render_reboot_screen(uint8_t *buf, int W, int H) {
+              vgrad(buf, W, H, 62, 18, 18, 14, 6, 6);
+              if (!g_font_ok) return;
+              txt_c(buf, W, H, 26.0f, W / 2, 58, "正在重启设备", 255, 255, 255);
+              txt_c(buf, W, H, 14.0f, W / 2, 104, "请稍候，不要断电", 255, 200, 195);
+          }
+
+          static void render_black_rgba(uint8_t *rgba) {
+              memset(rgba, 0, (size_t)(SCREEN_W * SCREEN_H * 4));
+              for (int i = 0; i < SCREEN_W * SCREEN_H; i++)
+                  rgba[i * 4 + 3] = 255;
+          }
+
+          static void rgba_to_fb(void *fb, uint32_t pitch,
+                                 const uint8_t *rgba, int img_w, int img_h) {
+              memset(fb, 0, (size_t)pitch * screen_h);
+              int x_off = ((int)screen_w - img_w) / 2;
+              int y_off = ((int)screen_h - img_h) / 2;
+              if (x_off < 0) x_off = 0;
+              if (y_off < 0) y_off = 0;
+              int cw = (img_w > (int)screen_w) ? (int)screen_w : img_w;
+              int ch = (img_h > (int)screen_h) ? (int)screen_h : img_h;
+              for (int y = 0; y < ch; y++) {
+                  uint8_t *dst_row = (uint8_t *)fb + (y + y_off) * pitch + x_off * 4;
+                  const uint8_t *src_row = rgba + y * img_w * 4;
+                  for (int x = 0; x < cw; x++) {
+                      dst_row[x*4 + 0] = src_row[x*4 + 2];
+                      dst_row[x*4 + 1] = src_row[x*4 + 1];
+                      dst_row[x*4 + 2] = src_row[x*4 + 0];
+                      dst_row[x*4 + 3] = 0xFF;
+                  }
+              }
+          }
+
+          static uint8_t *canvas_get(int idx) {
+              if (idx < 0 || idx >= PAGE_COUNT) return NULL;
+              if (!g_canvas[idx])
+                  g_canvas[idx] = malloc((size_t)(SCREEN_W * SCREEN_H) * 4);
+              return g_canvas[idx];
+          }
+
+          static uint8_t *scratch_get(void) {
+              if (!g_scratch)
+                  g_scratch = malloc((size_t)(SCREEN_W * SCREEN_H) * 4);
+              return g_scratch;
+          }
+
+          static void fb_present(disp_t *d, const uint8_t *canvas) {
+              rgba_to_fb(d->map, d->pitch, canvas, SCREEN_W, SCREEN_H);
+              drmModeSetCrtc(d->fd, d->crtc_id, d->fb_id, 0, 0,
+                             &d->conn_id, 1, d->mode);
+          }
+
+          /* page < 0 表示全黑（息屏画面） */
+          static void draw_page(disp_t *d, int page) {
+              uint8_t *c;
+              if (page < 0) {
+                  c = scratch_get();
+                  if (!c) return;
+                  render_black_rgba(c);
+                  fb_present(d, c);
+                  return;
+              }
+              if (page >= PAGE_COUNT) page = PAGE_COUNT - 1;
+              c = canvas_get(page);
+              if (!c) return;
+              switch (page) {
+              case PAGE_HITOKOTO:
+                  render_page0_rgba(c);
+                  break;
+              case PAGE_MODEM:
+                  collect_modem_info();
+                  render_info_page_rgba(c, SCREEN_W, SCREEN_H);
+                  break;
+              case PAGE_BRIGHTNESS:
+                  render_brightness_page(c, SCREEN_W, SCREEN_H,
+                                         g_disp_percent, g_drag_mode == 1);
+                  break;
+              case PAGE_DEVICE:
+                  render_device_page(c, SCREEN_W, SCREEN_H,
+                                     g_rb_permille, g_drag_mode == 2);
+                  break;
+              }
+              fb_present(d, c);
+              g_canvas_ms[page] = now_ms();
+          }
+
+          static void blit_cached(disp_t *d, int page) {
+              if (page < 0 || page >= PAGE_COUNT || !g_canvas[page]) return;
+              fb_present(d, g_canvas[page]);
+          }
+
+          /* 页面切换：第 1/2 页有缓存则先秒显，内容过期再重绘；
+           * 第 3/4 页状态敏感（拖动进度、亮度值），一律重绘。 */
+          static void page_show(disp_t *d, int page) {
+              long age;
+              if (page != PAGE_HITOKOTO && page != PAGE_MODEM) { draw_page(d, page); return; }
+              if (!g_canvas[page]) { draw_page(d, page); return; }
+              blit_cached(d, page);
+              age = now_ms() - g_canvas_ms[page];
+              if (page == PAGE_HITOKOTO) {
+                  if (age >= (long)REFRESH_SEC * 1000L) {
+                      fetcher_start();
+                  }
+              } else if (age >= (long)INFO_REFRESH_SEC * 1000L) {
+                  draw_page(d, page);
+              }
+          }
+
+          /* ================================================================
+           * ★ 输入层（事件级，支持拖动）
+           *
+           * 原 wait_touch() 把整段触摸压缩成 ±1，无法支撑滑块拖动，
+           * 这里改为 DOWN/MOVE/UP/TAP 事件队列。
+           * 原始 ABS 值按 EVIOCGABS 的 min/max 归一化到屏幕像素坐标，
+           * 不假设触摸屏分辨率与屏幕一致。
+           * ================================================================ */
+
+          typedef enum { IE_NONE = 0, IE_DOWN, IE_MOVE, IE_UP, IE_TAP } ie_type_t;
+
+          typedef struct {
+              ie_type_t type;
+              int x, y;             /* 屏幕坐标 */
+              int start_x, start_y; /* 本次手势起点 */
+              int dx, dy;           /* 相对起点的位移 */
+          } input_ev_t;
+
+          #define EVQ_SIZE 32
+          static input_ev_t g_evq[EVQ_SIZE];
+          static int g_evq_n = 0;
+          static int g_touch_release_from_timer = 0;
+          static int g_ev_dropped = 0;
+
+          typedef struct {
+              int in_contact;
+              int have_coord;
+              int raw_x, raw_y;
+              int start_sx, start_sy;
+              int moved;
+              long last_coord_ms;
+          } touch_state_t;
+          static touch_state_t g_ts;
+
+          static int g_ax_min, g_ax_max, g_ay_min, g_ay_max;
+
+          static int to_sx(int raw) {
+              if (g_ax_max <= g_ax_min) return 0;
+              return uil_clampi((raw - g_ax_min) * (SCREEN_W - 1) / (g_ax_max - g_ax_min),
+                                0, SCREEN_W - 1);
+          }
+          static int to_sy(int raw) {
+              if (g_ay_max <= g_ay_min) return 0;
+              return uil_clampi((raw - g_ay_min) * (SCREEN_H - 1) / (g_ay_max - g_ay_min),
+                                0, SCREEN_H - 1);
+          }
+
+          /* 入队。队列满时丢弃【最旧】的一条，绝不丢最新的——
+           * 否则拖动过程中积压的 MOVE 会把 IE_UP 挤掉，滑块会永久卡在拖动态。 */
+          static void evq_push(ie_type_t t, int x, int y, int sx, int sy) {
+              input_ev_t e;
+              if (g_evq_n >= EVQ_SIZE) {
+                  memmove(&g_evq[0], &g_evq[1], sizeof(input_ev_t) * (size_t)(EVQ_SIZE - 1));
+                  g_evq_n = EVQ_SIZE - 1;
+                  g_ev_dropped++;
+              }
+              e.type = t; e.x = x; e.y = y; e.start_x = sx; e.start_y = sy;
+              e.dx = x - sx; e.dy = y - sy;
+              g_evq[g_evq_n++] = e;
+          }
+
+          static void touch_end(int from_timer) {
+              touch_state_t *s = &g_ts;
+              int x = s->have_coord ? to_sx(s->raw_x) : s->start_sx;
+              int y = s->have_coord ? to_sy(s->raw_y) : s->start_sy;
+              if (from_timer) g_touch_release_from_timer++;
+              evq_push(s->moved ? IE_UP : IE_TAP, x, y, s->start_sx, s->start_sy);
+              s->in_contact = 0;
+              s->have_coord = 0;
+              s->moved = 0;
+          }
+
+          static void drain_touch(int fd) {
+              touch_state_t *s = &g_ts;
+              struct my_input_event ev;
+              ssize_t r;
+              int fx = 0, fy = 0, fxv = 0, fyv = 0;
+              int ftid = 0, ftidv = 0, ft = 0, ftv = 0;
+              int last_mx = -1, last_my = -1;
+
+              while ((r = read(fd, &ev, sizeof(ev))) == (ssize_t)sizeof(ev)) {
+                  if (ev.type == MY_EV_ABS) {
+                      if (ev.code == MY_ABS_X || ev.code == MY_ABS_MT_POSITION_X) { fx = 1; fxv = ev.value; }
+                      else if (ev.code == MY_ABS_Y || ev.code == MY_ABS_MT_POSITION_Y) { fy = 1; fyv = ev.value; }
+                      else if (ev.code == MY_ABS_MT_TRACKING_ID) { ftid = 1; ftidv = ev.value; }
+                  } else if (ev.type == MY_EV_KEY && ev.code == MY_BTN_TOUCH) {
+                      ft = 1; ftv = ev.value ? 1 : 0;
+                  } else if (ev.type == MY_EV_SYN && ev.code == MY_SYN_REPORT) {
+                      int raw_down, raw_up;
+                      if (fx || fy) {
+                          if (fx) s->raw_x = fxv;
+                          if (fy) s->raw_y = fyv;
+                          s->have_coord = 1;
+                          s->last_coord_ms = now_ms();
+                      }
+                      raw_down = (ftid && ftidv >= 0) || (ft && ftv);
+                      raw_up   = (ftid && ftidv <  0) || (ft && !ftv);
+
+                      if (raw_down && !s->in_contact) {
+                          s->in_contact = 1;
+                          s->moved = 0;
+                          if (s->have_coord) {
+                              s->start_sx = to_sx(s->raw_x);
+                              s->start_sy = to_sy(s->raw_y);
+                          }
+                          evq_push(IE_DOWN, s->start_sx, s->start_sy,
+                                   s->start_sx, s->start_sy);
+                      } else if (raw_up && s->in_contact) {
+                          touch_end(0);
+                      } else if (s->in_contact && s->have_coord) {
+                          int sx = to_sx(s->raw_x), sy = to_sy(s->raw_y);
+                          if (abs(sx - s->start_sx) > 2 || abs(sy - s->start_sy) > 2)
+                              s->moved = 1;
+                          /* 同一次 drain 内合并重复坐标：触摸屏上报率(~100Hz)远高于
+                           * 重绘率(~11fps)，不合并会把队列灌满。 */
+                          if (sx != last_mx || sy != last_my) {
+                              last_mx = sx; last_my = sy;
+                              evq_push(IE_MOVE, sx, sy, s->start_sx, s->start_sy);
+                          }
+                      }
+                      fx = fy = ftid = ft = 0;
+                  }
+              }
+          }
+
+          static int poll_input(int fd, int timeout_ms, input_ev_t *out) {
+              if (g_evq_n == 0) {
+                  touch_state_t *s = &g_ts;
+                  if (fd < 0) {
+                      sleep_ms(timeout_ms);
+                      return 0;
+                  }
+                  if (s->in_contact && s->last_coord_ms &&
+                      (now_ms() - s->last_coord_ms) > TOUCH_IDLE_MS) {
+                      touch_end(1);
+                  } else {
+                      struct pollfd pfd;
+                      int pr;
+                      pfd.fd = fd; pfd.events = POLLIN; pfd.revents = 0;
+                      pr = poll(&pfd, 1, timeout_ms);
+                      if (pr > 0) drain_touch(fd);
+                  }
+              }
+              if (g_evq_n == 0) return 0;
+              *out = g_evq[0];
+              if (g_evq_n > 1) memmove(&g_evq[0], &g_evq[1], sizeof(input_ev_t) * (size_t)(g_evq_n - 1));
+              g_evq_n--;
+              return 1;
+          }
+
+          static int open_touch(void) {
+              char path[32];
+              for (int i = 0; i < 16; i++) {
+                  struct my_absinfo ai;
+                  int fd;
+                  uint8_t ev_bits[(MY_EV_MAX/8)+1]  = {0};
+                  uint8_t abs_bits[(MY_ABS_MAX/8)+1] = {0};
+                  uint8_t key_bits[(MY_KEY_MAX/8)+1] = {0};
+                  int has_x, is_touch = 0;
+
+                  snprintf(path, sizeof(path), "/dev/input/event%d", i);
+                  fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+                  if (fd < 0) continue;
+                  if (ioctl(fd, MY_EVIOCGBIT(0, sizeof(ev_bits)), ev_bits) < 0) { close(fd); continue; }
+                  if (!TEST_BIT(MY_EV_ABS, ev_bits)) { close(fd); continue; }
+                  if (ioctl(fd, MY_EVIOCGBIT(MY_EV_ABS, sizeof(abs_bits)), abs_bits) < 0) { close(fd); continue; }
+                  has_x = TEST_BIT(MY_ABS_X, abs_bits) || TEST_BIT(MY_ABS_MT_POSITION_X, abs_bits);
+                  if (!has_x) { close(fd); continue; }
+                  if (TEST_BIT(MY_ABS_MT_TRACKING_ID, abs_bits)) is_touch = 1;
+                  if (!is_touch &&
+                      ioctl(fd, MY_EVIOCGBIT(MY_EV_KEY, sizeof(key_bits)), key_bits) >= 0 &&
+                      TEST_BIT(MY_BTN_TOUCH, key_bits)) is_touch = 1;
+                  if (!is_touch) {
+                      char name[128] = {0};
+                      if (ioctl(fd, MY_EVIOCGNAME(sizeof(name)), name) > 0) {
+                          for (char *p = name; *p; p++) if (*p >= 'A' && *p <= 'Z') *p += 32;
+                          if (strstr(name, "touch") || strstr(name, "goodix") ||
+                              strstr(name, "ft5x")  || strstr(name, "gt9")   ||
+                              strstr(name, "gsl")   || strstr(name, "tsc")   ||
+                              strstr(name, "axs")) is_touch = 1;
+                          logmsg("touch: 候选 %s name='%s'", path, name);
+                      }
+                  }
+                  if (!is_touch) { close(fd); continue; }
+
+                  /* 读取 ABS 量程，用于把原始坐标归一化到屏幕像素 */
+                  g_ax_min = 0; g_ax_max = SCREEN_W - 1;
+                  g_ay_min = 0; g_ay_max = SCREEN_H - 1;
+                  if (ioctl(fd, MY_EVIOCGABS(MY_ABS_X), &ai) == 0 && ai.maximum > ai.minimum) {
+                      g_ax_min = ai.minimum; g_ax_max = ai.maximum;
+                  } else if (ioctl(fd, MY_EVIOCGABS(MY_ABS_MT_POSITION_X), &ai) == 0 &&
+                             ai.maximum > ai.minimum) {
+                      g_ax_min = ai.minimum; g_ax_max = ai.maximum;
+                  }
+                  if (ioctl(fd, MY_EVIOCGABS(MY_ABS_Y), &ai) == 0 && ai.maximum > ai.minimum) {
+                      g_ay_min = ai.minimum; g_ay_max = ai.maximum;
+                  } else if (ioctl(fd, MY_EVIOCGABS(MY_ABS_MT_POSITION_Y), &ai) == 0 &&
+                             ai.maximum > ai.minimum) {
+                      g_ay_min = ai.minimum; g_ay_max = ai.maximum;
+                  }
+                  logmsg("touch: 使用 %s  X[%d..%d]->0..%d  Y[%d..%d]->0..%d",
+                         path, g_ax_min, g_ax_max, SCREEN_W - 1,
+                         g_ay_min, g_ay_max, SCREEN_H - 1);
+                  return fd;
+              }
+              logmsg("touch: 未找到可用触摸设备，交互不可用");
+              return -1;
+          }
+
+          /* ================================================================
+           * 命中测试 / 拖动换算
+           * ================================================================ */
+
+          static int hit_slider(int x, int y) {
+              return (y >= SL_CY - SL_HIT_PAD_Y && y <= SL_CY + SL_HIT_PAD_Y &&
+                      x >= SL_X0 - SL_HIT_PAD_X && x <= SL_X1 + SL_HIT_PAD_X);
+          }
+
+          static int hit_reboot(int x, int y) {
+              return (y >= RB_Y0 - RB_HIT_PAD_Y && y <= RB_Y0 + RB_H + RB_HIT_PAD_Y &&
+                      x >= RB_X0 - RB_HIT_PAD_X && x <= RB_X1 + RB_HIT_PAD_X);
+          }
+
+          static int reboot_travel(void) {
+              return (RB_X1 - RB_X0) - 2 * RB_PAD - RB_HANDLE_W;
+          }
+
+          /* 手指 x -> 重启滑条千分比（以手柄中心为基准） */
+          static int reboot_permille_from_x(int x) {
+              return uil_drag_permille(x, RB_X0 + RB_PAD + RB_HANDLE_W / 2, reboot_travel());
+          }
+
+          /* 手指 x -> UI 百分比（含方向开关），供显示与调光共用 */
+          static int slider_percent_at(int x) {
+              int p = uil_slider_percent(x, SL_X0, SL_X1);
+          #if SLIDER_X_INVERT
+              p = 100 - p;
+          #endif
+              return p;
+          }
+
+          /* 手指 x -> 亮度（立即写 sysfs） */
+          static void brightness_from_x(int x) {
+              int p = slider_percent_at(x);
+              int lv = uil_ui_to_level(p, BL_MIN_LEVEL, g_bl_max);
+              g_disp_percent = p;
+              if (lv != g_bl_level) {
+                  g_bl_level = lv;
+                  bl_write_raw(lv);
+                  g_bl_dirty = 1;
+              }
+          }
+
+          /* ================================================================
+           * 重启动作
+           * ================================================================ */
+
+          static void do_reboot(disp_t *d) {
+              uint8_t *c = scratch_get();
+              logmsg("reboot: 用户拖动重启滑条到位，执行重启");
+              if (g_bl_dirty) conf_save(g_bl_level);
+              if (c) {
+                  render_reboot_screen(c, SCREEN_W, SCREEN_H);
+                  fb_present(d, c);
+              }
+              bl_write_raw(g_bl_avail ? uil_clampi(g_bl_level, BL_MIN_LEVEL, g_bl_max) : 200);
+              sync();
+              {
+                  pid_t p = fork();
+                  if (p == 0) {
+                      setsid();
+                      execl("/sbin/reboot", "reboot", (char *)NULL);
+                      execl("/bin/busybox", "reboot", (char *)NULL);
+                      _exit(1);
+                  }
+              }
+              /* 等 procd 完成关机流程；超时则内核兜底 */
+              for (int i = 0; i < 40; i++) {
+                  sleep_ms(250);
+                  if (!g_running) break;
+              }
+              sync();
+              reboot(RB_AUTOBOOT);
+              _exit(0);
+          }
+
+          /* 唤醒：内容先推、背光后开，全程无白闪。
+           * 若静止已超过回首页时限，直接落到首页，避免半夜摸屏停在重启页。 */
+          static int wake_screen(disp_t *d, int cur_page, long idle_ms, time_t *last_refresh) {
+              if (idle_ms >= HOME_TIMEOUT_MS) cur_page = PAGE_HITOKOTO;
+              g_drag_mode = 0;
+              g_rb_permille = 0;
+              g_disp_percent = uil_level_to_ui(g_bl_level, BL_MIN_LEVEL, g_bl_max);
+              /* 背光此时仍为 0，推送过程不可见，无需先刷黑帧，省一次 ~80ms SPI 传输 */
+              draw_page(d, cur_page);
+              bl_screen_on();
+              g_evq_n = 0;                      /* 清空积压事件，唤醒这一下不触发任何操作 */
+              *last_refresh = time(NULL);
+              return cur_page;
+          }
+
+          /* ================================================================
+           * main
+           * ================================================================ */
+
+          static void daemonize(void) {
+              int devnull = open("/dev/null", O_RDWR);
+              if (devnull >= 0) {
+                  dup2(devnull, STDIN_FILENO);
+                  dup2(devnull, STDOUT_FILENO);
+                  dup2(devnull, STDERR_FILENO);
+                  if (devnull > 2) close(devnull);
+              }
+          }
+
+          int main(int argc, char *argv[]) {
+              const char *drm_device = (argc > 1) ? argv[1] : "/dev/dri/card1";
+              drmModeRes *res;
+              drmModeConnector *conn;
+              uint32_t crtc_id;
+              struct drm_mode_create_dumb dumb[2];
+              void *map[2];
+              uint32_t fb_id[2];
+              int fd, i;
+              size_t frame_size;
+              long total_frames, total_duration_frames, frame_count;
+              time_t start_time;
+              int cur;
+              int touch_fd, cur_page;
+              disp_t d;
+              time_t last_refresh;
+              int screen_off_state = 0;
+              time_t no_client_since = 0, last_client_check = 0;
+              long last_activity_ms, last_drag_draw_ms = 0;
+
+              signal(SIGPIPE, SIG_IGN);
+              signal(SIGTERM, sig_handler);
+              signal(SIGINT, sig_handler);
+
+              memset(dumb, 0, sizeof(dumb));
+              memset(map, 0, sizeof(map));
+              memset(fb_id, 0, sizeof(fb_id));
+              memset(g_canvas_ms, 0, sizeof(g_canvas_ms));
+
+              font_init();
+
+              /* ★ 背光必须在第一次 SetCrtc 之前设定，否则开机动画会用 DTS 默认亮度 200 播放 */
+              bl_init_startup();
+
+              fd = drm_init(drm_device, &res, &conn, &crtc_id);
+              if (fd < 0) { logmsg("drm: 打不开 %s", drm_device); return 1; }
+              g_saved_crtc = drmModeGetCrtc(fd, crtc_id);
+
+              for (i = 0; i < 2; i++) {
+                  if (drm_create_fb(fd, &dumb[i], &fb_id[i], &map[i]) < 0) {
+                      logmsg("drm: 创建 framebuffer %d 失败", i);
+                      drm_cleanup(fd, crtc_id, res, conn, dumb, map, fb_id, 2);
+                      return 1;
+                  }
+              }
+
+              d.fd = fd; d.crtc_id = crtc_id;
+              d.conn_id = conn->connector_id; d.mode = &conn->modes[0];
+              d.map = map[0]; d.pitch = dumb[0].pitch; d.fb_id = fb_id[0];
+
+              logmsg("start: dev=%s %ux%u crtc=%u 背光level=%d",
+                     drm_device, screen_w, screen_h, crtc_id, g_bl_level);
+
+              /* ---------- 开机动画 ---------- */
+              frame_size = VIDEO_W * VIDEO_H * (BPP / 8);
+              total_frames = (long)(apple_raw_len / frame_size);
+              total_duration_frames = FPS * DURATION;
+              if (total_frames <= 0) total_frames = 1;
+
+              copy_centered(map[0], dumb[0].pitch, apple_raw, VIDEO_W, VIDEO_H);
+              drmModeSetCrtc(fd, crtc_id, fb_id[0], 0, 0,
+                             &conn->connector_id, 1, &conn->modes[0]);
+
+              cur = 1;
+              frame_count = 1;
+              start_time = time(NULL);
+              while (frame_count < total_duration_frames && g_running) {
+                  long fi;
+                  if (difftime(time(NULL), start_time) >= DURATION) break;
+                  fi = frame_count % total_frames;
+                  copy_centered(map[cur], dumb[cur].pitch,
+                                apple_raw + fi * frame_size, VIDEO_W, VIDEO_H);
+                  drmModeSetCrtc(fd, crtc_id, fb_id[cur], 0, 0,
+                                 &conn->connector_id, 1, &conn->modes[0]);
+                  cur = 1 - cur;
+                  frame_count++;
+                  sleep_ms(1000 / FPS);
+              }
+
+              daemonize();
+
+              /* ---------- 信息屏主循环 ---------- */
+              touch_fd = open_touch();
+              cur_page = PAGE_HITOKOTO;
+              g_disp_percent = uil_level_to_ui(g_bl_level, BL_MIN_LEVEL, g_bl_max);
+
+              fetcher_start();
+              draw_page(&d, cur_page);
+              last_refresh = time(NULL);
+              last_activity_ms = now_ms();
+
+              while (g_running) {
+                  input_ev_t ev;
+                  long now;
+                  int has;
+
+                  has = poll_input(touch_fd, INPUT_POLL_MS, &ev);
+                  now = now_ms();
+
+                  /* ---- 输入处理 ---- */
+                  if (has) {
+                      long idle = now - last_activity_ms;
+                      last_activity_ms = now;
+
+                      if (screen_off_state) {
+                          /* 唤醒：静止超过 2 分钟则直接回首页，避免半夜摸屏落在重启页。
+                           * 唤醒用的这次触摸本身丢弃，防止误翻页/误触发。 */
+                          cur_page = wake_screen(&d, cur_page, idle, &last_refresh);
+                          screen_off_state = 0;
+                          no_client_since = 0;
+                          logmsg("wake: 触摸唤醒，回到第 %d 页（静止 %ld 秒）",
+                                 cur_page + 1, idle / 1000);
+                          continue;
+                      }
+
+                      switch (ev.type) {
+                      case IE_DOWN:
+                          if (cur_page == PAGE_BRIGHTNESS && g_bl_avail && hit_slider(ev.x, ev.y)) {
+                              g_drag_mode = 1;
+                              g_disp_percent = slider_percent_at(ev.x);
+                              brightness_from_x(ev.x);
+                              last_drag_draw_ms = 0;
+                              draw_page(&d, cur_page);
+                          } else if (cur_page == PAGE_DEVICE && hit_reboot(ev.x, ev.y)) {
+                              g_drag_mode = 2;
+                              g_rb_permille = reboot_permille_from_x(ev.x);
+                              last_drag_draw_ms = 0;
+                              draw_page(&d, cur_page);
+                          } else {
+                              g_drag_mode = 0;
+                          }
+                          break;
+
+                      case IE_MOVE:
+                          if (g_drag_mode == 1) {
+                              g_disp_percent = slider_percent_at(ev.x);
+                              brightness_from_x(ev.x);        /* 亮度即时生效 */
+                              if (now - last_drag_draw_ms >= DRAG_REDRAW_MS) {
+                                  last_drag_draw_ms = now;
+                                  draw_page(&d, cur_page);    /* 图形按 ~11fps 节流 */
+                              }
+                          } else if (g_drag_mode == 2) {
+                              g_rb_permille = reboot_permille_from_x(ev.x);
+                              if (now - last_drag_draw_ms >= DRAG_REDRAW_MS) {
+                                  last_drag_draw_ms = now;
+                                  draw_page(&d, cur_page);
+                              }
+                          }
+                          break;
+
+                      case IE_UP:
+                          if (g_drag_mode == 1) {
+                              g_drag_mode = 0;
+                              g_disp_percent = uil_level_to_ui(g_bl_level, BL_MIN_LEVEL, g_bl_max);
+                              if (g_bl_dirty) {
+                                  conf_save(g_bl_level);
+                                  logmsg("brightness: 保存 level=%d (%d%%)",
+                                         g_bl_level, g_disp_percent);
+                              }
+                              draw_page(&d, cur_page);
+                          } else if (g_drag_mode == 2) {
+                              int armed = uil_reboot_armed(g_rb_permille, REBOOT_TRIGGER);
+                              g_drag_mode = 0;
+                              if (armed) {
+                                  do_reboot(&d);              /* 不返回 */
+                              } else {
+                                  g_rb_permille = 0;
+                                  draw_page(&d, cur_page);
+                              }
+                          } else {
+                              /* 非拖动：垂直滑动循环翻页，水平滑动一律忽略 */
+                              int step = uil_swipe_pages(ev.dx, ev.dy, SWIPE_THRESH_PX);
+          #if SWIPE_V_INVERT
+                              step = -step;
+          #endif
+                              if (step != 0) {
+                                  cur_page = uil_page_step(cur_page, step, PAGE_COUNT);
+                                  if (cur_page == PAGE_BRIGHTNESS)
+                                      g_disp_percent =
+                                          uil_level_to_ui(g_bl_level, BL_MIN_LEVEL, g_bl_max);
+                                  if (cur_page == PAGE_DEVICE) g_rb_permille = 0;
+                                  page_show(&d, cur_page);
+                                  last_refresh = time(NULL);
+                              }
+                          }
+                          break;
+
+                      case IE_TAP:
+                          /* 仅刷新活动时间，不做动作 */
+                          break;
+
+                      case IE_NONE:
+                      default:
+                          break;
+                      }
+                  }
+
+                  now = now_ms();
+
+                  /* ---- 第 1 页网络抓取完成 → 重绘 ---- */
+                  if (fetcher_poll() && cur_page == PAGE_HITOKOTO && !screen_off_state) {
+                      draw_page(&d, PAGE_HITOKOTO);
+                      last_refresh = time(NULL);
+                  }
+
+                  {
+                      time_t tnow = time(NULL);
+
+                      /* ---- 客户端检测 / 息屏 ---- */
+                      if (tnow - last_client_check >= CLIENT_CHECK_SEC) {
+                          int clients;
+                          last_client_check = tnow;
+                          clients = count_clients();
+                          if (clients > 0) {
+                              no_client_since = 0;
+                              if (screen_off_state) {
+                                  /* 客户端回归同样唤醒（沿用原有行为） */
+                                  cur_page = wake_screen(&d, cur_page,
+                                                         now_ms() - last_activity_ms,
+                                                         &last_refresh);
+                                  screen_off_state = 0;
+                                  logmsg("wake: 检测到 %d 个客户端，唤醒到第 %d 页",
+                                         clients, cur_page + 1);
+                              }
+                          } else if (!screen_off_state) {
+                              if (no_client_since == 0) no_client_since = tnow;
+                              if (tnow - no_client_since >= SCREEN_OFF_DELAY) {
+                                  /* 先关背光（瞬间变暗，用户看不到中间态），
+                                   * 再把全黑帧刷进 GRAM：面板供电常开、GRAM 会保留内容，
+                                   * 万一背光被意外点亮也只会看到纯黑。 */
+                                  bl_screen_off();
+                                  draw_page(&d, -1);
+                                  screen_off_state = 1;
+                                  g_drag_mode = 0;
+                                  g_rb_permille = 0;
+                                  logmsg("sleep: 无客户端 %d 秒，息屏（背光 level 0，用户值 %d 保留）",
+                                         SCREEN_OFF_DELAY, g_bl_level);
+                              }
+                          }
+                      }
+
+                      /* ---- 背景图缺失时重试抓取 ---- */
+                      if (cur_page == PAGE_HITOKOTO && g_fetch_pid == 0 &&
+                          !screen_off_state && access(BG_CACHE, R_OK) != 0 &&
+                          tnow - g_last_fetch_try >= 30) {
+                          g_last_fetch_try = tnow;
+                          fetcher_start();
+                      }
+
+                      /* ---- 定时刷新 ---- */
+                      if (!screen_off_state && (time_t)(tnow - last_refresh) >=
+                          ((cur_page == PAGE_HITOKOTO) ? (time_t)REFRESH_SEC : (time_t)INFO_REFRESH_SEC)) {
+                          if (cur_page == PAGE_HITOKOTO) {
+                              fetcher_start();
+                          } else if (cur_page == PAGE_MODEM) {
+                              draw_page(&d, PAGE_MODEM);
+                          }
+                          last_refresh = tnow;
+                      }
+                  }
+
+                  /* ---- 非首页静止 2 分钟 → 回首页 ---- */
+                  if (!screen_off_state && cur_page != PAGE_HITOKOTO &&
+                      (now - last_activity_ms) >= HOME_TIMEOUT_MS) {
+                      g_drag_mode = 0;
+                      g_rb_permille = 0;
+                      cur_page = PAGE_HITOKOTO;
+                      page_show(&d, cur_page);
+                      last_refresh = time(NULL);
+                      last_activity_ms = now_ms();
+                      logmsg("idle: 非首页静止 %d 秒，自动返回首页", HOME_TIMEOUT_MS / 1000);
+                  }
+              }
+
+              if (g_bl_dirty) conf_save(g_bl_level);
+              if (g_touch_release_from_timer || g_ev_dropped)
+                  logmsg("touch: 抬手兜底 %d 次 / 队列溢出丢弃 %d 次 (静默阈值 %dms)",
+                         g_touch_release_from_timer, g_ev_dropped, TOUCH_IDLE_MS);
+              if (touch_fd >= 0) close(touch_fd);
+              for (i = 0; i < PAGE_COUNT; i++) {
+                  if (g_canvas[i]) { free(g_canvas[i]); g_canvas[i] = NULL; }
+              }
+              if (g_scratch) { free(g_scratch); g_scratch = NULL; }
+              if (g_font_data) { free(g_font_data); g_font_data = NULL; }
+              drm_cleanup(fd, crtc_id, res, conn, dumb, map, fb_id, 2);
+              return 0;
+          }
+          ENDOFSOURCE
+
+      - name: Cross Compile for ARM64 (RK3528)
+        run: |
+          aarch64-linux-gnu-gcc -O2 -static -o drm_play_arm64 drm_play.c \
+            -I. \
+            -I/tmp/arm64-sysroot/usr/include \
+            -I/tmp/arm64-sysroot/usr/include/libdrm \
+            -I/tmp/arm64-sysroot/usr/include/drm \
+            -I/tmp/arm64-sysroot/usr/include/aarch64-linux-gnu \
+            -L/tmp/arm64-sysroot/usr/lib/aarch64-linux-gnu \
+            -ldrm -lm
+
+          chmod +x drm_play_arm64
+          file drm_play_arm64
+          ls -lh drm_play_arm64
+
+      - name: Create init.d boot script
+        run: |
+          cat << 'EOF' > 99-bootanim
+          #!/bin/sh /etc/rc.common
+
+          START=11
+          STOP=10
+
+          DRM_DRIVER="panel-mipi-dbi-spi"
+
+          # 按驱动名动态定位 DRM 节点；unbind/bind 之后 minor 编号可能变化，
+          # 全部失败时才退回硬编码的 /dev/dri/card1。
+          find_drm_dev() {
+              for c in /sys/class/drm/card[0-9]*; do
+                  [ -d "$c" ] || continue
+                  case "$c" in *card*-*) continue;; esac
+                  d=$(readlink -f "$c/device/driver" 2>/dev/null)
+                  [ "${d##*/}" = "$DRM_DRIVER" ] || continue
+                  n=$(basename "$c")
+                  if [ -e "/dev/dri/$n" ]; then
+                      echo "/dev/dri/$n"
+                      return 0
+                  fi
+              done
+              if [ -e /dev/dri/card1 ]; then
+                  echo /dev/dri/card1
+                  return 0
+              fi
+              return 1
+          }
+
+          start() {
+              PLAYER="/usr/sbin/drm_play_arm64"
+              DRM_DEV=""
+
+              [ ! -f "$PLAYER" ] && return 1
+
+              i=0
+              while [ $i -lt 10 ]; do
+                  DRM_DEV=$(find_drm_dev) && [ -n "$DRM_DEV" ] && break
+                  sleep 1
+                  i=$((i+1))
+              done
+              [ -z "$DRM_DEV" ] && return 1
+
+              killall drm_play_arm64 2>/dev/null
+              sleep 1
+
+              SPI_DEV=""
+              for dev in /sys/bus/spi/devices/*; do
+                  if [ -f "$dev/modalias" ]; then
+                      ALIAS=$(cat "$dev/modalias" 2>/dev/null)
+                      case "$ALIAS" in
+                          *gc9307*|*panel-mipi-dbi*)
+                              SPI_DEV=$(basename "$dev")
+                              break
+                              ;;
+                      esac
+                  fi
+              done
+
+              if [ -n "$SPI_DEV" ] && [ -d "/sys/bus/spi/drivers/$DRM_DRIVER" ]; then
+                  echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/unbind" 2>/dev/null
+                  sleep 1
+                  echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/bind" 2>/dev/null
+                  i=0
+                  DRM_DEV=""
+                  while [ $i -lt 5 ]; do
+                      DRM_DEV=$(find_drm_dev) && [ -n "$DRM_DEV" ] && break
+                      sleep 1
+                      i=$((i+1))
+                  done
+              fi
+
+              [ -z "$DRM_DEV" ] && DRM_DEV=$(find_drm_dev)
+              [ -z "$DRM_DEV" ] && DRM_DEV=/dev/dri/card1
+
+              logger -t bootanim "drm_play_arm64 on $DRM_DEV"
+              "$PLAYER" "$DRM_DEV" &
+          }
+
+          stop() {
+              killall drm_play_arm64 2>/dev/null
+          }
+          EOF
+          chmod +x 99-bootanim
+
+      - name: Create install instructions
+        run: |
+          cat << 'EOF' > INSTALL.txt
+          ============================================
+            开机动画 + 四页信息屏（全合一）
+            HINLINK H29K / RK3528 / GC9307 320x172
+          ============================================
+
+          文件:
+            drm_play_arm64    - 开机动画 + 四页信息屏（ARM64 静态编译）
+            99-bootanim       - OpenWrt init.d 开机脚本
+            drm_ui_logic.h    - 纯逻辑头文件（亮度曲线/翻页/手势），仅供编译与单元测试
+            INSTALL.txt       - 本文件
+
+          --------------------------------------------
+          页面（共 4 页，上下滑动循环翻页）
+          --------------------------------------------
+            第 1 页  一言 + 随机背景图      每 15 分钟刷新
+            第 2 页  上网模块信息（黑底白字）每 60 秒刷新
+            第 3 页  亮度调节               拖动滑块，实时生效，松手自动保存
+            第 4 页  设备                   按住滑块拖到最右 → 重启设备
+
+            翻页手势：上滑 = 下一页，下滑 = 上一页，末页与首页相连循环
+            左右滑动：一律无效（亮度改为拖动滑块精调，避免误触）
+            自动回首页：停留在非首页且完全静止 2 分钟 → 自动跳回第 1 页
+
+          --------------------------------------------
+          亮度控制（硬件调光，真省电）
+          --------------------------------------------
+            设备    /sys/class/backlight/pinctrl:backlight   (pwm-backlight, pwm6, 40kHz)
+            量程    0 .. 255，DTS brightness-levels 为恒等线性
+            曲线    UI 百分比 -> level 采用 gamma 2.2 + 10% 线性混合
+                    0%->16  25%->32  50%->75  75%->148  100%->255
+                    level 150 = UI 75%，level 200 = UI 88%
+            下限    level 16（BL_MIN_LEVEL）。滑块拉到底也不会全黑，
+                    避免用户误以为死机；level 0 只保留给息屏逻辑。
+            默认    level 150（实测 DTS 默认的 200 偏亮）
+            配置    /etc/drm_play.conf   格式 brightness=<level>
+                    仅在拖动松手时写入一次，tmp+rename 原子替换，不磨损 flash
+
+            ★ 只写 brightness，不碰 bl_power ★
+            DTS 中面板节点带 backlight = <&backlight>，bl_power 由内核面板驱动
+            独占（进程退出关 CRTC 时驱动会自动写 bl_power=4）。用户态若同时写
+            bl_power 会与驱动互相覆盖，故本程序全程只操作 brightness。
+
+          --------------------------------------------
+          省电息屏（真断电，非假黑屏）
+          --------------------------------------------
+            触发    无有线/无线客户端持续 60 秒
+            动作    ① 背光 level 写 0（DTS 极性反转 → PWM duty 0 → LED 电流为 0）
+                    ② 再把全黑帧刷进 GRAM（面板供电常开，GRAM 保留内容，
+                       万一背光被意外点亮也只会看到纯黑）
+            唤醒    触摸或客户端回归
+                    ① 背光保持 0（推送过程不可见）
+                    ② 重绘目标页面并推送
+                    ③ 最后恢复用户亮度 → 全程绝无白闪
+            顺序    唤醒时若距最后一次触摸已超过 2 分钟，直接回第 1 页，
+                    不会回到息屏前的页面（避免半夜摸屏落在重启页）
+
+            客户端检测（每 20 秒）
+              有线 5 重兜底: eth0/carrier → operstate → speed → br-lan/brif → ethtool
+              无线: ubus → hostapd_cli / iw / iwinfo
+
+          --------------------------------------------
+          第 4 页重启（防误触）
+          --------------------------------------------
+            必须按住滑块横向拖动到 90% 以上再松手才会重启。
+            拖动中滑条变红并显示已拖动百分比，未到位松手则弹回取消。
+            触发后显示"正在重启设备"，sync() 后 execl /sbin/reboot，
+            10 秒未成功则用 reboot(RB_AUTOBOOT) 内核兜底。
+
+          --------------------------------------------
+          安装
+          --------------------------------------------
+            scp drm_play_arm64 root@192.168.1.1:/usr/sbin/
+            scp 99-bootanim    root@192.168.1.1:/etc/init.d/
+            scp MiSans-Regular.ttf root@192.168.1.1:/usr/share/fonts/
+            ssh root@192.168.1.1
+            chmod +x /usr/sbin/drm_play_arm64 /etc/init.d/99-bootanim
+            /etc/init.d/99-bootanim enable
+            /etc/init.d/99-bootanim start
+
+            停止: /etc/init.d/99-bootanim stop   （或 killall drm_play_arm64）
+
+          --------------------------------------------
+          排查
+          --------------------------------------------
+            运行日志    cat /tmp/drm_play.log
+                        启动时会记录背光节点/量程/生效 level、触摸设备与 ABS 量程映射，
+                        退出时记录"抬手兜底次数/事件队列溢出次数"。
+            亮度配置    cat /etc/drm_play.conf
+            手动调光    echo 120 > /sys/class/backlight/pinctrl:backlight/brightness
+            实时背光    cat /sys/kernel/debug/pwm | grep -A2 backlight
+
+            若发现"手指按住不动，滑块自己松开了"：
+            说明该触摸驱动不持续上报坐标，把源码里的 TOUCH_IDLE_MS 从 500 调大
+            （例如 2000）后重新编译即可。日志里的"抬手兜底次数"可用来确认。
+
+            若滑块上下方向与实际相反：调整源码 SWIPE 方向映射（uil_swipe_pages
+            的返回值符号），或在编译时加 -DTOUCH_INVERT 风格的开关。
+
+          --------------------------------------------
+          本次构建自带单元测试（workflow 内自动执行）
+          --------------------------------------------
+            test_logic.c  63 项断言：亮度曲线端点/单调性/往返一致性/无死区、
+                          循环翻页、垂直手势判定、滑块与重启滑条换算
+            任一断言失败即中断构建，不会产出坏固件。
+          EOF
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: H29K-BootAnimation-Pack
+          path: |
+            drm_play_arm64
+            99-bootanim
+            drm_ui_logic.h
+            INSTALL.txt
