@@ -74,9 +74,9 @@
 	};
 
 	rng: rng@ffc50000 {
-		compatible = "rockchip,rk3576-rng";
+		compatible = "rockchip,rkrng";
 		reg = <0x0 0xffc50000 0x0 0x200>;
-		clocks = <&cru HCLK_TRNG_NS>;
+		clocks = <&scmi_clk SCMI_HCLK_TRNG>;
 		clock-names = "hclk_trng";
 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
 		resets = <&cru SRST_H_TRNG_NS>;
