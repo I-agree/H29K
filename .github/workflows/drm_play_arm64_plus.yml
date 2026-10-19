@@ -34,7 +34,7 @@ jobs:
         run: |
           curl -L -o stb_image.h "https://raw.githubusercontent.com/nothings/stb/master/stb_image.h"
           curl -L -o stb_truetype.h "https://raw.githubusercontent.com/nothings/stb/master/stb_truetype.h"
-          curl -L -o stb_image_resize2.h "https://raw.githubusercontent.com/nothings/stb/master/stb_image_resize2.h"
+          curl -L -o stb_image_resize2.h "https://raw.githubusercontent.com/nothings/stb_image_resize/main/stb_image_resize2.h"
           ls -lh stb_*.h
 
       - name: Install ARM64 Cross-Compiler
