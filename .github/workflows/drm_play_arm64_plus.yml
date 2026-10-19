@@ -485,7 +485,7 @@ jobs:
            * 内核已按 DTS 的 touchscreen-swapped-x-y / inverted-x / inverted-y 变换过坐标，
            * 正常情况下两个开关都应为 0。 */
           #ifndef SWIPE_V_INVERT
-          #define SWIPE_V_INVERT    0
+          #define SWIPE_V_INVERT    1
           #endif
           #ifndef SLIDER_X_INVERT
           #define SLIDER_X_INVERT   0
