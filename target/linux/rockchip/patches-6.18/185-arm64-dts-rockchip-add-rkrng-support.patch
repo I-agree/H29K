@@ -1,0 +1,131 @@
+diff -ruN a/drivers/char/hw_random/rockchip-rng.c b/drivers/char/hw_random/rockchip-rng.c
+--- a/drivers/char/hw_random/rockchip-rng.c	2026-10-14 23:48:44.011683315 +0800
++++ b/drivers/char/hw_random/rockchip-rng.c	2026-10-14 23:48:44.011984692 +0800
+@@ -53,6 +53,26 @@
+ #define TRNG_RNG_CTL_START		BIT(0)
+ #define TRNG_RNG_SAMPLE_CNT		0x0004
+ #define TRNG_RNG_DOUT			0x0010
++/*
++ * RKRNG —— RK3528 上用的那套 RNG（内部叫 "SW DRNG"），寄存器与上面的 TRNG_* 完全不同：
++ *   RKRNG_CTRL      0x0010
++ *   RKRNG_STATE     0x0014
++ *   RKRNG_DRNG_DATA 0x0070 起 8 个 u32
++ * dt compatible 是 "rockchip,rkrng"。
++ *
++ * 访问序列照 coolsnowwolf/lede 那份老版 rockchip-rng.c 里的 rkrng_* 写
++ * （那是真机上跑过的实现）。
++ */
++#define RKRNG_CTRL			0x0010
++#define RKRNG_CTRL_SW_DRNG_REQ		BIT(3)
++
++#define RKRNG_STATE			0x0014
++#define RKRNG_STATE_SW_DRNG_ACK		BIT(3)
++
++#define RKRNG_DRNG_DATA_0		0x0070
++
++/* 高位 16 bit 是写保护掩码（与 lede 的 HIWORD_UPDATE(val, mask, 0) 等价） */
++#define RKRNG_HIWORD_UPDATE(val, mask) ((u32)(((val) & (mask)) | ((u32)(mask) << 16)))
+ 
+ /*
+  * TRNG V1 register definitions
+@@ -364,6 +384,74 @@
+ 	return (ret < 0) ? ret : to_read;
+ }
+ 
++static int rkrng_rng_init(struct hwrng *rng)
++{
++	struct rk_rng *rk_rng = container_of(rng, struct rk_rng, rng);
++	u32 reg;
++	int ret;
++
++	ret = rk_rng_enable_clks(rk_rng);
++	if (ret < 0)
++		return ret;
++
++	/* 先关掉请求位 */
++	writel(RKRNG_HIWORD_UPDATE(0, 0xffff), rk_rng->base + RKRNG_CTRL);
++
++	/* 把 STATE 原样写回，清掉残留的 ACK 位 */
++	reg = readl(rk_rng->base + RKRNG_STATE);
++	writel(reg, rk_rng->base + RKRNG_STATE);
++
++	return 0;
++}
++
++static void rkrng_rng_cleanup(struct hwrng *rng)
++{
++	struct rk_rng *rk_rng = container_of(rng, struct rk_rng, rng);
++
++	writel(RKRNG_HIWORD_UPDATE(0, 0xffff), rk_rng->base + RKRNG_CTRL);
++
++	clk_bulk_disable_unprepare(rk_rng->clk_num, rk_rng->clk_bulks);
++}
++
++static int rkrng_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
++{
++	struct rk_rng *rk_rng = container_of(rng, struct rk_rng, rng);
++	size_t to_read = min_t(size_t, max, RK_RNG_MAX_BYTE);
++	u32 reg;
++	int ret;
++
++	ret = pm_runtime_resume_and_get(rk_rng->dev);
++	if (ret < 0)
++		return ret;
++
++	/* 请求一份 SW DRNG 数据 */
++	writel(RKRNG_HIWORD_UPDATE(RKRNG_CTRL_SW_DRNG_REQ, 0xffff),
++	       rk_rng->base + RKRNG_CTRL);
++
++	ret = readl_poll_timeout(rk_rng->base + RKRNG_STATE, reg,
++				 (reg & RKRNG_STATE_SW_DRNG_ACK),
++				 RK_RNG_POLL_PERIOD_US,
++				 RK_RNG_POLL_TIMEOUT_US);
++	if (ret < 0)
++		goto out;
++
++	/* 写回清 ACK */
++	writel(reg, rk_rng->base + RKRNG_STATE);
++
++	/*
++	 * 搬出 DRNG_DATA_0..7。lede 那边是按大端做 be32_to_cpu 逐字转换的，
++	 * 这里直接用 memcpy_fromio —— 整块数据都是熵，字节顺序怎么排都等价，
++	 * 而且不用假设 buf 有 4 字节对齐、也不会在 max < 4 时越界。
++	 */
++	memcpy_fromio(buf, rk_rng->base + RKRNG_DRNG_DATA_0, to_read);
++
++out:
++	writel(RKRNG_HIWORD_UPDATE(0, 0xffff), rk_rng->base + RKRNG_CTRL);
++
++	pm_runtime_put_sync_autosuspend(rk_rng->dev);
++
++	return (ret < 0) ? ret : to_read;
++}
+ static const struct rk_rng_soc_data rk3568_soc_data = {
+ 	.rk_rng_init = rk3568_rng_init,
+ 	.rk_rng_read = rk3568_rng_read,
+@@ -479,12 +567,24 @@
+ 				pm_runtime_force_resume)
+ };
+ 
++static const struct rk_rng_soc_data rkrng_soc_data = {
++	.rk_rng_init = rkrng_rng_init,
++	.rk_rng_read = rkrng_rng_read,
++	.rk_rng_cleanup = rkrng_rng_cleanup,
++	.quality = 900,
++	/*
++	 * RK3528 的 RNG 没有独立的复位线（上游 reset 头里也还没有
++	 * SRST_H_TRNG_NS 这个宏），驱动也不需要 —— 直接声明成可选。
++	 */
++	.reset_optional = true,
++};
+ static const struct of_device_id rk_rng_dt_match[] = {
+ 	{ .compatible = "rockchip,rk3568-rng", .data = (void *)&rk3568_soc_data },
+ 	{ .compatible = "rockchip,rk3576-rng", .data = (void *)&rk3576_soc_data },
+ 	{ .compatible = "rockchip,rk3588-rng", .data = (void *)&rk3588_soc_data },
+ 	{ .compatible = "rockchip,rv1126-rng", .data = (void *)&rv1126_soc_data },
+-	{ /* sentinel */ },
++		{ .compatible = "rockchip,rkrng", .data = (void *)&rkrng_soc_data },
++{ /* sentinel */ },
+ };
+ 
+ MODULE_DEVICE_TABLE(of, rk_rng_dt_match);
