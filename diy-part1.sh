@@ -72,7 +72,7 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/060-fix-read-cpui
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch" "package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
-download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/999-clk-rk3528-add-hclk_trng-gate.patch" "target/linux/rockchip/patches-6.18/999-clk-rk3528-add-hclk_trng-gate.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch" "target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch"
 download_and_check "${BASE_URL}/JPG/99-bootanim" "files/etc/init.d/99-bootanim"
 download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm64"
 # download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch" "target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch"
