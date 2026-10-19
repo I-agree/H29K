@@ -62,7 +62,6 @@
 		label = "rfkill-modem";
 		radio-type = "wwan";
 		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
-		power-gpios = <&gpio4 RK_PB5 GPIO_ACTIVE_LOW>;
 	};
 
 	sdio_pwrseq: sdio-pwrseq {
