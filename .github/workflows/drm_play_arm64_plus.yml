@@ -609,6 +609,9 @@ jobs:
           static time_t g_last_fetch_try = 0;
           static drmModeCrtc *g_saved_crtc = NULL;
 
+          /* ★ 新增：第 2 页 modem 信息预取标志 */
+          static int g_modem_ready = 0;
+
           /* 字体缓存：避免每帧重复读盘 + 初始化 */
           static stbtt_fontinfo g_font;
           static uint8_t *g_font_data = NULL;
@@ -2115,7 +2118,11 @@ jobs:
                   render_page0_rgba(c);
                   break;
               case PAGE_MODEM:
-                  collect_modem_info();
+                  /* ★ 仅在首次或未预取时才采集，避免滑动到第 2 页时卡顿 */
+                  if (!g_modem_ready) {
+                      collect_modem_info();
+                      g_modem_ready = 1;
+                  }
                   render_info_page_rgba(c, SCREEN_W, SCREEN_H);
                   break;
               case PAGE_BRIGHTNESS:
@@ -2149,6 +2156,8 @@ jobs:
                       fetcher_start();
                   }
               } else if (age >= (long)INFO_REFRESH_SEC * 1000L) {
+                  /* ★ 第 2 页缓存过期：重置标志位，强制重新采集最新数据 */
+                  g_modem_ready = 0;
                   draw_page(d, page);
               }
           }
@@ -2549,6 +2558,15 @@ jobs:
 
               daemonize();
 
+              /* ★ 开机动画已结束，此时网络通常已就绪。
+               * 提前采集 modem 信息，避免首次滑到第 2 页时因同步 popen/ubus 而卡顿。
+               * 即使此时 qmodem 尚未完全启动，collect_modem_info 也会尽力填充可用字段，
+               * 后续 60 秒定时刷新会自动补全。 */
+              logmsg("prefetch: 开始后台预取第 2 页 modem 信息...");
+              collect_modem_info();
+              g_modem_ready = 1;
+              logmsg("prefetch: 第 2 页 modem 信息预取完成");
+
               /* ---------- 信息屏主循环 ---------- */
               touch_fd = open_touch();
               cur_page = PAGE_HITOKOTO;
@@ -2723,6 +2741,8 @@ jobs:
                           if (cur_page == PAGE_HITOKOTO) {
                               fetcher_start();
                           } else if (cur_page == PAGE_MODEM) {
+                              /* ★ 定时刷新时重置标志位，强制重新采集最新数据 */
+                              g_modem_ready = 0;
                               draw_page(&d, PAGE_MODEM);
                           }
                           last_refresh = tnow;
