@@ -236,6 +236,8 @@
 	snps,reset-active-low;
 	snps,reset-delays-us = <0 20000 100000>;
 	snps,reset-gpio = <&gpio4 RK_PC2 GPIO_ACTIVE_LOW>;
+	tx_delay = <0x30>;
+	rx_delay = <0x10>;
 	status = "okay";
 };
 
@@ -424,6 +426,8 @@
 	bus-width = <8>;
 	cap-mmc-highspeed;
 	mmc-hs200-1_8v;
+	no-mmc-hs400;
+	max-frequency = <150000000>;
 	non-removable;
 	vmmc-supply = <&vcc_3v3>;
 	vqmmc-supply = <&vcc_1v8>;
