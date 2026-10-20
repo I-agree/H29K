@@ -336,12 +336,7 @@ CONFIG_INPUT_EVDEV=y
 # =================================================================
 CONFIG_HZ_250=y
 CONFIG_HZ=250
-# CONFIG_MPTCP is not set
-# CONFIG_MPTCP_IPV6 is not set
-# CONFIG_IPV6_SEG6_LWTUNNEL is not set
-# CONFIG_IPV6_SEG6_BPF is not set
 CONFIG_TCP_AO=y
-CONFIG_NFT_SOCKET=y
 CONFIG_NETFILTER_EGRESS=y
 
 EOF
