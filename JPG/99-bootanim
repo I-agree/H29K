@@ -5,22 +5,44 @@ STOP=10
 
 DRM_DRIVER="panel-mipi-dbi-spi"
 
+# 按驱动名动态定位 DRM 节点；unbind/bind 之后 minor 编号可能变化，
+# 全部失败时才退回硬编码的 /dev/dri/card1。
+find_drm_dev() {
+    for c in /sys/class/drm/card[0-9]*; do
+        [ -d "$c" ] || continue
+        case "$c" in *card*-*) continue;; esac
+        d=$(readlink -f "$c/device/driver" 2>/dev/null)
+        [ "${d##*/}" = "$DRM_DRIVER" ] || continue
+        n=$(basename "$c")
+        if [ -e "/dev/dri/$n" ]; then
+            echo "/dev/dri/$n"
+            return 0
+        fi
+    done
+    if [ -e /dev/dri/card1 ]; then
+        echo /dev/dri/card1
+        return 0
+    fi
+    return 1
+}
+
 start() {
     PLAYER="/usr/sbin/drm_play_arm64"
-    DRM_DEV="/dev/dri/card1"
-    
+    DRM_DEV=""
+
     [ ! -f "$PLAYER" ] && return 1
-    
+
     i=0
-    while [ ! -e "$DRM_DEV" ] && [ $i -lt 10 ]; do
+    while [ $i -lt 10 ]; do
+        DRM_DEV=$(find_drm_dev) && [ -n "$DRM_DEV" ] && break
         sleep 1
         i=$((i+1))
     done
-    [ ! -e "$DRM_DEV" ] && return 1
-    
+    [ -z "$DRM_DEV" ] && return 1
+
     killall drm_play_arm64 2>/dev/null
     sleep 1
-    
+
     SPI_DEV=""
     for dev in /sys/bus/spi/devices/*; do
         if [ -f "$dev/modalias" ]; then
@@ -33,18 +55,24 @@ start() {
             esac
         fi
     done
-    
+
     if [ -n "$SPI_DEV" ] && [ -d "/sys/bus/spi/drivers/$DRM_DRIVER" ]; then
         echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/unbind" 2>/dev/null
         sleep 1
         echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/bind" 2>/dev/null
         i=0
-        while [ ! -e "$DRM_DEV" ] && [ $i -lt 5 ]; do
+        DRM_DEV=""
+        while [ $i -lt 5 ]; do
+            DRM_DEV=$(find_drm_dev) && [ -n "$DRM_DEV" ] && break
             sleep 1
             i=$((i+1))
         done
     fi
-    
+
+    [ -z "$DRM_DEV" ] && DRM_DEV=$(find_drm_dev)
+    [ -z "$DRM_DEV" ] && DRM_DEV=/dev/dri/card1
+
+    logger -t bootanim "drm_play_arm64 on $DRM_DEV"
     "$PLAYER" "$DRM_DEV" &
 }
 
