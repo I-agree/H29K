@@ -473,7 +473,7 @@ jobs:
           #define BL_OFF_LEVEL      0        /* 息屏亮度：DTS 极性反转，duty=0 即背光电流为 0 */
 
           #define CONF_PATH         "/etc/config/drm_play_arm64"
-          #define CONF_TMP          "/tmp/drm_play_arm64.conf.tmp"
+          #define CONF_TMP          "/etc/config/drm_play_arm64.tmp"
 
           #define HOME_TIMEOUT_MS   (120 * 1000L)   /* 非首页静止 2 分钟 → 回首页 */
           #define SWIPE_THRESH_PX   24              /* 翻页手势最小位移（屏幕像素） */
@@ -2896,7 +2896,7 @@ jobs:
             下限    level 16（BL_MIN_LEVEL）。滑块拉到底也不会全黑，
                     避免用户误以为死机；level 0 只保留给息屏逻辑。
             默认    level 150（实测 DTS 默认的 200 偏亮）
-            配置    /etc/config/drm_play_arm64   格式 brightness=<level>
+            配置    /etc/config/drm_play_arm64   UCI 格式（兼容 key=value）
                     仅在拖动松手时写入一次，tmp+rename 原子替换，不磨损 flash
 
             ★ 只写 brightness，不碰 bl_power ★
