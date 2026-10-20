@@ -2969,7 +2969,7 @@ jobs:
           EOF
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: H29K-BootAnimation-Pack
           path: |
