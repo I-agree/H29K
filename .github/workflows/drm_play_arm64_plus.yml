@@ -472,8 +472,8 @@ jobs:
           #define BL_DEFAULT_LEVEL  150      /* 无配置文件时的默认亮度（实测 200 偏亮） */
           #define BL_OFF_LEVEL      0        /* 息屏亮度：DTS 极性反转，duty=0 即背光电流为 0 */
 
-          #define CONF_PATH         "/etc/drm_play.conf"
-          #define CONF_TMP          "/etc/drm_play.conf.tmp"
+          #define CONF_PATH         "/etc/config/drm_play_arm64"
+          #define CONF_TMP          "/tmp/drm_play_arm64.conf.tmp"
 
           #define HOME_TIMEOUT_MS   (120 * 1000L)   /* 非首页静止 2 分钟 → 回首页 */
           #define SWIPE_THRESH_PX   24              /* 翻页手势最小位移（屏幕像素） */
@@ -1061,7 +1061,13 @@ jobs:
                   *eq = 0;
                   str_trim(line);
                   str_trim(eq + 1);
-                  if (strcmp(line, "brightness") == 0) got = atoi(eq + 1);
+                  if (strcmp(line, "option brightness") == 0 || strcmp(line, "brightness") == 0) {
+                      char *val = eq + 1;
+                      if (*val == '\'') val++;
+                      char *end = val + strlen(val) - 1;
+                      while (end > val && (*end == '\'' || *end == ' ' || *end == '\t')) *end-- = 0;
+                      got = atoi(val);
+                  }
               }
               fclose(f);
               return got;
@@ -1070,7 +1076,8 @@ jobs:
           static int conf_save(int level) {
               FILE *f = fopen(CONF_TMP, "w");
               if (!f) return -1;
-              fprintf(f, "# drm_play_arm64 显示配置\nbrightness=%d\n", level);
+              fprintf(f, "config drm_play_arm64\n");
+              fprintf(f, "\toption brightness '%d'\n", level);
               fflush(f);
               fsync(fileno(f));
               fclose(f);
@@ -2889,7 +2896,7 @@ jobs:
             下限    level 16（BL_MIN_LEVEL）。滑块拉到底也不会全黑，
                     避免用户误以为死机；level 0 只保留给息屏逻辑。
             默认    level 150（实测 DTS 默认的 200 偏亮）
-            配置    /etc/drm_play.conf   格式 brightness=<level>
+            配置    /etc/config/drm_play_arm64   格式 brightness=<level>
                     仅在拖动松手时写入一次，tmp+rename 原子替换，不磨损 flash
 
             ★ 只写 brightness，不碰 bl_power ★
@@ -2942,7 +2949,7 @@ jobs:
             运行日志    cat /tmp/drm_play.log
                         启动时会记录背光节点/量程/生效 level、触摸设备与 ABS 量程映射，
                         退出时记录"抬手兜底次数/事件队列溢出次数"。
-            亮度配置    cat /etc/drm_play.conf
+            亮度配置    cat /etc/config/drm_play_arm64
             手动调光    echo 120 > /sys/class/backlight/pinctrl:backlight/brightness
             实时背光    cat /sys/kernel/debug/pwm | grep -A2 backlight
 
