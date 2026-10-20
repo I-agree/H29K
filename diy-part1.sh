@@ -108,6 +108,7 @@ echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
 # 这些条目在原始 config-6.18 中有确定值，sed 可直接精确匹配
 sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
 sed -i 's/^# CONFIG_BLK_DEV_INITRD is not set$/CONFIG_BLK_DEV_INITRD=y/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_NR_CPUS=256$/CONFIG_NR_CPUS=4/' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -329,6 +330,19 @@ CONFIG_I2C=y
 CONFIG_I2C_RK3X=y
 CONFIG_INPUT=y
 CONFIG_INPUT_EVDEV=y
+
+# =================================================================
+# 🔄 H29K的内核专用优化
+# =================================================================
+CONFIG_HZ_250=y
+CONFIG_HZ=250
+# CONFIG_MPTCP is not set
+# CONFIG_MPTCP_IPV6 is not set
+# CONFIG_IPV6_SEG6_LWTUNNEL is not set
+# CONFIG_IPV6_SEG6_BPF is not set
+CONFIG_TCP_AO=y
+CONFIG_NFT_SOCKET=y
+CONFIG_NETFILTER_EGRESS=y
 
 EOF
 echo "✅ H29K 内核参数注入完成"
