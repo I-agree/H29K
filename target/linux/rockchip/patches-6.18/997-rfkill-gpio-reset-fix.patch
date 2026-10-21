@@ -7,7 +7,7 @@
  #include <linux/gpio/consumer.h>
  
  struct rfkill_gpio_data {
-@@ -148,9 +149,15 @@
+@@ -148,9 +149,13 @@
  		return -EINVAL;
  	}
  
@@ -19,8 +19,6 @@
 +	msleep(200);
 +
 +	gpiod_set_value_cansleep(rfkill->reset_gpio, true);
-+
-+	msleep(10000);
  
  	ret = gpiod_direction_output(rfkill->shutdown_gpio, true);
  	if (ret)
