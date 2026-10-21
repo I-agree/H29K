@@ -609,9 +609,8 @@ jobs:
           static time_t g_last_fetch_try = 0;
           static drmModeCrtc *g_saved_crtc = NULL;
 
-          /* ★ 新增：第 2 页 modem 信息预取标志与后台进程 PID */
+          /* ★ 新增：第 2 页 modem 信息预取标志 */
           static int g_modem_ready = 0;
-          static pid_t g_modem_prefetch_pid = 0;
 
           /* 字体缓存：避免每帧重复读盘 + 初始化 */
           static stbtt_fontinfo g_font;
@@ -2559,53 +2558,43 @@ jobs:
 
               daemonize();
 
+              /* ★ 开机动画已结束，此时 5G 模块已完全就绪。
+               * 在主线程同步采集 modem 信息，直接填充父进程的 g_fields，
+               * 这样首次滑到第 2 页时数据已经存在，不会出现空白。
+               * 因为是在 daemonize 之后、首帧渲染之前执行，
+               * 屏幕此时还停留在开机动画最后一帧，用户看不到延迟。 */
+              logmsg("prefetch: 开机动画结束，开始同步采集 modem 信息...");
+              collect_modem_info();
+              g_modem_ready = 1;
+              logmsg("prefetch: modem 信息采集完成，已填充 %d/%d 个字段",
+                     fields_filled_count(), FIELD_COUNT);
+
               /* ---------- 信息屏主循环 ---------- */
               touch_fd = open_touch();
               cur_page = PAGE_HITOKOTO;
               g_disp_percent = uil_level_to_ui(g_bl_level, BL_MIN_LEVEL, g_bl_max);
 
+              /* 启动网络抓取（一言 + 背景图） */
               fetcher_start();
-              
-              /* ★ 优先渲染首帧（第1页），让屏幕在开机动画结束后立即亮起，不阻塞等待 */
+
+              /* ★ 等待网络抓取完成后再渲染首帧，确保第 1 页直接显示真实一言和背景，
+               * 而不是先显示兜底文字再闪烁切换。HTTP_TIMEOUT=8 秒，最多等 8 秒。
+               * 如果网络不通（如无 SIM），8 秒后 wget 超时退出，fetcher_poll 返回 1，
+               * 首帧才会使用兜底文字，这是合理的降级行为。 */
+              logmsg("startup: 等待网络抓取完成...");
+              while (g_running && !fetcher_poll()) {
+                  sleep_ms(100);
+              }
+              logmsg("startup: 网络抓取完成，渲染首帧");
+
               draw_page(&d, cur_page);
               last_refresh = time(NULL);
               last_activity_ms = now_ms();
-
-              /* ★ 首帧显示后，再通过 fork 在后台异步预取第 2 页 modem 信息。
-               * 由于父子进程内存隔离，子进程无法直接修改父进程的 g_fields。
-               * 这里的策略是：子进程运行 collect_modem_info() 会扫描并生成/刷新 
-               * /tmp 下的 cache 文件和 dbg 文件。当用户首次滑到第 2 页时，
-               * 父进程调用 collect_modem_info() 就能快速命中这些已生成的缓存，
-               * 从而大幅降低 popen/ubus 带来的卡顿感。 */
-              {
-                  pid_t p = fork();
-                  if (p == 0) {
-                      /* 子进程：预热 qmodem 缓存文件 */
-                      collect_modem_info();
-                      _exit(0);
-                  }
-                  if (p > 0) {
-                      g_modem_prefetch_pid = p;
-                      logmsg("prefetch: 已在后台启动 modem 缓存预热 (pid=%d)", p);
-                  }
-              }
 
               while (g_running) {
                   input_ev_t ev;
                   long now;
                   int has;
-
-                  /* ★ 检查后台预热进程是否完成，完成后标记 ready，
-                   * 这样首次进入第 2 页时可以直接利用已刷新的缓存快速渲染。
-                   * 注意：如果预热未完成用户就滑到了第 2 页，draw_page 里的
-                   * !g_modem_ready 兜底逻辑仍会同步采集一次以保证显示。 */
-                  if (g_modem_prefetch_pid > 0) {
-                      if (waitpid(g_modem_prefetch_pid, NULL, WNOHANG) == g_modem_prefetch_pid) {
-                          g_modem_prefetch_pid = 0;
-                          g_modem_ready = 1;
-                          logmsg("prefetch: 后台 modem 缓存预热完成，第 2 页已就绪");
-                      }
-                  }
 
                   has = poll_input(touch_fd, INPUT_POLL_MS, &ev);
                   now = now_ms();
