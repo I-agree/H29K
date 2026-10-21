@@ -7,7 +7,7 @@
  #include <linux/gpio/consumer.h>
  
  struct rfkill_gpio_data {
-@@ -148,9 +148,15 @@
+@@ -148,9 +149,15 @@
  		return -EINVAL;
  	}
  
