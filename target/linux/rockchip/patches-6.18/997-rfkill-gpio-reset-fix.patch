@@ -16,11 +16,11 @@
  	if (ret)
  		return ret;
 +
-+	msleep(100);
++	msleep(200);
 +
 +	gpiod_set_value_cansleep(rfkill->reset_gpio, true);
 +
-+	msleep(2000);
++	msleep(5000);
  
  	ret = gpiod_direction_output(rfkill->shutdown_gpio, true);
  	if (ret)
