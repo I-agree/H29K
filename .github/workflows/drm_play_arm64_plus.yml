@@ -1995,7 +1995,7 @@ jobs:
               permille = uil_clampi(permille, 0, 1000);
               armed = uil_reboot_armed(permille, REBOOT_TRIGGER);
 
-              page_chrome(buf, W, H, "设备", PAGE_DEVICE, "上下滑动翻页");
+              page_chrome(buf, W, H, "重启设备", PAGE_DEVICE, "上下滑动翻页");
               if (!g_font_ok) return;
 
               txt_c(buf, W, H, 12.0f, W / 2, 48, "重启会中断当前所有网络连接",
