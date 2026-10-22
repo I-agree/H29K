@@ -57,13 +57,6 @@
 		};
 	};
 
-	rfkill-modem {
-		compatible = "rfkill-gpio";
-		label = "rfkill-modem";
-		radio-type = "wwan";
-		reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
-	};
-
 	sdio_pwrseq: sdio-pwrseq {
 		compatible = "mmc-pwrseq-simple";
 		pinctrl-names = "default";
@@ -82,6 +75,18 @@
 		resets = <&cru SRST_H_TRNG_NS>;
 		reset-names = "reset";
 		status = "okay";
+	};
+
+	vcc_wwan_rst: regulator-wwan-rst {
+		compatible = "regulator-fixed";
+		regulator-name = "vcc_wwan_rst";
+		gpio = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&wwan_rst_pin>;
+		regulator-always-on;
+		regulator-boot-on;
+		startup-delay-us = <8000000>;
+		off-on-delay-us = <700000>;
 	};
 
 	vcc5v0_sys: vcc5v0-sys {
@@ -278,6 +283,12 @@
 };
 
 &pinctrl {
+	wwan {
+		wwan_rst_pin: wwan-rst-pin {
+			rockchip,pins = <4 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
 	ir {
 		ir_int_pin: ir-int-pin {
 			rockchip,pins = <4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_up>;
@@ -333,6 +344,7 @@
 			rockchip,pins = <1 RK_PA7 RK_FUNC_GPIO &pcfg_pull_down>;
 		};
 	};
+	
 	touchscreen {
 		tp_int_pin: tp-int-pin {
 			rockchip,pins = <4 RK_PB2 RK_FUNC_GPIO &pcfg_pull_up>;
@@ -342,7 +354,6 @@
 			rockchip,pins = <4 RK_PB3 RK_FUNC_GPIO &pcfg_pull_up>;
 		};
 	};
-
 
 	pwmpanel {
 		panel_pwm_pin: panel-pwm-pin {
