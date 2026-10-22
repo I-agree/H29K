@@ -6,4 +6,3 @@
 060-fix-read-cpuid.patch
 070-fix-mips-pc-macro-conflict.patch
 080-fix-export-symbols-conflict.patch
-099-fix-debugfs-err-ptr-handling.patch
