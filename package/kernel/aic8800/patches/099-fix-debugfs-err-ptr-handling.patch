@@ -1,6 +1,6 @@
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
-@@ -1405,25 +1405,16 @@ static void rwnx_rc_stat_work(struct wor
+@@ -2422,25 +2422,16 @@ static void rwnx_rc_stat_work(struct wor
          }
  
          dir_sta = debugfs_create_dir(sta_name, dir_rc);
@@ -26,7 +26,7 @@
  
          if (rwnx_hw->mod_params->ht_on)
              nb_rx_rate += N_HT;
-@@ -1485,13 +1466,6 @@ static void rwnx_rc_stat_work(struct wor
+@@ -2509,13 +2500,6 @@ static void rwnx_rc_stat_work(struct wor
      }
  
      return;
@@ -40,7 +40,7 @@
  }
  
  void _rwnx_dbgfs_rc_stat_write(struct rwnx_debugfs *rwnx_debugfs, uint8_t sta_idx)
-@@ -1605,19 +1579,14 @@ int rwnx_dbgfs_register(struct rwnx_hw *
+@@ -1605,19 +1600,14 @@ int rwnx_dbgfs_register(struct rwnx_hw *
      struct dentry *dir_drv, *dir_diags;
  
      RWNX_DBG(RWNX_FN_ENTRY_STR);
@@ -63,7 +63,7 @@
      rwnx_debugfs->dir_rc = dir_rc;
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
-@@ -3070,7 +3070,7 @@ static int rwnx_cfg80211_del_station_com
+@@ -3170,7 +3170,7 @@ static int rwnx_cfg80211_del_station_com
              rwnx_mu_group_sta_del(rwnx_hw, cur);
  #endif /* CONFIG_RWNX_BFMER */
  
@@ -72,7 +72,7 @@
          rwnx_dbgfs_unregister_rc_stat(rwnx_hw, cur);
  #endif
          }else {
-@@ -6215,9 +6215,9 @@ int rwnx_cfg80211_init(struct rwnx_plat
+@@ -6320,9 +6320,9 @@ int rwnx_cfg80211_init(struct rwnx_plat
  
  #ifdef CONFIG_DEBUG_FS
      ret = rwnx_dbgfs_register(rwnx_hw, "rwnx");
