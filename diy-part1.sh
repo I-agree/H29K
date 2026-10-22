@@ -218,14 +218,11 @@ CONFIG_THERMAL_GOV_POWER_ALLOCATOR=y
 CONFIG_THERMAL_NETLINK=y
 
 # =================================================================
-# 🔄 rfkill-modem射频
+# 🔄 rfkill-modem射频,6.18内核rfkill-gpio已经被内核淘汰
 # =================================================================
 CONFIG_GPIOLIB=y
 CONFIG_OF=y
 CONFIG_RFKILL=y
-CONFIG_RFKILL_GPIO=y
-CONFIG_RFKILL_LEDS=y
-# CONFIG_RFKILL_INPUT is not set
 
 # =================================================================
 # 🔄 PWM sysfs 相关配置
