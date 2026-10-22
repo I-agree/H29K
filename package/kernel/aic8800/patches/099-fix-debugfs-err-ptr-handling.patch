@@ -1,35 +1,35 @@
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
 @@ -2422,25 +2422,16 @@ static void rwnx_rc_stat_work(struct wor
-         }
+ 		}
  
-         dir_sta = debugfs_create_dir(sta_name, dir_rc);
+ 		dir_sta = debugfs_create_dir(sta_name, dir_rc);
 -		if (!dir_sta)
 -			goto error;
 -
-         rwnx_debugfs->dir_sta[sta->sta_idx] = dir_sta;
+ 		rwnx_debugfs->dir_sta[sta->sta_idx] = dir_sta;
  
-         file = debugfs_create_file("stats", S_IRUSR, dir_sta, rwnx_hw,
-                                    &rwnx_dbgfs_rc_stats_ops);
+ 		file = debugfs_create_file("stats", S_IRUSR, dir_sta, rwnx_hw,
+ 								   &rwnx_dbgfs_rc_stats_ops);
 -		if (IS_ERR_OR_NULL(file))
 -			goto error_after_dir;
  
-         file = debugfs_create_file("fixed_rate_idx", S_IWUSR, dir_sta, rwnx_hw,
-                                    &rwnx_dbgfs_rc_fixed_rate_idx_ops);
+ 		file = debugfs_create_file("fixed_rate_idx", S_IWUSR, dir_sta, rwnx_hw,
+ 								   &rwnx_dbgfs_rc_fixed_rate_idx_ops);
 -		if (IS_ERR_OR_NULL(file))
 -			goto error_after_dir;
  
-         file = debugfs_create_file("rx_rate", S_IRUSR | S_IWUSR, dir_sta, rwnx_hw,
-                                    &rwnx_dbgfs_last_rx_ops);
+ 		file = debugfs_create_file("rx_rate", S_IRUSR | S_IWUSR, dir_sta, rwnx_hw,
+ 								   &rwnx_dbgfs_last_rx_ops);
 -		if (IS_ERR_OR_NULL(file))
 -			goto error_after_dir;
  
-         if (rwnx_hw->mod_params->ht_on)
-             nb_rx_rate += N_HT;
+ 		if (rwnx_hw->mod_params->ht_on)
+ 			nb_rx_rate += N_HT;
 @@ -2509,13 +2500,6 @@ static void rwnx_rc_stat_work(struct wor
-     }
+ 	}
  
-     return;
+ 	return;
 -
 -error_after_dir:
 -	debugfs_remove_recursive(rwnx_debugfs->dir_sta[sta_idx]);
@@ -41,46 +41,46 @@
  
  void _rwnx_dbgfs_rc_stat_write(struct rwnx_debugfs *rwnx_debugfs, uint8_t sta_idx)
 @@ -1605,19 +1600,14 @@ int rwnx_dbgfs_register(struct rwnx_hw *
-     struct dentry *dir_drv, *dir_diags;
+ 	struct dentry *dir_drv, *dir_diags;
  
-     RWNX_DBG(RWNX_FN_ENTRY_STR);
+ 	RWNX_DBG(RWNX_FN_ENTRY_STR);
 +
-     dir_drv = debugfs_create_dir(name, phyd);
+ 	dir_drv = debugfs_create_dir(name, phyd);
 -	if (!dir_drv)
 -		return -ENOMEM;
  
-     rwnx_debugfs->dir = dir_drv;
-     rwnx_debugfs->unregistering = false;
+ 	rwnx_debugfs->dir = dir_drv;
+ 	rwnx_debugfs->unregistering = false;
  
-     dir_diags = debugfs_create_dir("diags", dir_drv);
+ 	dir_diags = debugfs_create_dir("diags", dir_drv);
 -	if (!dir_diags)
 -		goto err;
  
  #ifdef CONFIG_RWNX_FULLMAC
-     dir_rc = debugfs_create_dir("rc", dir_drv);
+ 	dir_rc = debugfs_create_dir("rc", dir_drv);
 -	if (!dir_rc)
 -		goto err;
-     rwnx_debugfs->dir_rc = dir_rc;
+ 	rwnx_debugfs->dir_rc = dir_rc;
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_main.c
 @@ -3170,7 +3170,7 @@ static int rwnx_cfg80211_del_station_com
-             rwnx_mu_group_sta_del(rwnx_hw, cur);
+ 			rwnx_mu_group_sta_del(rwnx_hw, cur);
  #endif /* CONFIG_RWNX_BFMER */
  
 -#ifdef CONFIG_DEBUG_FS_AIC
 +#ifdef CONFIG_DEBUG_FS
-         rwnx_dbgfs_unregister_rc_stat(rwnx_hw, cur);
+ 		rwnx_dbgfs_unregister_rc_stat(rwnx_hw, cur);
  #endif
-         }else {
+ 		}else {
 @@ -6320,9 +6320,9 @@ int rwnx_cfg80211_init(struct rwnx_plat
  
  #ifdef CONFIG_DEBUG_FS
-     ret = rwnx_dbgfs_register(rwnx_hw, "rwnx");
-     if (ret) {
+ 	ret = rwnx_dbgfs_register(rwnx_hw, "rwnx");
+ 	if (ret) {
 -		wiphy_err(wiphy, "Failed to register debugfs entries");
 -		goto err_debugfs;
 +		wiphy_warn(wiphy, "Failed to register debugfs entries, continuing anyway\n");
 +		/* Do NOT abort initialization just because debugfs failed */
-     }
+ 	}
  #endif
-     rtnl_lock();
+ 	rtnl_lock();
