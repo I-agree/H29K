@@ -1,8 +1,6 @@
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_debugfs.c
-@@ -2422,25 +2422,16 @@ static void rwnx_rc_stat_work(struct wor
- 		}
- 
+@@ -2424,23 +2424,14 @@
  		dir_sta = debugfs_create_dir(sta_name, dir_rc);
 -		if (!dir_sta)
 -			goto error;
@@ -26,7 +24,7 @@
  
  		if (rwnx_hw->mod_params->ht_on)
  			nb_rx_rate += N_HT;
-@@ -2509,13 +2500,6 @@ static void rwnx_rc_stat_work(struct wor
+@@ -2509,13 +2500,6 @@
  	}
  
  	return;
@@ -40,11 +38,7 @@
  }
  
  void _rwnx_dbgfs_rc_stat_write(struct rwnx_debugfs *rwnx_debugfs, uint8_t sta_idx)
-@@ -2556,20 +2550,14 @@ int rwnx_dbgfs_register(struct rwnx_hw *
- 	struct dentry *dir_drv, *dir_diags;
- 
- 	RWNX_DBG(RWNX_FN_ENTRY_STR);
- 
+@@ -2560,16 +2544,10 @@
  	dir_drv = debugfs_create_dir(name, phyd);
 -	if (!dir_drv)
 -		return -ENOMEM;
@@ -72,15 +66,10 @@
  		rwnx_dbgfs_unregister_rc_stat(rwnx_hw, cur);
  #endif
  		}else {
-@@ -6296,9 +6296,9 @@ int rwnx_cfg80211_init(struct rwnx_plat
- 
- #ifdef CONFIG_DEBUG_FS
+@@ -6298,4 +6298,4 @@
  	ret = rwnx_dbgfs_register(rwnx_hw, "rwnx");
  	if (ret) {
 -		wiphy_err(wiphy, "Failed to register debugfs entries");
 -		goto err_debugfs;
 +		wiphy_warn(wiphy, "Failed to register debugfs entries, continuing anyway\n");
 +		/* Do NOT abort initialization just because debugfs failed */
- 	}
- #endif
- 	rtnl_lock();
