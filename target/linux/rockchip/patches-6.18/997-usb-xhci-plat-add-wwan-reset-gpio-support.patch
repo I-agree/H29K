@@ -70,7 +70,7 @@
 +					 &priv->reset_assert_us);
 +		fwnode_property_read_u32(prop_fwnode, "reset-deassert-us",
 +					 &priv->reset_deassert_us);
-+		dev_info(sysdev, "WWAN reset GPIO configured (assert=%uus, deassert=%uus)\n",
++		dev_info(sysdev, "WWAN reset GPIO configured (assert=%uus, deassert=%uus [async via hotplug])\n",
 +			 priv->reset_assert_us, priv->reset_deassert_us);
 +
 +		INIT_DELAYED_WORK(&priv->wwan_deassert_work,
