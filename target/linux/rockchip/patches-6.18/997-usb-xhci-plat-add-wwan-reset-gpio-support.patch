@@ -125,7 +125,7 @@
  	if (shared_hcd) {
  		usb_remove_hcd(shared_hcd);
  		xhci->shared_hcd = NULL;
-@@ -604,4 +697,20 @@
+@@ -604,6 +697,20 @@
  	return xhci_resume(xhci, false, true);
  }
  
