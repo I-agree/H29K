@@ -125,7 +125,7 @@
  	if (shared_hcd) {
  		usb_remove_hcd(shared_hcd);
  		xhci->shared_hcd = NULL;
-@@ -604,6 +697,18 @@
+@@ -604,4 +697,16 @@
  	return xhci_resume(xhci, false, true);
  }
  
@@ -144,8 +144,6 @@
 +}
 +
  const struct dev_pm_ops xhci_plat_pm_ops = {
- 	.suspend = pm_sleep_ptr(xhci_plat_suspend),
- 	.resume = pm_sleep_ptr(xhci_plat_resume),
 @@ -632,6 +739,6 @@
  	.probe	= xhci_generic_plat_probe,
 -	.remove = xhci_plat_remove,
