@@ -564,5 +564,8 @@
 
 &usb_host0_xhci {
 	dr_mode = "host";
+	reset-gpios = <&gpio3 RK_PB0 GPIO_ACTIVE_LOW>;
+	reset-assert-us = <500>;
+	reset-deassert-us = <30000>;
 	status = "okay";
 };
