@@ -1,17 +1,18 @@
 --- a/drivers/usb/host/xhci-plat.c
 +++ b/drivers/usb/host/xhci-plat.c
-@@ -18,2 +18,4 @@
+@@ -18,2 +18,5 @@
  #include <linux/usb/phy.h>
 +#include <linux/gpio/consumer.h>
 +#include <linux/of.h>
++#include <linux/workqueue.h>
  #include <linux/slab.h>
-@@ -92,6 +94,69 @@
+@@ -92,6 +95,85 @@
  	xhci->quirks |= priv->quirks;
  }
  
 +/*
 + * xhci_plat_wwan_reset - Control WWAN module reset via GPIO
-+ * @priv: platform private data containing GPIO descriptor and timing
++ * @priv: platform private data containing GPIO descriptor
 + * @assert: true to assert reset (drive active level), false to deassert
 + */
 +static void xhci_plat_wwan_reset(struct xhci_plat_priv *priv, bool assert)
@@ -20,11 +21,14 @@
 +		return;
 +
 +	gpiod_set_value_cansleep(priv->reset_gpio, assert ? 1 : 0);
++}
 +
-+	if (assert)
-+		fsleep(priv->reset_assert_us);
-+	else
-+		fsleep(priv->reset_deassert_us);
++static void xhci_plat_wwan_deassert_work(struct work_struct *work)
++{
++	struct xhci_plat_priv *priv = container_of(work, struct xhci_plat_priv,
++						  wwan_deassert_work.work);
++	/* Deassert reset (drive GPIO inactive) */
++	xhci_plat_wwan_reset(priv, false);
 +}
 +
 +static int xhci_plat_parse_wwan_reset(struct device *sysdev,
@@ -55,6 +59,7 @@
 +
 +	if (priv->reset_gpio) {
 +		struct fwnode_handle *prop_fwnode = dev_fwnode(sysdev);
++		unsigned long delay_jiffies;
 +
 +		/* Timing properties may also only exist in parent's of_node */
 +		if (!fwnode_property_present(prop_fwnode, "reset-assert-us") &&
@@ -67,6 +72,18 @@
 +					 &priv->reset_deassert_us);
 +		dev_info(sysdev, "WWAN reset GPIO configured (assert=%uus, deassert=%uus)\n",
 +			 priv->reset_assert_us, priv->reset_deassert_us);
++
++		INIT_DELAYED_WORK(&priv->wwan_deassert_work,
++				  xhci_plat_wwan_deassert_work);
++
++		/*
++		 * GPIO is already asserted (LOW) via GPIOD_OUT_LOW.
++		 * Schedule async deassert after reset_assert_us to avoid
++		 * blocking probe. USB core will auto-enumerate the module
++		 * once it boots up after deassert.
++		 */
++		delay_jiffies = usecs_to_jiffies(priv->reset_assert_us);
++		schedule_delayed_work(&priv->wwan_deassert_work, delay_jiffies);
 +	}
 +
 +	return 0;
@@ -75,7 +92,7 @@
  /* called during probe() after chip reset completes */
  static int xhci_plat_setup(struct usb_hcd *hcd)
  {
-@@ -246,6 +311,14 @@
+@@ -246,6 +328,14 @@
  		*priv = *priv_match;
  	}
  
@@ -90,7 +107,7 @@
  	device_set_wakeup_capable(&pdev->dev, true);
  
  	xhci->main_hcd = hcd;
-@@ -435,6 +508,7 @@
+@@ -435,6 +525,7 @@
  void xhci_plat_remove(struct platform_device *dev)
  {
  	struct usb_hcd	*hcd = platform_get_drvdata(dev);
@@ -98,17 +115,17 @@
  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
  	struct clk *clk = xhci->clk;
  	struct clk *reg_clk = xhci->reg_clk;
-@@ -443,6 +516,9 @@
+@@ -443,6 +533,9 @@
  	xhci->xhc_state |= XHCI_STATE_REMOVING;
  	pm_runtime_get_sync(&dev->dev);
  
-+	/* Assert WWAN reset before tearing down the host controller */
++	cancel_delayed_work_sync(&priv->wwan_deassert_work);
 +	xhci_plat_wwan_reset(priv, true);
 +
  	if (shared_hcd) {
  		usb_remove_hcd(shared_hcd);
  		xhci->shared_hcd = NULL;
-@@ -604,6 +680,20 @@
+@@ -604,6 +697,18 @@
  	return xhci_resume(xhci, false, true);
  }
  
@@ -119,7 +136,7 @@
 +	if (hcd) {
 +		struct xhci_plat_priv *priv = hcd_to_xhci_priv(hcd);
 +
-+		/* Assert WWAN reset during system shutdown/reboot */
++		cancel_delayed_work_sync(&priv->wwan_deassert_work);
 +		xhci_plat_wwan_reset(priv, true);
 +	}
 +
@@ -129,7 +146,7 @@
  const struct dev_pm_ops xhci_plat_pm_ops = {
  	.suspend = pm_sleep_ptr(xhci_plat_suspend),
  	.resume = pm_sleep_ptr(xhci_plat_resume),
-@@ -632,6 +722,6 @@
+@@ -632,6 +739,6 @@
  	.probe	= xhci_generic_plat_probe,
 -	.remove = xhci_plat_remove,
 -	.shutdown = usb_hcd_platform_shutdown,
@@ -140,23 +157,25 @@
  		.pm = &xhci_plat_pm_ops,
 --- a/drivers/usb/host/xhci-plat.h
 +++ b/drivers/usb/host/xhci-plat.h
-@@ -8,6 +8,9 @@
+@@ -8,6 +8,10 @@
  #ifndef _XHCI_PLAT_H
  #define _XHCI_PLAT_H
  
 +#include <linux/gpio/consumer.h>
 +#include <linux/types.h>
++#include <linux/workqueue.h>
 +
  struct device;
  struct platform_device;
  struct usb_hcd;
-@@ -15,6 +18,9 @@
+@@ -15,6 +19,10 @@
  struct xhci_plat_priv {
  	const char *firmware_name;
  	unsigned long long quirks;
 +	struct gpio_desc *reset_gpio;
 +	u32 reset_assert_us;
 +	u32 reset_deassert_us;
++	struct delayed_work wwan_deassert_work;
  	bool power_lost;
  	unsigned sideband_at_suspend:1;
  	void (*plat_start)(struct usb_hcd *);
