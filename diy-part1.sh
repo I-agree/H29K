@@ -74,6 +74,7 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-sy
 # download_and_check "${BASE_URL}/package/kernel/aic8800/patches/099-fix-debugfs-err-ptr-handling.patch" "package/kernel/aic8800/patches/099-fix-debugfs-err-ptr-handling.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch" "target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/997-usb-xhci-plat-add-wwan-reset-gpio-support.patch" "target/linux/rockchip/patches-6.18/997-usb-xhci-plat-add-wwan-reset-gpio-support.patch"
 # download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch" "target/linux/rockchip/patches-6.18/998-panel-mipi-dbi-debug-log.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/999-clk-rk3528-add-hclk_trng-gate.patch" "target/linux/rockchip/patches-6.18/999-clk-rk3528-add-hclk_trng-gate.patch"
 download_and_check "${BASE_URL}/JPG/99-bootanim" "files/etc/init.d/99-bootanim"
