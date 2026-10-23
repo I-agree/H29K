@@ -1,10 +1,11 @@
 --- a/drivers/usb/host/xhci-plat.c
 +++ b/drivers/usb/host/xhci-plat.c
-@@ -18,2 +18,3 @@
+@@ -18,2 +18,4 @@
  #include <linux/usb/phy.h>
 +#include <linux/gpio/consumer.h>
++#include <linux/of.h>
  #include <linux/slab.h>
-@@ -92,6 +93,45 @@
+@@ -92,6 +94,62 @@
  	xhci->quirks |= priv->quirks;
  }
  
@@ -29,8 +30,25 @@
 +static int xhci_plat_parse_wwan_reset(struct device *sysdev,
 +				      struct xhci_plat_priv *priv)
 +{
-+	priv->reset_gpio = devm_gpiod_get_optional(sysdev, "reset",
-+						   GPIOD_OUT_LOW);
++	struct fwnode_handle *fwnode = dev_fwnode(sysdev);
++
++	/*
++	 * The xhci-hcd device created by DWC3 uses a software_node and has
++	 * no of_node. The reset-gpios property lives in the parent DWC3
++	 * device tree node. Try sysdev's own fwnode first, then fall back
++	 * to the parent's of_node.
++	 */
++	priv->reset_gpio = devm_fwnode_gpiod_get(sysdev, fwnode, "reset",
++						 GPIOD_OUT_LOW, "wwan-reset");
++
++	if (!priv->reset_gpio && sysdev->parent && sysdev->parent->of_node) {
++		dev_dbg(sysdev, "reset-gpios not in swnode, trying parent of_node\n");
++		priv->reset_gpio = devm_fwnode_gpiod_get(
++			sysdev,
++			of_fwnode_handle(sysdev->parent->of_node),
++			"reset", GPIOD_OUT_LOW, "wwan-reset");
++	}
++
 +	if (IS_ERR(priv->reset_gpio))
 +		return dev_err_probe(sysdev, PTR_ERR(priv->reset_gpio),
 +				     "failed to get wwan reset gpio\n");
@@ -50,14 +68,14 @@
  /* called during probe() after chip reset completes */
  static int xhci_plat_setup(struct usb_hcd *hcd)
  {
-@@ -246,6 +286,14 @@
+@@ -246,6 +304,14 @@
  		*priv = *priv_match;
  	}
  
 +	/*
-+	 * Parse WWAN reset GPIO from the DWC3 controller node (sysdev).
-+	 * The dynamically created xhci-hcd device has no of_node of its own,
-+	 * so we must use sysdev which points to the DWC3 parent.
++	 * Parse WWAN reset GPIO. The dynamically created xhci-hcd device
++	 * has a software_node without reset-gpios, so we fall back to the
++	 * DWC3 parent's of_node where the property is defined in DT.
 +	 */
 +	if (priv)
 +		xhci_plat_parse_wwan_reset(sysdev, priv);
@@ -65,7 +83,7 @@
  	device_set_wakeup_capable(&pdev->dev, true);
  
  	xhci->main_hcd = hcd;
-@@ -435,6 +483,7 @@
+@@ -435,6 +501,7 @@
  void xhci_plat_remove(struct platform_device *dev)
  {
  	struct usb_hcd	*hcd = platform_get_drvdata(dev);
@@ -73,7 +91,7 @@
  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
  	struct clk *clk = xhci->clk;
  	struct clk *reg_clk = xhci->reg_clk;
-@@ -443,6 +491,9 @@
+@@ -443,6 +509,9 @@
  	xhci->xhc_state |= XHCI_STATE_REMOVING;
  	pm_runtime_get_sync(&dev->dev);
  
@@ -83,7 +101,7 @@
  	if (shared_hcd) {
  		usb_remove_hcd(shared_hcd);
  		xhci->shared_hcd = NULL;
-@@ -604,6 +655,20 @@
+@@ -604,6 +673,20 @@
  	return xhci_resume(xhci, false, true);
  }
  
@@ -104,7 +122,7 @@
  const struct dev_pm_ops xhci_plat_pm_ops = {
  	.suspend = pm_sleep_ptr(xhci_plat_suspend),
  	.resume = pm_sleep_ptr(xhci_plat_resume),
-@@ -632,6 +697,6 @@
+@@ -632,6 +715,6 @@
  	.probe	= xhci_generic_plat_probe,
 -	.remove = xhci_plat_remove,
 -	.shutdown = usb_hcd_platform_shutdown,
