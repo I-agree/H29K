@@ -5,7 +5,7 @@
 +#include <linux/gpio/consumer.h>
 +#include <linux/of.h>
  #include <linux/slab.h>
-@@ -92,6 +94,62 @@
+@@ -92,6 +94,69 @@
  	xhci->quirks |= priv->quirks;
  }
  
@@ -54,9 +54,16 @@
 +				     "failed to get wwan reset gpio\n");
 +
 +	if (priv->reset_gpio) {
-+		device_property_read_u32(sysdev, "reset-assert-us",
++		struct fwnode_handle *prop_fwnode = dev_fwnode(sysdev);
++
++		/* Timing properties may also only exist in parent's of_node */
++		if (!fwnode_property_present(prop_fwnode, "reset-assert-us") &&
++		    sysdev->parent && sysdev->parent->of_node)
++			prop_fwnode = of_fwnode_handle(sysdev->parent->of_node);
++
++		fwnode_property_read_u32(prop_fwnode, "reset-assert-us",
 +					 &priv->reset_assert_us);
-+		device_property_read_u32(sysdev, "reset-deassert-us",
++		fwnode_property_read_u32(prop_fwnode, "reset-deassert-us",
 +					 &priv->reset_deassert_us);
 +		dev_info(sysdev, "WWAN reset GPIO configured (assert=%uus, deassert=%uus)\n",
 +			 priv->reset_assert_us, priv->reset_deassert_us);
@@ -68,7 +75,7 @@
  /* called during probe() after chip reset completes */
  static int xhci_plat_setup(struct usb_hcd *hcd)
  {
-@@ -246,6 +304,14 @@
+@@ -246,6 +311,14 @@
  		*priv = *priv_match;
  	}
  
@@ -83,7 +90,7 @@
  	device_set_wakeup_capable(&pdev->dev, true);
  
  	xhci->main_hcd = hcd;
-@@ -435,6 +501,7 @@
+@@ -435,6 +508,7 @@
  void xhci_plat_remove(struct platform_device *dev)
  {
  	struct usb_hcd	*hcd = platform_get_drvdata(dev);
@@ -91,7 +98,7 @@
  	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
  	struct clk *clk = xhci->clk;
  	struct clk *reg_clk = xhci->reg_clk;
-@@ -443,6 +509,9 @@
+@@ -443,6 +516,9 @@
  	xhci->xhc_state |= XHCI_STATE_REMOVING;
  	pm_runtime_get_sync(&dev->dev);
  
@@ -101,7 +108,7 @@
  	if (shared_hcd) {
  		usb_remove_hcd(shared_hcd);
  		xhci->shared_hcd = NULL;
-@@ -604,6 +673,20 @@
+@@ -604,6 +680,20 @@
  	return xhci_resume(xhci, false, true);
  }
  
@@ -122,7 +129,7 @@
  const struct dev_pm_ops xhci_plat_pm_ops = {
  	.suspend = pm_sleep_ptr(xhci_plat_suspend),
  	.resume = pm_sleep_ptr(xhci_plat_resume),
-@@ -632,6 +715,6 @@
+@@ -632,6 +722,6 @@
  	.probe	= xhci_generic_plat_probe,
 -	.remove = xhci_plat_remove,
 -	.shutdown = usb_hcd_platform_shutdown,
