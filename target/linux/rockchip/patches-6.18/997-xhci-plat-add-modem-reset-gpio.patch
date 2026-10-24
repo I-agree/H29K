@@ -9,7 +9,7 @@
  #include <linux/acpi.h>
  #include <linux/usb/of.h>
  #include <linux/reset.h>
-@@ -240,6 +242,33 @@
+@@ -240,6 +242,35 @@
  	if (ret)
  		goto disable_reg_clk;
  
@@ -18,30 +18,28 @@
 +	 * This ensures the module is properly reset and initialized
 +	 * before the USB core starts enumerating devices.
 +	 */
-+	{
-+		struct gpio_desc *modem_reset_gpio;
-+		u32 assert_us = 1000000;    /* Default: 1s assert */
-+		u32 deassert_us = 10000000; /* Default: 10s deassert */
++	struct gpio_desc *modem_reset_gpio;
++	u32 assert_us = 1000000;    /* Default: 1s assert */
++	u32 deassert_us = 10000000; /* Default: 10s deassert */
 +
-+		modem_reset_gpio = devm_gpiod_get_optional(&pdev->dev, "reset", GPIOD_OUT_HIGH);
-+		if (IS_ERR(modem_reset_gpio)) {
-+			ret = PTR_ERR(modem_reset_gpio);
-+			dev_err(&pdev->dev, "Failed to get modem reset gpio: %d\n", ret);
-+			goto disable_clk;
-+		}
++	modem_reset_gpio = devm_gpiod_get_optional(&pdev->dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(modem_reset_gpio)) {
++		ret = PTR_ERR(modem_reset_gpio);
++		dev_err(&pdev->dev, "Failed to get modem reset gpio: %d\n", ret);
++		goto disable_clk;
++	}
 +
-+		if (modem_reset_gpio) {
-+			device_property_read_u32(&pdev->dev, "reset-assert-us", &assert_us);
-+			device_property_read_u32(&pdev->dev, "reset-deassert-us", &deassert_us);
++	if (modem_reset_gpio) {
++		device_property_read_u32(&pdev->dev, "reset-assert-us", &assert_us);
++		device_property_read_u32(&pdev->dev, "reset-deassert-us", &deassert_us);
 +
-+			dev_info(&pdev->dev, "FM350-GL Modem Reset: assert %uus, deassert %uus\n",
-+				 assert_us, deassert_us);
++		dev_info(&pdev->dev, "FM350-GL Modem Reset: assert %uus, deassert %uus\n",
++			 assert_us, deassert_us);
 +
-+			gpiod_set_value_cansleep(modem_reset_gpio, 1);
-+			fsleep(assert_us);
-+			gpiod_set_value_cansleep(modem_reset_gpio, 0);
-+			msleep(deassert_us / 1000);
-+		}
++		gpiod_set_value_cansleep(modem_reset_gpio, 1);
++		fsleep(assert_us);
++		gpiod_set_value_cansleep(modem_reset_gpio, 0);
++		msleep(deassert_us / 1000);
 +	}
 +
  	if (priv_match) {
