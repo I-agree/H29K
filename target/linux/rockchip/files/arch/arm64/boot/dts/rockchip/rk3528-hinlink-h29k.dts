@@ -271,12 +271,6 @@
 };
 
 &pinctrl {
-	wwan {
-		wwan_rst_pin: wwan-rst-pin {
-			rockchip,pins = <4 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-
 	ir {
 		ir_int_pin: ir-int-pin {
 			rockchip,pins = <4 RK_PC6 RK_FUNC_GPIO &pcfg_pull_up>;
@@ -552,9 +546,6 @@
 
 &usb_host0_xhci {
 	dr_mode = "host";
-	pinctrl-names = "default";
-	pinctrl-0 = <&wwan_rst_pin>;
-	reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
 	wwan-rst-pin-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
 	reset-assert-us = <1000000>;
 	reset-deassert-us = <10000000>;
