@@ -77,7 +77,7 @@
 +				  xhci_plat_wwan_deassert_work);
 +
 +		/*
-+		 * GPIO is already asserted (LOW) via GPIOD_OUT_LOW.
++		 * GPIO is physically driven LOW because we requested logical HIGH
 +		 * Schedule async deassert after reset_assert_us to avoid
 +		 * blocking probe. USB core will auto-enumerate the module
 +		 * once it boots up after deassert.
