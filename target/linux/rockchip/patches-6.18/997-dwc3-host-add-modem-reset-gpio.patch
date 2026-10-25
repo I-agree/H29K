@@ -1,0 +1,44 @@
+--- a/drivers/usb/dwc3/host.c
++++ b/drivers/usb/dwc3/host.c
+@@ -12,6 +12,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/usb.h>
+ #include <linux/usb/hcd.h>
++#include <linux/gpio/consumer.h>
++#include <linux/delay.h>
+ 
+ #include "../host/xhci-port.h"
+ #include "../host/xhci-ext-caps.h"
+@@ -158,6 +160,32 @@ int dwc3_host_init(struct dwc3 *dwc)
+ 		goto err;
+ 	}
+ 
++	/*
++	 * Handle external modem (e.g. FM350-GL) reset GPIO for soft reboot.
++	 * Since RK3528 uses a single-node DWC3 architecture, dwc->dev points
++	 * directly to the usb_host0_xhci node where our DT properties reside.
++	 */
++	{
++		struct gpio_desc *modem_rst_gpio;
++		u32 assert_us = 1000000;
++		u32 deassert_us = 10000000;
++
++		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_OUT_LOW);
++		if (IS_ERR(modem_rst_gpio)) {
++			dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_rst_gpio));
++		} else if (modem_rst_gpio) {
++			device_property_read_u32(dwc->dev, "reset-assert-us", &assert_us);
++			device_property_read_u32(dwc->dev, "reset-deassert-us", &deassert_us);
++
++			dev_info(dwc->dev, "FM350-GL Modem Reset: assert %uus, deassert %uus\n", assert_us, deassert_us);
++
++			gpiod_set_value_cansleep(modem_rst_gpio, 1);
++			fsleep(assert_us);
++			gpiod_set_value_cansleep(modem_rst_gpio, 0);
++			msleep(deassert_us / 1000);
++		}
++	}
++
+ 	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
+ 
+ 	props[prop_idx++] = PROPERTY_ENTRY_BOOL("xhci-sg-trb-cache-size-quirk");
