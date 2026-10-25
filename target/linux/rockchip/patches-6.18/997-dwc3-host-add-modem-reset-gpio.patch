@@ -78,20 +78,20 @@
  }
  
  static const struct xhci_plat_priv dwc3_xhci_plat_quirk = {
-@@ -158,6 +205,37 @@ int dwc3_host_init(struct dwc3 *dwc)
+@@ -158,6 +205,49 @@ int dwc3_host_init(struct dwc3 *dwc)
  		goto err;
  	}
  
 +	/*
 +	 * Acquire the modem reset GPIO early during host init.
-+	 * DO NOT toggle or sleep here! Just acquire it so that if the GPIO
-+	 * controller is not ready (-EPROBE_DEFER), we defer the whole DWC3 probe.
++	 * We use GPIOD_ASIS to avoid initial glitches, then explicitly
++	 * configure it as output with a safe state before triggering reset.
 +	 */
 +	{
 +		struct gpio_desc *modem_rst_gpio;
 +		struct modem_reset_ctx *ctx;
 +
-+		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_OUT_LOW);
++		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
 +		if (PTR_ERR(modem_rst_gpio) == -EPROBE_DEFER) {
 +			pending_modem_ctx = NULL; /* Prevent UAF on probe retry */
 +			ret = -EPROBE_DEFER;
@@ -99,16 +99,28 @@
 +		} else if (IS_ERR(modem_rst_gpio)) {
 +			dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_rst_gpio));
 +		} else if (modem_rst_gpio) {
-+			ctx = devm_kzalloc(dwc->dev, sizeof(*ctx), GFP_KERNEL);
-+			if (ctx) {
-+				ctx->dev = dwc->dev;
-+				ctx->gpio = modem_rst_gpio;
-+				ctx->assert_us = 1000000;
-+				ctx->deassert_us = 10000000;
-+				device_property_read_u32(dwc->dev, "reset-assert-us", &ctx->assert_us);
-+				device_property_read_u32(dwc->dev, "reset-deassert-us", &ctx->deassert_us);
-+				ctx->is_scheduled = false;
-+				pending_modem_ctx = ctx;
++			/*
++			 * CRITICAL FIX: Safely transition to output mode.
++			 * For ACTIVE_LOW: logical 0 = physical HIGH (deasserted/safe state).
++			 * Setting it to 0 BEFORE changing direction prevents any reset glitch.
++			 */
++			gpiod_set_value_cansleep(modem_rst_gpio, 0);
++
++			/* Now force the pin to output mode */
++			if (gpiod_direction_output(modem_rst_gpio, 0) < 0) {
++				dev_err(dwc->dev, "failed to set modem reset gpio direction\n");
++			} else {
++				ctx = devm_kzalloc(dwc->dev, sizeof(*ctx), GFP_KERNEL);
++				if (ctx) {
++					ctx->dev = dwc->dev;
++					ctx->gpio = modem_rst_gpio;
++					ctx->assert_us = 1000000;
++					ctx->deassert_us = 10000000;
++					device_property_read_u32(dwc->dev, "reset-assert-us", &ctx->assert_us);
++					device_property_read_u32(dwc->dev, "reset-deassert-us", &ctx->deassert_us);
++					ctx->is_scheduled = false;
++					pending_modem_ctx = ctx;
++				}
 +			}
 +		}
 +	}
@@ -116,7 +128,7 @@
  	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
  
  	props[prop_idx++] = PROPERTY_ENTRY_BOOL("xhci-sg-trb-cache-size-quirk");
-@@ -220,5 +298,14 @@
+@@ -220,5 +310,14 @@
  
  void dwc3_host_exit(struct dwc3 *dwc)
  {
