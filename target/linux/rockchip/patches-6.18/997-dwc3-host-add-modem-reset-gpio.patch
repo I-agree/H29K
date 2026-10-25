@@ -91,7 +91,7 @@
 +		struct gpio_desc *modem_rst_gpio;
 +		struct modem_reset_ctx *ctx;
 +
-+		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
++		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_OUT_LOW);
 +		if (PTR_ERR(modem_rst_gpio) == -EPROBE_DEFER) {
 +			pending_modem_ctx = NULL; /* Prevent UAF on probe retry */
 +			ret = -EPROBE_DEFER;
