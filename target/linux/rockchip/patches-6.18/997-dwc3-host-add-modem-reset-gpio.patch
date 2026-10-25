@@ -9,7 +9,53 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -158,6 +160,39 @@ int dwc3_host_init(struct dwc3 *dwc)
+@@ -62,16 +64,45 @@
+ 
+ static void dwc3_xhci_plat_start(struct usb_hcd *hcd)
+ {
++	struct gpio_desc *modem_rst_gpio;
++	u32 assert_us = 1000000;
++	u32 deassert_us = 10000000;
+ 	struct platform_device *pdev;
+ 	struct dwc3 *dwc;
+ 
+ 	if (!usb_hcd_is_primary_hcd(hcd))
+ 		return;
+ 
+ 	pdev = to_platform_device(hcd->self.controller);
+ 	dwc = dev_get_drvdata(pdev->dev.parent);
+ 
+ 	dwc3_enable_susphy(dwc, true);
++
++	/*
++	 * CRITICAL FIX: Execute Modem Reset AFTER xHCI and PHY are fully started.
++	 * This ensures the USB link is ready before the module attempts to enumerate.
++	 */
++	modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
++	if (IS_ERR(modem_rst_gpio)) {
++		dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_rst_gpio));
++	} else if (modem_rst_gpio) {
++		device_property_read_u32(dwc->dev, "reset-assert-us", &assert_us);
++		device_property_read_u32(dwc->dev, "reset-deassert-us", &deassert_us);
++
++		dev_info(dwc->dev, "FM350-GL: Triggering HW reset after xHCI start...\n");
++
++		/* Assert reset: Physical LOW due to ACTIVE_LOW in DT */
++		gpiod_set_value_cansleep(modem_rst_gpio, 1);
++		fsleep(assert_us);
++
++		/* Deassert reset: Physical HIGH, Module starts booting */
++		gpiod_set_value_cansleep(modem_rst_gpio, 0);
++
++		/* Wait for module firmware to load and pull up USB lines */
++		msleep(deassert_us / 1000);
++
++		dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
++	}
+ }
+ 
+ static const struct xhci_plat_priv dwc3_xhci_plat_quirk = {
+@@ -158,6 +189,39 @@ int dwc3_host_init(struct dwc3 *dwc)
  		goto err;
  	}
  
