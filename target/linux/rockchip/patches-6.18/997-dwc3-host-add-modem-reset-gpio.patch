@@ -9,14 +9,12 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -158,6 +160,32 @@ int dwc3_host_init(struct dwc3 *dwc)
+@@ -158,6 +160,39 @@ int dwc3_host_init(struct dwc3 *dwc)
  		goto err;
  	}
  
 +	/*
 +	 * Handle external modem (e.g. FM350-GL) reset GPIO for soft reboot.
-+	 * Since RK3528 uses a single-node DWC3 architecture, dwc->dev points
-+	 * directly to the usb_host0_xhci node where our DT properties reside.
 +	 */
 +	{
 +		struct gpio_desc *modem_rst_gpio;
@@ -24,7 +22,16 @@
 +		u32 deassert_us = 10000000;
 +
 +		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_OUT_LOW);
-+		if (IS_ERR(modem_rst_gpio)) {
++		
++		/* 
++		 * CRITICAL FIX: If GPIO controller is not ready yet (-EPROBE_DEFER / -517),
++		 * we MUST return the error to defer the entire DWC3 probe.
++		 * Otherwise the reset sequence will be silently skipped.
++		 */
++		if (PTR_ERR(modem_rst_gpio) == -EPROBE_DEFER) {
++			ret = -EPROBE_DEFER;
++			goto err;
++		} else if (IS_ERR(modem_rst_gpio)) {
 +			dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_rst_gpio));
 +		} else if (modem_rst_gpio) {
 +			device_property_read_u32(dwc->dev, "reset-assert-us", &assert_us);
