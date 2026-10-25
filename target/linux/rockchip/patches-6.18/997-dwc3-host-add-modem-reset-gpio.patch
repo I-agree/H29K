@@ -1,21 +1,64 @@
 --- a/drivers/usb/dwc3/host.c
 +++ b/drivers/usb/dwc3/host.c
-@@ -12,6 +12,8 @@
+@@ -12,6 +12,9 @@
  #include <linux/platform_device.h>
  #include <linux/usb.h>
  #include <linux/usb/hcd.h>
 +#include <linux/gpio/consumer.h>
 +#include <linux/delay.h>
++#include <linux/workqueue.h>
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -62,16 +64,45 @@
+@@ -22,6 +25,43 @@
+ #define XHCI_HCSPARAMS1		0x4
+ #define XHCI_PORTSC_BASE	0x400
+ 
++/* Context for asynchronous modem reset */
++struct modem_reset_ctx {
++	struct delayed_work work;
++	struct device *dev;
++	struct gpio_desc *gpio;
++	u32 assert_us;
++	u32 deassert_us;
++};
++
++static void modem_reset_work_handler(struct work_struct *work)
++{
++	struct modem_reset_ctx *ctx = container_of(to_delayed_work(work), struct modem_reset_ctx, work);
++
++	if (!ctx->gpio)
++		goto out_free;
++
++	dev_info(ctx->dev, "FM350-GL: Triggering async HW reset after xHCI start...\n");
++
++	/* Assert reset: Physical LOW due to ACTIVE_LOW in DT */
++	gpiod_set_value_cansleep(ctx->gpio, 1);
++	fsleep(ctx->assert_us);
++
++	/* Deassert reset: Physical HIGH, Module starts booting */
++	gpiod_set_value_cansleep(ctx->gpio, 0);
++
++	/* Wait for module firmware to load and pull up USB lines */
++	msleep(ctx->deassert_us / 1000);
++
++	dev_info(ctx->dev, "FM350-GL: Reset sequence completed.\n");
++
++out_free:
++	kfree(ctx);
++}
++
++/* Global pointer to pass context from host_init to plat_start */
++static struct modem_reset_ctx *pending_modem_reset_ctx;
++
+ /**
+  * dwc3_power_off_all_roothub_ports - Power off all Root hub ports
+  * @dwc: Pointer to our controller context structure
+@@ -62,16 +102,26 @@
  
  static void dwc3_xhci_plat_start(struct usb_hcd *hcd)
  {
-+	struct gpio_desc *modem_rst_gpio;
-+	u32 assert_us = 1000000;
-+	u32 deassert_us = 10000000;
++	struct modem_reset_ctx *ctx;
  	struct platform_device *pdev;
  	struct dwc3 *dwc;
  
@@ -27,68 +70,48 @@
  
  	dwc3_enable_susphy(dwc, true);
 +
-+	/*
-+	 * CRITICAL FIX: Execute Modem Reset AFTER xHCI and PHY are fully started.
-+	 * This ensures the USB link is ready before the module attempts to enumerate.
-+	 */
-+	modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
-+	if (IS_ERR(modem_rst_gpio)) {
-+		dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_rst_gpio));
-+	} else if (modem_rst_gpio) {
-+		device_property_read_u32(dwc->dev, "reset-assert-us", &assert_us);
-+		device_property_read_u32(dwc->dev, "reset-deassert-us", &deassert_us);
-+
-+		dev_info(dwc->dev, "FM350-GL: Triggering HW reset after xHCI start...\n");
-+
-+		/* Assert reset: Physical LOW due to ACTIVE_LOW in DT */
-+		gpiod_set_value_cansleep(modem_rst_gpio, 1);
-+		fsleep(assert_us);
-+
-+		/* Deassert reset: Physical HIGH, Module starts booting */
-+		gpiod_set_value_cansleep(modem_rst_gpio, 0);
-+
-+		/* Wait for module firmware to load and pull up USB lines */
-+		msleep(deassert_us / 1000);
-+
-+		dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
++	/* Schedule the modem reset asynchronously if context was prepared */
++	ctx = pending_modem_reset_ctx;
++	if (ctx) {
++		pending_modem_reset_ctx = NULL;
++		INIT_DELAYED_WORK(&ctx->work, modem_reset_work_handler);
++		/* Execute immediately in background kworker thread */
++		schedule_delayed_work(&ctx->work, 0);
 +	}
  }
  
  static const struct xhci_plat_priv dwc3_xhci_plat_quirk = {
-@@ -158,6 +189,39 @@ int dwc3_host_init(struct dwc3 *dwc)
+@@ -158,6 +208,36 @@ int dwc3_host_init(struct dwc3 *dwc)
  		goto err;
  	}
  
 +	/*
-+	 * Handle external modem (e.g. FM350-GL) reset GPIO for soft reboot.
++	 * Acquire the modem reset GPIO early during host init.
++	 * DO NOT toggle or sleep here! Just acquire it so that if the GPIO
++	 * controller is not ready (-EPROBE_DEFER), we defer the whole DWC3 probe.
++	 * The actual reset pulse will be triggered asynchronously in plat_start.
 +	 */
 +	{
 +		struct gpio_desc *modem_rst_gpio;
-+		u32 assert_us = 1000000;
-+		u32 deassert_us = 10000000;
++		struct modem_reset_ctx *ctx;
 +
-+		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_OUT_LOW);
-+		
-+		/* 
-+		 * CRITICAL FIX: If GPIO controller is not ready yet (-EPROBE_DEFER / -517),
-+		 * we MUST return the error to defer the entire DWC3 probe.
-+		 * Otherwise the reset sequence will be silently skipped.
-+		 */
++		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
 +		if (PTR_ERR(modem_rst_gpio) == -EPROBE_DEFER) {
 +			ret = -EPROBE_DEFER;
 +			goto err;
 +		} else if (IS_ERR(modem_rst_gpio)) {
 +			dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_rst_gpio));
 +		} else if (modem_rst_gpio) {
-+			device_property_read_u32(dwc->dev, "reset-assert-us", &assert_us);
-+			device_property_read_u32(dwc->dev, "reset-deassert-us", &deassert_us);
-+
-+			dev_info(dwc->dev, "FM350-GL Modem Reset: assert %uus, deassert %uus\n", assert_us, deassert_us);
-+
-+			gpiod_set_value_cansleep(modem_rst_gpio, 1);
-+			fsleep(assert_us);
-+			gpiod_set_value_cansleep(modem_rst_gpio, 0);
-+			msleep(deassert_us / 1000);
++			ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
++			if (ctx) {
++				ctx->dev = dwc->dev;
++				ctx->gpio = modem_rst_gpio;
++				ctx->assert_us = 1000000;
++				ctx->deassert_us = 10000000;
++				device_property_read_u32(dwc->dev, "reset-assert-us", &ctx->assert_us);
++				device_property_read_u32(dwc->dev, "reset-deassert-us", &ctx->deassert_us);
++				pending_modem_reset_ctx = ctx;
++			}
 +		}
 +	}
 +
