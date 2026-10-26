@@ -2822,8 +2822,10 @@ jobs:
           find_drm_dev() {
               for c in /sys/class/drm/card[0-9]*; do
                   [ -d "$c" ] || continue
+                  # 跳过 card0-connector 这类子节点，只处理主 card 节点
                   case "$c" in *card*-*) continue;; esac
                   d=$(readlink -f "$c/device/driver" 2>/dev/null)
+                  # 严格匹配驱动名称
                   [ "${d##*/}" = "$DRM_DRIVER" ] || continue
                   n=$(basename "$c")
                   if [ -e "/dev/dri/$n" ]; then
@@ -2831,10 +2833,7 @@ jobs:
                       return 0
                   fi
               done
-              if [ -e /dev/dri/card1 ]; then
-                  echo /dev/dri/card1
-                  return 0
-              fi
+              # ★ 移除了 /dev/dri/card1 的硬编码兜底，找不到就返回失败
               return 1
           }
 
@@ -2849,8 +2848,9 @@ jobs:
                   i=$((i+1))
               done
 
+              # ★ 严格校验：找不到对应驱动的设备绝不强行启动
               [ -z "$DRM_DEV" ] && {
-                  logger -t bootanim "未找到 DRM 设备，放弃启动开机动画"
+                  logger -t bootanim "Not found DRM device for $DRM_DRIVER, abort."
                   return 1
               }
 
