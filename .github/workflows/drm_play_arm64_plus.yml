@@ -2814,10 +2814,11 @@ jobs:
           START=11
           STOP=10
 
-          DRM_DRIVER="panel-mipi-dbi-spi"
+          USE_PROCD=1
 
-          # 按驱动名动态定位 DRM 节点；unbind/bind 之后 minor 编号可能变化，
-          # 全部失败时才退回硬编码的 /dev/dri/card1。
+          DRM_DRIVER="panel-mipi-dbi-spi"
+          PLAYER="/usr/sbin/drm_play_arm64"
+
           find_drm_dev() {
               for c in /sys/class/drm/card[0-9]*; do
                   [ -d "$c" ] || continue
@@ -2837,57 +2838,33 @@ jobs:
               return 1
           }
 
-          start() {
-              PLAYER="/usr/sbin/drm_play_arm64"
+          start_service() {
+              [ ! -x "$PLAYER" ] && return 1
+
               DRM_DEV=""
-
-              [ ! -f "$PLAYER" ] && return 1
-
               i=0
               while [ $i -lt 10 ]; do
                   DRM_DEV=$(find_drm_dev) && [ -n "$DRM_DEV" ] && break
                   sleep 1
                   i=$((i+1))
               done
-              [ -z "$DRM_DEV" ] && return 1
 
-              killall drm_play_arm64 2>/dev/null
-              sleep 1
-
-              SPI_DEV=""
-              for dev in /sys/bus/spi/devices/*; do
-                  if [ -f "$dev/modalias" ]; then
-                      ALIAS=$(cat "$dev/modalias" 2>/dev/null)
-                      case "$ALIAS" in
-                          *gc9307*|*panel-mipi-dbi*)
-                              SPI_DEV=$(basename "$dev")
-                              break
-                              ;;
-                      esac
-                  fi
-              done
-
-              if [ -n "$SPI_DEV" ] && [ -d "/sys/bus/spi/drivers/$DRM_DRIVER" ]; then
-                  echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/unbind" 2>/dev/null
-                  sleep 1
-                  echo "$SPI_DEV" > "/sys/bus/spi/drivers/$DRM_DRIVER/bind" 2>/dev/null
-                  i=0
-                  DRM_DEV=""
-                  while [ $i -lt 5 ]; do
-                      DRM_DEV=$(find_drm_dev) && [ -n "$DRM_DEV" ] && break
-                      sleep 1
-                      i=$((i+1))
-                  done
-              fi
-
-              [ -z "$DRM_DEV" ] && DRM_DEV=$(find_drm_dev)
-              [ -z "$DRM_DEV" ] && DRM_DEV=/dev/dri/card1
+              [ -z "$DRM_DEV" ] && {
+                  logger -t bootanim "未找到 DRM 设备，放弃启动开机动画"
+                  return 1
+              }
 
               logger -t bootanim "drm_play_arm64 on $DRM_DEV"
-              "$PLAYER" "$DRM_DEV" &
+
+              procd_open_instance
+              procd_set_param command "$PLAYER" "$DRM_DEV"
+              procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-0}
+              procd_set_param stdout 1
+              procd_set_param stderr 1
+              procd_close_instance
           }
 
-          stop() {
+          stop_service() {
               killall drm_play_arm64 2>/dev/null
           }
           EOF
