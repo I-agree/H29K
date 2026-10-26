@@ -115,7 +115,7 @@
 +					ctx->gpio = modem_rst_gpio;
 +					/* Optimized default fallback timings */
 +					ctx->assert_us = 200000;
-+					ctx->deassert_us = 6000000;
++					ctx->deassert_us = 7000000;
 +					device_property_read_u32(dwc->dev, "reset-assert-us", &ctx->assert_us);
 +					device_property_read_u32(dwc->dev, "reset-deassert-us", &ctx->deassert_us);
 +					ctx->is_scheduled = false;
