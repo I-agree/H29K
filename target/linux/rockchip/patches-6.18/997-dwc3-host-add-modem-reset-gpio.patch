@@ -44,7 +44,7 @@
 +	gpiod_set_value_cansleep(ctx->gpio, 0);
 +	fsleep(ctx->assert_us);
 +	gpiod_set_value_cansleep(ctx->gpio, 1);
-+	msleep(ctx->deassert_us / 1000);
++	msleep(DIV_ROUND_UP(ctx->deassert_us, 1000));
 +	dev_info(ctx->dev, "FM350-GL: Reset sequence completed.\n");
 +}
 +
@@ -68,17 +68,17 @@
  	dwc3_enable_susphy(dwc, true);
 +
 +	/* Retrieve and validate the pending context safely */
-+	ctx = pending_modem_ctx;
++	ctx = READ_ONCE(pending_modem_ctx);
 +	if (ctx && ctx->dev == dwc->dev && !ctx->is_scheduled) {
 +		ctx->is_scheduled = true;
-+		pending_modem_ctx = NULL; /* Clear immediately to prevent re-trigger */
++		WRITE_ONCE(pending_modem_ctx, NULL); /* Clear immediately to prevent re-trigger */
 +		INIT_DELAYED_WORK(&ctx->work, modem_reset_work_handler);
 +		schedule_delayed_work(&ctx->work, 0);
 +	}
  }
  
  static const struct xhci_plat_priv dwc3_xhci_plat_quirk = {
-@@ -158,6 +205,48 @@ int dwc3_host_init(struct dwc3 *dwc)
+@@ -158,6 +205,49 @@ int dwc3_host_init(struct dwc3 *dwc)
  		goto err;
  	}
  
@@ -93,7 +93,7 @@
 +
 +		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
 +		if (PTR_ERR(modem_rst_gpio) == -EPROBE_DEFER) {
-+			pending_modem_ctx = NULL; /* Prevent UAF on probe retry */
++			WRITE_ONCE(pending_modem_ctx, NULL); /* Prevent UAF on probe retry */
 +			ret = -EPROBE_DEFER;
 +			goto err;
 +		} else if (IS_ERR(modem_rst_gpio)) {
@@ -113,12 +113,13 @@
 +				if (ctx) {
 +					ctx->dev = dwc->dev;
 +					ctx->gpio = modem_rst_gpio;
-+					ctx->assert_us = 1000000;
-+					ctx->deassert_us = 10000000;
++					/* Optimized default fallback timings */
++					ctx->assert_us = 200000;
++					ctx->deassert_us = 6000000;
 +					device_property_read_u32(dwc->dev, "reset-assert-us", &ctx->assert_us);
 +					device_property_read_u32(dwc->dev, "reset-deassert-us", &ctx->deassert_us);
 +					ctx->is_scheduled = false;
-+					pending_modem_ctx = ctx;
++					WRITE_ONCE(pending_modem_ctx, ctx);
 +				}
 +			}
 +		}
@@ -127,17 +128,17 @@
  	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
  
  	props[prop_idx++] = PROPERTY_ENTRY_BOOL("xhci-sg-trb-cache-size-quirk");
-@@ -220,5 +309,14 @@
+@@ -220,5 +310,14 @@
  
  void dwc3_host_exit(struct dwc3 *dwc)
  {
 +	struct modem_reset_ctx *ctx;
 +
 +	/* Cancel any pending modem reset work before tearing down */
-+	ctx = pending_modem_ctx;
++	ctx = READ_ONCE(pending_modem_ctx);
 +	if (ctx && ctx->dev == dwc->dev) {
 +		cancel_delayed_work_sync(&ctx->work);
-+		pending_modem_ctx = NULL;
++		WRITE_ONCE(pending_modem_ctx, NULL);
 +	}
 +
  	if (dwc->sys_wakeup)
