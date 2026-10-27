@@ -36,27 +36,10 @@ fi
 
 # =================================================================================
 
-# ===================== 获取coolsnowwolf的openwrt-25.12的luci-app-turboacc插件 =====================
-# 浅克隆指定的分支
-git clone --depth=1 --branch openwrt-25.12 https://github.com/coolsnowwolf/luci.git temp_coolsnowwolf_luci
-
-# 复制需要的插件到目标位置
-cp -r temp_coolsnowwolf_luci/applications/luci-app-turboacc feeds/luci/applications/luci-app-turboacc
-
-# 验证文件是否存在
-if [ -f "feeds/luci/applications/luci-app-turboacc/Makefile" ]; then
-    echo "✅ 验证成功：插件已放入 feeds 标准目录，Makefile 存在。"
-else
-    echo "❌ 错误：未找到 Makefile！"
-    exit 1
-fi
-
-# 删除临时克隆的仓库以释放空间
-rm -rf temp_coolsnowwolf_luci
-
-# 【关键操作】让构建系统正式识别并注册这个新加入的包
-./scripts/feeds update -i
-./scripts/feeds install -f luci-app-turboacc
+# ===================== 系统防火墙增强版（openwrt-sonic-fullcone） =====================
+# 一键应用所有补丁（适用于6.6、6.12、6.18）
+# 全锥形 NAT（Full Cone NAT），无需额外勾选，fullcone 编译进现有 nft_masq.ko / xt_MASQUERADE.ko 模块
+curl -sSL https://raw.githubusercontent.com/mufeng05/openwrt-sonic-fullcone/master/add_sonic_fullcone.sh | bash
 
 # =================================================================================
 
