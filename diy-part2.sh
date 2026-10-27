@@ -36,6 +36,24 @@ fi
 
 # =================================================================================
 
+# ===================== 获取coolsnowwolf的openwrt-25.12的luci-app-turboacc插件 =====================
+# 浅克隆指定的分支
+git clone --depth=1 --branch openwrt-25.12 https://github.com/coolsnowwolf/luci.git temp_coolsnowwolf_luci
+
+# 复制需要的插件到目标位置
+cp -r temp_coolsnowwolf_luci/applications/luci-app-turboacc feeds/luci/applications/luci-app-turboacc
+
+# 验证文件是否存在
+if [ -f "feeds/luci/applications/luci-app-turboacc/Makefile" ]; then
+    echo "✅ 验证成功：插件已放入 feeds 标准目录，Makefile 存在。"
+else
+    echo "❌ 错误：未找到 Makefile！"
+    exit 1
+fi
+
+# 删除临时克隆的仓库以释放空间
+rm -rf temp_coolsnowwolf_luci
+
 # ===================== 赋权与开机自启 =====================
 # echo "🔧 给可执行脚本添加运行权限"
 chmod +x files/etc/init.d/99-bootanim
