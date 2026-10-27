@@ -21,6 +21,15 @@ git clone --depth=1 --branch openwrt-25.12 https://github.com/coolsnowwolf/luci.
 # 复制需要的插件到目标位置
 cp -r temp_coolsnowwolf_luci/applications/luci-app-turboacc package/luci-app-turboacc
 
+# 判断 Makefile 是否成功复制
+if [ -f "package/luci-app-turboacc/Makefile" ]; then
+    echo "✅ 验证成功：package/luci-app-turboacc/Makefile 文件存在，插件已正确就位。"
+else
+    echo "❌ 错误：未找到 package/luci-app-turboacc/Makefile 文件，请检查源码分支或目录结构是否正确！"
+    # 发现异常时直接终止脚本执行，防止带着错误配置继续编译
+    exit 1
+fi
+
 # 删除临时克隆的仓库以释放空间
 rm -rf temp_coolsnowwolf_luci
 
