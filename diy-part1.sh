@@ -15,6 +15,11 @@ echo 'src-git qmodem https://github.com/FUjr/QModem.git;main' >> feeds.conf.defa
 # === 3. 安装 glass 主题（原作者停更了）
 git clone https://github.com/I-agree/luci-theme-glass.git package/luci-theme-glass
 
+# === 4. 获取coolsnowwolf的openwrt-25.12的luci-app-turboacc插件
+# 使用 svn export 导出指定分支的插件源码
+# 命令格式：svn export URL 本地路径
+svn export https://github.com/coolsnowwolf/luci/branches/openwrt-25.12/applications/luci-app-turboacc package/luci-app-turboacc
+
 # ======================== 【统一下载与文件校验中心】 ========================
 echo "📥 开始统一拉取 H29K 编译所需的核心外置资源..."
 
