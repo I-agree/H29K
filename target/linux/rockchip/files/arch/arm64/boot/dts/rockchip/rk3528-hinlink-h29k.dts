@@ -556,6 +556,6 @@
 	pinctrl-0 = <&wwan_rst_pin>;
 	reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
 	reset-assert-us = <1000000>;
-	reset-deassert-us = <9000000>;
+	reset-deassert-us = <8000000>;
 	status = "okay";
 };
