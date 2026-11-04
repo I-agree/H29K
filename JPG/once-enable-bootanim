@@ -2,7 +2,7 @@
 
 # ==============================================================================
 # OpenWrt 首次启动自动扩容脚本 (f2fs 版本)
-# 功能: 
+# 功能:
 # 1. 启用开机动画
 # 2. 检测 eMMC 剩余空间，创建新分区 (mmcblk0p3)
 # 3. 格式化为 f2fs (专为闪存优化，速度快，寿命长)
@@ -11,167 +11,275 @@
 
 LOG_TAG="auto-resize"
 EMMC_DEV="/dev/mmcblk0"
-TARGET_PART="${EMMC_DEV}p3"
+TARGET_PARTNO=3
+TARGET_PART="${EMMC_DEV}p${TARGET_PARTNO}"
 MOUNT_POINT="/mnt/mmcblk0p3"
 FSTAB_CONFIG="/etc/config/fstab"
+WAIT_NODE_SEC=10
 
 log_info() {
-    logger -t "$LOG_TAG" "$1"
-    echo "[Auto-Resize] $1"
+	logger -t "$LOG_TAG" "$1"
+	echo "[Auto-Resize] $1"
+}
+
+have() {
+	command -v "$1" >/dev/null 2>&1
 }
 
 # ------------------------------------------------------------------------------
-# 第一部分: 启用开机动画
-# ------------------------------------------------------------------------------
-if [ -f "/etc/init.d/99-bootanim" ]; then
-    /etc/init.d/99-bootanim enable
-    log_info "Boot animation enabled."
-fi
-
-# ------------------------------------------------------------------------------
-# 第二部分: 自动分区与挂载逻辑 (f2fs)
+# 磁盘 / 分区表读取
 # ------------------------------------------------------------------------------
 
-# 1. 检查目标分区是否已经存在
-if [ -b "$TARGET_PART" ]; then
-    log_info "Partition $TARGET_PART already exists. Skipping resize."
-else
-    log_info "Starting auto-resize process for $EMMC_DEV (Target: f2fs)..."
+# 磁盘总扇区数  [FIX-5]
+get_total_sectors() {
+	if have blockdev; then
+		blockdev --getsz "$EMMC_DEV" 2>/dev/null
+		return 0
+	fi
+	# 回退: fdisk -l 的 "Disk /dev/mmcblk0: ... N sectors" 行，扇区数在第 7 列
+	fdisk -l "$EMMC_DEV" 2>/dev/null |
+		grep "^Disk ${EMMC_DEV}:" | awk '{print $7}'
+}
 
-    # 2. 获取分区布局信息
-    TOTAL_SECTORS=$(fdisk -l $EMMC_DEV | grep "Disk $EMMC_DEV" | awk '{print $7}')
-    LAST_END_SECTOR=$(fdisk -l $EMMC_DEV | grep "${EMMC_DEV}p" | awk '{print $3}' | sort -n | tail -n 1)
+# 所有已有分区中最大的 End 扇区  [FIX-2]
+#
+# 为什么原版会错: fdisk -l 的设备行在带 Boot 标志时会多出一列 '*'，
+#   /dev/mmcblk0p1 *      65536    196607   <- $3 = Start(被顶偏)
+#   /dev/mmcblk0p2       262144   2359295   <- $3 = End  (正常)
+# 固定取 $3 就会把某个分区的 Start 当成 End。原版靠 sort|tail 取最大值侥幸躲过，
+# 一旦 Boot 标志落在最后一个分区上，算出的起始扇区会落进已有分区内部。
+get_last_end_sector() {
+	if have sfdisk; then
+		# sfdisk -d 是机器可读 dump，字段名固定、没有 Boot 列:
+		#   /dev/mmcblk0p1 : start=65536, size=131072, type=83, bootable
+		sfdisk -d "$EMMC_DEV" 2>/dev/null |
+			sed -n 's/.*start=[[:space:]]*\([0-9][0-9]*\),[[:space:]]*size=[[:space:]]*\([0-9][0-9]*\).*/\1 \2/p' |
+			awk '{ e = $1 + $2 - 1; if (e > m) m = e } END { if (m > 0) print m }'
+		return 0
+	fi
+	# 回退: fdisk -l，显式判断第 2 列是否为 '*' 来决定 End 在 $4 还是 $3
+	fdisk -l "$EMMC_DEV" 2>/dev/null |
+		grep "^${EMMC_DEV}p" |
+		awk '{ if ($2 == "*") print $4; else print $3 }' |
+		awk '{ if ($1 + 0 > m + 0) m = $1 } END { if (m != "") print m + 0 }'
+}
 
-    if [ -z "$LAST_END_SECTOR" ] || [ -z "$TOTAL_SECTORS" ]; then
-        log_info "Error: Could not determine partition layout. Aborting resize."
-        exit 0
-    fi
+# ------------------------------------------------------------------------------
+# 第二部分: 创建并格式化分区（仅在目标分区不存在时执行）
+# ------------------------------------------------------------------------------
+ensure_partition() {
+	TOTAL_SECTORS=$(get_total_sectors)
+	LAST_END_SECTOR=$(get_last_end_sector)
 
-    START_SECTOR=$((LAST_END_SECTOR + 1))
-    
-    log_info "Creating partition $TARGET_PART from sector $START_SECTOR to end..."
+	if [ -z "$LAST_END_SECTOR" ] || [ -z "$TOTAL_SECTORS" ]; then
+		log_info "Error: Could not determine partition layout (total='$TOTAL_SECTORS' last_end='$LAST_END_SECTOR'). Aborting resize."
+		return 1
+	fi
 
-    # 3. 使用 fdisk 非交互式创建分区
-    (
-        echo n
-        echo p
-        echo 3
-        echo $START_SECTOR
-        echo 
-        echo w
-    ) | fdisk $EMMC_DEV > /dev/null 2>&1
+	START_SECTOR=$((LAST_END_SECTOR + 1))
 
-    if [ $? -ne 0 ]; then
-        log_info "Error: fdisk failed to create partition."
-        exit 0
-    fi
+	# [FIX-3] 安全闸：解析出错时宁可不扩容，也绝不写坏分区表
+	if [ "$START_SECTOR" -le "$LAST_END_SECTOR" ]; then
+		log_info "Error: START_SECTOR($START_SECTOR) not after LAST_END_SECTOR($LAST_END_SECTOR). Aborting resize."
+		return 1
+	fi
+	if [ "$START_SECTOR" -ge "$TOTAL_SECTORS" ]; then
+		log_info "Error: START_SECTOR($START_SECTOR) >= TOTAL_SECTORS($TOTAL_SECTORS). No free space or parse error. Aborting resize."
+		return 1
+	fi
 
-    # 4. 通知内核重新读取分区表
-    if command -v partprobe > /dev/null; then
-        partprobe $EMMC_DEV
-    else
-        blockdev --rereadpt $EMMC_DEV
-    fi
-    
-    # 等待设备节点生成
-    WAIT_COUNT=0
-    while [ ! -b "$TARGET_PART" ] && [ $WAIT_COUNT -lt 10 ]; do
-        sleep 1
-        WAIT_COUNT=$((WAIT_COUNT + 1))
-    done
+	log_info "Creating partition $TARGET_PART from sector $START_SECTOR to end (disk total $TOTAL_SECTORS)..."
 
-    if [ ! -b "$TARGET_PART" ]; then
-        log_info "Error: Partition node $TARGET_PART did not appear after creation."
-        exit 0
-    fi
+	# 写分区表沿用已在 H29K(Disklabel=dos) 上实测成功的 fdisk 交互序列:
+	#   n 新建 / p 主分区 / 分区号 / 起始扇区 / 空行(结束扇区取默认=磁盘末尾) / w 写盘
+	printf 'n\np\n%d\n%d\n\nw\n' "$TARGET_PARTNO" "$START_SECTOR" |
+		fdisk "$EMMC_DEV" >/dev/null 2>&1
+	rc=$?
+	if [ $rc -ne 0 ]; then
+		log_info "Error: fdisk failed to create partition (rc=$rc)."
+		return 1
+	fi
 
-    # 5. 格式化为 f2fs
-    # -f: force overwrite
-    # -l DATA: label
-    # 注意: f2fs 默认开启 discard (trim)，对 eMMC 寿命友好
-    log_info "Formatting $TARGET_PART as f2fs..."
-    
-    # 检查 mkfs.f2fs 是否存在
-    if command -v mkfs.f2fs > /dev/null; then
-        mkfs.f2fs -f -l DATA $TARGET_PART > /dev/null 2>&1
-    else
-        log_info "Error: mkfs.f2fs not found! Falling back to ext4."
-        mkfs.ext4 -F -L DATA $TARGET_PART > /dev/null 2>&1
-        FS_TYPE="ext4"
-    fi
-    
-    # 如果上面没报错且没降级，则是 f2fs
-    if [ -z "$FS_TYPE" ]; then
-        FS_TYPE="f2fs"
-    fi
+	# 通知内核重新读取分区表
+	if have partprobe; then
+		partprobe "$EMMC_DEV" 2>/dev/null
+	elif have blockdev; then
+		blockdev --rereadpt "$EMMC_DEV" 2>/dev/null
+	fi
 
-    if [ $? -ne 0 ]; then
-        log_info "Error: Failed to format partition."
-        exit 0
-    fi
+	# 等待设备节点生成
+	WAIT_COUNT=0
+	while [ ! -b "$TARGET_PART" ] && [ "$WAIT_COUNT" -lt "$WAIT_NODE_SEC" ]; do
+		sleep 1
+		WAIT_COUNT=$((WAIT_COUNT + 1))
+	done
 
-    # 6. 创建挂载点
-    mkdir -p $MOUNT_POINT
+	if [ ! -b "$TARGET_PART" ]; then
+		log_info "Error: Partition node $TARGET_PART did not appear after ${WAIT_NODE_SEC}s."
+		return 1
+	fi
 
-    # 7. 配置 /etc/config/fstab
-    if ! grep -q "option target '$MOUNT_POINT'" $FSTAB_CONFIG 2>/dev/null; then
-        log_info "Configuring fstab for auto-mount ($FS_TYPE)..."
-        
-        PART_UUID=$(blkid -s UUID -o value $TARGET_PART)
-        
-        # f2fs 推荐挂载参数: 
-        # noatime: 不记录访问时间，减少写入，提升性能
-        # background_gc=on: 后台垃圾回收
-        
-        OPTIONS="noatime"
-        if [ "$FS_TYPE" = "f2fs" ]; then
-            OPTIONS="noatime,background_gc=on"
-        fi
+	# 格式化为 f2fs
+	#   -f: force overwrite    -l DATA: label
+	#   注意: f2fs 默认开启 discard (trim)，对 eMMC 寿命友好
+	# [FIX-1] rc 紧跟 mkfs 捕获，中间不插入任何会覆盖 $? 的语句
+	FS_TYPE=""
+	if have mkfs.f2fs; then
+		log_info "Formatting $TARGET_PART as f2fs..."
+		mkfs.f2fs -f -l DATA "$TARGET_PART" >/dev/null 2>&1
+		rc=$?
+		[ $rc -eq 0 ] && FS_TYPE="f2fs"
+	else
+		log_info "Error: mkfs.f2fs not found! Falling back to ext4."
+		if have mkfs.ext4; then
+			mkfs.ext4 -F -L DATA "$TARGET_PART" >/dev/null 2>&1
+			rc=$?
+			[ $rc -eq 0 ] && FS_TYPE="ext4"
+		else
+			rc=127
+		fi
+	fi
 
-        if [ -n "$PART_UUID" ]; then
-            cat >> $FSTAB_CONFIG << EOF
+	if [ $rc -ne 0 ] || [ -z "$FS_TYPE" ]; then
+		log_info "Error: Failed to format $TARGET_PART (rc=$rc, fstype='$FS_TYPE'). Aborting."
+		return 1
+	fi
+
+	log_info "Formatted $TARGET_PART as $FS_TYPE."
+	return 0
+}
+
+# ------------------------------------------------------------------------------
+# 文件系统类型识别 / 挂载参数
+# ------------------------------------------------------------------------------
+detect_fstype() {
+	_ft=""
+	if have blkid; then
+		_ft=$(blkid -s TYPE -o value "$TARGET_PART" 2>/dev/null)
+	fi
+	if [ -z "$_ft" ]; then
+		# blkid 不可用时的兜底：从已挂载信息里读
+		_ft=$(awk -v mp="$MOUNT_POINT" '$2 == mp { print $3; exit }' /proc/mounts 2>/dev/null)
+	fi
+	echo "$_ft"
+}
+
+mount_opts_for() {
+	# f2fs 推荐挂载参数:
+	#   noatime          不记录访问时间，减少写入，提升性能
+	#   background_gc=on 后台垃圾回收
+	case "$1" in
+		f2fs) echo "noatime,background_gc=on" ;;
+		*)    echo "noatime" ;;
+	esac
+}
+
+# ------------------------------------------------------------------------------
+# 第三部分: 配置 /etc/config/fstab（幂等）  [FIX-4]
+# ------------------------------------------------------------------------------
+ensure_fstab() {
+	if grep -q "option target '$MOUNT_POINT'" "$FSTAB_CONFIG" 2>/dev/null; then
+		log_info "fstab entry for $MOUNT_POINT already present."
+		return 0
+	fi
+
+	FS_TYPE_DET=$(detect_fstype)
+	if [ -z "$FS_TYPE_DET" ]; then
+		# 不猜默认文件系统类型：写错 fstype 比不写更难排查
+		log_info "Warning: cannot detect filesystem type of $TARGET_PART, fstab NOT written."
+		return 1
+	fi
+	OPTS=$(mount_opts_for "$FS_TYPE_DET")
+
+	PART_UUID=""
+	if have blkid; then
+		PART_UUID=$(blkid -s UUID -o value "$TARGET_PART" 2>/dev/null)
+	fi
+
+	log_info "Configuring fstab for auto-mount ($FS_TYPE_DET)..."
+
+	if [ -n "$PART_UUID" ]; then
+		cat >> "$FSTAB_CONFIG" << EOF
 
 config mount
 	option target '$MOUNT_POINT'
 	option uuid '$PART_UUID'
-	option fstype '$FS_TYPE'
-	option options '$OPTIONS'
+	option fstype '$FS_TYPE_DET'
+	option options '$OPTS'
 	option enabled '1'
 	option enabled_fsck '0'
 EOF
-        else
-            cat >> $FSTAB_CONFIG << EOF
+	else
+		log_info "Warning: no UUID for $TARGET_PART, falling back to device path."
+		cat >> "$FSTAB_CONFIG" << EOF
 
 config mount
 	option target '$MOUNT_POINT'
 	option device '$TARGET_PART'
-	option fstype '$FS_TYPE'
-	option options '$OPTIONS'
+	option fstype '$FS_TYPE_DET'
+	option options '$OPTS'
 	option enabled '1'
 EOF
-        fi
-        
-        /etc/init.d/fstab reload 2>/dev/null
-    fi
+	fi
 
-    # 8. 立即手动挂载
-    log_info "Mounting $TARGET_PART ($FS_TYPE) to $MOUNT_POINT..."
-    
-    # 挂载时带上优化参数
-    MOUNT_OPTS=""
-    if [ "$FS_TYPE" = "f2fs" ]; then
-        MOUNT_OPTS="-o noatime,background_gc=on"
-    else
-        MOUNT_OPTS="-o noatime"
-    fi
-    
-    mount $MOUNT_OPTS $TARGET_PART $MOUNT_POINT
-    
-    if [ $? -eq 0 ]; then
-        log_info "Success! $MOUNT_POINT is ready ($FS_TYPE). Size: $(df -h $MOUNT_POINT | tail -1 | awk '{print $2}')"
-    else
-        log_info "Warning: Mount failed, but will try again on next reboot via fstab."
-    fi
+	if [ -x /etc/init.d/fstab ]; then
+		/etc/init.d/fstab reload 2>/dev/null
+	fi
+	return 0
+}
+
+# ------------------------------------------------------------------------------
+# 第四部分: 立即挂载（幂等）  [FIX-4]
+# ------------------------------------------------------------------------------
+ensure_mount() {
+	if awk -v mp="$MOUNT_POINT" '$2 == mp { found = 1 } END { exit(found ? 0 : 1) }' /proc/mounts 2>/dev/null; then
+		log_info "$MOUNT_POINT already mounted."
+		return 0
+	fi
+
+	FS_TYPE_DET=$(detect_fstype)
+	OPTS=$(mount_opts_for "$FS_TYPE_DET")
+
+	log_info "Mounting $TARGET_PART (${FS_TYPE_DET:-unknown}) to $MOUNT_POINT..."
+	if mount -o "$OPTS" "$TARGET_PART" "$MOUNT_POINT"; then
+		SIZE_H=$(df -h "$MOUNT_POINT" 2>/dev/null | tail -1 | awk '{print $2}')
+		log_info "Success! $MOUNT_POINT is ready (${FS_TYPE_DET:-unknown}). Size: ${SIZE_H:-unknown}"
+	else
+		log_info "Warning: Mount failed, but will try again on next reboot via fstab."
+	fi
+	return 0
+}
+
+# ==============================================================================
+# 主流程
+# ==============================================================================
+
+# 第一部分: 启用开机动画
+if [ -f "/etc/init.d/99-bootanim" ]; then
+	/etc/init.d/99-bootanim enable
+	log_info "Boot animation enabled."
+fi
+
+# 挂载点每次开机都确保存在
+mkdir -p "$MOUNT_POINT"
+
+# 第二部分: 自动分区与格式化（仅首次，p3 不存在时）
+if [ -b "$TARGET_PART" ]; then
+	log_info "Partition $TARGET_PART already exists. Skipping resize."
+else
+	log_info "Starting auto-resize process for $EMMC_DEV (Target: f2fs)..."
+	if ! ensure_partition; then
+		log_info "Resize aborted, nothing was written or the failure is logged above."
+		exit 0
+	fi
+fi
+
+# 第三 / 四部分: fstab 与挂载
+# [FIX-4] 放在扩容分支之外——分区早就存在、但上次 fstab 没写成功或没挂上时，
+#         这次开机仍能补写、补挂，而不是永久跳过。
+if [ -b "$TARGET_PART" ]; then
+	ensure_fstab
+	ensure_mount
 fi
 
 exit 0
