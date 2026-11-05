@@ -347,8 +347,10 @@ if ! grep -q "$FIX_MARKER" "$RC_LOCAL" 2>/dev/null; then
 	TMP_RC=$(mktemp)
 	grep -v "^exit 0" "$RC_LOCAL" > "$TMP_RC" 2>/dev/null
 	
-	cat >> "$TMP_RC" << EOF
-$FIX_MARKER
+	# 单独写入需要展开的标记变量
+	echo "$FIX_MARKER" >> "$TMP_RC"
+	
+	cat >> "$TMP_RC" << 'EOF'
 # Fix loop0 F2FS discard I/O error on every boot
 if [ -f /sys/block/loop0/queue/discard_max_bytes ]; then
 	echo 0 > /sys/block/loop0/queue/discard_max_bytes
