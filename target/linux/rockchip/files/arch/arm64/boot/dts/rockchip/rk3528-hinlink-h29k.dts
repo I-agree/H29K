@@ -559,3 +559,8 @@
 	reset-deassert-us = <8000000>;
 	status = "okay";
 };
+
+&power {
+	assigned-clocks = <&cru PCLK_GPIO0>;
+	assigned-clock-rates = <0>;
+};
