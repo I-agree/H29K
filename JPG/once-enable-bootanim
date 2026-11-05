@@ -321,6 +321,20 @@ if [ -b "$TARGET_PART" ]; then
 fi
 
 # 第五部分: 修复 overlay (loop0) 的 discard 报错
+PERSISTENT_FIX_SCRIPT="/etc/uci-defaults/99-fix-loop-discard"
+
+# 无论是不是首次开机，都先执行一次修复
 fix_loop_discard
+
+# 将修复逻辑写入一个独立的持久化启动脚本中
+# 注意：这里不用 /etc/uci-defaults，因为 uci-defaults 里的脚本执行一次也会被删！
+# 应该写入 /etc/init.d/ 或者通过 hotplug，最简单的是追加到 /etc/rc.local
+if ! grep -q "discard_max_bytes" /etc/rc.local 2>/dev/null; then
+	# 在 exit 0 之前插入修复命令
+	sed -i '/^exit 0/i \
+# Fix loop0 F2FS discard I/O error\
+[ -f /sys/block/loop0/queue/discard_max_bytes ] && echo 0 > /sys/block/loop0/queue/discard_max_bytes' /etc/rc.local 2>/dev/null
+	log_info "Persistent loop0 discard fix added to /etc/rc.local."
+fi
 
 exit 0
