@@ -321,20 +321,47 @@ if [ -b "$TARGET_PART" ]; then
 fi
 
 # 第五部分: 修复 overlay (loop0) 的 discard 报错
-PERSISTENT_FIX_SCRIPT="/etc/uci-defaults/99-fix-loop-discard"
-
-# 无论是不是首次开机，都先执行一次修复
+# 无论是不是首次开机，当前运行环境先执行一次修复
 fix_loop_discard
 
-# 将修复逻辑写入一个独立的持久化启动脚本中
-# 注意：这里不用 /etc/uci-defaults，因为 uci-defaults 里的脚本执行一次也会被删！
-# 应该写入 /etc/init.d/ 或者通过 hotplug，最简单的是追加到 /etc/rc.local
-if ! grep -q "discard_max_bytes" /etc/rc.local 2>/dev/null; then
-	# 在 exit 0 之前插入修复命令
-	sed -i '/^exit 0/i \
-# Fix loop0 F2FS discard I/O error\
-[ -f /sys/block/loop0/queue/discard_max_bytes ] && echo 0 > /sys/block/loop0/queue/discard_max_bytes' /etc/rc.local 2>/dev/null
-	log_info "Persistent loop0 discard fix added to /etc/rc.local."
+# 持久化处理：将修复逻辑安全写入 /etc/rc.local
+# 避免使用 sed -i 带来的 BusyBox 兼容性和多行转义问题
+RC_LOCAL="/etc/rc.local"
+FIX_MARKER="# FIX_LOOP_DISCARD_MARKER"
+
+# 检查是否已经注入过（通过唯一标记判断，防止重复追加）
+if ! grep -q "$FIX_MARKER" "$RC_LOCAL" 2>/dev/null; then
+	log_info "Injecting persistent loop0 discard fix into $RC_LOCAL..."
+
+	# 如果文件不存在，则创建一个空文件并赋予执行权限
+	if [ ! -f "$RC_LOCAL" ]; then
+		touch "$RC_LOCAL"
+		chmod +x "$RC_LOCAL"
+	fi
+
+	# 安全重建法：
+	# 1. 过滤掉原文件中可能存在的 exit 0
+	# 2. 追加我们的修复代码
+	# 3. 重新补上 exit 0
+	# 使用临时文件防止写入中断导致 rc.local 损坏
+	TMP_RC=$(mktemp)
+	grep -v "^exit 0" "$RC_LOCAL" > "$TMP_RC" 2>/dev/null
+	
+	cat >> "$TMP_RC" << EOF
+$FIX_MARKER
+# Fix loop0 F2FS discard I/O error on every boot
+if [ -f /sys/block/loop0/queue/discard_max_bytes ]; then
+	echo 0 > /sys/block/loop0/queue/discard_max_bytes
+fi
+
+exit 0
+EOF
+
+	# 覆盖原文件
+	mv "$TMP_RC" "$RC_LOCAL"
+	log_info "Persistent fix successfully injected."
+else
+	log_info "Persistent loop0 discard fix already present in $RC_LOCAL."
 fi
 
 exit 0
