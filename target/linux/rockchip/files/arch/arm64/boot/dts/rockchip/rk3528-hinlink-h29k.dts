@@ -561,6 +561,6 @@
 };
 
 &power {
-	assigned-clocks = <&cru PCLK_GPIO0>;
-	assigned-clock-rates = <0>;
+	assigned-clocks = <&cru ACLK_GPU_MALI>;
+	assigned-clock-parents = <&cru PLL_GPLL>;
 };
