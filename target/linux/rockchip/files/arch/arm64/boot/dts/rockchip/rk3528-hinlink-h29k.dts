@@ -562,5 +562,6 @@
 
 &power {
 	assigned-clocks = <&cru ACLK_GPU_MALI>;
-	assigned-clock-rates = <0>;
+	assigned-clock-rates = <297000000>;
 };
+
