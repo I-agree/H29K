@@ -257,25 +257,34 @@ ensure_mount() {
 fix_loop_discard() {
 	local loop_dev="loop0"
 	local discard_path="/sys/block/${loop_dev}/queue/discard_max_bytes"
-
-	# 等待 loop0 节点出现，最多等待 5 秒
 	local wait_count=0
+	local current_val
+
+	# 安全校验：确认 loop0 确实被用作 /overlay
+	if ! awk -v dev="/dev/$loop_dev" '$1 == dev && $2 == "/overlay" {found=1} END {exit !found}' /proc/mounts 2>/dev/null; then
+		log_info "Info: /dev/$loop_dev is not mounted as /overlay. Skipping discard fix."
+		return 0
+	fi
+
+	# 等待 sysfs 节点出现，最多等待 5 秒
 	while [ ! -f "$discard_path" ] && [ "$wait_count" -lt 5 ]; do
 		sleep 1
 		wait_count=$((wait_count + 1))
 	done
 
 	if [ -f "$discard_path" ]; then
-		# 检查当前值是否大于 0，避免重复写入产生无意义日志
 		current_val=$(cat "$discard_path" 2>/dev/null)
 		if [ "$current_val" != "0" ]; then
-			echo 0 > "$discard_path" 2>/dev/null
-			log_info "Fixed: Disabled DISCARD for /dev/$loop_dev to prevent F2FS I/O errors."
+			if echo 0 > "$discard_path" 2>/dev/null; then
+				log_info "Fixed: Disabled DISCARD for /dev/$loop_dev to prevent F2FS I/O errors."
+			else
+				log_info "Warning: Failed to disable DISCARD for /dev/$loop_dev."
+			fi
 		else
 			log_info "DISCARD for /dev/$loop_dev is already disabled."
 		fi
 	else
-		log_info "Warning: $discard_path not found. Skipping loop discard fix."
+		log_info "Warning: $discard_path not found after waiting. Skipping loop discard fix."
 	fi
 }
 
