@@ -7,6 +7,7 @@
 # 2. 检测 eMMC 剩余空间，创建新分区 (mmcblk0p3)
 # 3. 格式化为 f2fs (专为闪存优化，速度快，寿命长)
 # 4. 配置 /etc/config/fstab 实现开机自动挂载到 /mnt/mmcblk0p3
+# 5. 修复OpenWrt源码squashfs-sysupgrade固件 /overlay (loop0) F2FS discard I/O error 报错问题
 # ==============================================================================
 
 LOG_TAG="auto-resize"
@@ -250,6 +251,34 @@ ensure_mount() {
 	return 0
 }
 
+# ------------------------------------------------------------------------------
+# 第五部分: 修复OpenWrt源码squashfs-sysupgrade固件 loop0 discard I/O error
+# ------------------------------------------------------------------------------
+fix_loop_discard() {
+	local loop_dev="loop0"
+	local discard_path="/sys/block/${loop_dev}/queue/discard_max_bytes"
+
+	# 等待 loop0 节点出现，最多等待 5 秒
+	local wait_count=0
+	while [ ! -f "$discard_path" ] && [ "$wait_count" -lt 5 ]; do
+		sleep 1
+		wait_count=$((wait_count + 1))
+	done
+
+	if [ -f "$discard_path" ]; then
+		# 检查当前值是否大于 0，避免重复写入产生无意义日志
+		current_val=$(cat "$discard_path" 2>/dev/null)
+		if [ "$current_val" != "0" ]; then
+			echo 0 > "$discard_path" 2>/dev/null
+			log_info "Fixed: Disabled DISCARD for /dev/$loop_dev to prevent F2FS I/O errors."
+		else
+			log_info "DISCARD for /dev/$loop_dev is already disabled."
+		fi
+	else
+		log_info "Warning: $discard_path not found. Skipping loop discard fix."
+	fi
+}
+
 # ==============================================================================
 # 主流程
 # ==============================================================================
@@ -281,5 +310,8 @@ if [ -b "$TARGET_PART" ]; then
 	ensure_fstab
 	ensure_mount
 fi
+
+# 第五部分: 修复 overlay (loop0) 的 discard 报错
+fix_loop_discard
 
 exit 0
