@@ -2840,27 +2840,22 @@ jobs:
           start_service() {
           	[ ! -x "$PLAYER" ] && return 1
 
-          	DRM_DEV=""
-          	i=0
-          	while [ $i -lt 10 ]; do
-          		DRM_DEV=$(find_drm_dev) && [ -n "$DRM_DEV" ] && break
-          		sleep 1
-          		i=$((i+1))
-          	done
+          	DRM_DEV=$(find_drm_dev)
 
-          	# ★ 严格校验：找不到对应驱动的设备绝不强行启动
-          	[ -z "$DRM_DEV" ] && {
-          		logger -t bootanim "Not found DRM device for $DRM_DRIVER, abort."
-          		return 1
-          	}
+          	# ★ 没找到就直接退出，绝不阻塞系统启动队列
+          	if [ -z "$DRM_DEV" ]; then
+          		logger -t bootanim "DRM device not ready, waiting for hotplug event."
+          		return 0
+          	fi
 
-          	logger -t bootanim "drm_play_arm64 on $DRM_DEV"
+          	logger -t bootanim "Starting drm_play_arm64 on $DRM_DEV"
 
           	procd_open_instance
           	procd_set_param command "$PLAYER" "$DRM_DEV"
-          	procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-0}
+          	procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-3}
           	procd_set_param stdout 1
           	procd_set_param stderr 1
+          	procd_add_action_trigger "add" "drm" PROCD_RELOAD=1
           	procd_close_instance
           }
 
