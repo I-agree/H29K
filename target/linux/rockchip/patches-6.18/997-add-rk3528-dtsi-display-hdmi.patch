@@ -1,0 +1,110 @@
+--- a/arch/arm64/boot/dts/rockchip/rk3528.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3528.dtsi
+@@ -243,6 +243,12 @@
+         };
+     };
+ 
++	display_subsystem: display-subsystem {
++		compatible = "rockchip,display-subsystem";
++		ports = <&vop_out>;
++		status = "disabled";
++	};
++
+     psci {
+         compatible = "arm,psci-1.0", "arm,psci-0.2";
+         method = "smc";
+@@ -763,6 +769,73 @@
+             status = "disabled";
+         };
+ 
++		vop: vop@ff840000 {
++			compatible = "rockchip,rk3528-vop";
++			reg = <0x0 0xff840000 0x0 0x3000>,
++			      <0x0 0xff845000 0x0 0x1000>;
++			reg-names = "vop", "gamma-lut";
++			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru ACLK_VOP>,
++				 <&cru HCLK_VOP>,
++				 <&cru DCLK_VOP0>,
++				 <&cru DCLK_VOP1>,
++				 <&hdmiphy_clk>;
++			clock-names = "aclk", "hclk", "dclk_vp0", "dclk_vp1", "pll_hdmiphy0";
++			iommus = <&vop_mmu>;
++			power-domains = <&power RK3528_PD_VO>;
++			rockchip,grf = <&vo_grf>;
++			status = "disabled";
++
++			vop_out: ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				vp0: port@0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++				};
++
++				vp1: port@1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
++		vop_mmu: iommu@ff847e00 {
++			compatible = "rockchip,iommu-v2";
++			reg = <0x0 0xff847e00 0x0 0x100>;
++			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "vop_mmu";
++			clocks = <&cru ACLK_VOP>, <&cru HCLK_VOP>;
++			clock-names = "aclk", "iface";
++			#iommu-cells = <0>;
++			power-domains = <&power RK3528_PD_VO>;
++			status = "disabled";
++		};
++
++		hdmi: hdmi@ff8d0000 {
++			compatible = "rockchip,rk3528-dw-hdmi";
++			reg = <0x0 0xff8d0000 0x0 0x20000>;
++			interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_HDMI>, <&cru CLK_SFR_HDMI>, <&cru CLK_CEC_HDMI>;
++			clock-names = "iahb", "isfr", "cec";
++			phys = <&hdmiphy>;
++			phy-names = "hdmi";
++			power-domains = <&power RK3528_PD_VO>;
++			rockchip,grf = <&vo_grf>;
++			status = "disabled";
++
++			ports {
++				hdmi_in: port {
++					#address-cells = <1>;
++					#size-cells = <0>;
++				};
++			};
++		};
++
+         spi0: spi@ff9c0000 {
+             compatible = "rockchip,rk3528-spi",
+                      "rockchip,rk3066-spi";
+@@ -1430,6 +1503,20 @@
+                 #phy-cells = <0>;
+                 status = "disabled";
+             };
+         };
++
++		hdmiphy: hdmi-phy@ffe00000 {
++			compatible = "rockchip,rk3528-hdmi-phy";
++			reg = <0x0 0xffe00000 0x0 0x10000>;
++			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_HDMIPHY>, <&xin24m>;
++			clock-names = "sysclk", "refoclk";
++			#phy-cells = <0>;
++			status = "disabled";
++
++			hdmiphy_clk: clock-port {
++				#clock-cells = <0>;
++			};
++		};
+     };
+ };
