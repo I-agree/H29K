@@ -1,8 +1,8 @@
 --- a/arch/arm64/boot/dts/rockchip/rk3528.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3528.dtsi
 @@ -243,6 +243,12 @@
-         };
-     };
+ 		};
+ 	};
  
 +	display_subsystem: display-subsystem {
 +		compatible = "rockchip,display-subsystem";
@@ -10,12 +10,12 @@
 +		status = "disabled";
 +	};
 +
-     psci {
-         compatible = "arm,psci-1.0", "arm,psci-0.2";
-         method = "smc";
+ 	psci {
+ 		compatible = "arm,psci-1.0", "arm,psci-0.2";
+ 		method = "smc";
 @@ -763,6 +769,73 @@
-             status = "disabled";
-         };
+ 			status = "disabled";
+ 		};
  
 +		vop: vop@ff840000 {
 +			compatible = "rockchip,rk3528-vop";
@@ -84,14 +84,14 @@
 +			};
 +		};
 +
-         spi0: spi@ff9c0000 {
-             compatible = "rockchip,rk3528-spi",
-                      "rockchip,rk3066-spi";
+ 		spi0: spi@ff9c0000 {
+ 			compatible = "rockchip,rk3528-spi",
+ 				     "rockchip,rk3066-spi";
 @@ -1430,6 +1503,20 @@
-                 #phy-cells = <0>;
-                 status = "disabled";
-             };
-         };
+ 				#phy-cells = <0>;
+ 				status = "disabled";
+ 			};
+ 		};
 +
 +		hdmiphy: hdmi-phy@ffe00000 {
 +			compatible = "rockchip,rk3528-hdmi-phy";
@@ -106,5 +106,5 @@
 +				#clock-cells = <0>;
 +			};
 +		};
-     };
+ 	};
  };
