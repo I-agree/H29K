@@ -565,7 +565,7 @@
 	assigned-clock-rates = <297000000>;
 };
 
-display-subsystem {
+&display_subsystem {
 	status = "okay";
 };
 
@@ -586,6 +586,8 @@ display-subsystem {
 
 &hdmi {
 	status = "okay";
+	pinctrl-names = "default";
+	pinctrl-0 = <&hdmi_pins>;
 	avdd-0v9-supply = <&vdd_0v9>;
 	avdd-1v8-supply = <&vcc_1v8>;
 
