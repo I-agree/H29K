@@ -1,0 +1,47 @@
+diff -ruN a/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c b/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
+--- a/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
++++ b/drivers/phy/rockchip/phy-rockchip-inno-hdmi.c
+@@ -1660,7 +1660,8 @@
+ {
+ 	struct inno_hdmi_phy *inno = data;
+ 
+-	clk_disable_unprepare(inno->refpclk);
++	if (inno->refpclk)
++		clk_disable_unprepare(inno->refpclk);
+ 	clk_disable_unprepare(inno->sysclk);
+ }
+ 
+@@ -1692,7 +1693,7 @@
+ 		return ret;
+ 	}
+ 
+-	inno->refpclk = devm_clk_get(inno->dev, "refpclk");
++	inno->refpclk = devm_clk_get_optional(inno->dev, "refpclk");
+ 	if (IS_ERR(inno->refpclk)) {
+ 		ret = PTR_ERR(inno->refpclk);
+ 		dev_err(inno->dev, "failed to get ref clock: %d\n", ret);
+@@ -1716,12 +1717,19 @@
+ 	/*
+ 	 * Refpclk needs to be on, on at least the rk3328 for still
+ 	 * unknown reasons.
++	 *
++	 * The RK3528 HDMI PHY has no such clock at all: its BSP driver only
++	 * takes "sysclk" (PCLK_HDMIPHY) plus the 24MHz oscillator as the PLL
++	 * reference, and the rk3528 CRU has no DCLK_HDMIPHY equivalent.  So
++	 * treat it as optional instead of failing the probe.
+ 	 */
+-	ret = clk_prepare_enable(inno->refpclk);
+-	if (ret) {
+-		dev_err(inno->dev, "failed to enable refpclk\n");
+-		clk_disable_unprepare(inno->sysclk);
+-		return ret;
++	if (inno->refpclk) {
++		ret = clk_prepare_enable(inno->refpclk);
++		if (ret) {
++			dev_err(inno->dev, "failed to enable refpclk\n");
++			clk_disable_unprepare(inno->sysclk);
++			return ret;
++		}
+ 	}
+ 
+ 	ret = devm_add_action_or_reset(inno->dev, inno_hdmi_phy_action,

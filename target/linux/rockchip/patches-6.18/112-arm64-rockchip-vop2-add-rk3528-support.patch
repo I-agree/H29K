@@ -1,0 +1,216 @@
+diff -ruN a/drivers/gpu/drm/rockchip/rockchip_vop2_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop2_reg.c
+--- a/drivers/gpu/drm/rockchip/rockchip_vop2_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop2_reg.c
+@@ -2505,6 +2505,202 @@
+ 	.setup_overlay = rk3568_vop2_setup_overlay,
+ };
+ 
++/*
++ * RK3528 VOP2
++ *
++ * 数据来源：Rockchip BSP rockchip-linux/kernel develop-6.1 的
++ *           drivers/gpu/drm/rockchip/rockchip_vop2_reg.c
++ *
++ * 复用依据（都已在本机实测过）：
++ *   - BSP 的 rk3528 win_data 写着 .regs = &rk3568_esmart_win_data /
++ *     .area = rk3568_area_data ⇒ window 寄存器布局与 rk3568 相同，
++ *     所以三个 ops 回调与 cluster_reg/smart_reg 全部复用 rk3568 的。
++ *   - BSP 的 rk3528_vop_ctrl 里 hdmi0_en/hdmi0_mux/hdmi_pin_pol 全部引用
++ *     RK3568_DSP_IF_EN / RK3568_DSP_IF_POL ⇒ HDMI0 接口位与 rk3568 相同。
++ *   - BSP 的 rk3528_dump_regs 用 RK3568_ESMART0/1_CTRL0、RK3568_SMART0/1_CTRL0、
++ *     RK3568_CLUSTER0_WIN0_CTRL0 当 rk3528 的绝对地址 ⇒ window 基址可取
++ *     Esmart0/1/2/3 = 0x1800/0x1a00/0x1c00/0x1e00，Cluster0 = 0x1000/0x1080。
++ *
++ * 注意：6.18 的 WIN_FEATURE_* 只有 AFBDC/CLUSTER 两个、VOP2_VP_FEATURE_* 只有
++ *       OUTPUT_10BIT 一个，BSP 用到的 MULTI_AREA / Y2R_13BIT_DEPTH /
++ *       CLUSTER_MAIN / CLUSTER_SUB / ALPHA_SCALE / VIVID_HDR 等都没有对应物，
++ *       已按能用的标志降级。
++ *
++ * [TODO-HW] = 按 rk3568/rk3576 推断、必须真机确认的值。
++ */
++static const struct vop2_win_data rk3528_vop_win_data[] = {
++	{
++		.name = "Esmart0-win0",
++		.phys_id = ROCKCHIP_VOP2_ESMART0,
++		.base = 0x1800,
++		.possible_vp_mask = BIT(0),
++		.formats = formats_rk356x_esmart,
++		.nformats = ARRAY_SIZE(formats_rk356x_esmart),
++		.format_modifiers = format_modifiers,
++		/* 0xf means this layer can not attach to this VP */
++		.layer_sel_id = { 1, 0xf, 0xf, 0xf },
++		.supported_rotations = DRM_MODE_REFLECT_Y,
++		.type = DRM_PLANE_TYPE_PRIMARY,
++		.axi_bus_id = 0x07,
++		.axi_yrgb_r_id = 0,
++		.axi_uv_r_id = 0x06,
++		.max_upscale_factor = 8,
++		.max_downscale_factor = 8,
++		.dly = { 27, 45, 48 },
++	},
++	{
++		.name = "Esmart1-win0",
++		.phys_id = ROCKCHIP_VOP2_ESMART1,
++		.base = 0x1a00,
++		.possible_vp_mask = BIT(0),
++		.formats = formats_rk356x_esmart,
++		.nformats = ARRAY_SIZE(formats_rk356x_esmart),
++		.format_modifiers = format_modifiers,
++		/* 0xf means this layer can not attach to this VP */
++		.layer_sel_id = { 2, 0xf, 0xf, 0xf },
++		.supported_rotations = DRM_MODE_REFLECT_Y,
++		.type = DRM_PLANE_TYPE_OVERLAY,
++		.axi_bus_id = 0x09,
++		.axi_yrgb_r_id = 0,
++		.axi_uv_r_id = 0x08,
++		.max_upscale_factor = 8,
++		.max_downscale_factor = 8,
++		.dly = { 27, 45, 48 },
++	},
++	{
++		.name = "Esmart2-win0",
++		.phys_id = ROCKCHIP_VOP2_ESMART2,
++		.base = 0x1c00,
++		.possible_vp_mask = BIT(0) | BIT(1),
++		.formats = formats_rk356x_esmart,
++		.nformats = ARRAY_SIZE(formats_rk356x_esmart),
++		.format_modifiers = format_modifiers,
++		/* 0xf means this layer can not attach to this VP */
++		.layer_sel_id = { 3, 0, 0xf, 0xf },
++		.supported_rotations = DRM_MODE_REFLECT_Y,
++		.type = DRM_PLANE_TYPE_CURSOR,
++		.axi_bus_id = 0x0b,
++		.axi_yrgb_r_id = 0,
++		.axi_uv_r_id = 0x0a,
++		.max_upscale_factor = 8,
++		.max_downscale_factor = 8,
++		.dly = { 27, 45, 48 },
++	},
++	{
++		.name = "Esmart3-win0",
++		.phys_id = ROCKCHIP_VOP2_ESMART3,
++		.base = 0x1e00,
++		.possible_vp_mask = BIT(1),
++		.formats = formats_rk356x_esmart,
++		.nformats = ARRAY_SIZE(formats_rk356x_esmart),
++		.format_modifiers = format_modifiers,
++		/* 0xf means this layer can not attach to this VP */
++		.layer_sel_id = { 0xf, 1, 0xf, 0xf },
++		.supported_rotations = DRM_MODE_REFLECT_Y,
++		.type = DRM_PLANE_TYPE_PRIMARY,
++		.axi_bus_id = 0x0d,
++		.axi_yrgb_r_id = 0,
++		.axi_uv_r_id = 0x0c,
++		.max_upscale_factor = 8,
++		.max_downscale_factor = 8,
++		.dly = { 27, 45, 48 },
++	},
++	{
++		.name = "Cluster0-win0",
++		.phys_id = ROCKCHIP_VOP2_CLUSTER0,
++		.base = 0x1000,
++		.possible_vp_mask = BIT(0),
++		.formats = formats_cluster,
++		.nformats = ARRAY_SIZE(formats_cluster),
++		.format_modifiers = format_modifiers_afbc,
++		/* 0xf means this layer can not attach to this VP */
++		.layer_sel_id = { 0, 0xf, 0xf, 0xf },
++		.supported_rotations = DRM_MODE_ROTATE_90 | DRM_MODE_ROTATE_270 | DRM_MODE_REFLECT_X | DRM_MODE_REFLECT_Y,
++		.type = DRM_PLANE_TYPE_OVERLAY,
++		.axi_bus_id = 0x03,
++		.axi_yrgb_r_id = 0,
++		.axi_uv_r_id = 0x02,
++		.max_upscale_factor = 8,
++		.max_downscale_factor = 8,
++		.dly = { 27, 27, 21 },
++		.feature = WIN_FEATURE_AFBDC | WIN_FEATURE_CLUSTER,
++	},
++	{
++		.name = "Cluster0-win1",
++		.phys_id = ROCKCHIP_VOP2_CLUSTER0,
++		.base = 0x1080,
++		.possible_vp_mask = BIT(0),
++		.formats = formats_cluster,
++		.nformats = ARRAY_SIZE(formats_cluster),
++		.format_modifiers = format_modifiers_afbc,
++		/* 0xf means this layer can not attach to this VP */
++		.layer_sel_id = { 0, 0xf, 0xf, 0xf },
++		.supported_rotations = DRM_MODE_REFLECT_X | DRM_MODE_REFLECT_Y,
++		.type = DRM_PLANE_TYPE_OVERLAY,
++		.axi_bus_id = 0x05,
++		.axi_yrgb_r_id = 0,
++		.axi_uv_r_id = 0x04,
++		.max_upscale_factor = 8,
++		.max_downscale_factor = 8,
++		.dly = { 27, 27, 21 },
++		.feature = WIN_FEATURE_AFBDC,
++	},
++};
++
++static const struct vop2_video_port_data rk3528_vop_video_ports[] = {
++	{
++		.id = 0,
++		.feature = VOP2_VP_FEATURE_OUTPUT_10BIT,
++		.gamma_lut_len = 1024,
++		.cubic_lut_len = 0, /* [TODO-HW] BSP 的 rk3528 vp_data 没有 cubic_lut_len */
++		.max_output = { 4096, 4096 },
++		/* [TODO-HW] 顺序按 VOP2_DLY_* 排；BSP 给的是 win_dly=8,
++		 * layer_mix_dly=6, hdr_mix_dly=2，第 4 项（bg）BSP 没有 */
++		.pre_scan_max_dly = { 8, 6, 2, 0 },
++		.offset = 0xc00,
++		.pixel_rate = 2, /* [TODO-HW] */
++	}, {
++		.id = 1,
++		.feature = VOP2_VP_FEATURE_OUTPUT_10BIT,
++		.gamma_lut_len = 1024,
++		.cubic_lut_len = 0,
++		/* BSP：VP1 的 max_output 是 { 720, 576 }（TVE 用） */
++		.max_output = { 720, 576 },
++		.pre_scan_max_dly = { 8, 6, 2, 0 },
++		.offset = 0xd00,
++		.pixel_rate = 2, /* [TODO-HW] */
++	},
++};
++
++static const struct vop2_ops rk3528_vop_ops = {
++	/* 见文件头：rk3528 的 HDMI0 接口位与 window 布局都与 rk3568 相同，
++	 * 所以三个回调直接复用 rk3568 的，不新写。 */
++	.setup_intf_mux = rk3568_set_intf_mux,
++	.setup_bg_dly = rk3568_vop2_setup_bg_dly,
++	.setup_overlay = rk3568_vop2_setup_overlay,
++};
++
++static const struct vop2_data rk3528_vop = {
++	.version = VOP_VERSION_RK3528,
++	.feature = VOP2_FEATURE_HAS_SYS_GRF, /* [TODO-HW] rk3528 另有 vo_grf，是否要 VO0_GRF 标志待确认 */
++	.nr_vps = 2,
++	.max_input = { 4096, 4096 },
++	.max_output = { 4096, 4096 },
++	.vp = rk3528_vop_video_ports,
++	.win = rk3528_vop_win_data,
++	.win_size = ARRAY_SIZE(rk3528_vop_win_data),
++	.cluster_reg = rk3568_vop_cluster_regs,
++	.nr_cluster_regs = ARRAY_SIZE(rk3568_vop_cluster_regs),
++	.smart_reg = rk3568_vop_smart_regs,
++	.nr_smart_regs = ARRAY_SIZE(rk3568_vop_smart_regs),
++	/* [TODO-HW] 暂用 rk3568 的 dump 表；BSP 的 rk3528_dump_regs 里
++	 * RK3528_OVL_SYS(0x500)/RK3528_OVL_PORT0_CTRL/RK3528_HDR_LUT_CTRL
++	 * 与 rk3568 不同，会影响 debugfs 的寄存器 dump（不影响出图） */
++	.regs_dump = rk3568_regs_dump,
++	.regs_dump_size = ARRAY_SIZE(rk3568_regs_dump),
++	.ops = &rk3528_vop_ops,
++	.soc_id = 3528,
++};
+ static const struct vop2_data rk3566_vop = {
+ 	.version = VOP_VERSION_RK3568,
+ 	.feature = VOP2_FEATURE_HAS_SYS_GRF,
+@@ -2584,6 +2780,9 @@
+ 
+ static const struct of_device_id vop2_dt_match[] = {
+ 	{
++		.compatible = "rockchip,rk3528-vop",
++		.data = &rk3528_vop,
++	}, {
+ 		.compatible = "rockchip,rk3566-vop",
+ 		.data = &rk3566_vop,
+ 	}, {
