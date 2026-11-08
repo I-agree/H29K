@@ -607,7 +607,7 @@
 	avdd-0v9-supply = <&vdd_0v9>;
 	avdd-1v8-supply = <&vcc_1v8>;
 
-	ports {
+	&hdmi_in {
 		hdmi_in_vp0: endpoint@0 {
 			reg = <0>;
 			remote-endpoint = <&vp0_out_hdmi>;
