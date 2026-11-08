@@ -1,0 +1,29 @@
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -3434,12 +3434,20 @@
+ 	prod_id0 = hdmi_readb(hdmi, HDMI_PRODUCT_ID0);
+ 	prod_id1 = hdmi_readb(hdmi, HDMI_PRODUCT_ID1);
+ 
+-	if (prod_id0 != HDMI_PRODUCT_ID0_HDMI_TX ||
+-	    (prod_id1 & ~HDMI_PRODUCT_ID1_HDCP) != HDMI_PRODUCT_ID1_HDMI_TX) {
+-		dev_err(dev, "Unsupported HDMI controller (%04x:%02x:%02x)\n",
+-			hdmi->version, prod_id0, prod_id1);
+-		ret = -ENODEV;
+-		goto err_res;
++	/*
++	 * RK3528 HDMI TX controller (v2.1.0, version 0x2100) returns
++	 * 0x00 for both PRODUCT_ID0 and PRODUCT_ID1 registers.
++	 * Bypass the strict product ID check for this specific version
++	 * to allow the driver to bind successfully.
++	 */
++	if (hdmi->version != 0x2100) {
++		if (prod_id0 != HDMI_PRODUCT_ID0_HDMI_TX ||
++		    (prod_id1 & ~HDMI_PRODUCT_ID1_HDCP) != HDMI_PRODUCT_ID1_HDMI_TX) {
++			dev_err(dev, "Unsupported HDMI controller (%04x:%02x:%02x)\n",
++				hdmi->version, prod_id0, prod_id1);
++			ret = -ENODEV;
++			goto err_res;
++		}
+ 	}
+ 
+ 	ret = dw_hdmi_detect_phy(hdmi);
