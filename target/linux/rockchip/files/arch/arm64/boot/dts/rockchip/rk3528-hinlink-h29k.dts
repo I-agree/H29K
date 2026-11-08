@@ -621,7 +621,10 @@
 };
 
 &sai0 {
-	status = "okay";
-	pinctrl-names = "default";
-	pinctrl-0 = <&i2s0m0_mclk>;
+	status = "disabled";
 };
+
+&hdmi_sound {
+	status = "disabled";
+};
+
