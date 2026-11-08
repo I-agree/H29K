@@ -617,6 +617,7 @@
 
 &hdmiphy {
 	status = "okay";
+	#clock-cells = <0>;
 };
 
 &sai0 {
