@@ -100,7 +100,7 @@
 +			clock-names = "mclk", "hclk";
 +			dmas = <&dmac 1>, <&dmac 0>;
 +			dma-names = "tx", "rx";
-+			resets = <&cru SRST_MRESETN_SAI_I2S0>, <&cru SRST_HRESETN_SAI_I2S0>;
++			resets = <&cru SRST_M_SAI_I2S0>, <&cru SRST_H_SAI_I2S0>;
 +			reset-names = "m", "h";
 +			power-domains = <&power RK3528_PD_VO>;
 +			#sound-dai-cells = <0>;
