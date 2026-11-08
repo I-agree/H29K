@@ -335,6 +335,27 @@ CONFIG_INPUT=y
 CONFIG_INPUT_EVDEV=y
 
 # =================================================================
+# 🔄 内核HDMI相关支持
+# =================================================================
+CONFIG_DRM_ROCKCHIP=y
+CONFIG_ROCKCHIP_VOP2=y
+CONFIG_ROCKCHIP_DW_HDMI=y
+CONFIG_ROCKCHIP_RGB=y
+CONFIG_PHY_ROCKCHIP_INNO_HDMI=y
+CONFIG_ROCKCHIP_IOMMU=y
+CONFIG_ROCKCHIP_PM_DOMAINS=y
+# CONFIG_ROCKCHIP_VOP is not set
+# CONFIG_ROCKCHIP_ANALOGIX_DP is not set
+# CONFIG_ROCKCHIP_CDN_DP is not set
+# CONFIG_ROCKCHIP_DW_DP is not set
+# CONFIG_ROCKCHIP_DW_HDMI_QP is not set
+# CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
+# CONFIG_ROCKCHIP_DW_MIPI_DSI2 is not set
+# CONFIG_ROCKCHIP_INNO_HDMI is not set
+# CONFIG_ROCKCHIP_LVDS is not set
+# CONFIG_ROCKCHIP_RK3066_HDMI is not set
+
+# =================================================================
 # 🔄 H29K的内核专用优化
 # =================================================================
 CONFIG_HZ_250=y
