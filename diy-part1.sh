@@ -337,38 +337,55 @@ CONFIG_INPUT_EVDEV=y
 # =================================================================
 # 🔄 内核HDMI视频输出与音频相关支持
 # =================================================================
+# ================= 视频显示链路 =================
 CONFIG_DRM=y
 CONFIG_DRM_KMS_HELPER=y
 CONFIG_DRM_GEM_DMA_HELPER=y
 CONFIG_DRM_PANEL=y
+CONFIG_DRM_BRIDGE=y
+CONFIG_DRM_PANEL_BRIDGE=y
 CONFIG_ROCKCHIP_IOMMU=y
 CONFIG_DRM_ROCKCHIP=y
 CONFIG_ROCKCHIP_VOP2=y
 CONFIG_ROCKCHIP_RGB=y
 CONFIG_ROCKCHIP_DW_HDMI=y
 CONFIG_DRM_DW_HDMI=y
+
+# ================= HDMI 音频链路 =================
 CONFIG_SOUND=y
 CONFIG_SND=y
 CONFIG_SND_SOC=y
 CONFIG_DRM_DW_HDMI_I2S_AUDIO=y
 CONFIG_SND_SOC_ROCKCHIP_SAI=y
+# SND_SOC_HDMI_CODEC 通常由 DRM_DW_HDMI_I2S_AUDIO 自动 select，
+# 若未自动选中，请手动加上：CONFIG_SND_SOC_HDMI_CODEC=y
+CONFIG_SND_SIMPLE_CARD=y
+
+# ================= PHY 与电源域 =================
 CONFIG_PHY_ROCKCHIP_INNO_HDMI=y
 CONFIG_GENERIC_PHY=y
-CONFIG_REGMAP_MMIO=y
 CONFIG_PM_GENERIC_DOMAINS=y
 CONFIG_ROCKCHIP_PM_DOMAINS=y
+
+# ================= 底层框架依赖 =================
+CONFIG_REGMAP_MMIO=y
+CONFIG_DMADEVICES=y
+CONFIG_PL330_DMA=y
+CONFIG_RESET_CONTROLLER=y
+
+# ================= 必须禁用的干扰项 =================
 # CONFIG_ROCKCHIP_VOP is not set
 # CONFIG_ROCKCHIP_ANALOGIX_DP is not set
 # CONFIG_ROCKCHIP_CDN_DP is not set
 # CONFIG_ROCKCHIP_DW_DP is not set
 # CONFIG_ROCKCHIP_DW_HDMI_QP is not set
 # CONFIG_ROCKCHIP_DW_MIPI_DSI is not set
+# CONFIG_ROCKCHIP_DW_MIPI_DSI2 is not set
 # CONFIG_DRM_DW_HDMI_AHB_AUDIO is not set
 # CONFIG_DRM_DW_HDMI_GP_AUDIO is not set
 # CONFIG_SND_SOC_ROCKCHIP_I2S is not set
 # CONFIG_SND_SOC_ROCKCHIP_I2S_TDM is not set
 # CONFIG_SND_SOC_INNO_RK3036 is not set
-# CONFIG_ROCKCHIP_DW_MIPI_DSI2 is not set
 # CONFIG_ROCKCHIP_INNO_HDMI is not set
 # CONFIG_ROCKCHIP_LVDS is not set
 # CONFIG_ROCKCHIP_RK3066_HDMI is not set
