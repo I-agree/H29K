@@ -13,7 +13,7 @@
  	psci {
  		compatible = "arm,psci-1.0", "arm,psci-0.2";
  		method = "smc";
-@@ -763,6 +769,73 @@
+@@ -763,6 +769,74 @@
  			status = "disabled";
  		};
  
@@ -74,6 +74,7 @@
 +			phy-names = "hdmi";
 +			power-domains = <&power RK3528_PD_VO>;
 +			rockchip,grf = <&vo_grf>;
++			#sound-dai-cells = <0>;
 +			status = "disabled";
 +
 +			ports {
@@ -87,7 +88,7 @@
  		spi0: spi@ff9c0000 {
  			compatible = "rockchip,rk3528-spi",
  				     "rockchip,rk3066-spi";
-@@ -1125,6 +1198,21 @@
+@@ -1125,6 +1199,21 @@
  			status = "disabled";
  		};
  
@@ -109,7 +110,7 @@
  		gmac0: ethernet@ffbd0000 {
  			compatible = "rockchip,rk3528-gmac", "snps,dwmac-4.20a";
  			reg = <0x0 0xffbd0000 0x0 0x10000>;
-@@ -1430,6 +1518,20 @@
+@@ -1430,6 +1519,20 @@
  				#phy-cells = <0>;
  				status = "disabled";
  			};
