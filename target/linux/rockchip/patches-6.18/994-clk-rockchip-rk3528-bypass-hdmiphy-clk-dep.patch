@@ -1,0 +1,10 @@
+--- a/drivers/clk/rockchip/clk-rk3528.c
++++ b/drivers/clk/rockchip/clk-rk3528.c
+@@ -146,5 +146,5 @@
+ PNAME(clk_ref_pcie_inner_phy_p)         = { "clk_ppll_100m_src", "xin24m" };
+-PNAME(dclk_vop0_p)                      = { "dclk_vop_src0",
+-					    "clk_hdmiphy_pixel_io" };
++/* Bypass hdmiphy dependency to prevent VOP deferred probe timeout */
++PNAME(dclk_vop0_p)                      = { "dclk_vop_src0" };
+ PNAME(mclk_i2s0_2ch_sai_src_p)          = { "clk_i2s0_2ch_src",
+ 					    "clk_i2s0_2ch_frac", "xin12m" };
