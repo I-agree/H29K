@@ -87,7 +87,29 @@
  		spi0: spi@ff9c0000 {
  			compatible = "rockchip,rk3528-spi",
  				     "rockchip,rk3066-spi";
-@@ -1430,6 +1503,20 @@
+@@ -1125,6 +1198,21 @@
+ 			status = "disabled";
+ 		};
+ 
++		sai0: sai@ffb80000 {
++			compatible = "rockchip,rk3528-sai", "rockchip,sai-v1";
++			reg = <0x0 0xffb80000 0x0 0x1000>;
++			interrupts = <GIC_SPI 125 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru MCLK_SAI_I2S0>, <&cru HCLK_SAI_I2S0>;
++			clock-names = "mclk", "hclk";
++			dmas = <&dmac 1>, <&dmac 0>;
++			dma-names = "tx", "rx";
++			resets = <&cru SRST_MRESETN_SAI_I2S0>, <&cru SRST_HRESETN_SAI_I2S0>;
++			reset-names = "m", "h";
++			power-domains = <&power RK3528_PD_VO>;
++			#sound-dai-cells = <0>;
++			status = "disabled";
++		};
++
+ 		gmac0: ethernet@ffbd0000 {
+ 			compatible = "rockchip,rk3528-gmac", "snps,dwmac-4.20a";
+ 			reg = <0x0 0xffbd0000 0x0 0x10000>;
+@@ -1430,6 +1518,20 @@
  				#phy-cells = <0>;
  				status = "disabled";
  			};
