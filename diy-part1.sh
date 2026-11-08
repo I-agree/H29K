@@ -78,6 +78,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/111-arm64-roc
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/112-arm64-rockchip-vop2-add-rk3528-support.patch" "target/linux/rockchip/patches-6.18/112-arm64-rockchip-vop2-add-rk3528-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/113-arm64-rockchip-inno-hdmi-optional-refpclk.patch" "target/linux/rockchip/patches-6.18/113-arm64-rockchip-inno-hdmi-optional-refpclk.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch" "target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/994-clk-rockchip-rk3528-bypass-hdmiphy-clk-dep.patch" "target/linux/rockchip/patches-6.18/994-clk-rockchip-rk3528-bypass-hdmiphy-clk-dep.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/995-drm-bridge-synopsys-dw-hdmi-bypass-rk3528-prodid.patch" "target/linux/rockchip/patches-6.18/995-drm-bridge-synopsys-dw-hdmi-bypass-rk3528-prodid.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch" "target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/997-dwc3-host-add-modem-reset-gpio.patch" "target/linux/rockchip/patches-6.18/997-dwc3-host-add-modem-reset-gpio.patch"
