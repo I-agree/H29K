@@ -27,7 +27,7 @@
 +				 <&cru HCLK_VOP>,
 +				 <&cru DCLK_VOP0>,
 +				 <&cru DCLK_VOP1>,
-+				 <&hdmiphy_clk>;
++				 <&hdmiphy>;
 +			clock-names = "aclk", "hclk", "dclk_vp0", "dclk_vp1", "pll_hdmiphy0";
 +			iommus = <&vop_mmu>;
 +			power-domains = <&power RK3528_PD_VO>;
@@ -110,7 +110,7 @@
  		gmac0: ethernet@ffbd0000 {
  			compatible = "rockchip,rk3528-gmac", "snps,dwmac-4.20a";
  			reg = <0x0 0xffbd0000 0x0 0x10000>;
-@@ -1430,6 +1519,20 @@
+@@ -1430,6 +1519,17 @@
  				#phy-cells = <0>;
  				status = "disabled";
  			};
@@ -123,11 +123,8 @@
 +			clocks = <&cru PCLK_HDMIPHY>, <&xin24m>;
 +			clock-names = "sysclk", "refoclk";
 +			#phy-cells = <0>;
++			#clock-cells = <0>;
 +			status = "disabled";
-+
-+			hdmiphy_clk: clock-port {
-+				#clock-cells = <0>;
-+			};
 +		};
  	};
  };
