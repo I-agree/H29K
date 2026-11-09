@@ -405,6 +405,7 @@ CONFIG_NETFILTER_EGRESS=y
 # =================================================================
 CONFIG_PM_DEBUG=y
 CONFIG_PM_ADVANCED_DEBUG=y
+CONFIG_DEBUG_FS=y
 CONFIG_DYNAMIC_DEBUG=y
 
 EOF
