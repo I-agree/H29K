@@ -5,6 +5,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
 #include <dt-bindings/reset/rockchip,rk3528-cru.h>
+#include <dt-bindings/clock/rockchip,rk3528-cru.h>
 
 #include "rk3528.dtsi"
 
@@ -613,6 +614,8 @@
 	avdd-0v9-supply = <&vdd_0v9>;
 	avdd-1v8-supply = <&vcc_1v8>;
 	dependencies = <&power>;
+	clocks = <&cru PCLK_HDMI>, <&cru CLK_SFR_HDMI>, <&cru CLK_CEC_HDMI>;
+	clock-names = "iahb", "isfr", "cec";
 	resets = <&cru SRST_P_HDMI>, <&cru SRST_HDMI>;
 	reset-names = "ahb", "ref";
 };
@@ -627,7 +630,13 @@
 &hdmiphy {
 	status = "okay";
 	#clock-cells = <0>;
-	dependencies = <&cru>;
+	clocks = <&cru PCLK_HDMIPHY>;
+	clock-names = "sysclk";
+};
+
+&vo_io_domains {
+	status = "okay";
+	vo-supply = <&vcc_1v8>;
 };
 
 &sai0 {
