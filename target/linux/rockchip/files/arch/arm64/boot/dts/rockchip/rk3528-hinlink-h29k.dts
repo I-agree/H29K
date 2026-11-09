@@ -583,7 +583,6 @@
 
 &display_subsystem {
 	status = "okay";
-	dependencies = <&vop>, <&hdmi>;
 };
 
 &vop {
@@ -621,6 +620,7 @@
 &hdmiphy {
 	status = "okay";
 	#clock-cells = <0>;
+	dependencies = <&cru>;
 };
 
 &sai0 {
