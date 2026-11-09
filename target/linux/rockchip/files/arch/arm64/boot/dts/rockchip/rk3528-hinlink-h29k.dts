@@ -590,10 +590,12 @@
 	assigned-clocks = <&cru DCLK_VOP0>, <&cru DCLK_VOP_SRC0>;
 	assigned-clock-parents = <&cru DCLK_VOP_SRC0>;
 	assigned-clock-rates = <0>, <594000000>;
+	dependencies = <&power>;
 };
 
 &vop_mmu {
 	status = "okay";
+	dependencies = <&power>;
 };
 
 &vp0 {
