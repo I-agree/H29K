@@ -4,6 +4,7 @@
 #include <dt-bindings/interrupt-controller/irq.h>
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/pinctrl/rockchip.h>
+#include <dt-bindings/reset/rockchip,rk3528-cru.h>
 
 #include "rk3528.dtsi"
 
@@ -612,6 +613,8 @@
 	avdd-0v9-supply = <&vdd_0v9>;
 	avdd-1v8-supply = <&vcc_1v8>;
 	dependencies = <&power>;
+	resets = <&cru SRST_P_HDMI>, <&cru SRST_HDMI>;
+	reset-names = "ahb", "ref";
 };
 
 &hdmi_in {
