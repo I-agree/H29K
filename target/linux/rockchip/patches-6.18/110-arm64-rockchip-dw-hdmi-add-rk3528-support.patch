@@ -1,37 +1,42 @@
-diff -ruN a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -467,6 +467,29 @@
- 	.use_drm_infoframe = true,
+@@ -55,6 +55,14 @@
+ #define RK3568_HDMI_SDAIN_MSK		BIT(15)
+ #define RK3568_HDMI_SCLIN_MSK		BIT(14)
+ 
++#define RK3528_VO_GRF_SOC_CON5		0x0014
++#define RK3528_HDMI_SDAIN_MSK		BIT(1)
++#define RK3528_HDMI_SCLIN_MSK		BIT(0)
++
++#define RK3528_PMU_GRF_SOC_CON6		0x0018
++#define RK3528_HDMI_SDA5V_GRF		BIT(6)
++#define RK3528_HDMI_SCL5V_GRF		BIT(5)
++
+ /**
+  * struct rockchip_hdmi_chip_data - splite the grf setting of kind of chips
+  * @lcdsel_grf_reg: grf register offset of lcdc select
+@@ -488,6 +496,20 @@
+ 	.max_tmds_clock = 594000,
  };
  
-+static const struct dw_hdmi_phy_ops rk3528_hdmi_phy_ops = {
-+	.init		= dw_hdmi_rockchip_genphy_init,
-+	.disable	= dw_hdmi_rockchip_genphy_disable,
-+	.read_hpd	= dw_hdmi_phy_read_hpd,
-+	.update_hpd	= dw_hdmi_phy_update_hpd,
-+	.setup_hpd	= dw_hdmi_phy_setup_hpd,
-+};
-+
 +static struct rockchip_hdmi_chip_data rk3528_chip_data = {
 +	.lcdsel_grf_reg = -1,
++	.max_tmds_clock = 594000,
 +};
 +
 +static const struct dw_hdmi_plat_data rk3528_hdmi_drv_data = {
 +	.mode_valid = dw_hdmi_rockchip_mode_valid,
-+	.mpll_cfg   = rockchip_mpll_cfg,
-+	.cur_ctr    = rockchip_cur_ctr,
-+	.phy_config = rockchip_phy_config,
 +	.phy_data = &rk3528_chip_data,
-+	.phy_ops = &rk3528_hdmi_phy_ops,
++	.phy_ops = &rk3328_hdmi_phy_ops, /* RK3528 Inno PHY 复用 rk3328 的 ops */
 +	.phy_name = "inno_dw_hdmi_phy2",
 +	.phy_force_vendor = true,
 +	.use_drm_infoframe = true,
 +};
- static struct rockchip_hdmi_chip_data rk3399_chip_data = {
- 	.lcdsel_grf_reg = RK3399_GRF_SOC_CON20,
- 	.lcdsel_big = FIELD_PREP_WM16_CONST(RK3399_HDMI_LCDC_SEL, 0),
-@@ -510,6 +533,9 @@
++
+ static const struct dw_hdmi_plat_data rk3568_hdmi_drv_data = {
+ 	.mode_valid = dw_hdmi_rockchip_mode_valid,
+ 	.mpll_cfg   = rockchip_mpll_cfg,
+@@ -510,6 +532,9 @@
  	{ .compatible = "rockchip,rk3399-dw-hdmi",
  	  .data = &rk3399_hdmi_drv_data
  	},
@@ -41,3 +46,16 @@ diff -ruN a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockch
  	{ .compatible = "rockchip,rk3568-dw-hdmi",
  	  .data = &rk3568_hdmi_drv_data
  	},
+@@ -587,5 +612,12 @@
+ 			     FIELD_PREP_WM16(RK3568_HDMI_SCLIN_MSK, 1));
+ 	}
+ 
++	if (hdmi->chip_data == &rk3528_chip_data) {
++		/* 强制拉高 SDA/SCL 输入掩码，交由 HDMI 控制器接管 */
++		regmap_write(hdmi->regmap, RK3528_VO_GRF_SOC_CON5,
++			     FIELD_PREP_WM16(RK3528_HDMI_SDAIN_MSK, 1) |
++			     FIELD_PREP_WM16(RK3528_HDMI_SCLIN_MSK, 1));
++	}
++
+ 	drm_encoder_helper_add(encoder, &dw_hdmi_rockchip_encoder_helper_funcs);
+ 	drm_simple_encoder_init(drm, encoder, DRM_MODE_ENCODER_TMDS);
