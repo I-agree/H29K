@@ -1,15 +1,20 @@
 --- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
-@@ -78,6 +78,8 @@
+@@ -12,2 +12,3 @@
+ #include <linux/regmap.h>
++#include <linux/reset.h>
+ #include <linux/regulator/consumer.h>
+@@ -78,6 +79,9 @@
  	struct clk *hdmiphy_clk;
  	struct clk *ref_clk;
  	struct clk *grf_clk;
 +	struct clk *iahb_clk;
 +	struct clk *isfr_clk;
++	struct reset_control *rst;
  	struct dw_hdmi *hdmi;
  	struct phy *phy;
  };
-@@ -566,6 +568,18 @@
+@@ -566,6 +570,34 @@
  		return dev_err_probe(hdmi->dev, ret, "Unable to parse OF data\n");
  	}
  
@@ -23,6 +28,22 @@
 +	if (IS_ERR(hdmi->isfr_clk)) {
 +		ret = PTR_ERR(hdmi->isfr_clk);
 +		return dev_err_probe(hdmi->dev, ret, "failed to get isfr clock\n");
++	}
++
++	/*
++	 * RK3528 HDMI 必须在时钟开启后显式解除硬件复位，
++	 * 否则 APB 总线读取 PRODUCT_ID 依然返回 0x00。
++	 * 获取 DTS 中定义的所有复位线（ahb 和 ref）。
++	 */
++	hdmi->rst = devm_reset_control_array_get_exclusive(hdmi->dev);
++	if (IS_ERR(hdmi->rst)) {
++		ret = PTR_ERR(hdmi->rst);
++		return dev_err_probe(hdmi->dev, ret, "failed to get resets\n");
++	}
++
++	ret = reset_control_deassert(hdmi->rst);
++	if (ret) {
++		return dev_err_probe(hdmi->dev, ret, "failed to deassert resets\n");
 +	}
 +
  	hdmi->phy = devm_phy_optional_get(dev, "hdmi");
