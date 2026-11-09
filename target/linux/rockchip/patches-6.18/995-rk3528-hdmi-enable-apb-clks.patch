@@ -1,0 +1,30 @@
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -78,6 +78,8 @@
+ 	struct clk *hdmiphy_clk;
+ 	struct clk *ref_clk;
+ 	struct clk *grf_clk;
++	struct clk *iahb_clk;
++	struct clk *isfr_clk;
+ 	struct dw_hdmi *hdmi;
+ 	struct phy *phy;
+ };
+@@ -566,6 +568,18 @@
+ 		return dev_err_probe(hdmi->dev, ret, "Unable to parse OF data\n");
+ 	}
+ 
++	hdmi->iahb_clk = devm_clk_get_enabled(hdmi->dev, "iahb");
++	if (IS_ERR(hdmi->iahb_clk)) {
++		ret = PTR_ERR(hdmi->iahb_clk);
++		return dev_err_probe(hdmi->dev, ret, "failed to get iahb clock\n");
++	}
++
++	hdmi->isfr_clk = devm_clk_get_enabled(hdmi->dev, "isfr");
++	if (IS_ERR(hdmi->isfr_clk)) {
++		ret = PTR_ERR(hdmi->isfr_clk);
++		return dev_err_probe(hdmi->dev, ret, "failed to get isfr clock\n");
++	}
++
+ 	hdmi->phy = devm_phy_optional_get(dev, "hdmi");
+ 	if (IS_ERR(hdmi->phy)) {
+ 		ret = PTR_ERR(hdmi->phy);
