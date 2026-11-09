@@ -631,11 +631,6 @@
 	dependencies = <&cru>;
 };
 
-&vo_io_domains {
-	status = "okay";
-	vo-supply = <&vcc_1v8>;
-};
-
 &sai0 {
 	status = "disabled";
 };
