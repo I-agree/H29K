@@ -614,8 +614,6 @@
 	avdd-0v9-supply = <&vdd_0v9>;
 	avdd-1v8-supply = <&vcc_1v8>;
 	dependencies = <&power>;
-	clocks = <&cru PCLK_HDMI>, <&cru CLK_SFR_HDMI>, <&cru CLK_CEC_HDMI>;
-	clock-names = "iahb", "isfr", "cec";
 	resets = <&cru SRST_P_HDMI>, <&cru SRST_HDMI>;
 	reset-names = "ahb", "ref";
 };
@@ -630,8 +628,7 @@
 &hdmiphy {
 	status = "okay";
 	#clock-cells = <0>;
-	clocks = <&cru PCLK_HDMIPHY>;
-	clock-names = "sysclk";
+	dependencies = <&cru>;
 };
 
 &vo_io_domains {
