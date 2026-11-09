@@ -587,9 +587,9 @@
 
 &vop {
 	status = "okay";
-	assigned-clocks = <&cru DCLK_VOP0>;
+	assigned-clocks = <&cru DCLK_VOP0>, <&cru DCLK_VOP_SRC0>;
 	assigned-clock-parents = <&cru DCLK_VOP_SRC0>;
-	assigned-clock-rates = <594000000>;
+	assigned-clock-rates = <0>, <594000000>;
 };
 
 &vop_mmu {
