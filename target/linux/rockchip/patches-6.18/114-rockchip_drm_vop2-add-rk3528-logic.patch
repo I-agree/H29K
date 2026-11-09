@@ -1,0 +1,63 @@
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop2.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop2.c
+@@ -832,16 +832,34 @@
+ 	if (vop2->data->soc_id == 3566)
+ 		vop2_writel(vop2, RK3568_OTP_WIN_EN, 1);
+ 
+-	if (vop2->version == VOP_VERSION_RK3588)
++	if (vop2->version == VOP_VERSION_RK3588 ||
++	    vop2->version == VOP_VERSION_RK3528)
+ 		rk3588_vop2_power_domain_enable_all(vop2);
+ 
+-	if (vop2->version <= VOP_VERSION_RK3588) {
++	if (vop2->version <= VOP_VERSION_RK3588 ||
++	    vop2->version == VOP_VERSION_RK3528) {
+ 		vop2->old_layer_sel = vop2_readl(vop2, RK3568_OVL_LAYER_SEL);
+ 		vop2->old_port_sel = vop2_readl(vop2, RK3568_OVL_PORT_SEL);
+ 	}
+ 
+ 	vop2_writel(vop2, RK3568_REG_CFG_DONE, RK3568_REG_CFG_DONE__GLB_CFG_DONE_EN);
+ 
++	/*
++	 * This is unused and error init value for rk3528/rk3562 vp1, if less of this config,
++	 * vp1 can't display normally.
++	 */
++	if (vop2->version == VOP_VERSION_RK3528)
++		regmap_clear_bits(vop2->map, 0x700, GENMASK(5, 4));
++
++	/*
++	 * This is a workaround for RK3528/RK3562/RK3576:
++	 * The aclk pre auto gating function may disable the aclk
++	 * in some unexpected cases, which detected by hardware
++	 * automatically.
++	 */
++	if (vop2->version == VOP_VERSION_RK3528)
++		regmap_clear_bits(vop2->map, RK3568_SYS_AUTO_GATING_CTRL, BIT(4));
++
+ 	/*
+ 	 * Disable auto gating, this is a workaround to
+ 	 * avoid display image shift when a window enabled.
+@@ -1320,10 +1338,12 @@
+ 		 * but this function is not work well so we need
+ 		 * to disable it for these two platform.
+ 		 * On rk3588, and the following new soc(rk3528/rk3576),
+-		 * this bit is gating disable, we should write 1 to
++		 * this bit is gating disable. However, RK3528 hardware
++		 * behavior matches RK3568, we should write 0 to
+ 		 * disable gating when enable afbc.
+ 		 */
+-		if (vop2->version == VOP_VERSION_RK3568)
++		if (vop2->version == VOP_VERSION_RK3568 ||
++		    vop2->version == VOP_VERSION_RK3528)
+ 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 0);
+ 		else
+ 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 1);
+@@ -1261,6 +1281,7 @@
+ 		afbc_en ? "AFBC" : "", &yrgb_mst);
+ 
+-	if (vop2->version > VOP_VERSION_RK3568) {
++	if (vop2->version > VOP_VERSION_RK3568 &&
++	    vop2->version != VOP_VERSION_RK3528) {
+ 		vop2_win_write(win, VOP2_WIN_AXI_BUS_ID, win->data->axi_bus_id);
+ 		vop2_win_write(win, VOP2_WIN_AXI_YRGB_R_ID, win->data->axi_yrgb_r_id);
+ 		vop2_win_write(win, VOP2_WIN_AXI_UV_R_ID, win->data->axi_uv_r_id);
