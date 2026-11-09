@@ -583,7 +583,6 @@
 
 &display_subsystem {
 	status = "okay";
-	/delete-property/ dependencies;
 };
 
 &vop {
