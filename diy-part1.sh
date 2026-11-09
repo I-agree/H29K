@@ -405,6 +405,7 @@ CONFIG_NETFILTER_EGRESS=y
 # =================================================================
 CONFIG_PM_DEBUG=y
 CONFIG_PM_ADVANCED_DEBUG=y
+CONFIG_DYNAMIC_DEBUG=y
 
 EOF
 echo "✅ H29K 内核参数注入完成"
