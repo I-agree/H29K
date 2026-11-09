@@ -588,6 +588,8 @@
 
 &vop {
 	status = "okay";
+	assigned-clocks = <&cru DCLK_VOP_SRC0>;
+	assigned-clock-rates = <594000000>;
 };
 
 &vop_mmu {
