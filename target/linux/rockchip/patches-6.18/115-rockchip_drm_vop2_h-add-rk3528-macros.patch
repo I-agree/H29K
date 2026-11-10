@@ -1,6 +1,14 @@
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop2.h
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop2.h
-@@ -518,5 +518,17 @@
+@@ -139,6 +139,7 @@
+ 	VOP2_WIN_CLUSTER_ENABLE,
+ 	VOP2_WIN_AFBC_ENABLE,
+ 	VOP2_WIN_CLUSTER_LB_MODE,
++	VOP2_WIN_SCL_LB_MODE,
+ 
+ 	/* afbc regs */
+ 	VOP2_WIN_AFBC_FORMAT,
+@@ -518,5 +519,17 @@
  #define RK3568_CLUSTER0_MIX_SRC_ALPHA_CTRL	0x618
  #define RK3568_CLUSTER0_MIX_DST_ALPHA_CTRL	0x61C
 +/* RK3528 Cluster Mix registers */
