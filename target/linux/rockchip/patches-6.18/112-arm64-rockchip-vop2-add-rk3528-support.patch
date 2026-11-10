@@ -279,7 +279,6 @@
 +	}, {
 +		.compatible = "rockchip,rk3528-vop",
 +		.data = &rk3528_vop,
-     }, {
  	}, {
  		.compatible = "rockchip,rk3568-vop",
  		.data = &rk3568_vop,
