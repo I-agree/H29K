@@ -272,7 +272,7 @@
  static const struct vop2_data rk3576_vop = {
  	.version = VOP_VERSION_RK3576,
  	.feature = VOP2_FEATURE_HAS_SYS_PMU,
-@@ -2541,6 +2771,10 @@
+@@ -2541,6 +2771,9 @@
  	{
  		.compatible = "rockchip,rk3566-vop",
  		.data = &rk3566_vop,
