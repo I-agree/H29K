@@ -401,12 +401,13 @@ CONFIG_NETFILTER_EGRESS=y
 # =================================================================
 # 🔄 临时加入的内核调试
 # =================================================================
+CONFIG_DRM_DEBUG_MM=y
 CONFIG_PM_DEBUG=y
 CONFIG_PM_ADVANCED_DEBUG=y
 CONFIG_PRINTK=y
 CONFIG_DEBUG_FS=y
 CONFIG_DYNAMIC_DEBUG=y
-CONFIG_DRM_DEBUG_MM=y
+CONFIG_DYNAMIC_DEBUG_CORE=y
 
 EOF
 echo "✅ H29K 内核参数注入完成"
