@@ -1198,7 +1198,7 @@
 +	.probe  = inno_hdmi_phy_probe,
 +	.remove = inno_hdmi_phy_remove,
 +	.driver = {
-+		.name = "inno-hdmi-phy2",
++		.name = "inno_dw_hdmi_phy2",
 +		.of_match_table = of_match_ptr(inno_hdmi_phy_of_match),
 +	},
 +};
