@@ -74,6 +74,7 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-sy
 # download_and_check "${BASE_URL}/package/kernel/aic8800/patches/099-fix-debugfs-err-ptr-handling.patch" "package/kernel/aic8800/patches/099-fix-debugfs-err-ptr-handling.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/110-arm64-rockchip-dw-hdmi-add-rk3528-support.patch" "target/linux/rockchip/patches-6.18/110-arm64-rockchip-dw-hdmi-add-rk3528-support.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/111-pmdomain-rockchip-fix-rk3528-pm-domains.patch" "target/linux/rockchip/patches-6.18/111-pmdomain-rockchip-fix-rk3528-pm-domains.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/112-arm64-rockchip-vop2-add-rk3528-support.patch" "target/linux/rockchip/patches-6.18/112-arm64-rockchip-vop2-add-rk3528-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/114-rockchip_drm_vop2-add-rk3528-logic.patch" "target/linux/rockchip/patches-6.18/114-rockchip_drm_vop2-add-rk3528-logic.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/115-rockchip_drm_vop2_h-add-rk3528-macros.patch" "target/linux/rockchip/patches-6.18/115-rockchip_drm_vop2_h-add-rk3528-macros.patch"
