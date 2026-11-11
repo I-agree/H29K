@@ -72,8 +72,9 @@
 +			clocks = <&cru PCLK_HDMI>,
 +				 <&cru CLK_SFR_HDMI>,
 +				 <&cru CLK_CEC_HDMI>,
++				 <&inno_hdmiphy_clk>,
 +				 <&inno_hdmiphy_clk>;
-+			clock-names = "iahb", "isfr", "cec", "dclk_vp0";
++			clock-names = "iahb", "isfr", "cec", "dclk_vp0", "ref";
 +			phys = <&hdmiphy>;
 +			phy-names = "hdmi";
 +			power-domains = <&power RK3528_PD_VO>;
