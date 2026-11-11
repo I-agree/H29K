@@ -589,22 +589,10 @@
 
 &vop {
 	status = "okay";
-	assigned-clocks = <&cru DCLK_VOP0>, <&cru DCLK_VOP_SRC0>;
-	assigned-clock-parents = <&cru DCLK_VOP_SRC0>;
-	assigned-clock-rates = <0>, <594000000>;
-	dependencies = <&power>;
 };
 
 &vop_mmu {
 	status = "okay";
-	dependencies = <&power>;
-};
-
-&vp0 {
-	vp0_out_hdmi: endpoint@0 {
-		reg = <0>;
-		remote-endpoint = <&hdmi_in_vp0>;
-	};
 };
 
 &hdmi {
@@ -613,29 +601,12 @@
 	pinctrl-0 = <&hdmi_pins>;
 	avdd-0v9-supply = <&vdd_0v9>;
 	avdd-1v8-supply = <&vcc_1v8>;
-	dependencies = <&power>;
-	resets = <&cru SRST_P_HDMI>, <&cru SRST_HDMI>;
-	reset-names = "ahb", "ref";
-};
-
-&hdmi_in {
-	hdmi_in_vp0: endpoint@0 {
-		reg = <0>;
-		remote-endpoint = <&vp0_out_hdmi>;
-	};
 };
 
 &hdmiphy {
 	status = "okay";
-	#clock-cells = <0>;
-	dependencies = <&cru>;
 };
 
 &sai0 {
 	status = "disabled";
 };
-
-&hdmi_sound {
-	status = "disabled";
-};
-
