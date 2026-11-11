@@ -367,6 +367,9 @@ CONFIG_GENERIC_PHY=y
 CONFIG_PM_GENERIC_DOMAINS=y
 CONFIG_ROCKCHIP_PM_DOMAINS=y
 
+# ================= 补丁增加非原生内核配置 =================
+CONFIG_PHY_ROCKCHIP_INNO_HDMI_PHY=y
+
 # ================= 底层框架依赖 =================
 CONFIG_REGMAP_MMIO=y
 CONFIG_DMADEVICES=y
