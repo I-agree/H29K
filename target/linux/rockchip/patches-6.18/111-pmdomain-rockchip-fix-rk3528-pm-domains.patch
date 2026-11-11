@@ -1,0 +1,12 @@
+--- a/drivers/pmdomain/rockchip/pm-domains.c
++++ b/drivers/pmdomain/rockchip/pm-domains.c
+@@ -1222,4 +1222,8 @@
+ static const struct rockchip_domain_info rk3528_pm_domains[] = {
++	[RK3528_PD_PMU]		= DOMAIN_RK3528("pmu",        0, BIT(0)),
++	[RK3528_PD_BUS]		= DOMAIN_RK3528("bus",        0, BIT(1)),
++	[RK3528_PD_DDR]		= DOMAIN_RK3528("ddr",        0, BIT(2)),
++	[RK3528_PD_MSCH]	= DOMAIN_RK3528("msch",       0, BIT(3)),
+ 	[RK3528_PD_GPU]		= DOMAIN_RK3528("gpu",  BIT(0), BIT(4)),
+ 	[RK3528_PD_RKVDEC]	= DOMAIN_RK3528("vdec",      0, BIT(5)),
+ 	[RK3528_PD_RKVENC]	= DOMAIN_RK3528("venc",      0, BIT(6)),
+  
