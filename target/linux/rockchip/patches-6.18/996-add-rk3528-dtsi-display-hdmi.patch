@@ -69,7 +69,7 @@
 +			compatible = "rockchip,rk3528-dw-hdmi";
 +			reg = <0x0 0xff8d0000 0x0 0x20000>;
 +			interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
-+						reg-io-width = <4>;
++			reg-io-width = <4>;
 +			clocks = <&cru PCLK_HDMI>,
 +				 <&cru CLK_SFR_HDMI>,
 +				 <&cru CLK_CEC_HDMI>,
