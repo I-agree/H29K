@@ -80,7 +80,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/113-rockchip-
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/114-rockchip_drm_vop2-add-rk3528-logic.patch" "target/linux/rockchip/patches-6.18/114-rockchip_drm_vop2-add-rk3528-logic.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/115-rockchip_drm_vop2_h-add-rk3528-macros.patch" "target/linux/rockchip/patches-6.18/115-rockchip_drm_vop2_h-add-rk3528-macros.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/116-phy-rockchip-add-inno-hdmi-phy-rk3528-support.patch" "target/linux/rockchip/patches-6.18/116-phy-rockchip-add-inno-hdmi-phy-rk3528-support.patch"
-download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/117-sound-soc-rockchip-sai-add-rk3528-compatible.patch" "target/linux/rockchip/patches-6.18/117-sound-soc-rockchip-sai-add-rk3528-compatible.patch"
+# download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/117-sound-soc-rockchip-sai-add-rk3528-compatible.patch" "target/linux/rockchip/patches-6.18/117-sound-soc-rockchip-sai-add-rk3528-compatible.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch" "target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch" "target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/997-dwc3-host-add-modem-reset-gpio.patch" "target/linux/rockchip/patches-6.18/997-dwc3-host-add-modem-reset-gpio.patch"
