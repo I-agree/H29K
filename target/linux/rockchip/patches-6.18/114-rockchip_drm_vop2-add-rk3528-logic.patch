@@ -1,6 +1,6 @@
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop2.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop2.c
-@@ -832,16 +832,34 @@
+@@ -832,12 +832,14 @@
  	if (vop2->data->soc_id == 3566)
  		vop2_writel(vop2, RK3568_OTP_WIN_EN, 1);
  
@@ -17,10 +17,40 @@
  	}
  
  	vop2_writel(vop2, RK3568_REG_CFG_DONE, RK3568_REG_CFG_DONE__GLB_CFG_DONE_EN);
+@@ -1319,11 +1321,14 @@
+ 		 * On rk3566/8, this bit is auto gating enable,
+ 		 * but this function is not work well so we need
+ 		 * to disable it for these two platform.
+-		 * On rk3588, and the following new soc(rk3528/rk3576),
+-		 * this bit is gating disable, we should write 1 to
++		 * On rk3588, and the following new soc(rk3576),
++		 * this bit is gating disable, we should write 1 to
+ 		 * disable gating when enable afbc.
++		 * However, RK3528 hardware behavior matches RK3568,
++		 * we should write 0 to disable gating when enable afbc.
+ 		 */
+-		if (vop2->version == VOP_VERSION_RK3568)
++		if (vop2->version == VOP_VERSION_RK3568 ||
++		    vop2->version == VOP_VERSION_RK3528)
+ 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 0);
+ 		else
+ 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 1);
+@@ -1261,6 +1266,7 @@
+ 		afbc_en ? "AFBC" : "", &yrgb_mst);
+ 
+-	if (vop2->version > VOP_VERSION_RK3568) {
++	if (vop2->version > VOP_VERSION_RK3568 &&
++	    vop2->version != VOP_VERSION_RK3528) {
+ 		vop2_win_write(win, VOP2_WIN_AXI_BUS_ID, win->data->axi_bus_id);
+ 		vop2_win_write(win, VOP2_WIN_AXI_YRGB_R_ID, win->data->axi_yrgb_r_id);
+ 		vop2_win_write(win, VOP2_WIN_AXI_UV_R_ID, win->data->axi_uv_r_id);
+@@ -1774,5 +1780,22 @@
+ 	clk_set_rate(vp->dclk, clock);
  
 +	/*
 +	 * This is unused and error init value for rk3528/rk3562 vp1, if less of this config,
-+	 * vp1 can't display normally.
++	 * vp1 can't display normally. Moved here to ensure stable clock and power domain
++	 * state after IOMMU attachment.
 +	 */
 +	if (vop2->version == VOP_VERSION_RK3528)
 +		regmap_clear_bits(vop2->map, 0x700, GENMASK(5, 4));
@@ -34,30 +64,6 @@
 +	if (vop2->version == VOP_VERSION_RK3528)
 +		regmap_clear_bits(vop2->map, RK3568_SYS_AUTO_GATING_CTRL, BIT(4));
 +
- 	/*
- 	 * Disable auto gating, this is a workaround to
- 	 * avoid display image shift when a window enabled.
-@@ -1261,6 +1279,7 @@
- 		afbc_en ? "AFBC" : "", &yrgb_mst);
+ 	vop2_post_config(crtc);
  
--	if (vop2->version > VOP_VERSION_RK3568) {
-+	if (vop2->version > VOP_VERSION_RK3568 &&
-+	    vop2->version != VOP_VERSION_RK3528) {
- 		vop2_win_write(win, VOP2_WIN_AXI_BUS_ID, win->data->axi_bus_id);
- 		vop2_win_write(win, VOP2_WIN_AXI_YRGB_R_ID, win->data->axi_yrgb_r_id);
- 		vop2_win_write(win, VOP2_WIN_AXI_UV_R_ID, win->data->axi_uv_r_id);
-@@ -1320,10 +1339,12 @@
- 		 * but this function is not work well so we need
- 		 * to disable it for these two platform.
- 		 * On rk3588, and the following new soc(rk3528/rk3576),
--		 * this bit is gating disable, we should write 1 to
-+		 * this bit is gating disable. However, RK3528 hardware
-+		 * behavior matches RK3568, we should write 0 to
- 		 * disable gating when enable afbc.
- 		 */
--		if (vop2->version == VOP_VERSION_RK3568)
-+		if (vop2->version == VOP_VERSION_RK3568 ||
-+		    vop2->version == VOP_VERSION_RK3528)
- 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 0);
- 		else
- 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 1);
+ 	vop2_cfg_done(vp);
