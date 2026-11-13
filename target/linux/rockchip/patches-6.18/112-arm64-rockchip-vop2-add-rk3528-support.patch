@@ -235,7 +235,47 @@
  static const struct vop2_regs_dump rk3568_regs_dump[] = {
  	{
  		.name = "SYS",
-@@ -2448,6 +2655,12 @@
+@@ -1936,7 +2143,8 @@
+ 		break;
+ 	}
+ 
+-	if (vop2->version <= VOP_VERSION_RK3588) {
++	if (vop2->version <= VOP_VERSION_RK3588 ||
++	    vop2->version == VOP_VERSION_RK3528) {
+ 		src_color_ctrl_reg = RK3568_CLUSTER0_MIX_SRC_COLOR_CTRL;
+ 		dst_color_ctrl_reg = RK3568_CLUSTER0_MIX_DST_COLOR_CTRL;
+ 		src_alpha_ctrl_reg = RK3568_CLUSTER0_MIX_SRC_ALPHA_CTRL;
+@@ -1969,7 +2177,8 @@
+ 	bool bottom_layer_alpha_en = false;
+ 	u32 dst_global_alpha = DRM_BLEND_ALPHA_OPAQUE;
+ 
+-	if (vop2->version <= VOP_VERSION_RK3588)
++	if (vop2->version <= VOP_VERSION_RK3588 ||
++	    vop2->version == VOP_VERSION_RK3528)
+ 		mixer_id = vop2_find_start_mixer_id_for_vp(vp);
+ 	else
+ 		mixer_id = 0;
+@@ -1992,7 +2201,8 @@
+ 		}
+ 	}
+ 
+-	if (vop2->version <= VOP_VERSION_RK3588) {
++	if (vop2->version <= VOP_VERSION_RK3588 ||
++	    vop2->version == VOP_VERSION_RK3528) {
+ 		src_color_ctrl_reg = RK3568_MIX0_SRC_COLOR_CTRL;
+ 		dst_color_ctrl_reg = RK3568_MIX0_DST_COLOR_CTRL;
+ 		src_alpha_ctrl_reg = RK3568_MIX0_SRC_ALPHA_CTRL;
+@@ -2058,7 +2258,8 @@
+ 	}
+ 
+ 	if (vp->id == 0) {
+-		if (vop2->version <= VOP_VERSION_RK3588) {
++		if (vop2->version <= VOP_VERSION_RK3588 ||
++		    vop2->version == VOP_VERSION_RK3528) {
+ 			src_color_ctrl_reg = RK3568_HDR0_SRC_COLOR_CTRL;
+ 			dst_color_ctrl_reg = RK3568_HDR0_DST_COLOR_CTRL;
+ 			src_alpha_ctrl_reg = RK3568_HDR0_SRC_ALPHA_CTRL;
+@@ -2493,6 +2794,12 @@
  	.setup_overlay = rk3568_vop2_setup_overlay,
  };
  
@@ -248,7 +288,7 @@
  static const struct vop2_ops rk3576_vop_ops = {
  	.setup_intf_mux = rk3576_set_intf_mux,
  	.setup_bg_dly = rk3576_vop2_setup_bg_dly,
-@@ -2498,6 +2711,23 @@
+@@ -2543,6 +2850,23 @@
  	.soc_id = 3568,
  };
  
@@ -272,7 +312,7 @@
  static const struct vop2_data rk3576_vop = {
  	.version = VOP_VERSION_RK3576,
  	.feature = VOP2_FEATURE_HAS_SYS_PMU,
-@@ -2541,6 +2771,9 @@
+@@ -2586,6 +2910,9 @@
  	{
  		.compatible = "rockchip,rk3566-vop",
  		.data = &rk3566_vop,
