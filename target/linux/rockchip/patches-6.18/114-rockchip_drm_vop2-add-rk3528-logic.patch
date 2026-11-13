@@ -26,20 +26,20 @@
  
  	if (vop2->version >= VOP_VERSION_RK3576)
 @@ -1322,11 +1327,14 @@
-          * On rk3566/8, this bit is auto gating enable,
-          * but this function is not work well so we need
-          * to disable it for these two platform.
+ 		 * On rk3566/8, this bit is auto gating enable,
+ 		 * but this function is not work well so we need
+ 		 * to disable it for these two platform.
 -		 * On rk3588, and the following new soc(rk3528/rk3576),
 -		 * this bit is gating disable, we should write 1 to
 +		 * On rk3588, and the following new soc(rk3576),
 +		 * this bit is gating disable, we should write 1 to
-          * disable gating when enable afbc.
+ 		 * disable gating when enable afbc.
 +		 * However, RK3528 hardware behavior matches RK3568,
 +		 * we should write 0 to disable gating when enable afbc.
-          */
+ 		 */
 -		if (vop2->version == VOP_VERSION_RK3568)
 +		if (vop2->version == VOP_VERSION_RK3568 ||
 +		    vop2->version == VOP_VERSION_RK3528)
-             vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 0);
-         else
-             vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 1);
+ 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 0);
+ 		else
+ 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 1);
