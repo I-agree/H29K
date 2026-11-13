@@ -49,25 +49,7 @@
  			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 0);
  		else
  			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 1);
-@@ -1776,6 +1786,40 @@
- 
-+	/*
-+	 * Switch DCLK parent to HDMI PHY clock safely.
-+	 * This was previously done via assigned-clock-parents in DT, which
-+	 * triggered early PHY register access before PD_VO was powered on,
-+	 * causing SError bus hang. Moved here after pm_runtime_resume_and_get
-+	 * ensures PD_VO is active.
-+	 */
-+	if (vop2->version == VOP_VERSION_RK3528 && vop2->pll_hdmiphy0) {
-+		if (!vp->dclk_src)
-+			vp->dclk_src = clk_get_parent(vp->dclk);
-+
-+		ret = clk_set_parent(vp->dclk, vop2->pll_hdmiphy0);
-+		if (ret < 0)
-+			drm_warn(vop2->drm,
-+				 "Could not switch to HDMI PHY PLL: %d\n", ret);
-+	}
-+
+@@ -1777,5 +1787,22 @@
  	clk_set_rate(vp->dclk, clock);
  
 +	/*
