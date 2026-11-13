@@ -13,7 +13,7 @@
  	psci {
  		compatible = "arm,psci-1.0", "arm,psci-0.2";
  		method = "smc";
-@@ -763,6 +769,104 @@
+@@ -763,6 +769,102 @@
  			status = "disabled";
  		};
  
@@ -30,8 +30,6 @@
 +				 <&cru DCLK_VOP1>,
 +				 <&inno_hdmiphy_clk>;
 +			clock-names = "aclk", "hclk", "dclk_vp0", "dclk_vp1", "pll_hdmiphy0";
-+			assigned-clocks = <&cru DCLK_VOP0>;
-+			assigned-clock-parents = <&inno_hdmiphy_clk>;
 +			iommus = <&vop_mmu>;
 +			power-domains = <&power RK3528_PD_VO>;
 +			status = "disabled";
@@ -118,7 +116,7 @@
  		spi0: spi@ff9c0000 {
  			compatible = "rockchip,rk3528-spi",
  				     "rockchip,rk3066-spi";
-@@ -1430,6 +1534,22 @@
+@@ -1430,6 +1532,22 @@
  				#phy-cells = <0>;
  				status = "disabled";
  			};
