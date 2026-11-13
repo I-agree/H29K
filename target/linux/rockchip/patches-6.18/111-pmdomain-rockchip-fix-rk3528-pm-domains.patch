@@ -1,6 +1,6 @@
 --- a/drivers/pmdomain/rockchip/pm-domains.c
 +++ b/drivers/pmdomain/rockchip/pm-domains.c
-@@ -1222,4 +1222,8 @@
+@@ -1246,4 +1246,8 @@
  static const struct rockchip_domain_info rk3528_pm_domains[] = {
 +	[RK3528_PD_PMU]		= DOMAIN_RK3528("pmu",        0, BIT(0)),
 +	[RK3528_PD_BUS]		= DOMAIN_RK3528("bus",        0, BIT(1)),
