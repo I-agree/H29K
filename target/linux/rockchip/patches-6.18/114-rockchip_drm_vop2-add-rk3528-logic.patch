@@ -25,7 +25,7 @@
  	}
  
  	if (vop2->version >= VOP_VERSION_RK3576)
-@@ -1322,11 +1327,14 @@ static void vop2_plane_atomic_update(struct drm_plane *plane,
+@@ -1322,11 +1327,14 @@
           * On rk3566/8, this bit is auto gating enable,
           * but this function is not work well so we need
           * to disable it for these two platform.
