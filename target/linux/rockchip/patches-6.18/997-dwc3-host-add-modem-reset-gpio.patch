@@ -10,75 +10,27 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -22,6 +25,40 @@
+@@ -22,6 +25,19 @@
  #define XHCI_HCSPARAMS1		0x4
  #define XHCI_PORTSC_BASE	0x400
  
-+/* Context for asynchronous modem reset */
-+struct modem_reset_ctx {
-+	struct delayed_work work;
-+	struct device *dev;
-+	struct gpio_desc *gpio;
-+	u32 assert_us;
-+	u32 deassert_us;
-+	bool is_scheduled;
-+};
++/* Context for asynchronous modem reset deassert wait */
++static struct gpio_desc *modem_reset_gpio;
++static struct delayed_work modem_async_work;
 +
-+/*
-+ * Safe context passing mechanism.
-+ * We cannot use drvdata (occupied by dwc3 core and xhci-plat).
-+ * We cannot use platform_data (overwritten by platform_device_add_data).
-+ * RK3528 has a single DWC3 instance, so a static pointer with owner
-+ * validation is safe and avoids modifying core.h.
-+ */
-+static struct modem_reset_ctx *pending_modem_ctx;
-+
-+static void modem_reset_work_handler(struct work_struct *work)
++static void modem_async_work_handler(struct work_struct *work)
 +{
-+	struct modem_reset_ctx *ctx = container_of(to_delayed_work(work), struct modem_reset_ctx, work);
-+
-+	if (!ctx->gpio)
-+		return;
-+
-+	dev_info(ctx->dev, "FM350-GL: Triggering async HW reset after xHCI start...\n");
-+	gpiod_set_value_cansleep(ctx->gpio, 0);
-+	fsleep(ctx->assert_us);
-+	gpiod_set_value_cansleep(ctx->gpio, 1);
-+	msleep(DIV_ROUND_UP(ctx->deassert_us, 1000));
-+	dev_info(ctx->dev, "FM350-GL: Reset sequence completed.\n");
++	/*
++	 * This runs in the background after 8 seconds.
++	 * It prevents blocking the xHCI initialization thread.
++	 * Add any post-boot modem checks here if needed.
++	 */
 +}
 +
  /**
   * dwc3_power_off_all_roothub_ports - Power off all Root hub ports
   * @dwc: Pointer to our controller context structure
-@@ -62,16 +99,26 @@
- 
- static void dwc3_xhci_plat_start(struct usb_hcd *hcd)
- {
-+	struct modem_reset_ctx *ctx;
- 	struct platform_device *pdev;
- 	struct dwc3 *dwc;
- 
- 	if (!usb_hcd_is_primary_hcd(hcd))
- 		return;
- 
- 	pdev = to_platform_device(hcd->self.controller);
- 	dwc = dev_get_drvdata(pdev->dev.parent);
- 
- 	dwc3_enable_susphy(dwc, true);
-+
-+	/* Retrieve and validate the pending context safely */
-+	ctx = READ_ONCE(pending_modem_ctx);
-+	if (ctx && ctx->dev == dwc->dev && !ctx->is_scheduled) {
-+		ctx->is_scheduled = true;
-+		WRITE_ONCE(pending_modem_ctx, NULL); /* Clear immediately to prevent re-trigger */
-+		INIT_DELAYED_WORK(&ctx->work, modem_reset_work_handler);
-+		schedule_delayed_work(&ctx->work, 0);
-+	}
- }
- 
- static const struct xhci_plat_priv dwc3_xhci_plat_quirk = {
-@@ -158,6 +205,49 @@ int dwc3_host_init(struct dwc3 *dwc)
+@@ -161,6 +177,48 @@
  		goto err;
  	}
  
@@ -87,58 +39,52 @@
 +	 * Hardware truth: The physical LOW level is the safe/deasserted state for this board,
 +	 * despite the DTS declaring ACTIVE_LOW. We must explicitly drive it to avoid floating.
 +	 */
-+	{
-+		struct gpio_desc *modem_rst_gpio;
-+		struct modem_reset_ctx *ctx;
++	modem_reset_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
++	if (PTR_ERR(modem_reset_gpio) == -EPROBE_DEFER) {
++		ret = -EPROBE_DEFER;
++		goto err;
++	} else if (IS_ERR(modem_reset_gpio)) {
++		dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_reset_gpio));
++		modem_reset_gpio = NULL;
++	} else if (modem_reset_gpio) {
++		/*
++		 * CRITICAL POLARITY FIX:
++		 * Request logical 1 -> translates to physical LOW (safe state).
++		 * Then force direction to output while maintaining this value.
++		 */
++		gpiod_set_value_cansleep(modem_reset_gpio, 1);
 +
-+		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
-+		if (PTR_ERR(modem_rst_gpio) == -EPROBE_DEFER) {
-+			WRITE_ONCE(pending_modem_ctx, NULL); /* Prevent UAF on probe retry */
-+			ret = -EPROBE_DEFER;
-+			goto err;
-+		} else if (IS_ERR(modem_rst_gpio)) {
-+			dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_rst_gpio));
-+		} else if (modem_rst_gpio) {
-+			/*
-+			 * CRITICAL POLARITY FIX:
-+			 * Request logical 1 -> translates to physical LOW (safe state).
-+			 * Then force direction to output while maintaining this value.
-+			 */
-+			gpiod_set_value_cansleep(modem_rst_gpio, 1);
-+
-+			if (gpiod_direction_output(modem_rst_gpio, 1) < 0) {
-+				dev_err(dwc->dev, "failed to set modem reset gpio direction\n");
-+			} else {
-+				ctx = devm_kzalloc(dwc->dev, sizeof(*ctx), GFP_KERNEL);
-+				if (ctx) {
-+					ctx->dev = dwc->dev;
-+					ctx->gpio = modem_rst_gpio;
-+					/* Optimized default fallback timings */
-+					ctx->assert_us = 1000000;
-+					ctx->deassert_us = 8000000;
-+					device_property_read_u32(dwc->dev, "reset-assert-us", &ctx->assert_us);
-+					device_property_read_u32(dwc->dev, "reset-deassert-us", &ctx->deassert_us);
-+					ctx->is_scheduled = false;
-+					WRITE_ONCE(pending_modem_ctx, ctx);
-+				}
-+			}
++		if (gpiod_direction_output(modem_reset_gpio, 1) < 0) {
++			dev_err(dwc->dev, "failed to set modem reset gpio direction\n");
++		} else {
++			dev_info(dwc->dev, "FM350-GL: Triggering HW reset...\n");
++			
++			/* 1. Assert reset (Physical LOW) */
++			gpiod_set_value_cansleep(modem_reset_gpio, 0);
++			
++			/* 2. Wait 1 second synchronously (Acceptable delay) */
++			fsleep(1000000);
++			
++			/* 3. Deassert reset (Physical HIGH) */
++			gpiod_set_value_cansleep(modem_reset_gpio, 1);
++			
++			/* 4. Schedule the 8-second wait asynchronously to avoid blocking boot */
++			INIT_DELAYED_WORK(&modem_async_work, modem_async_work_handler);
++			schedule_delayed_work(&modem_async_work, msecs_to_jiffies(8000));
++			
++			dev_info(dwc->dev, "FM350-GL: Reset pulse sent, continuing boot asynchronously.\n");
 +		}
 +	}
 +
  	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
  
  	props[prop_idx++] = PROPERTY_ENTRY_BOOL("xhci-sg-trb-cache-size-quirk");
-@@ -220,5 +310,14 @@
- 
+@@ -224,4 +282,9 @@
  void dwc3_host_exit(struct dwc3 *dwc)
  {
-+	struct modem_reset_ctx *ctx;
-+
-+	/* Cancel any pending modem reset work before tearing down */
-+	ctx = READ_ONCE(pending_modem_ctx);
-+	if (ctx && ctx->dev == dwc->dev) {
-+		cancel_delayed_work_sync(&ctx->work);
-+		WRITE_ONCE(pending_modem_ctx, NULL);
++	/* Cancel any pending async modem reset work before tearing down */
++	if (modem_reset_gpio) {
++		cancel_delayed_work_sync(&modem_async_work);
 +	}
 +
  	if (dwc->sys_wakeup)
