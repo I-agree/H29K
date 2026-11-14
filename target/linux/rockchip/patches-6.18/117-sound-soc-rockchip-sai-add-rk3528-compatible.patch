@@ -1,6 +1,6 @@
 --- a/sound/soc/rockchip/rockchip_sai.c
 +++ b/sound/soc/rockchip/rockchip_sai.c
-@@ -1509,5 +1509,7 @@
+@@ -1513,5 +1513,7 @@
  static const struct of_device_id rockchip_sai_match[] = {
 +	{ .compatible = "rockchip,rk3528-sai", },
 +	{ .compatible = "rockchip,sai-v1", },
