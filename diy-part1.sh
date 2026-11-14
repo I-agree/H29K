@@ -98,6 +98,7 @@ download_and_check "${BASE_URL}/JPG/system" "files/etc/config/system"
 download_and_check "${BASE_URL}/JPG/wireless" "files/etc/config/wireless"
 download_and_check "${BASE_URL}/JPG/smartdns" "files/etc/config/smartdns"
 download_and_check "${BASE_URL}/JPG/ksmbd" "files/etc/config/ksmbd"
+download_and_check "${BASE_URL}/JPG/99-rndis-dhcp" "files/etc/hotplug.d/net/99-rndis-dhcp"
 download_and_check "${BASE_URL}/package/python-charset-normalizer/Makefile" "package/python-charset-normalizer/Makefile"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
