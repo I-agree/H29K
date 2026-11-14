@@ -10,82 +10,80 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -22,6 +25,19 @@
+@@ -22,6 +25,34 @@
  #define XHCI_HCSPARAMS1		0x4
  #define XHCI_PORTSC_BASE	0x400
  
-+/* Context for asynchronous modem reset deassert wait */
-+static struct gpio_desc *modem_reset_gpio;
-+static struct delayed_work modem_async_work;
++/* Context for fully asynchronous modem reset */
++struct modem_reset_ctx {
++	struct delayed_work work;
++	struct device *dev;
++	struct gpio_desc *gpio;
++	int state;
++};
 +
 +static void modem_async_work_handler(struct work_struct *work)
 +{
-+	/*
-+	 * This runs in the background after 8 seconds.
-+	 * It prevents blocking the xHCI initialization thread.
-+	 * Add any post-boot modem checks here if needed.
-+	 */
++	struct modem_reset_ctx *ctx = container_of(to_delayed_work(work), struct modem_reset_ctx, work);
++
++	if (!ctx || !ctx->gpio)
++		return;
++
++	if (ctx->state == 0) {
++		/* Step 1: Assert reset (Physical LOW) */
++		gpiod_set_value_cansleep(ctx->gpio, 0);
++		ctx->state = 1;
++		/* Schedule deassert after 1 second asynchronously */
++		schedule_delayed_work(&ctx->work, msecs_to_jiffies(1000));
++	} else if (ctx->state == 1) {
++		/* Step 2: Deassert reset (Physical HIGH) */
++		gpiod_set_value_cansleep(ctx->gpio, 1);
++		dev_info(ctx->dev, "FM350-GL: Async HW reset sequence completed.\n");
++	}
 +}
 +
  /**
   * dwc3_power_off_all_roothub_ports - Power off all Root hub ports
   * @dwc: Pointer to our controller context structure
-@@ -161,6 +177,48 @@
+@@ -161,6 +192,35 @@
  		goto err;
  	}
  
 +	/*
-+	 * Acquire the modem reset GPIO early during host init.
-+	 * Hardware truth: The physical LOW level is the safe/deasserted state for this board,
-+	 * despite the DTS declaring ACTIVE_LOW. We must explicitly drive it to avoid floating.
++	 * Acquire the modem reset GPIO and trigger async reset.
++	 * This avoids blocking the xHCI initialization thread entirely.
 +	 */
-+	modem_reset_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
-+	if (PTR_ERR(modem_reset_gpio) == -EPROBE_DEFER) {
-+		ret = -EPROBE_DEFER;
-+		goto err;
-+	} else if (IS_ERR(modem_reset_gpio)) {
-+		dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_reset_gpio));
-+		modem_reset_gpio = NULL;
-+	} else if (modem_reset_gpio) {
-+		/*
-+		 * CRITICAL POLARITY FIX:
-+		 * Request logical 1 -> translates to physical LOW (safe state).
-+		 * Then force direction to output while maintaining this value.
-+		 */
-+		gpiod_set_value_cansleep(modem_reset_gpio, 1);
++	{
++		struct gpio_desc *rst_gpio;
++		struct modem_reset_ctx *ctx;
 +
-+		if (gpiod_direction_output(modem_reset_gpio, 1) < 0) {
-+			dev_err(dwc->dev, "failed to set modem reset gpio direction\n");
-+		} else {
-+			dev_info(dwc->dev, "FM350-GL: Triggering HW reset...\n");
-+			
-+			/* 1. Assert reset (Physical LOW) */
-+			gpiod_set_value_cansleep(modem_reset_gpio, 0);
-+			
-+			/* 2. Wait 1 second synchronously (Acceptable delay) */
-+			fsleep(1000000);
-+			
-+			/* 3. Deassert reset (Physical HIGH) */
-+			gpiod_set_value_cansleep(modem_reset_gpio, 1);
-+			
-+			/* 4. Schedule the 8-second wait asynchronously to avoid blocking boot */
-+			INIT_DELAYED_WORK(&modem_async_work, modem_async_work_handler);
-+			schedule_delayed_work(&modem_async_work, msecs_to_jiffies(8000));
-+			
-+			dev_info(dwc->dev, "FM350-GL: Reset pulse sent, continuing boot asynchronously.\n");
++		rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
++		if (IS_ERR(rst_gpio)) {
++			if (PTR_ERR(rst_gpio) == -EPROBE_DEFER) {
++				ret = -EPROBE_DEFER;
++				goto err;
++			}
++			dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(rst_gpio));
++		} else if (rst_gpio) {
++			/* Set to safe state (Physical LOW) first */
++			gpiod_set_value_cansleep(rst_gpio, 1);
++
++			if (gpiod_direction_output(rst_gpio, 1) == 0) {
++				ctx = devm_kzalloc(dwc->dev, sizeof(*ctx), GFP_KERNEL);
++				if (ctx) {
++					ctx->dev = dwc->dev;
++					ctx->gpio = rst_gpio;
++					ctx->state = 0;
++					INIT_DELAYED_WORK(&ctx->work, modem_async_work_handler);
++					
++					dev_info(dwc->dev, "FM350-GL: Scheduling async HW reset...\n");
++					/* Start the async reset sequence immediately without blocking */
++					schedule_delayed_work(&ctx->work, 0);
++				}
++			}
 +		}
 +	}
 +
  	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
  
  	props[prop_idx++] = PROPERTY_ENTRY_BOOL("xhci-sg-trb-cache-size-quirk");
-@@ -224,4 +282,9 @@
- void dwc3_host_exit(struct dwc3 *dwc)
- {
-+	/* Cancel any pending async modem reset work before tearing down */
-+	if (modem_reset_gpio) {
-+		cancel_delayed_work_sync(&modem_async_work);
-+	}
-+
- 	if (dwc->sys_wakeup)
- 		device_init_wakeup(&dwc->xhci->dev, false);
