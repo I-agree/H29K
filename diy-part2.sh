@@ -50,6 +50,7 @@ chmod +x files/usr/sbin/drm_play_arm64
 chmod +x files/etc/uci-defaults/once-enable-bootanim
 chmod 0755 files/usr/share/qmodem/led_scripts/misectel_led.sh
 chmod +x files/usr/share/qmodem/led_scripts/misectel_led.sh
+chmod +x files/etc/hotplug.d/net/99-rndis-dhcp
 # ==============================================================
 
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
