@@ -40,7 +40,7 @@
  	.of_xlate = rk_iommu_of_xlate,
  	.default_domain_ops = &(const struct iommu_domain_ops) {
  		.attach_dev	= rk_iommu_attach_device,
-@@ -1374,6 +1385,9 @@
+@@ -1380,6 +1391,9 @@
  static const struct of_device_id rk_iommu_dt_ids[] = {
  	{	.compatible = "rockchip,iommu",
  		.data = &iommu_data_ops_v1,
