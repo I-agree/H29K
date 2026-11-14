@@ -45,7 +45,7 @@
  /**
   * dwc3_power_off_all_roothub_ports - Power off all Root hub ports
   * @dwc: Pointer to our controller context structure
-@@ -161,6 +192,35 @@
+@@ -161,6 +192,41 @@
  		goto err;
  	}
  
