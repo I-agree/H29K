@@ -1,0 +1,22 @@
+#!/bin/sh
+
+# 仅响应网卡 UP 事件
+[ "$ACTION" = "ifup" ] || exit 0
+
+# 确保设备名称变量存在
+[ -n "$DEVICENAME" ] || exit 0
+
+# 解析 sysfs 中该网卡绑定的真实底层驱动名称
+DRIVER_PATH=$(readlink -f /sys/class/net/$DEVICENAME/device/driver 2>/dev/null)
+DRIVER_NAME=$(basename "$DRIVER_PATH" 2>/dev/null)
+
+# 匹配 RNDIS 驱动，实现通用 5G 模块自适应
+if [ "$DRIVER_NAME" = "rndis_host" ]; then
+	logger -t rndis-hotplug "Detected generic RNDIS module on interface $DEVICENAME, triggering DHCP..."
+	
+	# 使用动态获取到的物理接口名发起 DHCP 请求
+	# -b: 后台运行不阻塞 hotplug 流程
+	# -R: 释放旧 IP
+	# -p: 指定 PID 文件防止重复拉起
+	udhcpc -i "$DEVICENAME" -b -R -p /var/run/udhcpc-$DEVICENAME.pid
+fi
