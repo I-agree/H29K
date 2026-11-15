@@ -41,7 +41,7 @@
 +	if (IS_ERR(dwc->modem_rst_gpio)) {
 +		ret = PTR_ERR(dwc->modem_rst_gpio);
 +		if (ret == -EPROBE_DEFER)
-+			goto err_exit_mode;
++			goto err_exit_debugfs;
 +		dev_err(dev, "failed to get modem reset gpio: %d\n", ret);
 +		dwc->modem_rst_gpio = NULL;
 +	}
