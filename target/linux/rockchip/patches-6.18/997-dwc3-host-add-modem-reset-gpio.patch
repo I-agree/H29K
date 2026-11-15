@@ -1,6 +1,6 @@
 --- a/drivers/usb/dwc3/core.h
 +++ b/drivers/usb/dwc3/core.h
-@@ -1241,5 +1241,10 @@
+@@ -1241,5 +1241,11 @@
  	struct usb_phy		*usb2_phy;
  	struct usb_phy		*usb3_phy;
  
@@ -8,6 +8,7 @@
 +	struct gpio_desc	*modem_rst_gpio;
 +	u32			reset_assert_us;
 +	u32			reset_deassert_us;
++	struct work_struct	modem_reset_work;
 +
  	struct phy		*usb2_generic_phy[DWC3_USB2_MAX_PORTS];
  	struct phy		*usb3_generic_phy[DWC3_USB3_MAX_PORTS];
@@ -23,7 +24,7 @@
  #include "core.h"
  #include "gadget.h"
  #include "glue.h"
-@@ -2342,5 +2345,25 @@
+@@ -2342,5 +2345,23 @@
  		goto err_exit_debugfs;
  
 +	/*
@@ -31,11 +32,9 @@
 +	 * Bind GPIO lifecycle to dwc3_core_probe/remove instead of host_init/exit.
 +	 * This ensures the pin remains strongly driven during __dwc3_set_mode
 +	 * transitions and dwc3_set_prtcap calls.
-+	 * NOTE: We ONLY acquire the GPIO here. The actual reset timing sequence
-+	 * is executed in dwc3_host_init AFTER xHCI registration.
 +	 */
 +	dwc->reset_assert_us = 1000000;    /* Default 1s assert */
-+	dwc->reset_deassert_us = 8000000; /* Extended to 8s for warm-reboot dirty state clearance */
++	dwc->reset_deassert_us = 8000000;  /* Extended to 8s for warm-reboot dirty state clearance */
 +	device_property_read_u32(dev, "reset-assert-us", &dwc->reset_assert_us);
 +	device_property_read_u32(dev, "reset-deassert-us", &dwc->reset_deassert_us);
 +
@@ -51,12 +50,13 @@
  	pm_runtime_put(dev);
  
  	dma_set_max_seg_size(dev, UINT_MAX);
-@@ -2405,5 +2430,12 @@
+@@ -2405,5 +2428,13 @@
  	dwc3_core_exit_mode(dwc);
  	dwc3_debugfs_exit(dwc);
 +
 +	/* Safely release the devm-managed GPIO on core teardown */
 +	if (dwc->modem_rst_gpio) {
++		cancel_work_sync(&dwc->modem_reset_work);
 +		gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1); /* Force Physical LOW safe state */
 +		/* devm will automatically call gpiod_put after this function returns */
 +		dwc->modem_rst_gpio = NULL;
@@ -75,41 +75,51 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -215,6 +217,38 @@
+@@ -127,6 +129,34 @@
+ 	return irq;
+ }
+ 
++static void dwc3_modem_reset_work_fn(struct work_struct *work)
++{
++	struct dwc3 *dwc = container_of(work, struct dwc3, modem_reset_work);
++
++	if (!dwc->modem_rst_gpio)
++		return;
++
++	dev_info(dwc->dev, "FM350-GL: Triggering asynchronous HW reset...\n");
++
++	/* Step 0: Pre-discharge & PHY Sync Wait. */
++	fsleep(500000);
++
++	/* Step 1: Assert reset (Logical 0 -> Physical HIGH) */
++	gpiod_set_value_cansleep(dwc->modem_rst_gpio, 0);
++	fsleep(dwc->reset_assert_us);
++
++	/* Step 2: Deassert reset (Logical 1 -> Physical LOW) */
++	gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1);
++
++	/*
++	 * Step 3: Wait for firmware load and USB PHY link training.
++	 * Executed asynchronously to prevent blocking dwc3_host_init.
++	 */
++	msleep(DIV_ROUND_UP(dwc->reset_deassert_us, 1000));
++
++	dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
++}
++
+ int dwc3_host_init(struct dwc3 *dwc)
+ {
+ 	struct property_entry	props[6];
+@@ -215,6 +245,13 @@
  		device_init_wakeup(&xhci->dev, true);
  	}
  
 +	/*
-+	 * Pure timing sequence execution.
-+	 * MUST be placed AFTER platform_device_add(xhci) succeeds.
-+	 * This ensures xHCI is fully registered before we trigger the modem reset,
-+	 * preventing cold-boot enumeration timeouts.
++	 * Schedule the modem reset asynchronously.
++	 * This prevents blocking the dwc3_host_init return path, avoiding cold-boot hangs.
 +	 */
-+	if (dwc->modem_rst_gpio) {
-+		dev_info(dwc->dev, "FM350-GL: Triggering synchronous HW reset...\n");
-+
-+		/*
-+		 * Step 0: Pre-discharge & PHY Sync Wait.
-+		 * Hold safe state for 500ms. This allows the modem's internal
-+		 * logic to completely settle from any previous dirty state.
-+		 */
-+		fsleep(500000);
-+
-+		/* Step 1: Assert reset (Logical 0 -> Physical HIGH) */
-+		gpiod_set_value_cansleep(dwc->modem_rst_gpio, 0);
-+		fsleep(dwc->reset_assert_us);
-+
-+		/* Step 2: Deassert reset (Logical 1 -> Physical LOW) */
-+		gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1);
-+
-+		/*
-+		 * Step 3: Wait for firmware load and USB PHY link training.
-+		 * Warm reboots require more time for the modem baseband to clear stale RAM.
-+		 */
-+		msleep(DIV_ROUND_UP(dwc->reset_deassert_us, 1000));
-+
-+		dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
-+	}
++	INIT_WORK(&dwc->modem_reset_work, dwc3_modem_reset_work_fn);
++	schedule_work(&dwc->modem_reset_work);
 +
  	return 0;
  err:
