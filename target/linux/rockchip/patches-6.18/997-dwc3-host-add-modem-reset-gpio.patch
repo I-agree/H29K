@@ -1,3 +1,16 @@
+--- a/drivers/usb/dwc3/core.h
++++ b/drivers/usb/dwc3/core.h
+@@ -1241,5 +1241,10 @@
+ 	struct usb_phy		*usb2_phy;
+ 	struct usb_phy		*usb3_phy;
+ 
++	/* Modem reset GPIO for FM350-GL (Non-devm managed for OTG safety) */
++	struct gpio_desc	*modem_rst_gpio;
++	u32			reset_assert_us;
++	u32			reset_deassert_us;
++
+ 	struct phy		*usb2_generic_phy[DWC3_USB2_MAX_PORTS];
+ 	struct phy		*usb3_generic_phy[DWC3_USB3_MAX_PORTS];
 --- a/drivers/usb/dwc3/host.c
 +++ b/drivers/usb/dwc3/host.c
 @@ -12,6 +12,9 @@
@@ -10,54 +23,93 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -161,6 +164,50 @@
- 		goto err;
- 	}
+@@ -130,11 +133,54 @@
+ int dwc3_host_init(struct dwc3 *dwc)
+ {
++	struct gpio_desc *modem_rst_gpio = NULL;
+ 	struct property_entry	props[6];
+ 	struct platform_device	*xhci;
+ 	int			ret, irq;
+ 	int			prop_idx = 0;
  
-+	/*
-+	 * Synchronous modem reset sequence before xHCI initialization.
+ 	/*
++	 * Synchronous modem reset sequence before xHCI allocation.
 +	 * Hardware truth: The physical LOW level is the safe/deasserted state for this board,
 +	 * despite the DTS declaring ACTIVE_LOW. We must explicitly drive it to avoid floating.
 +	 */
-+	{
-+		struct gpio_desc *modem_rst_gpio;
-+		u32 assert_us = 1000000;   /* Default 1s assert */
-+		u32 deassert_us = 8000000; /* Default 8s wait for firmware */
++	dwc->reset_assert_us = 1000000;   /* Default 1s assert */
++	dwc->reset_deassert_us = 8000000; /* Default 8s wait for firmware */
++	device_property_read_u32(dwc->dev, "reset-assert-us", &dwc->reset_assert_us);
++	device_property_read_u32(dwc->dev, "reset-deassert-us", &dwc->reset_deassert_us);
 +
-+		device_property_read_u32(dwc->dev, "reset-assert-us", &assert_us);
-+		device_property_read_u32(dwc->dev, "reset-deassert-us", &deassert_us);
-+
-+		modem_rst_gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
-+		if (PTR_ERR(modem_rst_gpio) == -EPROBE_DEFER) {
-+			ret = -EPROBE_DEFER;
-+			goto err;
-+		} else if (IS_ERR(modem_rst_gpio)) {
-+			dev_err(dwc->dev, "failed to get modem reset gpio: %ld\n", PTR_ERR(modem_rst_gpio));
-+		} else if (modem_rst_gpio) {
-+			/*
-+			 * CRITICAL POLARITY FIX:
-+			 * Request logical 1 -> translates to physical LOW (safe state).
-+			 * Then force direction to output while maintaining this value.
-+			 */
++	/* Use non-devm API to safely handle OTG role switches without resource leaks */
++	modem_rst_gpio = gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
++	if (IS_ERR(modem_rst_gpio)) {
++		ret = PTR_ERR(modem_rst_gpio);
++		if (ret == -EPROBE_DEFER)
++			return ret;
++		dev_err(dwc->dev, "failed to get modem reset gpio: %d\n", ret);
++	} else if (modem_rst_gpio) {
++		/*
++		 * CRITICAL POLARITY FIX:
++		 * Request logical 1 -> translates to physical LOW (safe state).
++		 * Then force direction to output while maintaining this value.
++		 */
++		gpiod_set_value_cansleep(modem_rst_gpio, 1);
++		if (gpiod_direction_output(modem_rst_gpio, 1) < 0) {
++			dev_err(dwc->dev, "failed to set modem reset gpio direction\n");
++		} else {
++			dev_info(dwc->dev, "FM350-GL: Triggering synchronous HW reset...\n");
++			
++			/* Step 1: Assert reset (Logical 0 -> Physical HIGH) */
++			gpiod_set_value_cansleep(modem_rst_gpio, 0);
++			fsleep(dwc->reset_assert_us);
++			
++			/* Step 2: Deassert reset (Logical 1 -> Physical LOW) */
 +			gpiod_set_value_cansleep(modem_rst_gpio, 1);
-+			if (gpiod_direction_output(modem_rst_gpio, 1) < 0) {
-+				dev_err(dwc->dev, "failed to set modem reset gpio direction\n");
-+			} else {
-+				dev_info(dwc->dev, "FM350-GL: Triggering synchronous HW reset...\n");
-+				
-+				/* Step 1: Assert reset (Logical 0 -> Physical HIGH) */
-+				gpiod_set_value_cansleep(modem_rst_gpio, 0);
-+				fsleep(assert_us);
-+				
-+				/* Step 2: Deassert reset (Logical 1 -> Physical LOW) */
-+				gpiod_set_value_cansleep(modem_rst_gpio, 1);
-+				msleep(DIV_ROUND_UP(deassert_us, 1000));
-+				
-+				dev_info(dwc->dev, "FM350-GL: Reset sequence completed, proceeding to xHCI init.\n");
-+			}
++			msleep(DIV_ROUND_UP(dwc->reset_deassert_us, 1000));
++			
++			dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
 +		}
++		dwc->modem_rst_gpio = modem_rst_gpio;
 +	}
 +
- 	memset(props, 0, sizeof(struct property_entry) * ARRAY_SIZE(props));
++	/*
+ 	 * Some platforms need to power off all Root hub ports immediately after DWC3 set to host
+ 	 * mode to avoid VBUS glitch happen when xhci get reset later.
+ 	 */
+@@ -147,7 +193,8 @@
+ 	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
+ 	if (!xhci) {
+ 		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
+-		return -ENOMEM;
++		ret = -ENOMEM;
++		goto err_put_gpio;
+ 	}
  
- 	props[prop_idx++] = PROPERTY_ENTRY_BOOL("xhci-sg-trb-cache-size-quirk");
+ 	xhci->dev.parent	= dwc->dev;
+@@ -218,5 +265,8 @@
+ 	return 0;
+ err:
+ 	platform_device_put(xhci);
++err_put_gpio:
++	if (modem_rst_gpio)
++		gpiod_put(modem_rst_gpio);
+ 	return ret;
+ }
+@@ -225,8 +275,15 @@
+ {
+ 	if (dwc->sys_wakeup)
+ 		device_init_wakeup(&dwc->xhci->dev, false);
+ 
++	/* Safely release the non-devm GPIO on host teardown */
++	if (dwc->modem_rst_gpio) {
++		gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1); /* Ensure safe state */
++		gpiod_put(dwc->modem_rst_gpio);
++		dwc->modem_rst_gpio = NULL;
++	}
++
+ 	dwc3_enable_susphy(dwc, true);
+ 	platform_device_unregister(dwc->xhci);
+ 	dwc->xhci = NULL;
+ }
