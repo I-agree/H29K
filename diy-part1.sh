@@ -36,6 +36,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/kernel/aic8800/patches \
          package/python-charset-normalizer/patches \
          files/etc/hotplug.d/net \
+         files/etc/board.d \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
@@ -90,6 +91,7 @@ download_and_check "${BASE_URL}/JPG/99-bootanim" "files/etc/init.d/99-bootanim"
 download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm64"
 download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
 download_and_check "${BASE_URL}/JPG/once-enable-bootanim" "files/etc/uci-defaults/once-enable-bootanim"
+download_and_check "${BASE_URL}/qmodem/03_qmodem" "files/etc/board.d/03_qmodem"
 download_and_check "${BASE_URL}/qmodem/misectel_led.sh" "files/usr/share/qmodem/led_scripts/misectel_led.sh"
 download_and_check "${BASE_URL}/qmodem/qmodem_led" "files/etc/config/qmodem_led"
 download_and_check "${BASE_URL}/package/kernel/axs5106/Makefile" "package/kernel/axs5106/Makefile"
