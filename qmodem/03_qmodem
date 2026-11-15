@@ -13,6 +13,9 @@ arcadyan,aw1000)
 	ucidef_add_qmodem_slot usb0 type usb slot 4-1 net_led 'ipq::led9' sim_led 'ipq::led2' alias wwan0
 	ucidef_add_qmodem_slot pcie0 type pcie slot '0000:01:00.0' net_led 'ipq::led9' sim_led 'ipq::led2' associated_usb 4-1 alias wwan1
 	;;
+hinlink,h29k)
+	ucidef_add_qmodem_slot fm350 type usb slot 4-1 alias wwan0 default_metric 5
+	;;
 alwaylink,m60k63|\
 feiyan,m60k63)
 	ucidef_add_qmodem_slot wwan0 type usb slot 2-1 alias wwan0 gpio 5g-power gpio_up 0 gpio_down 1 default_metric 5
