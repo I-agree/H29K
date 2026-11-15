@@ -30,7 +30,7 @@
 +	 * CRITICAL WARM-REBOOT FIX:
 +	 * Bind GPIO lifecycle to dwc3_core_probe/remove instead of host_init/exit.
 +	 * This ensures the pin remains strongly driven during __dwc3_set_mode
-+	 * transitions and dwc3_set_prtcap calls. 2
++	 * transitions and dwc3_set_prtcap calls.
 +	 */
 +	dwc->reset_assert_us = 1000000;    /* Default 1s assert */
 +	dwc->reset_deassert_us = 12000000; /* Extended to 12s for warm-reboot dirty state clearance */
@@ -41,7 +41,7 @@
 +	if (IS_ERR(dwc->modem_rst_gpio)) {
 +		ret = PTR_ERR(dwc->modem_rst_gpio);
 +		if (ret == -EPROBE_DEFER)
-+			goto err_exit_debugfs;
++			goto err_exit_mode;
 +		dev_err(dev, "failed to get modem reset gpio: %d\n", ret);
 +		dwc->modem_rst_gpio = NULL;
 +	}
@@ -49,7 +49,15 @@
  	pm_runtime_put(dev);
  
  	dma_set_max_seg_size(dev, UINT_MAX);
-@@ -2405,5 +2428,12 @@
+@@ -2350,5 +2373,7 @@
+ err_exit_debugfs:
+ 	dwc3_debugfs_exit(dwc);
++err_exit_mode:
++	dwc3_core_exit_mode(dwc);
+ 	dwc3_event_buffers_cleanup(dwc);
+ 	dwc3_phy_power_off(dwc);
+ 	dwc3_phy_exit(dwc);
+@@ -2405,5 +2430,12 @@
  	dwc3_core_exit_mode(dwc);
  	dwc3_debugfs_exit(dwc);
 +
@@ -64,17 +72,16 @@
  	dwc3_ulpi_exit(dwc);
 --- a/drivers/usb/dwc3/host.c
 +++ b/drivers/usb/dwc3/host.c
-@@ -12,6 +12,9 @@
+@@ -12,6 +12,8 @@
  #include <linux/platform_device.h>
  #include <linux/usb.h>
  #include <linux/usb/hcd.h>
 +#include <linux/gpio/consumer.h>
 +#include <linux/delay.h>
-+#include <linux/property.h>
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -130,11 +133,42 @@
+@@ -130,11 +132,42 @@
  int dwc3_host_init(struct dwc3 *dwc)
  {
  	struct property_entry	props[6];
