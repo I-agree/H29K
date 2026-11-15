@@ -23,7 +23,7 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -130,11 +133,54 @@
+@@ -130,11 +133,58 @@
  int dwc3_host_init(struct dwc3 *dwc)
  {
 +	struct gpio_desc *modem_rst_gpio = NULL;
@@ -37,40 +37,44 @@
 +	 * Hardware truth: The physical LOW level is the safe/deasserted state for this board,
 +	 * despite the DTS declaring ACTIVE_LOW. We must explicitly drive it to avoid floating.
 +	 */
-+	dwc->reset_assert_us = 1000000;   /* Default 1s assert */
-+	dwc->reset_deassert_us = 8000000; /* Default 8s wait for firmware */
++	dwc->reset_assert_us = 1000000;    /* Default 1s assert */
++	dwc->reset_deassert_us = 12000000; /* Extended to 12s for warm-reboot dirty state clearance */
 +	device_property_read_u32(dwc->dev, "reset-assert-us", &dwc->reset_assert_us);
 +	device_property_read_u32(dwc->dev, "reset-deassert-us", &dwc->reset_deassert_us);
 +
-+	/* Use non-devm API to safely handle OTG role switches without resource leaks */
-+	modem_rst_gpio = gpiod_get_optional(dwc->dev, "reset", GPIOD_ASIS);
++	/*
++	 * CRITICAL FIX FOR WARM REBOOT:
++	 * Use GPIOD_OUT_HIGH instead of GPIOD_ASIS. This forces the GPIO controller
++	 * to immediately configure the pin as OUTPUT and drive it to Logical 1 (Physical LOW).
++	 * This eliminates any residual floating states left by soft reboots.
++	 */
++	modem_rst_gpio = gpiod_get_optional(dwc->dev, "reset", GPIOD_OUT_HIGH);
 +	if (IS_ERR(modem_rst_gpio)) {
 +		ret = PTR_ERR(modem_rst_gpio);
 +		if (ret == -EPROBE_DEFER)
 +			return ret;
 +		dev_err(dwc->dev, "failed to get modem reset gpio: %d\n", ret);
 +	} else if (modem_rst_gpio) {
-+		/*
-+		 * CRITICAL POLARITY FIX:
-+		 * Request logical 1 -> translates to physical LOW (safe state).
-+		 * Then force direction to output while maintaining this value.
++		dev_info(dwc->dev, "FM350-GL: Triggering synchronous HW reset...\n");
++
++		/* Step 0: Pre-discharge. Hold safe state (Logical 1 / Physical LOW) for 500ms.
++		 * This ensures the modem's internal logic completely settles from any previous state.
 +		 */
++		fsleep(500000);
++
++		/* Step 1: Assert reset (Logical 0 -> Physical HIGH) */
++		gpiod_set_value_cansleep(modem_rst_gpio, 0);
++		fsleep(dwc->reset_assert_us);
++
++		/* Step 2: Deassert reset (Logical 1 -> Physical LOW) */
 +		gpiod_set_value_cansleep(modem_rst_gpio, 1);
-+		if (gpiod_direction_output(modem_rst_gpio, 1) < 0) {
-+			dev_err(dwc->dev, "failed to set modem reset gpio direction\n");
-+		} else {
-+			dev_info(dwc->dev, "FM350-GL: Triggering synchronous HW reset...\n");
-+			
-+			/* Step 1: Assert reset (Logical 0 -> Physical HIGH) */
-+			gpiod_set_value_cansleep(modem_rst_gpio, 0);
-+			fsleep(dwc->reset_assert_us);
-+			
-+			/* Step 2: Deassert reset (Logical 1 -> Physical LOW) */
-+			gpiod_set_value_cansleep(modem_rst_gpio, 1);
-+			msleep(DIV_ROUND_UP(dwc->reset_deassert_us, 1000));
-+			
-+			dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
-+		}
++
++		/* Step 3: Wait for firmware load and USB PHY link training.
++		 * Warm reboots require more time for the modem baseband to clear stale RAM.
++		 */
++		msleep(DIV_ROUND_UP(dwc->reset_deassert_us, 1000));
++
++		dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
 +		dwc->modem_rst_gpio = modem_rst_gpio;
 +	}
 +
@@ -78,7 +82,7 @@
  	 * Some platforms need to power off all Root hub ports immediately after DWC3 set to host
  	 * mode to avoid VBUS glitch happen when xhci get reset later.
  	 */
-@@ -147,7 +193,8 @@
+@@ -147,7 +197,8 @@
  	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
  	if (!xhci) {
  		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
@@ -88,7 +92,7 @@
  	}
  
  	xhci->dev.parent	= dwc->dev;
-@@ -218,5 +265,10 @@
+@@ -218,5 +269,10 @@
  	return 0;
  err:
  	platform_device_put(xhci);
@@ -99,7 +103,7 @@
 +	}
  	return ret;
  }
-@@ -225,8 +277,15 @@
+@@ -225,8 +281,15 @@
  {
  	if (dwc->sys_wakeup)
  		device_init_wakeup(&dwc->xhci->dev, false);
