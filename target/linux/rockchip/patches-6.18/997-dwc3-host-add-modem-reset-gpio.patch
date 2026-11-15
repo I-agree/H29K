@@ -88,16 +88,18 @@
  	}
  
  	xhci->dev.parent	= dwc->dev;
-@@ -218,5 +265,8 @@
+@@ -218,5 +265,10 @@
  	return 0;
  err:
  	platform_device_put(xhci);
 +err_put_gpio:
-+	if (modem_rst_gpio)
++	if (modem_rst_gpio) {
 +		gpiod_put(modem_rst_gpio);
++		dwc->modem_rst_gpio = NULL; /* Prevent UAF on retry or teardown */
++	}
  	return ret;
  }
-@@ -225,8 +275,15 @@
+@@ -225,8 +277,15 @@
  {
  	if (dwc->sys_wakeup)
  		device_init_wakeup(&dwc->xhci->dev, false);
