@@ -15,6 +15,7 @@ arcadyan,aw1000)
 	;;
 hinlink,h29k)
 	ucidef_add_qmodem_slot usb_slot0 type usb slot 4-1 alias wwan0 default_metric 5
+	ucidef_add_qmodem_slot usb_slot1 type usb slot 2-1 alias wwan0 default_metric 5
 	;;
 alwaylink,m60k63|\
 feiyan,m60k63)
