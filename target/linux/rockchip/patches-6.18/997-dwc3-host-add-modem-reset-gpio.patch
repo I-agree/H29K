@@ -49,15 +49,7 @@
  	pm_runtime_put(dev);
  
  	dma_set_max_seg_size(dev, UINT_MAX);
-@@ -2350,5 +2373,7 @@
- err_exit_debugfs:
- 	dwc3_debugfs_exit(dwc);
-+err_exit_mode:
-+	dwc3_core_exit_mode(dwc);
- 	dwc3_event_buffers_cleanup(dwc);
- 	dwc3_phy_power_off(dwc);
- 	dwc3_phy_exit(dwc);
-@@ -2405,5 +2430,12 @@
+@@ -2405,5 +2428,12 @@
  	dwc3_core_exit_mode(dwc);
  	dwc3_debugfs_exit(dwc);
 +
