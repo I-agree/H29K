@@ -73,16 +73,7 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -130,11 +132,44 @@
- int dwc3_host_init(struct dwc3 *dwc)
- {
- 	struct platform_device	*pdev = to_platform_device(dwc->dev);
- 	struct property_entry	props[6];
- 	struct platform_device	*xhci;
- 	int			ret, irq;
- 	int			prop_idx = 0;
- 	int			id;
- 
+@@ -137,4 +139,35 @@
  	/*
 +	 * Pure timing sequence execution.
 +	 * GPIO is already acquired and held in dwc3_core_probe via devm.
