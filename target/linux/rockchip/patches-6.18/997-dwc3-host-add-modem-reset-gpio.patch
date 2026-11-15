@@ -31,9 +31,11 @@
 +	 * Bind GPIO lifecycle to dwc3_core_probe/remove instead of host_init/exit.
 +	 * This ensures the pin remains strongly driven during __dwc3_set_mode
 +	 * transitions and dwc3_set_prtcap calls.
++	 * NOTE: We ONLY acquire the GPIO here. The actual reset timing sequence
++	 * is executed in dwc3_host_init AFTER xHCI registration.
 +	 */
 +	dwc->reset_assert_us = 1000000;    /* Default 1s assert */
-+	dwc->reset_deassert_us = 12000000; /* Extended to 12s for warm-reboot dirty state clearance */
++	dwc->reset_deassert_us = 8000000; /* Extended to 8s for warm-reboot dirty state clearance */
 +	device_property_read_u32(dev, "reset-assert-us", &dwc->reset_assert_us);
 +	device_property_read_u32(dev, "reset-deassert-us", &dwc->reset_deassert_us);
 +
@@ -49,7 +51,7 @@
  	pm_runtime_put(dev);
  
  	dma_set_max_seg_size(dev, UINT_MAX);
-@@ -2405,5 +2428,12 @@
+@@ -2405,5 +2430,12 @@
  	dwc3_core_exit_mode(dwc);
  	dwc3_debugfs_exit(dwc);
 +
@@ -73,19 +75,23 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -137,4 +139,35 @@
- 	/*
+@@ -215,6 +217,38 @@
+ 		device_init_wakeup(&xhci->dev, true);
+ 	}
+ 
++	/*
 +	 * Pure timing sequence execution.
-+	 * GPIO is already acquired and held in dwc3_core_probe via devm.
++	 * MUST be placed AFTER platform_device_add(xhci) succeeds.
++	 * This ensures xHCI is fully registered before we trigger the modem reset,
++	 * preventing cold-boot enumeration timeouts.
 +	 */
 +	if (dwc->modem_rst_gpio) {
 +		dev_info(dwc->dev, "FM350-GL: Triggering synchronous HW reset...\n");
 +
 +		/*
 +		 * Step 0: Pre-discharge & PHY Sync Wait.
-+		 * Hold safe state for 500ms. This serves two purposes:
-+		 * 1. Allows the modem's internal logic to completely settle.
-+		 * 2. Gives the DWC3 PHY extra time to stabilize after CoreSoftReset.
++		 * Hold safe state for 500ms. This allows the modem's internal
++		 * logic to completely settle from any previous dirty state.
 +		 */
 +		fsleep(500000);
 +
@@ -105,7 +111,6 @@
 +		dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
 +	}
 +
-+	/*
- 	 * Some platforms need to power off all Root hub ports immediately after DWC3 set to host
- 	 * mode to avoid VBUS glitch happen when xhci get reset later.
- 	 */
+ 	return 0;
+ err:
+ 	platform_device_put(xhci);
