@@ -24,7 +24,7 @@
  #include "core.h"
  #include "gadget.h"
  #include "glue.h"
-@@ -2342,5 +2345,23 @@
+@@ -2342,5 +2345,25 @@
  		goto err_exit_debugfs;
  
 +	/*
