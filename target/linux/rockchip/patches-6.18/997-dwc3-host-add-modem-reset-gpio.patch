@@ -23,7 +23,7 @@
  
  #include "../host/xhci-port.h"
  #include "../host/xhci-ext-caps.h"
-@@ -130,11 +133,58 @@
+@@ -130,11 +133,67 @@
  int dwc3_host_init(struct dwc3 *dwc)
  {
 +	struct gpio_desc *modem_rst_gpio = NULL;
@@ -33,9 +33,11 @@
  	int			prop_idx = 0;
  
  	/*
-+	 * Synchronous modem reset sequence before xHCI allocation.
-+	 * Hardware truth: The physical LOW level is the safe/deasserted state for this board,
-+	 * despite the DTS declaring ACTIVE_LOW. We must explicitly drive it to avoid floating.
++	 * CRITICAL WARM-REBOOT FIX:
++	 * When switching roles or warm-rebooting, __dwc3_set_mode issues a
++	 * GCTL.CoreSoftReset and waits 100ms before calling dwc3_host_init. 1
++	 * The DWC3 PHY clocks might still be stabilizing. We must ensure the
++	 * modem reset sequence doesn't race with the PHY link training.
 +	 */
 +	dwc->reset_assert_us = 1000000;    /* Default 1s assert */
 +	dwc->reset_deassert_us = 12000000; /* Extended to 12s for warm-reboot dirty state clearance */
@@ -43,10 +45,8 @@
 +	device_property_read_u32(dwc->dev, "reset-deassert-us", &dwc->reset_deassert_us);
 +
 +	/*
-+	 * CRITICAL FIX FOR WARM REBOOT:
-+	 * Use GPIOD_OUT_HIGH instead of GPIOD_ASIS. This forces the GPIO controller
-+	 * to immediately configure the pin as OUTPUT and drive it to Logical 1 (Physical LOW).
-+	 * This eliminates any residual floating states left by soft reboots.
++	 * Use GPIOD_OUT_HIGH to force the pin to Logical 1 (Physical LOW safe state)
++	 * immediately upon request, eliminating any residual floating states from soft reboots.
 +	 */
 +	modem_rst_gpio = gpiod_get_optional(dwc->dev, "reset", GPIOD_OUT_HIGH);
 +	if (IS_ERR(modem_rst_gpio)) {
@@ -57,8 +57,11 @@
 +	} else if (modem_rst_gpio) {
 +		dev_info(dwc->dev, "FM350-GL: Triggering synchronous HW reset...\n");
 +
-+		/* Step 0: Pre-discharge. Hold safe state (Logical 1 / Physical LOW) for 500ms.
-+		 * This ensures the modem's internal logic completely settles from any previous state.
++		/*
++		 * Step 0: Pre-discharge & PHY Sync Wait.
++		 * Hold safe state for 500ms. This serves two purposes:
++		 * 1. Allows the modem's internal logic to completely settle.
++		 * 2. Gives the DWC3 PHY extra time to stabilize after CoreSoftReset.
 +		 */
 +		fsleep(500000);
 +
@@ -69,12 +72,18 @@
 +		/* Step 2: Deassert reset (Logical 1 -> Physical LOW) */
 +		gpiod_set_value_cansleep(modem_rst_gpio, 1);
 +
-+		/* Step 3: Wait for firmware load and USB PHY link training.
++		/*
++		 * Step 3: Wait for firmware load and USB PHY link training.
 +		 * Warm reboots require more time for the modem baseband to clear stale RAM.
++		 * During this 12s window, the modem will boot and initiate SS link training.
++		 * Because we waited 500ms in Step 0, the DWC3 PHY is guaranteed to be ready
++		 * to respond to the modem's LFPS (Low Frequency Periodic Signaling).
 +		 */
 +		msleep(DIV_ROUND_UP(dwc->reset_deassert_us, 1000));
 +
 +		dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
++		
++		/* Store in dwc context so it can be safely released on host exit */
 +		dwc->modem_rst_gpio = modem_rst_gpio;
 +	}
 +
@@ -82,7 +91,7 @@
  	 * Some platforms need to power off all Root hub ports immediately after DWC3 set to host
  	 * mode to avoid VBUS glitch happen when xhci get reset later.
  	 */
-@@ -147,7 +197,8 @@
+@@ -147,7 +206,8 @@
  	xhci = platform_device_alloc("xhci-hcd", PLATFORM_DEVID_AUTO);
  	if (!xhci) {
  		dev_err(dwc->dev, "couldn't allocate xHCI device\n");
@@ -92,25 +101,31 @@
  	}
  
  	xhci->dev.parent	= dwc->dev;
-@@ -218,5 +269,10 @@
+@@ -218,5 +278,11 @@
  	return 0;
  err:
  	platform_device_put(xhci);
 +err_put_gpio:
 +	if (modem_rst_gpio) {
++		gpiod_set_value_cansleep(modem_rst_gpio, 1); /* Ensure safe state before release */
 +		gpiod_put(modem_rst_gpio);
 +		dwc->modem_rst_gpio = NULL; /* Prevent UAF on retry or teardown */
 +	}
  	return ret;
  }
-@@ -225,8 +281,15 @@
+@@ -225,8 +291,20 @@
  {
  	if (dwc->sys_wakeup)
  		device_init_wakeup(&dwc->xhci->dev, false);
  
-+	/* Safely release the non-devm GPIO on host teardown */
++	/*
++	 * Safely release the non-devm GPIO on host teardown.
++	 * This is called during role switch or system reboot via dwc3_core_exit_mode. 1
++	 * We MUST drive it to safe state before putting it back to the kernel pool,
++	 * otherwise the subsequent CoreSoftReset might cause the pin to float.
++	 */
 +	if (dwc->modem_rst_gpio) {
-+		gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1); /* Ensure safe state */
++		gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1); /* Force Physical LOW */
 +		gpiod_put(dwc->modem_rst_gpio);
 +		dwc->modem_rst_gpio = NULL;
 +	}
