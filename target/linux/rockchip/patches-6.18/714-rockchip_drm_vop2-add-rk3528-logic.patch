@@ -1,45 +1,18 @@
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop2.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop2.c
-@@ -835,7 +835,8 @@
- 	if (vop2->data->soc_id == 3566)
- 		vop2_writel(vop2, RK3568_OTP_WIN_EN, 1);
- 
--	if (vop2->version == VOP_VERSION_RK3588)
-+	/* RK3528 uses standard pm_runtime genpd framework, do not call rk3588 PD enable */
-+	if (vop2->version == VOP_VERSION_RK3588)
- 		rk3588_vop2_power_domain_enable_all(vop2);
- 
- 	if (vop2->version <= VOP_VERSION_RK3588) {
-@@ -1264,9 +1265,13 @@
+@@ -1264,7 +1264,14 @@
  		afbc_en ? "AFBC" : "", &yrgb_mst);
  
  	if (vop2->version > VOP_VERSION_RK3568) {
 -		vop2_win_write(win, VOP2_WIN_AXI_BUS_ID, win->data->axi_bus_id);
-+		/* RK3528 does not have AXI_BUS_ID register mapped */
++		/*
++		 * RK3528 has no AXI bus id field for its windows: the vendor data
++		 * (rk3528_cluster0_win_data) only describes axi_yrgb_id/axi_uv_id,
++		 * and the bus id stays 0 in rk3528_vop_win_data.
++		 */
 +		if (vop2->version != VOP_VERSION_RK3528)
 +			vop2_win_write(win, VOP2_WIN_AXI_BUS_ID, win->data->axi_bus_id);
 +
-+		/* RK3528 needs YRGB and UV AXI IDs configured */
  		vop2_win_write(win, VOP2_WIN_AXI_YRGB_R_ID, win->data->axi_yrgb_r_id);
  		vop2_win_write(win, VOP2_WIN_AXI_UV_R_ID, win->data->axi_uv_r_id);
  	}
- 
- 	if (vop2->version >= VOP_VERSION_RK3576)
-@@ -1322,11 +1327,14 @@
- 		 * On rk3566/8, this bit is auto gating enable,
- 		 * but this function is not work well so we need
- 		 * to disable it for these two platform.
--		 * On rk3588, and the following new soc(rk3528/rk3576),
--		 * this bit is gating disable, we should write 1 to
-+		 * On rk3588, and the following new soc(rk3576),
-+		 * this bit is gating disable, we should write 1 to
- 		 * disable gating when enable afbc.
-+		 * However, RK3528 hardware behavior matches RK3568,
-+		 * we should write 0 to disable gating when enable afbc.
- 		 */
--		if (vop2->version == VOP_VERSION_RK3568)
-+		if (vop2->version == VOP_VERSION_RK3568 ||
-+		    vop2->version == VOP_VERSION_RK3528)
- 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 0);
- 		else
- 			vop2_win_write(win, VOP2_WIN_AFBC_AUTO_GATING_EN, 1);
