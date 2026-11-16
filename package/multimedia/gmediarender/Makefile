@@ -35,14 +35,12 @@ define Package/gmediarender
 		+glib2 \
 		+libupnp \
 		+gstreamer1 \
-		+libgstreamer1 \
 		+gstreamer1-plugins-base \
 		+gstreamer1-plugins-good \
 		+gstreamer1-plugins-bad \
 		+gstreamer1-plugins-ugly \
-		+gst1-libav \
-		+avahi-daemon \
-		+alsa-utils
+		+gstreamer1-libav \
+		+alsa-lib
 endef
 
 define Package/gmediarender/description
