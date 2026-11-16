@@ -4,7 +4,7 @@
  	struct usb_phy		*usb2_phy;
  	struct usb_phy		*usb3_phy;
  
-+	/* Modem reset GPIO for FM350-GL (Bound to core lifecycle for warm-reboot safety) */
++	/* Modem reset GPIO for FM350-GL (bound to core lifecycle) */
 +	struct gpio_desc	*modem_rst_gpio;
 +	u32			reset_assert_us;
 +	u32			reset_deassert_us;
@@ -24,59 +24,8 @@
  #include "core.h"
  #include "gadget.h"
  #include "glue.h"
-@@ -2342,5 +2345,25 @@
- 		goto err_exit_debugfs;
- 
-+	/*
-+	 * CRITICAL WARM-REBOOT FIX:
-+	 * Bind GPIO lifecycle to dwc3_core_probe/remove instead of host_init/exit.
-+	 * This ensures the pin remains strongly driven during __dwc3_set_mode
-+	 * transitions and dwc3_set_prtcap calls.
-+	 */
-+	dwc->reset_assert_us = 1000000;    /* Default 1s assert */
-+	dwc->reset_deassert_us = 8000000;  /* Extended to 8s for warm-reboot dirty state clearance */
-+	device_property_read_u32(dev, "reset-assert-us", &dwc->reset_assert_us);
-+	device_property_read_u32(dev, "reset-deassert-us", &dwc->reset_deassert_us);
-+
-+	dwc->modem_rst_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
-+	if (IS_ERR(dwc->modem_rst_gpio)) {
-+		ret = PTR_ERR(dwc->modem_rst_gpio);
-+		if (ret == -EPROBE_DEFER)
-+			goto err_exit_debugfs;
-+		dev_err(dev, "failed to get modem reset gpio: %d\n", ret);
-+		dwc->modem_rst_gpio = NULL;
-+	}
-+
- 	pm_runtime_put(dev);
- 
- 	dma_set_max_seg_size(dev, UINT_MAX);
-@@ -2405,5 +2428,13 @@
- 	dwc3_core_exit_mode(dwc);
- 	dwc3_debugfs_exit(dwc);
-+
-+	/* Safely release the devm-managed GPIO on core teardown */
-+	if (dwc->modem_rst_gpio) {
-+		cancel_work_sync(&dwc->modem_reset_work);
-+		gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1); /* Force Physical LOW safe state */
-+		/* devm will automatically call gpiod_put after this function returns */
-+		dwc->modem_rst_gpio = NULL;
-+	}
- 
- 	dwc3_core_exit(dwc);
- 	dwc3_ulpi_exit(dwc);
---- a/drivers/usb/dwc3/host.c
-+++ b/drivers/usb/dwc3/host.c
-@@ -12,6 +12,8 @@
- #include <linux/platform_device.h>
- #include <linux/usb.h>
- #include <linux/usb/hcd.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/delay.h>
- 
- #include "../host/xhci-port.h"
- #include "../host/xhci-ext-caps.h"
-@@ -127,6 +129,34 @@
- 	return irq;
+@@ -300,6 +303,31 @@
+ 	queue_work(system_freezable_wq, &dwc->drd_work);
  }
  
 +static void dwc3_modem_reset_work_fn(struct work_struct *work)
@@ -88,39 +37,94 @@
 +
 +	dev_info(dwc->dev, "FM350-GL: Triggering asynchronous HW reset...\n");
 +
-+	/* Step 0: Pre-discharge & PHY Sync Wait. */
++	/* Pre-discharge & PHY sync wait */
 +	fsleep(500000);
 +
-+	/* Step 1: Assert reset (Logical 0 -> Physical HIGH) */
++	/* Assert reset (logical 0 = physical active level) */
 +	gpiod_set_value_cansleep(dwc->modem_rst_gpio, 0);
 +	fsleep(dwc->reset_assert_us);
 +
-+	/* Step 2: Deassert reset (Logical 1 -> Physical LOW) */
++	/* Deassert reset (logical 1 = physical safe state) */
 +	gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1);
 +
-+	/*
-+	 * Step 3: Wait for firmware load and USB PHY link training.
-+	 * Executed asynchronously to prevent blocking dwc3_host_init.
-+	 */
++	/* Wait for firmware boot and PHY link training */
 +	msleep(DIV_ROUND_UP(dwc->reset_deassert_us, 1000));
 +
 +	dev_info(dwc->dev, "FM350-GL: Reset sequence completed.\n");
 +}
 +
- int dwc3_host_init(struct dwc3 *dwc)
+ u32 dwc3_core_fifo_space(struct dwc3_ep *dep, u8 type)
  {
- 	struct property_entry	props[6];
-@@ -215,6 +245,13 @@
+ 	struct dwc3		*dwc = dep->dwc;
+@@ -2337,6 +2365,36 @@
+ 	dwc3_check_params(dwc);
+ 	dwc3_debugfs_init(dwc);
+ 
++	/*
++	 * Modem reset GPIO & work initialization
++	 * Bound to core lifecycle to ensure pin state is maintained
++	 * during mode transitions and warm reboot.
++	 * Placed before mode init to keep EPROBE_DEFER rollback clean.
++	 */
++	{
++		dwc->reset_assert_us = 1000000;	/* Default 1s assert */
++		dwc->reset_deassert_us = 8000000;	/* Default 8s deassert */
++
++		device_property_read_u32(dev, "reset-assert-us", &dwc->reset_assert_us);
++		device_property_read_u32(dev, "reset-deassert-us", &dwc->reset_deassert_us);
++
++		/* Init work once with core lifecycle */
++		INIT_WORK(&dwc->modem_reset_work, dwc3_modem_reset_work_fn);
++
++		dwc->modem_rst_gpio = devm_gpiod_get_optional(dev, "reset", GPIOD_ASIS);
++		if (IS_ERR(dwc->modem_rst_gpio)) {
++			ret = PTR_ERR(dwc->modem_rst_gpio);
++			if (ret == -EPROBE_DEFER)
++				goto err_exit_debugfs;
++			dev_err(dev, "failed to get modem reset gpio: %d\n", ret);
++			dwc->modem_rst_gpio = NULL;
++		} else if (dwc->modem_rst_gpio) {
++			/* Drive to safe state (physical LOW) before setting output direction */
++			gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1);
++			gpiod_direction_output(dwc->modem_rst_gpio, 1);
++		}
++	}
++
+ 	ret = dwc3_core_init_mode(dwc);
+ 	if (ret)
+ 		goto err_exit_debugfs;
+@@ -2405,5 +2463,13 @@
+ 	dwc3_core_exit_mode(dwc);
+ 	dwc3_debugfs_exit(dwc);
+ 
++	/* Safely teardown modem reset GPIO */
++	if (dwc->modem_rst_gpio) {
++		cancel_work_sync(&dwc->modem_reset_work);
++		/* Drive to physical LOW safe state before release */
++		gpiod_set_value_cansleep(dwc->modem_rst_gpio, 1);
++		dwc->modem_rst_gpio = NULL;
++	}
++
+ 	dwc3_core_exit(dwc);
+ 	dwc3_ulpi_exit(dwc);
+--- a/drivers/usb/dwc3/host.c
++++ b/drivers/usb/dwc3/host.c
+@@ -215,6 +215,10 @@
  		device_init_wakeup(&xhci->dev, true);
  	}
  
-+	/*
-+	 * Schedule the modem reset asynchronously.
-+	 * This prevents blocking the dwc3_host_init return path, avoiding cold-boot hangs.
-+	 */
-+	INIT_WORK(&dwc->modem_reset_work, dwc3_modem_reset_work_fn);
-+	schedule_work(&dwc->modem_reset_work);
++	/* Schedule asynchronous modem reset after host is ready */
++	if (dwc->modem_rst_gpio)
++		schedule_work(&dwc->modem_reset_work);
 +
  	return 0;
  err:
  	platform_device_put(xhci);
+@@ -224,4 +227,7 @@
+ void dwc3_host_exit(struct dwc3 *dwc)
+ {
++	/* Cancel any pending reset work before tearing down host */
++	cancel_work_sync(&dwc->modem_reset_work);
++
+ 	if (dwc->sys_wakeup)
+ 		device_init_wakeup(&dwc->xhci->dev, false);
