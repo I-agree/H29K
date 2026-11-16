@@ -1,0 +1,19 @@
+--- a/multimedia/gst1-plugins-bad/Makefile
++++ b/multimedia/gst1-plugins-bad/Makefile
+@@ -200,7 +200,7 @@
+ 	-Dgsm=disabled \
+ 	-Dipcpipeline=disabled \
+ 	-Diqa=disabled \
+-	-Dkms=disabled \
++	$(call GST_COND_SELECT,kms) \
+ 	-Dladspa=disabled \
+ 	-Dlibde265=disabled \
+ 	-Dlv2=disabled \
+@@ -446,6 +446,7 @@
+ $(eval $(call GstBuildPlugin,dtls,DTLS support,,,+libopenssl))
+ $(eval $(call GstBuildPlugin,faad,faad support,audio,,+libfaad2))
+ $(eval $(call GstBuildPlugin,fbdevsink,fbdev support,video,,))
++$(eval $(call GstBuildPlugin,kms,KMS/DRM video sink,allocators video,,+libdrm))
+ $(eval $(call GstBuildPlugin,hls,HLS support,pbutils adaptivedemux,multifile,+libnettle))
+ $(eval $(call GstBuildPlugin,opusparse,OPUS streams library,pbutils,,+libopus))
+ $(eval $(call GstBuildPlugin,sbc,sbc support,audio,,+sbc))
