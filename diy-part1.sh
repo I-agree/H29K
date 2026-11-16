@@ -381,6 +381,9 @@ CONFIG_DMADEVICES=y
 CONFIG_PL330_DMA=y
 CONFIG_RESET_CONTROLLER=y
 
+# ================= 平台级媒体驱动总开关 =================
+CONFIG_MEDIA_PLATFORM_DRIVERS=y
+
 # ================= 必须禁用的干扰项 =================
 # CONFIG_ROCKCHIP_VOP is not set
 # CONFIG_ROCKCHIP_ANALOGIX_DP is not set
