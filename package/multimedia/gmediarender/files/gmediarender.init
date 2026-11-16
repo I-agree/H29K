@@ -64,8 +64,13 @@ start_instance() {
 	[ -n "$port" ] && set -- "$@" --port "$port"
 	[ -n "$audiosink" ] && set -- "$@" --gstout-audiosink "$audiosink"
 	[ -n "$audiodevice" ] && set -- "$@" --gstout-audiodevice "$audiodevice"
-	[ -n "$videosink" ] && set -- "$@" --gstout-videosink "$videosink"
-	[ -n "$videopipe" ] && set -- "$@" --gstout-videopipe "$videopipe"
+	# videosink 与 videopipe 二选一：videopipe 非空时优先生效（用于需要
+	# videoconvert 兜底的场景），避免两个参数同时传给 gmediarender
+	if [ -n "$videopipe" ]; then
+		set -- "$@" --gstout-videopipe "$videopipe"
+	elif [ -n "$videosink" ]; then
+		set -- "$@" --gstout-videosink "$videosink"
+	fi
 	[ -n "$volume_db" ] && set -- "$@" --gstout-initial-volume-db "$volume_db"
 	[ -n "$mime_filter" ] && set -- "$@" --mime-filter "$mime_filter"
 	[ -n "$logfile" ] && set -- "$@" --logfile "$logfile"
