@@ -416,6 +416,17 @@ CONFIG_MEDIA_CONTROLLER=y
 # CONFIG_ROCKCHIP_RK3066_HDMI is not set
 
 # =================================================================
+# 🔄 板栽红外线接收头相关支持
+# =================================================================
+CONFIG_RC_CORE=y
+CONFIG_RC_DECODERS=y
+CONFIG_IR_NEC_DECODER=y
+CONFIG_IR_RC5_DECODER=y
+CONFIG_IR_RC6_DECODER=y
+CONFIG_IR_GPIO_CIR=y
+CONFIG_LIRC=y
+
+# =================================================================
 # 🔄 H29K的内核专用优化
 # =================================================================
 CONFIG_HZ_250=y
