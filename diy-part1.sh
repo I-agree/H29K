@@ -37,6 +37,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/python-charset-normalizer/patches \
          files/etc/hotplug.d/net \
          package/multimedia/gmediarender \
+         toolchain/kernel/patches \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
@@ -79,9 +80,15 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/711-pmdomain-
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/712-arm64-rockchip-vop2-add-rk3528-support.patch" "target/linux/rockchip/patches-6.18/712-arm64-rockchip-vop2-add-rk3528-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/713-rockchip-iommu-add-v2-compatible.patch" "target/linux/rockchip/patches-6.18/713-rockchip-iommu-add-v2-compatible.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/714-rockchip_drm_vop2-add-rk3528-logic.patch" "target/linux/rockchip/patches-6.18/714-rockchip_drm_vop2-add-rk3528-logic.patch"
-download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/715-rockchip_drm_vop2_h-add-rk3528-macros.patch" "target/linux/rockchip/patches-6.18/715-rockchip_drm_vop2_h-add-rk3528-macros.patch"
+# download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/715-rockchip_drm_vop2_h-add-rk3528-macros.patch" "target/linux/rockchip/patches-6.18/715-rockchip_drm_vop2_h-add-rk3528-macros.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/716-phy-rockchip-add-inno-hdmi-phy-rk3528-support.patch" "target/linux/rockchip/patches-6.18/716-phy-rockchip-add-inno-hdmi-phy-rk3528-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/717-sound-soc-rockchip-sai-add-rk3528-compatible.patch" "target/linux/rockchip/patches-6.18/717-sound-soc-rockchip-sai-add-rk3528-compatible.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/719-rkvdec-backport-vdpu381-vdpu383.patch" "target/linux/rockchip/patches-6.18/719-rkvdec-backport-vdpu381-vdpu383.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/720-rkvdec-add-rk3528-vdpu382.patch" "target/linux/rockchip/patches-6.18/720-rkvdec-add-rk3528-vdpu382.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/721-hevc-ext-sps-rps-uapi.patch" "target/linux/rockchip/patches-6.18/721-hevc-ext-sps-rps-uapi.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/722-rkvdec-hevc-enable.patch" "target/linux/rockchip/patches-6.18/722-rkvdec-hevc-enable.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/997-add-rk3528-dtsi-vdec.patch" "target/linux/rockchip/patches-6.18/997-add-rk3528-dtsi-vdec.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/721-hevc-ext-sps-rps-uapi.patch" "toolchain/kernel/patches/721-hevc-ext-sps-rps-uapi.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch" "target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch" "target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/997-dwc3-host-add-modem-reset-gpio.patch" "target/linux/rockchip/patches-6.18/997-dwc3-host-add-modem-reset-gpio.patch"
