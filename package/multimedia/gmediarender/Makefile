@@ -1,25 +1,19 @@
 #
 # Copyright (C) 2020 coolsnowwolf@gmail.com
 # Updated for HINLINK H29K (RK3528) / OpenWrt 25.12 / Kernel 6.18
-# Features: master rolling branch + full soft-decode deps + procd init + HDMI preset
-#
-# This is free software, licensed under the GNU General Public License v2.
-# See /LICENSE for more information.
+# Secure Single-File Build with Inline Procd Init Script
 #
 
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=gmediarender
-PKG_VERSION:=git-master
+PKG_SOURCE_VERSION:=master
+PKG_VERSION:=git-$(shell echo $(PKG_SOURCE_VERSION) | cut -c1-8)
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/hzeller/gmrender-resurrect.git
-# 实时跟踪 master 分支，不固定 commit
-PKG_SOURCE_VERSION:=master
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
-# 跳过哈希校验，适配滚动更新
-PKG_MIRROR_HASH:=skip
 
 PKG_FIXUP:=autoreconf
 PKG_INSTALL:=1
@@ -37,7 +31,6 @@ define Package/gmediarender
 	CATEGORY:=Multimedia
 	TITLE:=UPnP/DLNA Media Renderer for H29K HDMI Output
 	URL:=https://github.com/hzeller/gmrender-resurrect
-	# 所有依赖均为标准 feed 自带，无额外移植需求
 	DEPENDS:= \
 		+glib2 \
 		+libupnp \
@@ -55,57 +48,62 @@ endef
 define Package/gmediarender/description
 	Lightweight headless UPnP/DLNA media renderer, optimized for H29K RK3528 platform.
 	Outputs video/audio directly to HDMI via KMS/DRM (kmssink), no desktop required.
-	Pre-configured with HDMI-A-1 connector and HDMI audio device.
-	Tracks upstream master branch.
+	Integrated with OpenWrt 25.12 procd service manager.
 endef
 
+TARGET_CFLAGS += -std=gnu99
+
 CONFIGURE_ARGS += \
-	CFLAGS="$(TARGET_CFLAGS) -std=gnu99 -O2" \
 	--with-build-cc="$(HOSTCC)" \
 	--prefix=/usr \
 	--disable-silent-rules
 
 define Package/gmediarender/install
-	# 主程序安装
+	# 1. 安装主程序
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/$(PKG_NAME) $(1)/usr/bin/
 
-	# 预装适配 H29K 的 procd 启动脚本，参数已硬件级精准匹配
+	# 2. 预装适配 H29K 的 procd 启动脚本
 	$(INSTALL_DIR) $(1)/etc/init.d
-	( \
-		echo '#!/bin/sh /etc/rc.common'; \
-		echo ''; \
-		echo 'START=99'; \
-		echo 'USE_PROCD=1'; \
-		echo ''; \
-		echo 'PROG=/usr/bin/gmediarender'; \
-		echo 'DEVICE_NAME="H29K-DLNA"'; \
-		echo 'VIDEO_SINK="kmssink connector=HDMI-A-1"'; \
-		echo 'AUDIO_SINK="alsasink"'; \
-		echo 'AUDIO_DEVICE="hw:0,0"'; \
-		echo ''; \
-		echo 'start_service() {'; \
-		echo '    procd_open_instance'; \
-		echo '    procd_set_param command $$$$PROG \\'; \
-		echo '        -f "$$$$DEVICE_NAME" \\'; \
-		echo '        --gstout-videosink="$$$$VIDEO_SINK" \\'; \
-		echo '        --gstout-audiosink="$$$$AUDIO_SINK" \\'; \
-		echo '        --gstout-audiodevice="$$$$AUDIO_DEVICE" \\'; \
-		echo '        --gstout-initial-volume-db=0 \\'; \
-		echo '        -d'; \
-		echo '    procd_set_param respawn threshold=3600 timeout=5 retry=5'; \
-		echo '    procd_close_instance'; \
-		echo '}'; \
-		echo ''; \
-		echo 'stop_service() {'; \
-		echo '    killall gmediarender 2>/dev/null'; \
-		echo '}'; \
-	) > $(1)/etc/init.d/gmediarender
+	cat << 'EOF' > $(1)/etc/init.d/gmediarender
+#!/bin/sh /etc/rc.common
+# Optimized for HINLINK H29K (RK3528) / OpenWrt 25.12
+
+START=99
+STOP=10
+USE_PROCD=1
+
+PROG=/usr/bin/gmediarender
+DEVICE_NAME="H29K-DLNA"
+VIDEO_SINK="kmssink connector=HDMI-A-1"
+AUDIO_SINK="alsasink"
+AUDIO_DEVICE="hw:0,0"
+
+start_service() {
+	procd_open_instance
+	procd_set_param command "$$PROG" \
+		-f "$$DEVICE_NAME" \
+		--gstout-videosink="$$VIDEO_SINK" \
+		--gstout-audiosink="$$AUDIO_SINK" \
+		--gstout-audiodevice="$$AUDIO_DEVICE" \
+		--gstout-initial-volume-db=0 \
+		-d
+
+	procd_set_param netdev
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_set_param respawn 3600 5 5
+	procd_close_instance
+}
+
+EOF
 	chmod 0755 $(1)/etc/init.d/gmediarender
 
-	# 附带上游示例脚本，仅作参考
+	# 3. 附带上游示例脚本，仅作参考
 	$(INSTALL_DIR) $(1)/usr/share/gmediarender
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/scripts/init.d/gmediarenderer $(1)/usr/share/gmediarender/
+	if [ -f $(PKG_BUILD_DIR)/scripts/init.d/gmediarenderer ]; then \
+		$(INSTALL_DATA) $(PKG_BUILD_DIR)/scripts/init.d/gmediarenderer $(1)/usr/share/gmediarender/; \
+	fi
 endef
 
 $(eval $(call BuildPackage,gmediarender))
