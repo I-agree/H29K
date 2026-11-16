@@ -47,7 +47,7 @@ define Package/gmediarender
 		+gstreamer1-plugins-good \
 		+gstreamer1-plugins-bad \
 		+gstreamer1-plugins-ugly \
-		+gstreamer1-libav \
+		+gst1-libav \
 		+avahi-daemon \
 		+alsa-utils
 endef
