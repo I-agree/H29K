@@ -51,11 +51,19 @@ PKG_BUILD_PARALLEL:=1
 # fbdevsink 无处可写。kmssink 走 /dev/dri/card0（= rockchip-drm：vop@ff840000 +
 # dwhdmi@ff8d0000，connector card0-HDMI-A-1），这就是唯一的出图路径。
 #
-# 硬件解码：本机没有 /dev/video*，主线的 rk3528.dtsi 里也没有 vdec 节点
-# （只有 RK3528_PD_RKVDEC 电源域），所以 H.264/H.265 只能软解，靠 gst1-libav。
+# 硬件解码：靠 kernel-patches 里的 rkvdec 补丁（719/720/721/722 + 997）产生 /dev/video0，
+# 再由 gst1-mod-v4l2codecs 提供 v4l2slh264dec / v4l2slh265dec（rank PRIMARY+1，playbin 自动选）。
+# 这层依赖是可选的：不开硬解也能编、能软解，所以不写进 DEPENDS。
 #
 # 只做音频 / 只想先让包编过时，把 KMS_DEPS 清空并把 videosink 设空即可（会退回 autovideosink）。
-KMS_DEPS:=+gst1-mod-kms +libgst1allocators +libgst1video +libdrm
+#
+# 注意 gst1-mod-kms 这个包名只有在 feeds 的 gst1-plugins-bad/Makefile 打了
+# extras/0001-gst1-plugins-bad-enable-kmssink.patch 之后才存在（GstBuildPlugin,kms,...）；
+# 没打补丁时直接写死 +gst1-mod-kms 会让整个构建报 "dependency on 'gst1-mod-kms',
+# which does not exist"，所以这里探测一下再决定要不要硬依赖。
+GST_BAD_MK:=$(firstword $(wildcard $(TOPDIR)/feeds/*/multimedia/gst1-plugins-bad/Makefile))
+KMS_PATCHED:=$(shell grep -l "GstBuildPlugin,kms" $(GST_BAD_MK) 2>/dev/null)
+KMS_DEPS:=+libgst1allocators +libgst1video +libdrm $(if $(KMS_PATCHED),+gst1-mod-kms)
 
 include $(INCLUDE_DIR)/package.mk
 
