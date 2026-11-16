@@ -36,6 +36,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/kernel/aic8800/patches \
          package/python-charset-normalizer/patches \
          files/etc/hotplug.d/net \
+         package/multimedia/gmediarender \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
