@@ -101,7 +101,7 @@ download_and_check "${BASE_URL}/JPG/smartdns" "files/etc/config/smartdns"
 download_and_check "${BASE_URL}/JPG/ksmbd" "files/etc/config/ksmbd"
 download_and_check "${BASE_URL}/JPG/99-rndis-dhcp" "files/etc/hotplug.d/net/99-rndis-dhcp"
 download_and_check "${BASE_URL}/package/python-charset-normalizer/Makefile" "package/python-charset-normalizer/Makefile"
-download_and_check "${BASE_URL}/package/multimedia/gmediarender" "package/multimedia/gmediarender"
+download_and_check "${BASE_URL}/package/multimedia/gmediarender/Makefile" "package/multimedia/gmediarender/Makefile"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
