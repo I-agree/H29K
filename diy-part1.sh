@@ -38,7 +38,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/etc/hotplug.d/net \
          package/multimedia/gmediarender/extras \
          package/multimedia/gmediarender/files \
-         toolchain/kernel/patches \
+         toolchain/kernel-headers/patches \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
@@ -89,7 +89,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/720-rkvdec-ad
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/721-hevc-ext-sps-rps-uapi.patch" "target/linux/rockchip/patches-6.18/721-hevc-ext-sps-rps-uapi.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/722-rkvdec-hevc-enable.patch" "target/linux/rockchip/patches-6.18/722-rkvdec-hevc-enable.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/997-add-rk3528-dtsi-vdec.patch" "target/linux/rockchip/patches-6.18/997-add-rk3528-dtsi-vdec.patch"
-download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/721-hevc-ext-sps-rps-uapi.patch" "toolchain/kernel/patches/721-hevc-ext-sps-rps-uapi.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/721-hevc-ext-sps-rps-uapi.patch" "toolchain/kernel-headers/patches/721-hevc-ext-sps-rps-uapi.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch" "target/linux/rockchip/patches-6.18/185-arm64-dts-rockchip-add-rkrng-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch" "target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/997-dwc3-host-add-modem-reset-gpio.patch" "target/linux/rockchip/patches-6.18/997-dwc3-host-add-modem-reset-gpio.patch"
