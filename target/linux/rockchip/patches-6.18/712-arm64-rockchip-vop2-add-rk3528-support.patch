@@ -43,7 +43,7 @@
 +
 +static const struct reg_field rk3528_vop_cluster_regs[VOP2_WIN_MAX_REG] = {
 +	[VOP2_WIN_ENABLE] = REG_FIELD(RK3568_CLUSTER_WIN_CTRL0, 0, 0),
-+	[VOP2_WIN_FORMAT] = REG_FIELD(RK3568_CLUSTER_WIN_CTRL0, 1, 5),
++	[VOP2_WIN_FORMAT] = REG_FIELD(RK3568_CLUSTER_WIN_CTRL0, 1, 6),
 +	[VOP2_WIN_RB_SWAP] = REG_FIELD(RK3568_CLUSTER_WIN_CTRL0, 14, 14),
 +	[VOP2_WIN_UV_SWAP] = REG_FIELD(RK3568_CLUSTER_WIN_CTRL0, 17, 17),
 +	[VOP2_WIN_DITHER_UP] = REG_FIELD(RK3568_CLUSTER_WIN_CTRL0, 18, 18),
@@ -235,16 +235,6 @@
  static const struct vop2_regs_dump rk3568_regs_dump[] = {
  	{
  		.name = "SYS",
-@@ -1936,7 +2143,8 @@
- 		break;
- 	}
- 
--	if (vop2->version <= VOP_VERSION_RK3588) {
-+	if (vop2->version <= VOP_VERSION_RK3588 ||
-+	    vop2->version == VOP_VERSION_RK3528) {
- 		src_color_ctrl_reg = RK3568_CLUSTER0_MIX_SRC_COLOR_CTRL;
- 		dst_color_ctrl_reg = RK3568_CLUSTER0_MIX_DST_COLOR_CTRL;
- 		src_alpha_ctrl_reg = RK3568_CLUSTER0_MIX_SRC_ALPHA_CTRL;
 @@ -1969,7 +2177,8 @@
  	bool bottom_layer_alpha_en = false;
  	u32 dst_global_alpha = DRM_BLEND_ALPHA_OPAQUE;
@@ -255,26 +245,6 @@
  		mixer_id = vop2_find_start_mixer_id_for_vp(vp);
  	else
  		mixer_id = 0;
-@@ -1992,7 +2201,8 @@
- 		}
- 	}
- 
--	if (vop2->version <= VOP_VERSION_RK3588) {
-+	if (vop2->version <= VOP_VERSION_RK3588 ||
-+	    vop2->version == VOP_VERSION_RK3528) {
- 		src_color_ctrl_reg = RK3568_MIX0_SRC_COLOR_CTRL;
- 		dst_color_ctrl_reg = RK3568_MIX0_DST_COLOR_CTRL;
- 		src_alpha_ctrl_reg = RK3568_MIX0_SRC_ALPHA_CTRL;
-@@ -2058,7 +2258,8 @@
- 	}
- 
- 	if (vp->id == 0) {
--		if (vop2->version <= VOP_VERSION_RK3588) {
-+		if (vop2->version <= VOP_VERSION_RK3588 ||
-+		    vop2->version == VOP_VERSION_RK3528) {
- 			src_color_ctrl_reg = RK3568_HDR0_SRC_COLOR_CTRL;
- 			dst_color_ctrl_reg = RK3568_HDR0_DST_COLOR_CTRL;
- 			src_alpha_ctrl_reg = RK3568_HDR0_SRC_ALPHA_CTRL;
 @@ -2493,6 +2794,12 @@
  	.setup_overlay = rk3568_vop2_setup_overlay,
  };
