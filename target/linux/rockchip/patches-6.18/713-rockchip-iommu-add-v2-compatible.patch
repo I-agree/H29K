@@ -8,32 +8,30 @@
  };
  
  static const struct rk_iommu_ops *rk_ops;
-@@ -1164,6 +1165,13 @@
+@@ -1177,6 +1178,12 @@
  	device_link_del(data->link);
  }
  
 +static bool rk_iommu_is_attach_deferred(struct device *dev)
 +{
 +	struct rk_iommudata *data = dev_iommu_priv_get(dev);
-+
-+	return data && data->defer_attach;
++	return data->defer_attach;
 +}
 +
  static int rk_iommu_of_xlate(struct device *dev,
  			     const struct of_phandle_args *args)
  {
-@@ -1180,6 +1188,9 @@
- 	dev_iommu_priv_set(dev, data);
+@@ -1194,6 +1201,9 @@
  
  	platform_device_put(iommu_dev);
-+
-+	if (of_device_is_compatible(dev->of_node, "rockchip,rk3528-vop"))
-+		data->defer_attach = true;
  
++	if (strstr(dev_name(dev), "vop"))
++		data->defer_attach = true;
++
  	return 0;
  }
-@@ -1190,7 +1201,8 @@
- 	.probe_device = rk_iommu_probe_device,
+ 
+@@ -1210,6 +1220,7 @@
  	.release_device = rk_iommu_release_device,
  	.device_group = generic_single_device_group,
  	.def_domain_type = rk_iommu_def_domain_type,
@@ -41,13 +39,13 @@
  	.of_xlate = rk_iommu_of_xlate,
  	.default_domain_ops = &(const struct iommu_domain_ops) {
  		.attach_dev	= rk_iommu_attach_device,
-@@ -1380,6 +1392,9 @@
- static const struct of_device_id rk_iommu_dt_ids[] = {
+@@ -1395,6 +1406,9 @@
  	{	.compatible = "rockchip,iommu",
  		.data = &iommu_data_ops_v1,
-+	},
+ 	},
 +	{	.compatible = "rockchip,iommu-v2",
 +		.data = &iommu_data_ops_v2,
- 	},
++	},
  	{	.compatible = "rockchip,rk3568-iommu",
  		.data = &iommu_data_ops_v2,
+ 	},
