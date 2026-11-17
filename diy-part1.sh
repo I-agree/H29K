@@ -133,6 +133,7 @@ echo "📝 正在精准注入 H29K 专属内核配置到: $CONFIG_FILE"
 sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
 sed -i 's/^# CONFIG_BLK_DEV_INITRD is not set$/CONFIG_BLK_DEV_INITRD=y/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_NR_CPUS=256$/CONFIG_NR_CPUS=4/' "$CONFIG_FILE"
+sed -i 's/^# CONFIG_VIDEO_ROCKCHIP_VDEC is not set$/CONFIG_VIDEO_ROCKCHIP_VDEC=y/' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
