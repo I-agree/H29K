@@ -610,3 +610,11 @@
 &sai0 {
 	status = "okay";
 };
+
+&rkvdec {
+	status = "okay";
+};
+
+&rkvdec_mmu {
+	status = "okay";
+};
