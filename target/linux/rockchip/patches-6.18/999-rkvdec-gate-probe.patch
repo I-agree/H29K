@@ -1,0 +1,98 @@
+--- a/drivers/media/platform/rockchip/rkvdec/rkvdec.c
++++ b/drivers/media/platform/rockchip/rkvdec/rkvdec.c
+@@ -15,6 +15,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/iommu.h>
+ #include <linux/module.h>
++#include <linux/moduleparam.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
+@@ -1764,12 +1765,36 @@
+ };
+ MODULE_DEVICE_TABLE(of, of_rkvdec_match);
+ 
++/*
++ * H29K debug gate: keep the decoder unbound at boot so a bad power/clock
++ * sequence can never break the boot path, then bisect at runtime via sysfs:
++ *   /sys/module/rockchip_vdec/parameters/bind_stage
++ *     0 = stay unbound (default)
++ *     1 = stop right after clocks are enabled
++ *     2 = stop right after the register windows are mapped
++ *     3 = stop right after the IRQ is requested
++ *     4 = stop right after the v4l2 devices are registered
++ *     5 = full probe
++ * then: echo <stage> > .../bind_stage
++ *       echo ff740000.video-codec > /sys/bus/platform/drivers/rkvdec/bind
++ */
++static int rkvdec_bind_stage;
++module_param_named(bind_stage, rkvdec_bind_stage, int, 0644);
++MODULE_PARM_DESC(bind_stage, "rkvdec bind gate: 0=unbound, 1..4=bisect stages");
++
+ static int rkvdec_probe(struct platform_device *pdev)
+ {
+ 	const struct rkvdec_variant *variant;
+ 	struct rkvdec_dev *rkvdec;
+ 	int ret, irq;
+ 
++	if (rkvdec_bind_stage <= 0) {
++		dev_info(&pdev->dev, "rkvdec: bind gated (bind_stage=0), device left unbound\n");
++		return -ENODEV;
++	}
++
++	dev_info(&pdev->dev, "rkvdec: probe start (bind_stage=%d)\n", rkvdec_bind_stage);
++
+ 	variant = of_device_get_match_data(&pdev->dev);
+ 	if (!variant)
+ 		return -EINVAL;
+@@ -1795,6 +1820,13 @@
+ 	rkvdec->num_clocks = ret;
+ 	rkvdec->axi_clk = devm_clk_get(&pdev->dev, "axi");
+ 
++	if (rkvdec_bind_stage < 2) {
++		dev_info(&pdev->dev, "rkvdec: stage 1 ok (clocks enabled, axi=%luHz%s)\n",
++			 IS_ERR_OR_NULL(rkvdec->axi_clk) ? 0UL : clk_get_rate(rkvdec->axi_clk),
++			 IS_ERR_OR_NULL(rkvdec->axi_clk) ? ", axi clk missing" : "");
++		return -ENODEV;
++	}
++
+ 	if (rkvdec->variant->has_single_reg_region) {
+ 		rkvdec->regs = devm_platform_ioremap_resource(pdev, 0);
+ 		if (IS_ERR(rkvdec->regs))
+@@ -1809,6 +1841,11 @@
+ 			return PTR_ERR(rkvdec->link);
+ 	}
+ 
++	if (rkvdec_bind_stage < 3) {
++		dev_info(&pdev->dev, "rkvdec: stage 2 ok (register windows mapped)\n");
++		return -ENODEV;
++	}
++
+ 	ret = dma_set_coherent_mask(&pdev->dev, DMA_BIT_MASK(32));
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Could not set DMA coherent mask.\n");
+@@ -1831,6 +1868,12 @@
+ 	if (!rkvdec->sram_pool && rkvdec->variant->num_rcb_sizes > 0)
+ 		dev_info(&pdev->dev, "No sram node, RCB will be stored in RAM\n");
+ 
++	if (rkvdec_bind_stage < 4) {
++		dev_info(&pdev->dev, "rkvdec: stage 3 ok (irq %d requested, sram %s)\n",
++			 irq, rkvdec->sram_pool ? "present" : "absent");
++		return -ENODEV;
++	}
++
+ 	pm_runtime_set_autosuspend_delay(&pdev->dev, 100);
+ 	pm_runtime_use_autosuspend(&pdev->dev);
+ 	pm_runtime_enable(&pdev->dev);
+@@ -1839,6 +1882,11 @@
+ 	if (ret)
+ 		goto err_disable_runtime_pm;
+ 
++	if (rkvdec_bind_stage < 5) {
++		dev_info(&pdev->dev, "rkvdec: stage 4 ok (v4l2 nodes registered), stop before iommu\n");
++		return 0;
++	}
++
+ 	rkvdec->iommu_domain = iommu_get_domain_for_dev(&pdev->dev);
+ 	if (rkvdec->iommu_domain) {
+ 		rkvdec->empty_domain = iommu_paging_domain_alloc(rkvdec->dev);
