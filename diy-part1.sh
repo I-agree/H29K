@@ -131,6 +131,7 @@ sed -i 's/^CONFIG_ARM64_SVE=y$/# CONFIG_ARM64_SVE is not set/' "$CONFIG_FILE"
 sed -i 's/^# CONFIG_BLK_DEV_INITRD is not set$/CONFIG_BLK_DEV_INITRD=y/' "$CONFIG_FILE"
 sed -i 's/^CONFIG_NR_CPUS=256$/CONFIG_NR_CPUS=4/' "$CONFIG_FILE"
 sed -i 's/^# CONFIG_VIDEO_ROCKCHIP_VDEC is not set$/CONFIG_VIDEO_ROCKCHIP_VDEC=y/' "$CONFIG_FILE"
+sed -i 's/^CONFIG_STRICT_DEVMEM=y$/# CONFIG_STRICT_DEVMEM is not set/' "$CONFIG_FILE"
 
 cat >> "$CONFIG_FILE" << 'EOF'
 
@@ -437,7 +438,7 @@ CONFIG_NETFILTER_EGRESS=y
 # =================================================================
 # 🔄 调试
 # =================================================================
-CONFIG_DEVMEM=m
+CONFIG_DEVMEM=y
 # CONFIG_STRICT_DEVMEM is not set
 
 EOF
