@@ -612,7 +612,7 @@
 };
 
 &rkvdec {
-	status = "disabled";
+	status = "okay";
 };
 
 &rkvdec_mmu {
