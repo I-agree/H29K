@@ -434,5 +434,11 @@ CONFIG_HZ=250
 CONFIG_TCP_AO=y
 CONFIG_NETFILTER_EGRESS=y
 
+# =================================================================
+# 🔄 调试
+# =================================================================
+CONFIG_DEVMEM=m
+# CONFIG_STRICT_DEVMEM is not set
+
 EOF
 echo "✅ H29K 内核参数注入完成"
