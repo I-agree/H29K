@@ -434,5 +434,11 @@ CONFIG_HZ=250
 CONFIG_TCP_AO=y
 CONFIG_NETFILTER_EGRESS=y
 
+# =================================================================
+# 🔄 调试用：允许 /dev/mem（测完可删）
+# =================================================================
+CONFIG_DEVMEM=y
+# CONFIG_STRICT_DEVMEM is not set
+
 EOF
 echo "✅ H29K 内核参数注入完成"
