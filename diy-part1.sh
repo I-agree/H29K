@@ -112,6 +112,7 @@ download_and_check "${BASE_URL}/package/multimedia/gmediarender/Makefile" "packa
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch" "package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/gmediarender.config" "package/multimedia/gmediarender/files/gmediarender.config"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/gmediarender.init" "package/multimedia/gmediarender/files/gmediarender.init"
+download_and_check "${BASE_URL}/package/multimedia/gmediarender/patches/0001-gmediarender-sink-whitelist.patch" "package/multimedia/gmediarender/patches/0001-gmediarender-sink-whitelist.patch"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
