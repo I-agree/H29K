@@ -38,6 +38,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/etc/hotplug.d/net \
          package/multimedia/gmediarender/extras \
          package/multimedia/gmediarender/files \
+         package/multimedia/gmediarender/patches \
          toolchain/kernel-headers/patches \
          files/usr/share/fonts
 
