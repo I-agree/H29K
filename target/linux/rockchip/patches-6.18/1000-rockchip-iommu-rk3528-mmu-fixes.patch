@@ -1,0 +1,75 @@
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -115,6 +115,8 @@
+ 	int num_irq;
+ 	struct clk_bulk_data *clocks;
+ 	int num_clocks;
++	/* Optional extra clock gating the MMU command engine (RK3528 cabac). */
++	struct clk *cabac_clk;
+ 	bool reset_disabled;
+ 	struct iommu_device iommu;
+ 	struct list_head node; /* entry in rk_iommu_domain.iommus */
+@@ -951,13 +953,30 @@
+ 	if (ret)
+ 		return ret;
+ 
++	if (iommu->cabac_clk) {
++		ret = clk_prepare_enable(iommu->cabac_clk);
++		if (ret) {
++			clk_bulk_disable(iommu->num_clocks, iommu->clocks);
++			return ret;
++		}
++	}
++
+ 	ret = rk_iommu_enable_stall(iommu);
+ 	if (ret)
+ 		goto out_disable_clocks;
+ 
++	/*
++	 * The FORCE_RESET handshake needs the master's core clock running, which
++	 * on RK3528 only happens once the decoder driver probes. rk_iommu_enable()
++	 * can run earlier than that (the device link resumes the IOMMU from
++	 * device_links_driver_bound()), so a timeout here must not abort the page
++	 * table programming below - the register file itself was just verified by
++	 * the DTE_ADDR readback inside rk_iommu_force_reset().
++	 */
+ 	ret = rk_iommu_force_reset(iommu);
+ 	if (ret)
+-		goto out_disable_stall;
++		dev_warn(iommu->dev,
++			 "MMU force-reset not completed (%d), continuing\n", ret);
+ 
+ 	for (i = 0; i < iommu->num_mmu; i++) {
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
+@@ -972,10 +991,14 @@
+ 	}
+ 
+ 	ret = rk_iommu_enable_paging(iommu);
++	if (ret)
++		goto out_disable_stall;
+ 
+ out_disable_stall:
+ 	rk_iommu_disable_stall(iommu);
+ out_disable_clocks:
++	if (iommu->cabac_clk)
++		clk_disable_unprepare(iommu->cabac_clk);
+ 	clk_bulk_disable(iommu->num_clocks, iommu->clocks);
+ 	return ret;
+ }
+@@ -1291,6 +1314,16 @@
+ 	if (err)
+ 		return err;
+ 
++	/*
++	 * Some Rockchip video codecs gate their MMU command engine with an extra
++	 * clock (RK3528 exposes it as CLK_HEVC_CA_RKVDEC).  If that clock is not
++	 * running, FORCE_RESET and ENABLE_PAGING never complete even though the
++	 * register file itself stays readable.
++	 */
++	iommu->cabac_clk = devm_clk_get_optional(dev, "clk_hevc_cabac");
++	if (IS_ERR(iommu->cabac_clk))
++		return PTR_ERR(iommu->cabac_clk);
++
+ 	pm_runtime_enable(dev);
+ 
+ 	for (i = 0; i < iommu->num_irq; i++) {
