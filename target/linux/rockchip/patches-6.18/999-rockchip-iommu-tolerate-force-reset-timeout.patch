@@ -1,0 +1,31 @@
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -955,9 +955,18 @@
+ 	if (ret)
+ 		goto out_disable_clocks;
+ 
++	/*
++	 * The FORCE_RESET handshake needs the master's core clock running, which
++	 * on RK3528 only happens once the decoder driver probes. rk_iommu_enable()
++	 * can run earlier than that (the device link resumes the IOMMU from
++	 * device_links_driver_bound()), so a timeout here must not abort the page
++	 * table programming below - the register file itself was just verified by
++	 * the DTE_ADDR readback inside rk_iommu_force_reset().
++	 */
+ 	ret = rk_iommu_force_reset(iommu);
+ 	if (ret)
+-		goto out_disable_stall;
++		dev_warn(iommu->dev,
++			 "MMU force-reset not completed (%d), continuing\n", ret);
+ 
+ 	for (i = 0; i < iommu->num_mmu; i++) {
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR,
+@@ -972,6 +981,8 @@
+ 	}
+ 
+ 	ret = rk_iommu_enable_paging(iommu);
++	if (ret)
++		goto out_disable_stall;
+ 
+ out_disable_stall:
+ 	rk_iommu_disable_stall(iommu);

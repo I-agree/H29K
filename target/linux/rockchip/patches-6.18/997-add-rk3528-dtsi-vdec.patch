@@ -1,6 +1,6 @@
 --- a/arch/arm64/boot/dts/rockchip/rk3528.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3528.dtsi
-@@ -625,6 +625,34 @@
+@@ -625,6 +625,35 @@
  			reg = <0x0 0xff360000 0x0 0x10000>;
  		};
  
@@ -22,7 +22,8 @@
 +
 +		rkvdec_mmu: iommu@ff740800 {
 +			compatible = "rockchip,rk3568-iommu";
-+			reg = <0x0 0xff740800 0x0 0x40>;
++			reg = <0x0 0xff740800 0x0 0x40>,
++			      <0x0 0xff740900 0x0 0x40>;
 +			interrupts = <GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>;
 +			interrupt-names = "rkvdec_mmu";
 +			clocks = <&cru ACLK_RKVDEC>, <&cru HCLK_RKVDEC>;
@@ -35,7 +36,7 @@
  		cru: clock-controller@ff4a0000 {
  			compatible = "rockchip,rk3528-cru";
  			reg = <0x0 0xff4a0000 0x0 0x30000>;
-@@ -696,9 +724,7 @@
+@@ -696,9 +725,7 @@
  				/* These power domains are grouped by VD_LOGIC */
  				power-domain@RK3528_PD_RKVDEC {
  					reg = <RK3528_PD_RKVDEC>;
