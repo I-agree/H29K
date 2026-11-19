@@ -1,0 +1,51 @@
+--- a/src/upnp_connmgr.c
++++ b/src/upnp_connmgr.c
+@@ -308,6 +308,34 @@ static void connmgr_filter_mime_type_root(const mime_type_filters_t* mime_filter
+ 	}
+ }
+ 
++// Apply a strict whitelist of MIME types, replacing the dynamically scanned
++// list. Controllers only see what this renderer can really decode in real
++// time, so they transcode (or pick another stream) instead of pushing
++// something that cannot be played - the RK3528 VPU has H.264/HEVC hardware
++// decoding only, and no VP9/AV1 at all.
++static void connmgr_apply_whitelist(const char *whitelist_string)
++{
++	g_slist_free_full(supported_types_list, free);
++	supported_types_list = NULL;
++
++	Log_info("connmgr", "Applying sink whitelist: '%s'", whitelist_string);
++
++	char* list = strdup(whitelist_string);
++
++	char* saveptr = NULL;
++	char* token = strtok_r(list, ",", &saveptr);
++	while (token != NULL)
++	{
++		g_strstrip(token);
++		if (token[0] != '\0')
++			add_mime_type(token);
++
++		token = strtok_r(NULL, ",", &saveptr);
++	}
++
++	free(list);
++}
++
+ int connmgr_init(const char* mime_filter_string) {
+ 
+ 	struct service *srv = upnp_connmgr_get_service();
+@@ -315,6 +343,13 @@ int connmgr_init(const char* mime_filter_string) {
+ 	// Parse MIME filter into separate fields
+ 	mime_type_filters_t mime_filter = connmgr_parse_mime_filter_string(mime_filter_string);
+ 
++	// A strict whitelist replaces the auto-discovered list entirely. It is
++	// passed through the environment so that a UCI option in the init script
++	// can set it without rebuilding the binary.
++	const char* sink_whitelist = getenv("GMEDIARENDER_SINK_WHITELIST");
++	if (sink_whitelist != NULL && sink_whitelist[0] != '\0')
++		connmgr_apply_whitelist(sink_whitelist);
++
+ 	// Filter MIME types by root
+ 	connmgr_filter_mime_type_root(&mime_filter);
+ 
