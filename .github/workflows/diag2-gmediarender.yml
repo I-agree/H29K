@@ -1,0 +1,169 @@
+name: 诊断2 gmediarender 为什么被 Kconfig 丢掉
+
+on:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: main
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
+
+jobs:
+  diag2:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 50
+    steps:
+    - name: 检出源码
+      uses: actions/checkout@v4
+
+    - name: 调整磁盘空间
+      run: |
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
+        sudo swapoff -a || true
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        sudo sysctl vm.swappiness=10
+        sudo umount /tmp || true
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        df -h
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+
+    - name: 初始化构建环境
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo docker image prune --all --force || true
+        sudo -E apt-get -qq update
+        sudo -E apt-get -qq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev python3-dev libreadline-dev libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf quilt python2.7 python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd libyaml-dev zlib1g-dev
+        sudo -E apt-get -qq autoremove --purge
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "$TZ"
+
+    - name: 克隆 OpenWrt 源码到磁盘
+      run: |
+        cd $WORK_DIR
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 变量实验
+      run: |
+        set -uo pipefail
+        LOG=$WORK_DIR/diag2.log
+        exec > >(tee -a "$LOG") 2>&1
+        cd $WORK_DIR/openwrt
+
+        cp -rf $GITHUB_WORKSPACE/package/. package/
+        ls -l package/multimedia/gmediarender/Makefile
+
+        ./scripts/feeds update -a > /tmp/upd.txt 2>&1; echo "update exit=$?"
+        ./scripts/feeds install -a > /tmp/ins.txt 2>&1; echo "install exit=$?"
+        ls -d package/feeds/packages/gst1-plugins-bad >/dev/null 2>&1 && echo "gst1-plugins-bad 已安装"
+
+        cp -f $GITHUB_WORKSPACE/$CONFIG_FILE .config
+        make defconfig > /tmp/def_base.txt 2>&1; echo "基线 defconfig exit=$?"
+        echo "基线 .config: $(grep -c 'CONFIG_PACKAGE_gmediarender' .config) 行"
+
+        echo "######## A. gmediarender 在 Kconfig 里的定义（完整 stanza）########"
+        awk '/^config PACKAGE_gmediarender$/{f=1;print;next} f&&/^config /{exit} f{print}' tmp/.config-package.in
+
+        echo "######## B. 元数据里的 gmediarender 条目 ########"
+        awk '/^Package: gmediarender$/{f=1;print;next} f&&/^$/{exit} f{print}' tmp/.packageinfo
+
+        echo "######## C. 可疑符号是否存在 ########"
+        for s in PACKAGE_gmediarender PACKAGE_audio-support PACKAGE_video-support PACKAGE_libupnp PACKAGE_gst1-mod-alsa; do
+          printf "%-30s config 行数=%s\n" "$s" "$(grep -c "^config $s\$" tmp/.config-package.in || true)"
+        done
+
+        echo "######## D. 各依赖自身的 depends 行 ########"
+        for d in libupnp glib2 libgstreamer1 libgst1allocators libgst1video libdrm gst1-mod-alsa gst1-mod-playback gst1-mod-isomp4 gst1-libav; do
+          echo "--- PACKAGE_$d ---"
+          grep -A 16 "^config PACKAGE_$d\$" tmp/.config-package.in | grep -E "depends on|select|bool|tristate" | head -8 || echo "(未找到该符号)"
+        done
+
+        echo "######## E. 缺省条件下谁在拦（kconfig 自身判定）########"
+        ./scripts/config/conf --defconfig=.config Config.in > /tmp/conf_check.txt 2>&1; echo "conf exit=$?"
+        grep -nE "gmediarender|audio-support|video-support" /tmp/conf_check.txt | head -10 || echo "（conf 无相关输出）"
+
+        echo "######## F. 依赖变量实验（逐个组合，看谁让它出现）########"
+        MK=package/multimedia/gmediarender/Makefile
+        cp $MK /tmp/orig.mk
+
+        run_variant() {
+          local name="$1"; local deps="$2"
+          awk -v D="$deps" '
+            /^  DEPENDS:=/ && !done { print "  DEPENDS:=" D; done=1; inb=1; next }
+            inb && /\$(KMS_DEPS)/ { inb=0; next }
+            inb { next }
+            { print }
+          ' /tmp/orig.mk > $MK
+          make defconfig > /tmp/def_$name.txt 2>&1
+          if grep -q "^CONFIG_PACKAGE_gmediarender=y" .config; then
+            echo "RESULT $name => y"
+          elif grep -q "CONFIG_PACKAGE_gmediarender" .config; then
+            echo "RESULT $name => $(grep 'CONFIG_PACKAGE_gmediarender' .config)"
+          else
+            echo "RESULT $name => 符号被完全丢弃"
+          fi
+        }
+
+        echo "--- V1 只留 libupnp ---"
+        run_variant V1 "+libupnp"
+
+        echo "--- V2 只留基础库 ---"
+        run_variant V2 "+libupnp +glib2 +libgstreamer1 +libgst1allocators +libgst1video +libdrm"
+
+        echo "--- V3 基础库 + 全部解复用/解码插件，不含 gst1-libav ---"
+        run_variant V3 "+libupnp +glib2 +libgstreamer1 +libgst1allocators +libgst1video +libdrm +gst1-mod-playback +gst1-mod-alsa +gst1-mod-audioconvert +gst1-mod-audioresample +gst1-mod-volume +gst1-mod-typefindfunctions +gst1-mod-pbtypes +gst1-mod-videoconvertscale +gst1-mod-soup +gst1-mod-audioparsers +gst1-mod-videoparsersbad +gst1-mod-v4l2codecs +gst1-mod-mpegpsdemux +gst1-mod-avi +gst1-mod-ogg +gst1-mod-vorbis +gst1-mod-opus +gst1-mod-theora +gst1-mod-vpx +gst1-mod-id3demux +gst1-mod-autodetect +gst1-mod-isomp4 +gst1-mod-matroska +gst1-mod-mpegtsdemux +gst1-mod-mpg123 +gst1-mod-flac +gst1-mod-faad +gst1-mod-wavparse"
+
+        echo "--- V4 同上再去掉 gst1-mod-alsa ---"
+        run_variant V4 "+libupnp +glib2 +libgstreamer1 +libgst1allocators +libgst1video +libdrm +gst1-mod-playback +gst1-mod-audioconvert +gst1-mod-audioresample +gst1-mod-volume +gst1-mod-typefindfunctions +gst1-mod-pbtypes +gst1-mod-videoconvertscale +gst1-mod-soup +gst1-mod-audioparsers +gst1-mod-videoparsersbad +gst1-mod-v4l2codecs +gst1-mod-mpegpsdemux +gst1-mod-avi +gst1-mod-ogg +gst1-mod-vorbis +gst1-mod-opus +gst1-mod-theora +gst1-mod-vpx +gst1-mod-id3demux +gst1-mod-autodetect +gst1-mod-isomp4 +gst1-mod-matroska +gst1-mod-mpegtsdemux +gst1-mod-mpg123 +gst1-mod-flac +gst1-mod-faad +gst1-mod-wavparse"
+
+        echo "--- V5 只加 gst1-libav ---"
+        run_variant V5 "+libupnp +glib2 +libgstreamer1 +libgst1allocators +libgst1video +libdrm +gst1-libav"
+
+        echo "--- V6 只加 gst1-mod-v4l2codecs ---"
+        run_variant V6 "+libupnp +glib2 +libgstreamer1 +libgst1allocators +libgst1video +libdrm +gst1-mod-v4l2codecs"
+
+        cp /tmp/orig.mk $MK
+        echo "######## 实验结束 ########"
+
+    - name: 摘要
+      if: always()
+      run: |
+        LOG=$WORK_DIR/diag2.log
+        [ -f "$LOG" ] || exit 0
+        {
+          echo "## 诊断2 摘要"
+          echo
+          echo "### gmediarender 的 Kconfig 定义"
+          echo '```'
+          sed -n '/A. gmediarender/,/B. 元数据/p' "$LOG" | head -40
+          echo '```'
+          echo "### 变量实验结果"
+          echo '```'
+          grep -E "^RESULT " "$LOG" || echo "（无结果）"
+          echo '```'
+          echo "### 可疑符号存在性"
+          echo '```'
+          sed -n '/C. 可疑符号/,/D. 各依赖/p' "$LOG" | grep "config 行数"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: 上传日志
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: diag2-gmediarender
+        path: |
+          /workdir/diag2.log
+          /tmp/def_*.txt
+          /tmp/conf_check.txt
+        if-no-files-found: warn
+        retention-days: 14
+#（注：内容由AI生成）
