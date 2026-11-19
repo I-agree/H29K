@@ -51,9 +51,17 @@ PKG_BUILD_PARALLEL:=1
 # fbdevsink 无处可写。kmssink 走 /dev/dri/card0（= rockchip-drm：vop@ff840000 +
 # dwhdmi@ff8d0000，connector card0-HDMI-A-1），这就是唯一的出图路径。
 #
-# 硬件解码：靠 kernel-patches 里的 rkvdec 补丁（719/720/721/722 + 997）产生 /dev/video0，
-# 再由 gst1-mod-v4l2codecs 提供 v4l2slh264dec / v4l2slh265dec（rank PRIMARY+1，playbin 自动选）。
-# 这层依赖是可选的：不开硬解也能编、能软解，所以不写进 DEPENDS。
+# 硬件解码：靠 kernel-patches/vdec-v2 里的 997g + 998 + 1000 打出来的 /dev/video0
+# （rkvdec 驱动 + RK3528 MMU 双 bank + clk_hevc_cabac），再由 gst1-mod-v4l2codecs
+# 提供 v4l2slh264dec / v4l2slh265dec（stateless 解码器，playbin 自动优先选硬件）。
+#
+# 为什么 gst1-mod-v4l2codecs 必须写进 DEPENDS（不能只写在 .config 里）：
+#   feeds 里所有 gst1-mod-* 都是 GstBuildPlugin 生成的包，宏里固定写了 HIDDEN:=1，
+#   scripts/package-metadata.pl 遇到 hidden 会把 Kconfig title 置空 → 生成的符号没有 prompt，
+#   make defconfig 会直接丢掉手写的 CONFIG_PACKAGE_gst1-mod-v4l2codecs=y。
+#   隐藏符号只能被"可见包"的 DEPENDS 里的 + 号（= Kconfig select）带进来。
+#   gmediarender 本身就是可见包，所以把需要的能力全部写在这里，
+#   .config 里只写 CONFIG_PACKAGE_gmediarender=y 就够了，不需要额外造元包。
 #
 # 只做音频 / 只想先让包编过时，把 KMS_DEPS 清空并把 videosink 设空即可（会退回 autovideosink）。
 #
@@ -102,6 +110,14 @@ define Package/gmediarender
 	+gst1-mod-soup \
 	+gst1-mod-audioparsers \
 	+gst1-mod-videoparsersbad \
+	+gst1-mod-v4l2codecs \
+	+gst1-mod-mpegpsdemux \
+	+gst1-mod-avi \
+	+gst1-mod-ogg \
+	+gst1-mod-vorbis \
+	+gst1-mod-opus \
+	+gst1-mod-theora \
+	+gst1-mod-vpx \
 	+gst1-mod-id3demux \
 	+gst1-mod-autodetect \
 	+gst1-mod-isomp4 \
@@ -109,6 +125,7 @@ define Package/gmediarender
 	+gst1-mod-mpegtsdemux \
 	+gst1-mod-mpg123 \
 	+gst1-mod-flac \
+	+gst1-mod-faad \
 	+gst1-mod-wavparse \
 	+gst1-libav \
 	$(KMS_DEPS)
