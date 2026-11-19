@@ -1,0 +1,160 @@
+name: 诊断 gmediarender 依赖与 feeds
+
+on:
+  workflow_dispatch:
+
+env:
+  WORK_DIR: /workdir
+  TZ: Asia/Shanghai
+
+jobs:
+  diag:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 安装主机依赖
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install -y build-essential clang flex bison g++ gawk \
+            gcc-multilib g++-multilib gettext git libncurses-dev libssl-dev rsync \
+            python3-dev python3-setuptools python3-pip unzip zlib1g-dev file wget
+
+      - name: 克隆 OpenWrt
+        run: |
+          git clone --depth=1 -b main https://github.com/openwrt/openwrt.git $WORK_DIR/openwrt
+
+      - name: 全流程诊断
+        run: |
+          set -uo pipefail
+          LOG="$WORK_DIR/diag.log"
+          mkdir -p "$WORK_DIR"
+          exec > >(tee -a "$LOG") 2>&1
+          cd "$WORK_DIR/openwrt"
+
+          echo "######## 0. 上游自带的 feeds.conf.default ########"
+          cat feeds.conf.default
+
+          echo "######## 1. 运行 diy-part1.sh（只做下载与目录准备，容忍失败）########"
+          chmod +x "$GITHUB_WORKSPACE/diy-part1.sh"
+          "$GITHUB_WORKSPACE/diy-part1.sh"; echo "part1 exit=$?"
+
+          if [ ! -f package/multimedia/gmediarender/Makefile ]; then
+            echo "⚠️ part1 未产出 gmediarender 包，用仓库内副本兜底"
+            cp -rf "$GITHUB_WORKSPACE/package/." package/
+          fi
+          echo "gmediarender Makefile: $(ls -l package/multimedia/gmediarender/Makefile 2>&1)"
+
+          echo "######## 2. feeds update -a ########"
+          ./scripts/feeds update -a; echo "update exit=$?"
+
+          echo "######## 3. feeds install -a ########"
+          ./scripts/feeds install -a; echo "install exit=$?"
+
+          echo "######## 4. install 落地核对 ########"
+          echo "--- feeds/ ---"; ls -d feeds/*/ 2>/dev/null
+          echo "--- package/feeds/ ---"; ls package/feeds/ 2>/dev/null
+          echo "--- 关键包是否已安装（走符号链接）---"
+          for p in gst1-plugins-base gst1-plugins-bad gst1-plugins-good gst1-libav \
+                   gstreamer1 libupnp glib2 libdrm ffmpeg; do
+            if ls -d package/feeds/packages/*/"$p" >/dev/null 2>&1; then
+              echo "ok   $p"
+            else
+              echo "FAIL $p 未安装"
+            fi
+          done
+          echo "--- 已安装 Makefile 数量 ---"
+          echo "package/feeds/packages: $(find -L package/feeds/packages -name Makefile 2>/dev/null | wc -l)"
+          echo "feeds/packages 源:      $(find -L feeds/packages -mindepth 3 -maxdepth 3 -name Makefile 2>/dev/null | wc -l)"
+          echo "--- gst1 系列已安装的目录 ---"
+          find -L package/feeds/packages -maxdepth 2 -type d -name "gst1*" 2>/dev/null | sort
+
+          echo "######## 5. 载入自定义配置 ########"
+          cp -f "$GITHUB_WORKSPACE/rk3528-hinlink-h29k.config" .config
+          grep -nE "CONFIG_TARGET_BOARD|CONFIG_TARGET_SUBTARGET|gmediarender|gstreamer1" .config | head -10
+
+          echo "######## 6. defconfig 第一遍（完全按你现在的流程，不清缓存）########"
+          make defconfig > /tmp/def1.txt 2>&1; echo "defconfig1 exit=$?"
+          echo "警告行数: $(grep -c 'does not exist' /tmp/def1.txt || true)"
+          echo "--- 前 6 条警告 ---"
+          grep 'does not exist' /tmp/def1.txt | head -6 || true
+          echo "--- 元数据统计 ---"
+          echo "gst1-mod 包数: $(grep -c '^Package: gst1-mod' tmp/.packageinfo 2>/dev/null || echo 0)"
+          echo "Package 总条数: $(grep -c '^Package: ' tmp/.packageinfo 2>/dev/null || echo 0)"
+          grep -n '^Package: libupnp$' tmp/.packageinfo | head -2 || echo "libupnp 不在元数据"
+          grep -n '^Package: gst1-mod-v4l2codecs$' tmp/.packageinfo | head -2 || echo "gst1-mod-v4l2codecs 不在元数据"
+          echo "--- .config 相关行 ---"
+          grep -nE "gmediarender|gst1-mod-kms|gst1-mod-v4l2codecs|gstreamer1-utils|libupnp" .config || echo "（无相关行）"
+          cp .config /tmp/config1
+
+          echo "######## 7. defconfig 第二遍（先清 tmp 缓存）########"
+          rm -rf tmp
+          make defconfig > /tmp/def2.txt 2>&1; echo "defconfig2 exit=$?"
+          echo "警告行数: $(grep -c 'does not exist' /tmp/def2.txt || true)"
+          echo "--- 元数据统计 ---"
+          echo "gst1-mod 包数: $(grep -c '^Package: gst1-mod' tmp/.packageinfo 2>/dev/null || echo 0)"
+          echo "Package 总条数: $(grep -c '^Package: ' tmp/.packageinfo 2>/dev/null || echo 0)"
+          echo "--- .config 相关行 ---"
+          grep -nE "gmediarender|gst1-mod-kms|gst1-mod-v4l2codecs|gstreamer1-utils|libupnp|gst1-libav" .config || echo "（无相关行）"
+          echo "--- 两遍 defconfig 的 .config 差异（前 30 行）---"
+          diff /tmp/config1 .config | head -30 || true
+
+          echo "######## 8. 时间戳（元数据 vs 符号链接）########"
+          stat -c '%y  %n' tmp/.packageinfo tmp/.packagedeps 2>/dev/null
+          stat -c '%y  %n' package/feeds/packages 2>/dev/null
+
+          echo "######## 9. kmssink 补丁是否可应用（干跑）########"
+          if [ -f "$GITHUB_WORKSPACE/package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch" ]; then
+            (cd feeds/packages && patch -p1 --dry-run < "$GITHUB_WORKSPACE/package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch"); echo "dryrun exit=$?"
+          else
+            echo "补丁文件不存在"
+          fi
+
+          echo "######## 诊断结束 ########"
+
+      - name: 输出摘要
+        if: always()
+        run: |
+          LOG="$WORK_DIR/diag.log"
+          [ -f "$LOG" ] || { echo "没有生成日志"; exit 0; }
+          {
+            echo "## 诊断摘要"
+            echo
+            echo '| 项目 | 结果 |'
+            echo '| --- | --- |'
+            echo "| part1 产出 gmediarender Makefile | $(grep -c 'gmediarender Makefile' "$LOG" >/dev/null && grep -m1 'gmediarender Makefile' "$LOG" | sed 's/|/ /g' || echo '见日志') |"
+            echo "| feeds update 结果 | $(grep -m1 'update exit=' "$LOG") |"
+            echo "| feeds install 结果 | $(grep -m1 'install exit=' "$LOG") |"
+            echo "| 第一遍 defconfig 警告数 | $(grep -m1 '警告行数' "$LOG") |"
+            echo "| 第一遍 gst1-mod 包数 | $(grep -m1 'gst1-mod 包数' "$LOG") |"
+            echo
+            echo "### 第一遍 .config 关键行"
+            echo '```'
+            sed -n '/6. defconfig 第一遍/,/7. defconfig 第二遍/p' "$LOG" | grep -nE "gmediarender|gst1-mod-kms|gst1-mod-v4l2codecs|gstreamer1-utils|libupnp|（无相关行）" | tail -10
+            echo '```'
+            echo
+            echo "### 第二遍 .config 关键行"
+            echo '```'
+            sed -n '/7. defconfig 第二遍/,$p' "$LOG" | grep -nE "gmediarender|gst1-mod-kms|gst1-mod-v4l2codecs|gstreamer1-utils|libupnp|（无相关行）" | head -12
+            echo '```'
+            echo
+            echo "### install 落地核对"
+            echo '```'
+            sed -n '/4. install 落地核对/,/5. 载入自定义配置/p' "$LOG" | grep -E "^(ok|FAIL)|已安装 Makefile|package/feeds/packages:|feeds/packages 源:"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 上传日志
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: diag-gst-feeds
+          path: |
+            /workdir/diag.log
+            /tmp/def1.txt
+            /tmp/def2.txt
+          if-no-files-found: warn
+          retention-days: 14
+#（注：内容由AI生成）
