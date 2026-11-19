@@ -36,6 +36,28 @@ fi
 
 # =================================================================================
 
+# =================================================================================
+# 2. 🎯 给 gst1-plugins-bad 启用 kmssink（HDMI 直出必需）
+# =================================================================================
+GST_BAD="feeds/packages/multimedia/gst1-plugins-bad"
+KMS_PATCH="$(pwd)/package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch"
+
+if [ ! -f "$GST_BAD/Makefile" ]; then
+    echo "❌ 未找到 $GST_BAD/Makefile，feeds 还没装好"
+    exit 1
+fi
+
+echo "🔧 正在为 gst1-plugins-bad 启用 kmssink..."
+patch -p1 -d feeds/packages --forward < "$KMS_PATCH"
+
+grep -q "GstBuildPlugin,kms" "$GST_BAD/Makefile" || {
+    echo "❌ kmssink 补丁未生效"
+    exit 1
+}
+echo "✅ kmssink 已启用：$(grep -n 'GstBuildPlugin,kms' "$GST_BAD/Makefile")"
+
+# =================================================================================
+
 # ===================== 系统防火墙增强版（openwrt-sonic-fullcone） =====================
 # 一键应用所有补丁（适用于6.6、6.12、6.18）
 # 全锥形 NAT（Full Cone NAT），无需额外勾选，fullcone 编译进现有 nft_masq.ko / xt_MASQUERADE.ko 模块
