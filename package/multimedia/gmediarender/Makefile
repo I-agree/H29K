@@ -23,8 +23,14 @@ include $(TOPDIR)/rules.mk
 PKG_NAME:=gmediarender
 
 # 上游 configure.ac 的 AC_INIT 版本是 0.3.1，master 上没有规范版本号，
-# 所以用「0.3.1 + 快照日期」保证版本可比较
-PKG_VERSION:=0.3.1+git20261102
+# 所以用「0.3.1 + 快照日期」保证版本可比较。
+#
+# 注意：OpenWrt master 用 apk 打包，apk 的版本语法是
+#   digit{.digit}...{letter}{_suf{#}}...{~hash}{-r#}
+# 里没有 '+'，写 0.3.1+git20261102 会被 apk mkpkg 拒绝：
+#   ERROR: info field 'version' has invalid value: package version is invalid
+# 因此快照日期改成第四段纯数字，最终包版本为 0.3.1.20261102-r1。
+PKG_VERSION:=0.3.1.20261102
 PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
