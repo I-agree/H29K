@@ -1,15 +1,15 @@
 --- a/multimedia/gst1-plugins-bad/Makefile
 +++ b/multimedia/gst1-plugins-bad/Makefile
-@@ -200,7 +200,7 @@
+@@ -201,7 +201,7 @@
  	-Dgsm=disabled \
  	-Dipcpipeline=disabled \
  	-Diqa=disabled \
 -	-Dkms=disabled \
-+	$(call GST_COND_SELECT,kms) \
++	-Dkms=$(if $(CONFIG_PACKAGE_libdrm),en,dis)abled \
  	-Dladspa=disabled \
  	-Dlibde265=disabled \
  	-Dlv2=disabled \
-@@ -446,6 +446,7 @@
+@@ -449,6 +449,7 @@
  $(eval $(call GstBuildPlugin,dtls,DTLS support,,,+libopenssl))
  $(eval $(call GstBuildPlugin,faad,faad support,audio,,+libfaad2))
  $(eval $(call GstBuildPlugin,fbdevsink,fbdev support,video,,))
