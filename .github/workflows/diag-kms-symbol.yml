@@ -1,0 +1,100 @@
+name: diag-kms-symbol
+
+# 目的：只查一件事 —— gst1-mod-kms 这个子包符号，在补丁之后能不能进 .config
+# 不编译、不下载源码包，只跑到 make defconfig，约 5~10 分钟
+
+on:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt.git
+  REPO_BRANCH: main
+  WORK_DIR: /workdir
+  MY_REPO: https://github.com/I-agree/H29K.git
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  KMS_PATCH: package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch
+
+jobs:
+  diag:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 1. 环境准备
+        run: |
+          sudo mkdir -p $WORK_DIR && sudo chown -R $USER:$USER $WORK_DIR
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses-dev zlib1g-dev unzip gawk python3 bison flex
+
+      - name: 2. 克隆 openwrt + 取自定义包与 config
+        run: |
+          git clone --depth=1 -b $REPO_BRANCH $REPO_URL $WORK_DIR/openwrt
+          cd $WORK_DIR/openwrt
+          echo ">>> 上游 commit（内核版本就看这里）"
+          git log -1 --oneline
+          grep -E "KERNEL_PATCHVER" target/linux/rockchip/Makefile
+
+          git clone --depth=1 $MY_REPO $WORK_DIR/h29k
+          mkdir -p package/multimedia
+          cp -r $WORK_DIR/h29k/package/multimedia/gmediarender package/multimedia/
+          cp $WORK_DIR/h29k/$CONFIG_FILE .config
+
+      - name: 3. 装 feeds
+        run: |
+          cd $WORK_DIR/openwrt
+          cp feeds.conf.default feeds.conf
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          echo ">>> feeds 里的 gst1-plugins-bad"
+          ls -l package/feeds/packages/gst1-plugins-bad
+
+      - name: 4. 打 kmssink 补丁（和 diy-part2 完全一致的做法）
+        run: |
+          cd $WORK_DIR/openwrt
+          P="$(pwd)/package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch"
+          ls -l "$P"
+          patch -p1 -d feeds/packages --forward < "$P"
+
+          echo "=== A. 补丁后，源文件 / 编译用文件 是否都有 ==="
+          echo -n "feeds/packages            : "; grep -c "GstBuildPlugin,kms" feeds/packages/multimedia/gst1-plugins-bad/Makefile
+          echo -n "package/feeds/packages    : "; grep -c "GstBuildPlugin,kms" package/feeds/packages/gst1-plugins-bad/Makefile
+          echo -n "同一文件？                : "
+          [ "$(readlink -f feeds/packages/multimedia/gst1-plugins-bad/Makefile)" = "$(readlink -f package/feeds/packages/gst1-plugins-bad/Makefile)" ] && echo "是（软链同一份）" || echo "否（两份独立文件！）"
+          echo "=== B. -Dkms 那行 ==="
+          grep -n "Dkms=" package/feeds/packages/gst1-plugins-bad/Makefile
+
+      - name: 5. 清元数据 + defconfig
+        run: |
+          cd $WORK_DIR/openwrt
+          rm -rf tmp
+          mkdir -p staging_dir/host && touch staging_dir/host/.prereq-build
+          make defconfig > /tmp/def.log 2>&1; echo "defconfig exit=$?"
+          tail -5 /tmp/def.log
+
+      - name: 6. 查符号（这就是本次唯一要的答案）
+        run: |
+          cd $WORK_DIR/openwrt
+          echo "=========== C. .config 里的关键符号 ==========="
+          for s in gmediarender gst1-mod-kms audio-support video-support libdrm; do
+            line=$(grep -E "^(# )?CONFIG_PACKAGE_$s=" .config | head -1)
+            echo "${s} => ${line:-（整条不存在）}"
+          done
+
+          echo "=========== D. 元数据里有没有这个包/符号 ==========="
+          echo -n "tmp/.packageinfo  Package: gst1-mod-kms  行数 = "
+          grep -c "^Package: gst1-mod-kms$" tmp/.packageinfo
+          echo -n "tmp/.config-package.in  config PACKAGE_gst1-mod-kms  行数 = "
+          grep -cE "^[[:space:]]*config PACKAGE_gst1-mod-kms$" tmp/.config-package.in
+          echo "--- 它的 Kconfig stanza ---"
+          awk '/^[[:space:]]*config PACKAGE_gst1-mod-kms$/{f=1} f{print} f&&/^[[:space:]]*config PACKAGE_[a-z]/&&!/gst1-mod-kms/{exit}' tmp/.config-package.in | head -15
+
+          echo "--- gmediarender stanza 里的 depends/select 是否含 kms ---"
+          awk '/^[[:space:]]*config PACKAGE_gmediarender$/{f=1} f{print} f&&/^[[:space:]]*config PACKAGE_[a-z]/&&!/gmediarender/{exit}' tmp/.config-package.in | grep -i "kms\|audio-support\|video-support"
+
+          echo "=========== E. 兜底：手写进 .config 后能否被 defconfig 保留 ==========="
+          echo "CONFIG_PACKAGE_gst1-mod-kms=y" >> .config
+          make defconfig > /tmp/def2.log 2>&1; echo "第二次 defconfig exit=$?"
+          echo -n "保留结果: "; grep -E "^(# )?CONFIG_PACKAGE_gst1-mod-kms=" .config || echo "（被丢弃）"
+
+          echo "=========== F. 包的 dump（确认 Package: gst1-mod-kms 被声明）==========="
+          make -s -C package/feeds/packages/gst1-plugins-bad DUMP=1 FEED= TOPDIR=$PWD 2>/dev/null \
+            | grep -A8 "^Package: gst1-mod-kms$" | head -12 || echo "（dump 失败，看上面 D 段即可）"
+#（注：内容由AI生成）
