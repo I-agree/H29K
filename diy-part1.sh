@@ -77,6 +77,8 @@ download_and_check "${BASE_URL}/package/kernel/aic8800/patches/060-fix-read-cpui
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch" "package/kernel/aic8800/patches/070-fix-mips-pc-macro-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch" "package/kernel/aic8800/patches/080-fix-export-symbols-conflict.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/090-fix-vmalloc-include.patch" "package/kernel/aic8800/patches/090-fix-vmalloc-include.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/091-tcp-ack-hardening.patch" "package/kernel/aic8800/patches/091-tcp-ack-hardening.patch"
+download_and_check "${BASE_URL}/package/kernel/aic8800/patches/092-tcp-ack-observability.patch" "package/kernel/aic8800/patches/092-tcp-ack-observability.patch"
 download_and_check "${BASE_URL}/package/kernel/aic8800/patches/series" "package/kernel/aic8800/patches/series"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/710-arm64-rockchip-dw-hdmi-add-rk3528-support.patch" "target/linux/rockchip/patches-6.18/710-arm64-rockchip-dw-hdmi-add-rk3528-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/711-pmdomain-rockchip-fix-rk3528-pm-domains.patch" "target/linux/rockchip/patches-6.18/711-pmdomain-rockchip-fix-rk3528-pm-domains.patch"
