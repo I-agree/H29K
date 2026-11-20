@@ -75,7 +75,13 @@ PKG_BUILD_PARALLEL:=1
 # extras/0001-gst1-plugins-bad-enable-kmssink.patch 之后才存在（GstBuildPlugin,kms,...）；
 # 没打补丁时直接写死 +gst1-mod-kms 会让整个构建报 "dependency on 'gst1-mod-kms',
 # which does not exist"，所以这里探测一下再决定要不要硬依赖。
-GST_BAD_MK:=$(firstword $(wildcard $(TOPDIR)/feeds/*/multimedia/gst1-plugins-bad/Makefile))
+#
+# 探测优先看 package/feeds/*/gst1-plugins-bad/Makefile —— 那才是 OpenWrt 扫描元数据
+# 和真正编译时用的那份（feeds 源目录只是它的来源）。只看 feeds/ 会出现"依赖要求
+# gst1-mod-kms、但产物里没有这个 apk"的错位，最终在镜像安装阶段报
+#   gst1-mod-kms (no such package) required by gmediarender
+GST_BAD_MK:=$(firstword $(wildcard $(TOPDIR)/package/feeds/*/gst1-plugins-bad/Makefile) \
+	$(wildcard $(TOPDIR)/feeds/*/multimedia/gst1-plugins-bad/Makefile))
 KMS_PATCHED:=$(shell grep -l "GstBuildPlugin,kms" $(GST_BAD_MK) 2>/dev/null)
 KMS_DEPS:=+libgst1allocators +libgst1video +libdrm $(if $(KMS_PATCHED),+gst1-mod-kms)
 
