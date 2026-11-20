@@ -40,21 +40,43 @@ fi
 # 2. 🎯 给 gst1-plugins-bad 启用 kmssink（HDMI 直出必需）
 # =================================================================================
 GST_BAD="feeds/packages/multimedia/gst1-plugins-bad"
+GST_BAD_COMPILED="package/feeds/packages/gst1-plugins-bad"
 KMS_PATCH="$(pwd)/package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch"
 
 if [ ! -f "$GST_BAD/Makefile" ]; then
     echo "❌ 未找到 $GST_BAD/Makefile，feeds 还没装好"
     exit 1
 fi
+if [ ! -f "$KMS_PATCH" ]; then
+    echo "❌ 未找到补丁 $KMS_PATCH（diy-part1 的 download_and_check 可能失败了）"
+    exit 1
+fi
 
 echo "🔧 正在为 gst1-plugins-bad 启用 kmssink..."
 patch -p1 -d feeds/packages --forward < "$KMS_PATCH"
 
+# package/feeds/*/gst1-plugins-bad 通常是软链（此时上面那一步已经生效）；
+# 若它是实体目录，必须单独再打一遍，否则编译用的那份还是 disabled。
+if [ -f "$GST_BAD_COMPILED/Makefile" ] && [ ! -L "$GST_BAD_COMPILED" ]; then
+    grep -q "GstBuildPlugin,kms" "$GST_BAD_COMPILED/Makefile" \
+        || patch -p3 -d "$GST_BAD_COMPILED" --forward < "$KMS_PATCH"
+fi
+
 grep -q "GstBuildPlugin,kms" "$GST_BAD/Makefile" || {
-    echo "❌ kmssink 补丁未生效"
+    echo "❌ kmssink 补丁未生效（$GST_BAD/Makefile）"
     exit 1
 }
-echo "✅ kmssink 已启用：$(grep -n 'GstBuildPlugin,kms' "$GST_BAD/Makefile")"
+if [ -f "$GST_BAD_COMPILED/Makefile" ]; then
+    grep -q "GstBuildPlugin,kms" "$GST_BAD_COMPILED/Makefile" || {
+        echo "❌ kmssink 补丁未落到实际编译的 Makefile（$GST_BAD_COMPILED/Makefile）"
+        exit 1
+    }
+fi
+
+echo "✅ kmssink 已启用"
+echo "   源文件:     $(grep -n 'GstBuildPlugin,kms' "$GST_BAD/Makefile")"
+echo "   编译用:     $(grep -n 'GstBuildPlugin,kms' "${GST_BAD_COMPILED}/Makefile" 2>/dev/null || echo '（软链，同上）')"
+echo "   插件开关:   $(grep -n '\-Dkms=' "$GST_BAD/Makefile")"
 
 # =================================================================================
 
