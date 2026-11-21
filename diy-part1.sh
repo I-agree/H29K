@@ -35,7 +35,6 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/boot/uboot-rockchip/patches \
          package/kernel/aic8800/patches \
          package/python-charset-normalizer/patches \
-         files/etc/hotplug.d/net \
          package/multimedia/gmediarender/extras \
          package/multimedia/gmediarender/files \
          package/multimedia/gmediarender/patches \
@@ -111,12 +110,12 @@ download_and_check "${BASE_URL}/JPG/system" "files/etc/config/system"
 download_and_check "${BASE_URL}/JPG/wireless" "files/etc/config/wireless"
 download_and_check "${BASE_URL}/JPG/smartdns" "files/etc/config/smartdns"
 download_and_check "${BASE_URL}/JPG/ksmbd" "files/etc/config/ksmbd"
-# download_and_check "${BASE_URL}/JPG/99-rndis-dhcp" "files/etc/hotplug.d/net/99-rndis-dhcp"
 download_and_check "${BASE_URL}/package/python-charset-normalizer/Makefile" "package/python-charset-normalizer/Makefile"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/Makefile" "package/multimedia/gmediarender/Makefile"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch" "package/multimedia/gmediarender/extras/0001-gst1-plugins-bad-enable-kmssink.patch"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/gmediarender.config" "package/multimedia/gmediarender/files/gmediarender.config"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/gmediarender.init" "package/multimedia/gmediarender/files/gmediarender.init"
+download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/rkvdec-bind.init" "package/multimedia/gmediarender/files/rkvdec-bind.init"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/patches/0001-gmediarender-sink-whitelist.patch" "package/multimedia/gmediarender/patches/0001-gmediarender-sink-whitelist.patch"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
