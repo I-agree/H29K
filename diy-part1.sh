@@ -39,6 +39,13 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/multimedia/gmediarender/files \
          package/multimedia/gmediarender/patches \
          toolchain/kernel-headers/patches \
+         package/luci-app-btmanager/htdocs/luci-static/resources/view \
+         package/luci-app-btmanager/root/etc/config \
+         package/luci-app-btmanager/root/etc/init.d \
+         package/luci-app-btmanager/root/etc/uci-defaults \
+         package/luci-app-btmanager/root/usr/sbin \
+         package/luci-app-btmanager/root/usr/share/luci/menu.d \
+         package/luci-app-btmanager/root/usr/share/rpcd/acl.d \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
