@@ -117,6 +117,14 @@ download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/gmediarend
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/gmediarender.init" "package/multimedia/gmediarender/files/gmediarender.init"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/rkvdec-bind.init" "package/multimedia/gmediarender/files/rkvdec-bind.init"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/patches/0001-gmediarender-sink-whitelist.patch" "package/multimedia/gmediarender/patches/0001-gmediarender-sink-whitelist.patch"
+download_and_check "${BASE_URL}/package/luci-app-btmanager/htdocs/luci-static/resources/view/btmanager.js" "package/luci-app-btmanager/htdocs/luci-static/resources/view/btmanager.js"
+download_and_check "${BASE_URL}/package/luci-app-btmanager/root/etc/config/btmanager" "package/luci-app-btmanager/root/etc/config/btmanager"
+download_and_check "${BASE_URL}/package/luci-app-btmanager/root/etc/init.d/btmanager" "package/luci-app-btmanager/root/etc/init.d/btmanager"
+download_and_check "${BASE_URL}/package/luci-app-btmanager/root/etc/uci-defaults/99-btmanager" "package/luci-app-btmanager/root/etc/uci-defaults/99-btmanager"
+download_and_check "${BASE_URL}/package/luci-app-btmanager/root/usr/sbin/btmanager" "package/luci-app-btmanager/root/usr/sbin/btmanager"
+download_and_check "${BASE_URL}/package/luci-app-btmanager/root/usr/share/luci/menu.d/luci-app-btmanager.json" "package/luci-app-btmanager/root/usr/share/luci/menu.d/luci-app-btmanager.json"
+download_and_check "${BASE_URL}/package/luci-app-btmanager/root/usr/share/rpcd/acl.d/luci-app-btmanager.json" "package/luci-app-btmanager/root/usr/share/rpcd/acl.d/luci-app-btmanager.json"
+download_and_check "${BASE_URL}/package/luci-app-btmanager/Makefile" "package/luci-app-btmanager/Makefile"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
