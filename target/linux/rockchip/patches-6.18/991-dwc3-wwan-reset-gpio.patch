@@ -1,0 +1,91 @@
+--- a/drivers/usb/dwc3/core.h
++++ b/drivers/usb/dwc3/core.h
+@@ -1241,6 +1241,9 @@
+ 	struct usb_phy		*usb2_phy;
+ 	struct usb_phy		*usb3_phy;
+ 
++	/* 可选：M.2 WWAN 模组的 RESET#（板级 DT 提供 reset-gpios 时非 NULL） */
++	struct gpio_desc	*wwan_rst_gpio;
++
+ 	struct phy		*usb2_generic_phy[DWC3_USB2_MAX_PORTS];
+ 	struct phy		*usb3_generic_phy[DWC3_USB3_MAX_PORTS];
+ 
+--- a/drivers/usb/dwc3/core.c
++++ b/drivers/usb/dwc3/core.c
+@@ -29,6 +29,8 @@
+ #include <linux/pinctrl/consumer.h>
+ #include <linux/pinctrl/devinfo.h>
+ #include <linux/reset.h>
++#include <linux/gpio/consumer.h>
++#include <linux/property.h>
+ #include <linux/bitfield.h>
+ 
+ #include <linux/usb/ch9.h>
+@@ -1343,6 +1345,56 @@
+ 	}
+ }
+ 
++/*
++ * dwc3_wwan_rst_pulse - 在 xHCI 注册之前给 M.2 WWAN 模组一个硬复位脉冲
++ * @dwc: dwc3 控制器
++ *
++ * H29K 的 M.2 B-key 只引了 USB3/USB2（没有 PCIe lane），模组只能以 USB
++ * 复合设备形态工作（FM350-GL 在 RNDIS 模式下是 rndis_host + option 串口）。
++ *
++ * 问题是模组在主机热重启时 3V3/VBUS 不会掉电，它的 USB 侧还停在上一轮枚举
++ * 后的状态；主机重新初始化 xHCI 后模组不会重新枚举，日志表现为反复
++ * "Timeout while waiting for setup device command"、error -62 / -71、
++ * port power cycle，最后靠模组自身状态机慢慢恢复（实测约 60s）。
++ *
++ * 在 dwc3 进入 host 模式、xHCI 注册之前拉一次 RESET#，模组会从自己的 USB
++ * 栈重新开始，主机就不会先去跟一个旧状态的模组死磕。
++ *
++ * 复位脚/极性由板级 DT 决定（reset-gpios，通常 GPIO_ACTIVE_LOW：逻辑 0 =
++ * 拉低 = RESET# 有效）。可选 reset-assert-us 调整拉低时长，默认 1s（实机
++ * 验证过的值），上限 2s。释放后不做等待 —— 模组自己是两段式启动（先出
++ * AT/HS 组合，再切到 RNDIS/SuperSpeed），xHCI 会按 connect 事件正常接管。
++ *
++ * 返回 0：无复位脚或脉冲已完成；负值：需要中止 probe（含 -EPROBE_DEFER）。
++ */
++static int dwc3_wwan_rst_pulse(struct dwc3 *dwc)
++{
++	struct gpio_desc *gpio;
++	u32 assert_us = 1000000;
++
++	gpio = devm_gpiod_get_optional(dwc->dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(gpio))
++		return dev_err_probe(dwc->dev, PTR_ERR(gpio),
++				     "failed to get WWAN reset gpio\n");
++	if (!gpio)
++		return 0;
++
++	if (!device_property_read_u32(dwc->dev, "reset-assert-us", &assert_us) &&
++	    assert_us > 2000000)
++		assert_us = 2000000;
++
++	dwc->wwan_rst_gpio = gpio;
++
++	/* 逻辑 0 = RESET# 有效；保持 assert_us 后释放（逻辑 1 = 不复位） */
++	gpiod_set_value_cansleep(gpio, 0);
++	fsleep(assert_us);
++	gpiod_set_value_cansleep(gpio, 1);
++
++	dev_info(dwc->dev, "WWAN RESET# pulsed for %u us\n", assert_us);
++
++	return 0;
++}
++
+ /**
+  * dwc3_core_init - Low-level initialization of DWC3 Core
+  * @dwc: Pointer to our controller context structure
+@@ -2337,6 +2389,10 @@
+ 	dwc3_check_params(dwc);
+ 	dwc3_debugfs_init(dwc);
+ 
++	ret = dwc3_wwan_rst_pulse(dwc);
++	if (ret)
++		goto err_exit_debugfs;
++
+ 	ret = dwc3_core_init_mode(dwc);
+ 	if (ret)
+ 		goto err_exit_debugfs;
