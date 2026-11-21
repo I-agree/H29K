@@ -71,19 +71,40 @@ PKG_BUILD_PARALLEL:=1
 #
 # 只做音频 / 只想先让包编过时，把 KMS_DEPS 清空并把 videosink 设空即可（会退回 autovideosink）。
 #
-# 注意 gst1-mod-kms 这个包名只有在 feeds 的 gst1-plugins-bad/Makefile 打了
-# extras/0001-gst1-plugins-bad-enable-kmssink.patch 之后才存在（GstBuildPlugin,kms,...）；
-# 没打补丁时直接写死 +gst1-mod-kms 会让整个构建报 "dependency on 'gst1-mod-kms',
-# which does not exist"，所以这里探测一下再决定要不要硬依赖。
+# 【重要】这里故意**不做任何探测**，把 +gst1-mod-kms 静态写死。原因是一段踩过的坑：
 #
-# 探测优先看 package/feeds/*/gst1-plugins-bad/Makefile —— 那才是 OpenWrt 扫描元数据
-# 和真正编译时用的那份（feeds 源目录只是它的来源）。只看 feeds/ 会出现"依赖要求
-# gst1-mod-kms、但产物里没有这个 apk"的错位，最终在镜像安装阶段报
-#   gst1-mod-kms (no such package) required by gmediarender
-GST_BAD_MK:=$(firstword $(wildcard $(TOPDIR)/package/feeds/*/gst1-plugins-bad/Makefile) \
-	$(wildcard $(TOPDIR)/feeds/*/multimedia/gst1-plugins-bad/Makefile))
-KMS_PATCHED:=$(shell grep -l "GstBuildPlugin,kms" $(GST_BAD_MK) 2>/dev/null)
-KMS_DEPS:=+libgst1allocators +libgst1video +libdrm $(if $(KMS_PATCHED),+gst1-mod-kms)
+#   gst1-mod-kms 这个包名只有在 feeds 的 gst1-plugins-bad/Makefile 打了
+#   extras/0001-gst1-plugins-bad-enable-kmssink.patch 之后才存在
+#   （GstBuildPlugin,kms,...）。所以之前这里用
+#       KMS_PATCHED:=$(shell grep -l "GstBuildPlugin,kms" ...)
+#   探测之后再决定要不要依赖。这个写法是**错的**，会稳定地把构建搞失败：
+#
+#   1) `./scripts/feeds install -a` 内部会跑一次 `make -s prepare-tmpinfo`
+#      （scripts/feeds 第 299 行），也就是在打补丁**之前**就已经把
+#      tmp/info/ 里每个包的扫描片段生成好了；本包的片段里自然没有 kms 依赖。
+#   2) 之后 diy-part2 打的补丁改的是 *gst1-plugins-bad* 的 Makefile。
+#      include/scan.mk 判断"某个包要不要重扫"的唯一依据是**它自己的**
+#      Makefile（+ SCAN_DEPS）比片段新 —— 本包 Makefile 一字节没动，
+#      于是它的片段被原样复用，Depends 里永远没有 +gst1-mod-kms。
+#   3) 结果元数据里 gst1-mod-kms 这个包存在（gst1-plugins-bad 被重扫了），
+#      但 gmediarender 的 Kconfig stanza 里没有 `select PACKAGE_gst1-mod-kms`。
+#      该符号是 HIDDEN 的 tristate（无 prompt），没人 select 就没有值，
+#      连 .config 里手写的 CONFIG_PACKAGE_gst1-mod-kms=y 都会被 conf 丢掉
+#      → 包不编译 → 镜像安装阶段报
+#         gst1-mod-kms (no such package): required by gmediarender
+#
+#   即：$(shell grep) 让本包的 DEPENDS 隐式依赖了**另一个文件**的内容，
+#   而 scan.mk 对此一无所知（SCAN_DEPS 里不含它）。这是个隐藏依赖。
+#
+# 结论：依赖必须静态声明。补丁本身由 diy-part2 负责打，且它打完会 grep 断言，
+# 打不上就直接 exit 1（不会出现"依赖写了、包不存在"的中间态）。
+# 没有打补丁就构建本包时，pm.pl 会明确报
+#   has a dependency on 'gst1-mod-kms', which does not exist
+# 这是期望行为：错误暴露在扫描阶段，而不是拖到镜像 install 阶段。
+#
+# 配套要求（很关键）：workflow 里 `make defconfig` 之前必须 `rm -rf tmp`，
+# 强制全量重扫，否则 scan.mk 的增量缓存还会把别的跨包依赖坑掉。
+KMS_DEPS:=+libgst1allocators +libgst1video +libdrm +gst1-mod-kms
 
 include $(INCLUDE_DIR)/package.mk
 
