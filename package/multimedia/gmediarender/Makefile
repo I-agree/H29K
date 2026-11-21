@@ -207,6 +207,7 @@ define Package/gmediarender/install
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/gmediarender.init $(1)/etc/init.d/gmediarender
+	$(INSTALL_BIN) ./files/rkvdec-bind.init $(1)/etc/init.d/rkvdec-bind
 
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_CONF) ./files/gmediarender.config $(1)/etc/config/gmediarender

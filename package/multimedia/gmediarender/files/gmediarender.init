@@ -12,6 +12,14 @@ USE_PROCD=1
 PROG=/usr/bin/gmediarender
 CONFIG_NAME=gmediarender
 
+# V4L2 stateless 硬解元素的 rank 提升。
+# 背景：rkvdec 开闸后 v4l2codecs 插件才注册 v4l2slh264dec/v4l2slh265dec，但它们的
+# 默认 rank 与 libav 的 avdec_h264（primary=256）可能打平，playbin 在平局时未必挑硬解。
+# 这里把硬解元素抬到 MAX，软解保持原样（不打压 avdec，留作后续条目的兜底）。
+# 注意：GST_DEBUG 在这套固件里编译时被关掉了，但 GST_PLUGIN_FEATURE_RANK 是纯运行时
+#       特性，不依赖 debug 支持，照常生效。
+GST_RANK_BOOST="v4l2slh264dec:MAX,v4l2slh265dec:MAX,v4l2slvp8dec:MAX,v4l2slvp9dec:MAX,v4l2slav1dec:MAX"
+
 # 没配置 uuid 时，用第一块物理网卡的 MAC 生成一个稳定的 UUID
 derive_uuid() {
 	local iface="$1" mac="" i
@@ -83,9 +91,12 @@ start_instance() {
 	# sink_whitelist 走环境变量传进去（gmediarender 没有对应的命令行参数）：
 	# 非空时 SinkProtocolInfo 只通告这些 MIME，控制器看到不支持就会转码或换流
 	if [ -n "$sink_whitelist" ]; then
-		procd_set_param env USER=root HOME=/root "GMEDIARENDER_SINK_WHITELIST=$sink_whitelist"
+		procd_set_param env USER=root HOME=/root \
+			"GST_PLUGIN_FEATURE_RANK=$GST_RANK_BOOST" \
+			"GMEDIARENDER_SINK_WHITELIST=$sink_whitelist"
 	else
-		procd_set_param env USER=root HOME=/root
+		procd_set_param env USER=root HOME=/root \
+			"GST_PLUGIN_FEATURE_RANK=$GST_RANK_BOOST"
 	fi
 	procd_set_param respawn ${respawn_threshold:-3600} ${respawn_timeout:-5} ${respawn_retry:-5}
 	procd_set_param file "/etc/config/$CONFIG_NAME"
