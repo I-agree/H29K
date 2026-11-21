@@ -102,8 +102,26 @@ PKG_BUILD_PARALLEL:=1
 #   has a dependency on 'gst1-mod-kms', which does not exist
 # 这是期望行为：错误暴露在扫描阶段，而不是拖到镜像 install 阶段。
 #
-# 配套要求（很关键）：workflow 里 `make defconfig` 之前必须 `rm -rf tmp`，
-# 强制全量重扫，否则 scan.mk 的增量缓存还会把别的跨包依赖坑掉。
+# 为什么只靠静态依赖就够了（构建步骤无需任何改动）：
+#
+#   * tmp/.packageinfo 里本包的 Depends 是扫描时从本文件原样 dump 出的字符串，
+#     +gst1-mod-kms 会一直留在其中，与"扫描那一刻 gst1-mod-kms 这个包还不存在"无关。
+#   * pm.pl 的 mconf_depends 对 `+` 依赖是一律发 select 的
+#     （只有"把目标包自己的 depends 转嫁到父包"那一句才判存在性），
+#     所以目标是悬空符号时只是当时无人认领，不会报错、也不会挡住后面的生成。
+#   * 补丁改的是 gst1-plugins-bad 的 Makefile，它的片段会被重扫，
+#     .packageinfo 随之重写，tmp/.config-package.in 再整体重新生成；
+#     那一刻 Package: gst1-mod-kms 已经存在，select 就落地了。
+#
+#   因此成立条件只有一个：补丁之后确实发生过一次重扫。当前 workflow 天然满足 ——
+#   .config 是在 feeds install -a 之后才拷入的，其 mtime 晚于
+#   tmp/info/.scan-packageinfo.stamp，prepare-tmpinfo 里 scan_unchanged 必然判为 false，
+#   于是 make defconfig 会重扫 gst1-plugins-bad。所以不需要 rm -rf tmp，也不用改任何步骤。
+#
+#   唯一会失效的情形：以后有人把 cp $CONFIG_FILE .config 挪到 feeds install 之前
+#   （那 .config 不再比扫描戳新，重扫被跳过）。真到那天，在 diy-part2 打完补丁后加一行
+#       touch package/multimedia/gmediarender/Makefile
+#   即可精确触发本包重扫，比 rm -rf tmp 便宜得多。
 KMS_DEPS:=+libgst1allocators +libgst1video +libdrm +gst1-mod-kms
 
 include $(INCLUDE_DIR)/package.mk
