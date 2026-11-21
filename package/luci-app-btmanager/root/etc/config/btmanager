@@ -1,0 +1,10 @@
+config btmanager 'main'
+	option enabled '1'
+	# AIC8800 BT 的 HCI 走 UART2（rk3528 uart2m1，带 CTS）
+	option uart '/dev/ttyS2'
+	option baud '1500000'
+	option flow 'flow'
+	option type 'any'
+	# 开机自动连接下面 autodev 列表里的已配对设备
+	option autoconnect '1'
+	option autodev ''

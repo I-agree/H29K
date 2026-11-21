@@ -1,0 +1,62 @@
+#!/bin/sh /etc/rc.common
+# ---------------------------------------------------------------------------
+# Bluetooth service for luci-app-btmanager
+#
+#   1. unblock the bluetooth rfkill switch (AIC8800 BTLPM / rfkill-gpio)
+#   2. attach the AIC8800 BT controller on the board UART via hciattach
+#   3. hand over to bluetoothd (already enabled by 99-btmanager uci-defaults)
+#   4. auto-connect devices selected in the LuCI page
+# ---------------------------------------------------------------------------
+
+START=96
+STOP=15
+USE_PROCD=1
+
+. /lib/functions.sh
+
+rfkill_unblock() {
+	if command -v rfkill >/dev/null 2>&1; then
+		rfkill unblock bluetooth 2>/dev/null
+		return 0
+	fi
+	for d in /sys/class/rfkill/rfkill*; do
+		[ -r "$d/type" ] || continue
+		[ "$(cat "$d/type" 2>/dev/null)" = "bluetooth" ] || continue
+		echo 0 > "$d/soft" 2>/dev/null
+	done
+}
+
+start_service() {
+	local enabled uart baud flow type
+
+	config_load btmanager
+	config_get_bool enabled main enabled 1
+	[ "$enabled" = "1" ] || return 0
+
+	config_get uart main uart /dev/ttyS2
+	config_get baud main baud 1500000
+	config_get flow main flow flow
+	config_get type main type any
+
+	mkdir -p /var/run/btmanager
+	rfkill_unblock
+
+	# dbus must be up before bluetoothd (bluetoothd START=62)
+	/etc/init.d/dbus start 2>/dev/null
+	/etc/init.d/bluetoothd start 2>/dev/null
+
+	# hciattach stays in foreground (-n), procd keeps it alive
+	procd_open_instance hci
+	procd_set_param command /usr/bin/hciattach -n -s "$baud" "$uart" "$type" "$baud" "$flow" nosleep
+	procd_set_param respawn 3600 10 0
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+
+	# one shot: wait for hci0 then connect the configured devices
+	procd_open_instance boot
+	procd_set_param command /usr/sbin/btmanager boot
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}

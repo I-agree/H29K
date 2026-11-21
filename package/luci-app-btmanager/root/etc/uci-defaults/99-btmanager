@@ -1,0 +1,11 @@
+#!/bin/sh
+# First boot setup for luci-app-btmanager
+
+[ -f /etc/init.d/dbus ]        && /etc/init.d/dbus enable        2>/dev/null
+[ -f /etc/init.d/bluetoothd ]  && /etc/init.d/bluetoothd enable  2>/dev/null
+[ -f /etc/init.d/btmanager ]   && /etc/init.d/btmanager enable   2>/dev/null
+
+# rcS 已经在启动本脚本前算好服务列表，这里显式拉起一次，免得要等到下一次重启
+[ -f /etc/init.d/btmanager ]   && /etc/init.d/btmanager start    2>/dev/null
+
+exit 0

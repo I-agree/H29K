@@ -1,0 +1,482 @@
+#!/bin/sh
+# ---------------------------------------------------------------------------
+# btmanager - backend helper for luci-app-btmanager
+#
+# Invoked by rpcd "file.exec" (root). Every sub-command is whitelisted here,
+# the LuCI frontend never passes raw shell code.
+#
+# Sub-commands:
+#   summary                     controller / daemon status
+#   devices                     paired + discovered device list (JSON)
+#   scan [seconds]              start discovery, return found devices (JSON)
+#   pair <mac>                  btmgmt pair (BR/EDR then LE) + trust + connect
+#   connect <mac>               connect
+#   disconnect <mac>            disconnect
+#   trust <mac> | untrust <mac> manage Trusted flag
+#   remove <mac>                remove bonding
+#   power on|off                adapter power
+#   restart                     restart bluetooth service stack
+#
+#   config                      current UCI settings (JSON)
+#   set <key> <value>           change UCI setting
+#   autodev <mac> <0|1>         add/remove device from auto-connect list
+#   boot                        one-shot boot helper (wait hci0, autoconnect)
+#   diag                        plain text diagnostics
+#   log                         plain text recent bluetooth log
+# ---------------------------------------------------------------------------
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+BTCTL=/usr/bin/bluetoothctl
+BTMGMT=/usr/bin/btmgmt
+STATE_DIR=/var/run/btmanager
+LOG_FILE=$STATE_DIR/btmanager.log
+
+mkdir -p "$STATE_DIR" 2>/dev/null
+
+# ------------------------------- helpers -----------------------------------
+
+json_esc() {
+	printf '%s' "$1" | tr -d '\r' | tr '\n\t' '  ' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}
+
+bool_json() {
+	[ "$1" = "yes" ] && printf 'true' || printf 'false'
+}
+
+norm_mac() {
+	printf '%s' "$1" | tr 'a-f' 'A-F'
+}
+
+valid_mac() {
+	printf '%s' "$1" | grep -Eq '^([0-9A-F]{2}:){5}[0-9A-F]{2}$'
+}
+
+cfg() {
+	uci -q get "btmanager.main.$1" 2>/dev/null
+}
+
+bt_show_field() {
+	run_lim 8 "$BTCTL" show 2>/dev/null | sed -n "s/^[[:space:]]*$1:[[:space:]]*//p" | head -n 1
+}
+
+bt_field() {
+	# $1 = mac, $2 = field name of "bluetoothctl info"
+	run_lim 6 "$BTCTL" info "$1" 2>/dev/null | sed -n "s/^[[:space:]]*$2:[[:space:]]*//p" | head -n 1
+}
+
+wait_field() {
+	# $1 mac, $2 field, $3 expected value, $4 timeout seconds
+	wf_i=0
+	while [ $wf_i -lt "$4" ]; do
+		[ "$(bt_field "$1" "$2")" = "$3" ] && return 0
+		sleep 1
+		wf_i=$((wf_i + 1))
+	done
+	return 1
+}
+
+run_lim() {
+	# $1 = timeout seconds, rest = command
+	t=$1; shift
+	if command -v timeout >/dev/null 2>&1; then
+		timeout "$t" "$@"
+	else
+		"$@"
+	fi
+}
+
+autodev_list() {
+	cfg autodev
+}
+
+is_autodev() {
+	for a in $(autodev_list); do
+		[ "$(norm_mac "$a")" = "$1" ] && return 0
+	done
+	return 1
+}
+
+fail_json() {
+	printf '{"ok":false,"message":"%s"}\n' "$(json_esc "$1")"
+	exit 0
+}
+
+# ---------------------------- JSON builders --------------------------------
+
+device_json() {
+	mac=$1
+	info=$(run_lim 6 "$BTCTL" info "$mac" 2>/dev/null)
+
+	name=$(printf '%s\n' "$info"   | sed -n 's/^[[:space:]]*Name:[[:space:]]*//p'    | head -n 1)
+	alias=$(printf '%s\n' "$info"  | sed -n 's/^[[:space:]]*Alias:[[:space:]]*//p'   | head -n 1)
+	icon=$(printf '%s\n' "$info"   | sed -n 's/^[[:space:]]*Icon:[[:space:]]*//p'    | head -n 1)
+	klass=$(printf '%s\n' "$info"  | sed -n 's/^[[:space:]]*Class:[[:space:]]*//p'   | head -n 1)
+	paired=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*Paired:[[:space:]]*//p'  | head -n 1)
+	trusted=$(printf '%s\n' "$info"| sed -n 's/^[[:space:]]*Trusted:[[:space:]]*//p' | head -n 1)
+	conn=$(printf '%s\n' "$info"   | sed -n 's/^[[:space:]]*Connected:[[:space:]]*//p' | head -n 1)
+	rssi=$(printf '%s\n' "$info"   | sed -n 's/^[[:space:]]*RSSI:[[:space:]]*//p'    | head -n 1)
+
+	audio=no
+	printf '%s\n' "$info" | grep -qE 'Audio (Sink|Source)|Handsfree|Headset|A/V Remote' && audio=yes
+
+	auto=no
+	is_autodev "$mac" && auto=yes
+
+	[ -z "$name" ] && name="$alias"
+	[ -z "$name" ] && name="$mac"
+
+	printf '{"address":"%s","name":"%s","alias":"%s","icon":"%s","class":"%s","paired":%s,"trusted":%s,"connected":%s,"rssi":"%s","audio":%s,"autoconnect":%s}' \
+		"$mac" \
+		"$(json_esc "$name")" \
+		"$(json_esc "$alias")" \
+		"$(json_esc "$icon")" \
+		"$(json_esc "$klass")" \
+		"$(bool_json "$paired")" \
+		"$(bool_json "$trusted")" \
+		"$(bool_json "$conn")" \
+		"$(json_esc "$rssi")" \
+		"$(bool_json "$audio")" \
+		"$(bool_json "$auto")"
+}
+
+print_devices_array() {
+	printf '['
+	first=1
+	run_lim 10 "$BTCTL" devices 2>/dev/null | while IFS= read -r line; do
+		mac=$(printf '%s' "$line" | sed -n 's/^Device \([0-9A-Fa-f:]\{17\}\).*/\1/p')
+		[ -n "$mac" ] || continue
+		if [ "$first" = 1 ]; then first=0; else printf ','; fi
+		device_json "$(norm_mac "$mac")"
+	done
+	printf ']'
+}
+
+config_json() {
+	printf '{"uart":"%s","baud":"%s","flow":"%s","type":"%s","enabled":"%s","autoconnect":"%s","autodev":"%s"}' \
+		"$(json_esc "$(cfg uart)")" \
+		"$(json_esc "$(cfg baud)")" \
+		"$(json_esc "$(cfg flow)")" \
+		"$(json_esc "$(cfg type)")" \
+		"$(json_esc "$(cfg enabled)")" \
+		"$(json_esc "$(cfg autoconnect)")" \
+		"$(json_esc "$(autodev_list)")"
+}
+
+# ------------------------------- commands ----------------------------------
+
+cmd_summary() {
+	show=$(run_lim 8 "$BTCTL" show 2>&1)
+	addr=$(printf '%s\n' "$show" | sed -n 's/^Controller \([0-9A-Fa-f:]\{17\}\).*/\1/p' | head -n 1)
+	[ -z "$addr" ] && addr=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Address:[[:space:]]*//p' | head -n 1)
+	name=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Alias:[[:space:]]*//p'     | head -n 1)
+	[ -z "$name" ] && name=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Name:[[:space:]]*//p' | head -n 1)
+	powered=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Powered:[[:space:]]*//p' | head -n 1)
+	disc=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Discoverable:[[:space:]]*//p' | head -n 1)
+	pair=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Pairable:[[:space:]]*//p' | head -n 1)
+
+	bd=no; pidof bluetoothd >/dev/null 2>&1 && bd=yes
+	ha=no; pidof hciattach  >/dev/null 2>&1 && ha=yes
+	hci0=no; [ -e /sys/class/bluetooth/hci0 ] && hci0=yes
+
+	paired_count=$(run_lim 10 "$BTCTL" devices Paired 2>/dev/null | grep -c '^Device ')
+	conn_count=$(run_lim 10 "$BTCTL" devices Connected 2>/dev/null | grep -c '^Device ')
+
+	printf '{"ok":true,"service":{"bluetoothd":%s,"hciattach":%s,"hci0":%s},"controller":{"address":"%s","name":"%s","powered":%s,"discoverable":%s,"pairable":%s},"counts":{"paired":%d,"connected":%d},"config":%s}\n' \
+		"$(bool_json "$bd")" "$(bool_json "$ha")" "$(bool_json "$hci0")" \
+		"$(json_esc "$addr")" "$(json_esc "$name")" \
+		"$(bool_json "$powered")" "$(bool_json "$disc")" "$(bool_json "$pair")" \
+		"${paired_count:-0}" "${conn_count:-0}" \
+		"$(config_json)"
+}
+
+cmd_devices() {
+	printf '{"ok":true,"devices":'
+	print_devices_array
+	printf '}\n'
+}
+
+cmd_scan() {
+	dur=${1:-8}
+	case "$dur" in ''|*[!0-9]*) dur=8 ;; esac
+	[ "$dur" -lt 4 ]  && dur=4
+	[ "$dur" -gt 20 ] && dur=20
+
+	"$BTCTL" power on >/dev/null 2>&1
+
+	scan_out=$( { printf 'scan on\n'; sleep "$dur"; printf 'scan off\nquit\n'; } | run_lim $((dur + 10)) "$BTCTL" 2>&1 )
+
+	macs=$(printf '%s\n' "$scan_out" | sed -n 's/^.*Device \([0-9A-Fa-f:]\{17\}\).*/\1/p' | tr 'a-f' 'A-F' | sort -u)
+	total=$(printf '%s\n' "$macs" | grep -c '[0-9A-F]')
+
+	printf '{"ok":true,"message":"%s","found":[' "$(json_esc "扫描完成，发现 ${total:-0} 个设备")"
+	first=1
+	for mac in $macs; do
+		name=$(bt_field "$mac" Alias)
+		[ -z "$name" ] && name=$(bt_field "$mac" Name)
+		[ -z "$name" ] && name="未知设备"
+		if [ "$first" = 1 ]; then first=0; else printf ','; fi
+		printf '{"address":"%s","name":"%s"}' "$mac" "$(json_esc "$name")"
+	done
+	printf ']}\n'
+}
+
+cmd_pair() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+
+	"$BTCTL" power on >/dev/null 2>&1
+
+	out1=""
+	out2=""
+	out1=$(run_lim 25 "$BTMGMT" pair -c 3 -t 0 "$mac" 2>&1)
+	if ! wait_field "$mac" Paired yes 4; then
+		out2=$(run_lim 25 "$BTMGMT" pair -c 3 -t 2 "$mac" 2>&1)
+		wait_field "$mac" Paired yes 4
+	fi
+
+	# btmgmt may return before bluetoothd has synced the device, so also
+	# accept the "Pairing successful" marker from the mgmt output
+	if [ "$(bt_field "$mac" Paired)" != "yes" ] && \
+	   printf '%s\n%s\n' "$out1" "$out2" | grep -qiE 'Pairing successful|Paired: yes'; then
+		paired_hint=yes
+	else
+		paired_hint=$(bt_field "$mac" Paired)
+	fi
+
+	"$BTCTL" trust "$mac" >/dev/null 2>&1
+	"$BTCTL" connect "$mac" >/dev/null 2>&1
+
+	wait_field "$mac" Connected yes 10
+
+	paired=$(bt_field "$mac" Paired)
+	[ "$paired" != "yes" ] && paired=$paired_hint
+	conn=$(bt_field "$mac" Connected)
+	out=$(printf '%s\n%s\n' "$out1" "$out2" | grep -v '^$' | tail -n 6)
+
+	if [ "$paired" = "yes" ] && [ "$conn" = "yes" ]; then
+		msg="已配对并连接"
+	elif [ "$paired" = "yes" ]; then
+		msg="已配对，但连接未建立（可稍后点“连接”重试）"
+	else
+		msg="配对失败：请确认设备处于配对模式；需要 PIN 的键盘请改用 SSH 手动配对"
+	fi
+
+	printf '{"ok":true,"paired":%s,"connected":%s,"message":"%s","output":"%s"}\n' \
+		"$(bool_json "$paired")" "$(bool_json "$conn")" "$(json_esc "$msg")" "$(json_esc "$out")"
+}
+
+cmd_connect() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+
+	"$BTCTL" power on >/dev/null 2>&1
+	out=$("$BTCTL" connect "$mac" 2>&1)
+
+	i=0
+	while [ $i -lt 10 ]; do
+		[ "$(bt_field "$mac" Connected)" = "yes" ] && break
+		sleep 1
+		i=$((i + 1))
+	done
+
+	conn=$(bt_field "$mac" Connected)
+	if [ "$conn" = "yes" ]; then msg="连接成功"; else msg="连接失败：$(printf '%s\n' "$out" | tail -n 1)"; fi
+
+	printf '{"ok":true,"connected":%s,"message":"%s","output":"%s"}\n' \
+		"$(bool_json "$conn")" "$(json_esc "$msg")" "$(json_esc "$out")"
+}
+
+cmd_disconnect() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+
+	out=$("$BTCTL" disconnect "$mac" 2>&1)
+	i=0
+	while [ $i -lt 6 ]; do
+		[ "$(bt_field "$mac" Connected)" != "yes" ] && break
+		sleep 1
+		i=$((i + 1))
+	done
+
+	printf '{"ok":true,"message":"%s","output":"%s"}\n' \
+		"$(json_esc "已断开连接")" "$(json_esc "$out")"
+}
+
+cmd_trust() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+	if [ "$2" = "0" ]; then
+		"$BTCTL" untrust "$mac" >/dev/null 2>&1
+		msg="已取消信任"
+	else
+		"$BTCTL" trust "$mac" >/dev/null 2>&1
+		msg="已设为信任设备"
+	fi
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "$msg")"
+}
+
+cmd_remove() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+	"$BTCTL" remove "$mac" >/dev/null 2>&1
+	cmd_autodev "$mac" 0 >/dev/null 2>&1
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "已删除配对信息")"
+}
+
+cmd_power() {
+	case "$1" in
+		on|off) ;;
+		*) fail_json "参数必须是 on 或 off" ;;
+	esac
+	"$BTCTL" power "$1" >/dev/null 2>&1
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "适配器已$([ "$1" = on ] && echo 上电 || echo 下电)")"
+}
+
+cmd_restart() {
+	/etc/init.d/btmanager restart >/dev/null 2>&1
+	sleep 3
+	cmd_summary
+}
+
+cmd_config() {
+	printf '{"ok":true,"config":%s}\n' "$(config_json)"
+}
+
+cmd_set() {
+	key=$1
+	val=$2
+	case "$key" in
+		uart)
+			printf '%s' "$val" | grep -Eq '^/dev/tty[A-Za-z0-9._-]+$' || fail_json "串口设备路径无效"
+			;;
+		baud)
+			printf '%s' "$val" | grep -Eq '^[0-9]+$' || fail_json "波特率必须是数字"
+			[ "$val" -ge 9600 ] && [ "$val" -le 4000000 ] || fail_json "波特率超出范围"
+			;;
+		flow)
+			case "$val" in flow|noflow) ;; *) fail_json "flow 只能是 flow/noflow" ;; esac
+			;;
+		type)
+			printf '%s' "$val" | grep -Eq '^[a-z0-9]+$' || fail_json "协议类型无效"
+			;;
+		enabled|autoconnect)
+			case "$val" in 0|1) ;; *) fail_json "该配置只接受 0 或 1" ;; esac
+			;;
+		*)
+			fail_json "未知配置项"
+			;;
+	esac
+
+	uci -q set "btmanager.main.$key=$val" || fail_json "写入配置失败"
+	uci -q commit btmanager || fail_json "提交配置失败"
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "配置已保存")"
+}
+
+cmd_autodev() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+	enable=$2
+
+	new=""
+	for a in $(autodev_list); do
+		[ "$(norm_mac "$a")" = "$mac" ] && continue
+		new="$new $a"
+	done
+	[ "$enable" = "1" ] && new="$new $mac"
+
+	uci -q set "btmanager.main.autodev=$new" || fail_json "写入配置失败"
+	uci -q commit btmanager || fail_json "提交配置失败"
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "自动连接列表已更新")"
+}
+
+cmd_boot() {
+	# Wait for the HCI device created by hciattach
+	i=0
+	while [ $i -lt 25 ]; do
+		[ -e /sys/class/bluetooth/hci0 ] && break
+		sleep 1
+		i=$((i + 1))
+	done
+	sleep 2
+	"$BTCTL" power on >/dev/null 2>&1
+
+	[ "$(cfg autoconnect)" = "1" ] || exit 0
+
+	for mac in $(autodev_list); do
+		mac=$(norm_mac "$mac")
+		valid_mac "$mac" || continue
+		[ "$(bt_field "$mac" Paired)" = "yes" ] || continue
+		t=1
+		while [ $t -le 3 ]; do
+			"$BTCTL" connect "$mac" >/dev/null 2>&1
+			sleep 3
+			[ "$(bt_field "$mac" Connected)" = "yes" ] && break
+			t=$((t + 1))
+		done
+	done
+	exit 0
+}
+
+cmd_diag() {
+	echo "== date"
+	date
+	echo
+	echo "== hciconfig -a"
+	hciconfig -a 2>&1
+	echo
+	echo "== bluetoothctl show"
+	"$BTCTL" show 2>&1
+	echo
+	echo "== btmgmt info"
+	run_lim 10 "$BTMGMT" info 2>&1 | head -n 40
+	echo
+	echo "== processes"
+	ps w 2>/dev/null | grep -E 'bluetoothd|hciattach|dbus-daemon' | grep -v grep
+	echo
+	echo "== tty devices"
+	ls -l /dev/ttyS* /dev/ttyAS* 2>/dev/null
+	echo
+	echo "== rfkill"
+	for f in /sys/class/rfkill/rfkill*; do
+		[ -d "$f" ] || continue
+		echo "$f name=$(cat "$f/name" 2>/dev/null) type=$(cat "$f/type" 2>/dev/null) soft=$(cat "$f/soft" 2>/dev/null) hard=$(cat "$f/hard" 2>/dev/null)"
+	done
+	echo
+	echo "== kernel log (bluetooth / hci / aic)"
+	dmesg 2>/dev/null | grep -iE 'bluetooth|hci|aic|bt_' | tail -n 40
+}
+
+cmd_log() {
+	if command -v logread >/dev/null 2>&1; then
+		logread 2>/dev/null | grep -iE 'hciattach|bluetooth|bt_|bluez' | tail -n 50
+	fi
+	[ -s "$LOG_FILE" ] && { echo; echo "== $LOG_FILE"; tail -n 30 "$LOG_FILE"; }
+	exit 0
+}
+
+# -------------------------------- dispatch ---------------------------------
+
+case "$1" in
+	summary)    cmd_summary ;;
+	devices)    cmd_devices ;;
+	scan)       cmd_scan "$2" ;;
+	pair)       cmd_pair "$2" ;;
+	connect)    cmd_connect "$2" ;;
+	disconnect) cmd_disconnect "$2" ;;
+	trust)      cmd_trust "$2" "$3" ;;
+	remove)     cmd_remove "$2" ;;
+	power)      cmd_power "$2" ;;
+	restart)    cmd_restart ;;
+	config)     cmd_config ;;
+	set)        cmd_set "$2" "$3" ;;
+	autodev)    cmd_autodev "$2" "$3" ;;
+	boot)       cmd_boot ;;
+	diag)       cmd_diag ;;
+	log)        cmd_log ;;
+	*)
+		echo "unknown command: $1" >&2
+		exit 2
+		;;
+esac
