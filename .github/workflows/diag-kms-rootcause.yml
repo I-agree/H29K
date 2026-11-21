@@ -1,0 +1,218 @@
+name: diag-kms-rootcause
+
+# 目的：定位 gst1-mod-kms 为什么在真实流水线里进不了 .config
+# 做法：100% 复刻你的真实流水线（你自己的 diy-part1.sh / diy-part2.sh），
+#       在 4 个时间点做快照，并加一组对照：第一次 defconfig 原样跑，再清空 tmp 跑第二次。
+# 不编译、不 download，约 15~25 分钟。
+#
+# 判读规则（最后一步会自动打印结论）：
+#   snap3 kms=0 且 snap4 kms=1  -> 根因 = 第一次 defconfig 没重建元数据（扫描缓存/门禁问题）
+#   snap3 kms>=1 且 snap3 .config 无该行 -> 符号已定义，被 depends 挡住 或 select 没生效
+#   snap3 kms>=1 且 snap3 .config 有该行  -> 这条链其实通了，问题在编译/打包阶段
+#   其余 -> 补丁没进入扫描视野（看 snap2 的 inode / 路径）
+
+on:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: main
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
+
+jobs:
+  diag:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 0. 检出你自己的仓库
+        uses: actions/checkout@v4
+
+      - name: 1. 磁盘与环境
+        run: |
+          sudo mkdir -p $WORK_DIR && sudo chown -R $USER:$USER $WORK_DIR
+          sudo -E apt-get -qq update
+          sudo -E apt-get -qq install build-essential libncurses5-dev libncursesw5-dev zlib1g-dev \
+            unzip gawk python3 python3-dev bison flex patch curl git rsync subversion quilt \
+            autoconf automake autopoint gettext help2man intltool libtool pkgconf xmlto cpio
+          df -h / /tmp
+
+      - name: 2. 克隆 openwrt
+        run: |
+          cd $WORK_DIR
+          git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+          cd openwrt
+          echo ">>> 上游 commit（内核版本看这里）"; git log -1 --oneline
+          grep -E "KERNEL_PATCHVER" target/linux/rockchip/Makefile
+          # 跳过 prereq 全量检查（不影响扫描/元数据逻辑，只为省时间；真实构建里这一步是通过的）
+          mkdir -p staging_dir/host && touch staging_dir/host/.prereq-build
+          mkdir -p $GITHUB_WORKSPACE/diag
+
+      - name: 3. 安装快照脚本
+        run: |
+          cat > $WORK_DIR/snap.sh <<'SH'
+          #!/usr/bin/env bash
+          N="$1"; OUT="$2"
+          cd /workdir/openwrt || exit 1
+          cnt() { if [ -e "$2" ]; then c=$(grep -cE "$1" "$2" 2>/dev/null); echo "${c:-0}"; else echo MISSING; fi; }
+          {
+          echo "==================== SNAPSHOT $N ===================="
+          date -u '+%Y-%m-%dT%H:%M:%SZ'
+          echo "--- [1] 元数据/缓存时间戳 ---"
+          for f in tmp tmp/.packageinfo tmp/.config-package.in tmp/.config-feeds.in tmp/.build \
+                   tmp/info/.scan-packageinfo.stamp tmp/info/.scan-targetinfo.stamp; do
+            if [ -e "$f" ]; then stat -c '  %y  size=%-9s %n' "$f"; else echo "  (缺失) $f"; fi
+          done
+          echo "--- [2] gst1-plugins-bad 的扫描片段 ---"
+          ls -l tmp/info 2>/dev/null | grep -i 'gst1-plugins-bad' || echo "  (tmp/info 中没有 gst1-plugins-bad 片段)"
+          echo "--- [3] 关键文件身份（inode 是否同一份）---"
+          for f in .config feeds/packages/multimedia/gst1-plugins-bad/Makefile \
+                   package/feeds/packages/gst1-plugins-bad/Makefile; do
+            if [ -e "$f" ]; then stat -c '  %y  inode=%i  %n' "$f"; else echo "  (缺失) $f"; fi
+          done
+          echo -n "  package/feeds/.../gst1-plugins-bad 类型: "
+          if [ -L package/feeds/packages/gst1-plugins-bad ]; then
+            echo "软链 -> $(readlink package/feeds/packages/gst1-plugins-bad)"
+          elif [ -d package/feeds/packages/gst1-plugins-bad ]; then echo "实体目录（副本！）"
+          else echo "不存在"; fi
+          echo "  readlink -f 源文件  : $(readlink -f feeds/packages/multimedia/gst1-plugins-bad/Makefile 2>/dev/null)"
+          echo "  readlink -f 编译用  : $(readlink -f package/feeds/packages/gst1-plugins-bad/Makefile 2>/dev/null)"
+          echo "--- [4] kms 在各处的存在性 ---"
+          echo "  C1 tmp/.config-package.in  config PACKAGE_gst1-mod-kms = $(cnt '^[[:space:]]*config PACKAGE_gst1-mod-kms$' tmp/.config-package.in)"
+          echo "  C2 tmp/.packageinfo        Package: gst1-mod-kms     = $(cnt '^Package: gst1-mod-kms$' tmp/.packageinfo)"
+          echo "  C3 gmediarender stanza 里的 kms/audio/video 行:"
+          awk '/^[[:space:]]*config PACKAGE_gmediarender$/{f=1} f{print} f&&/^[[:space:]]*config PACKAGE_[a-z]/&&!/gmediarender/{exit}' \
+            tmp/.config-package.in 2>/dev/null | grep -iE 'kms|audio-support|video-support' | sed 's/^/     /' || echo "     (无 gmediarender stanza 或无相关行)"
+          echo "--- [5] kms stanza 原文（若有）---"
+          awk '/^[[:space:]]*config PACKAGE_gst1-mod-kms$/{f=1} f{print} f&&/^[[:space:]]*config PACKAGE_[a-z]/&&!/gst1-mod-kms/{exit}' \
+            tmp/.config-package.in 2>/dev/null | head -14 | sed 's/^/  /'
+          echo "--- [6] 补丁是否在两个 Makefile 里 ---"
+          echo "  P1 feeds/packages/.../Makefile     GstBuildPlugin,kms = $(cnt 'GstBuildPlugin,kms' feeds/packages/multimedia/gst1-plugins-bad/Makefile)"
+          echo "  P2 package/feeds/.../Makefile      GstBuildPlugin,kms = $(cnt 'GstBuildPlugin,kms' package/feeds/packages/gst1-plugins-bad/Makefile)"
+          echo "  P3 -Dkms 行: $(grep -n 'Dkms=' feeds/packages/multimedia/gst1-plugins-bad/Makefile 2>/dev/null || echo '未找到')"
+          echo "--- [7] .config 关键符号 ---"
+          for s in gmediarender gst1-mod-kms gst1-mod-v4l2codecs audio-support video-support libdrm; do
+            line=$(grep -E "^(# )?CONFIG_PACKAGE_$s(=| is not set)" .config 2>/dev/null | head -1)
+            echo "  ${s} => ${line:-（整条不存在）}"
+          done
+          echo "--- [8] 机器可读 ---"
+          echo "M_KMS_CFGPKGIN=$(cnt '^[[:space:]]*config PACKAGE_gst1-mod-kms$' tmp/.config-package.in)"
+          echo "M_KMS_PKGINFO=$(cnt '^Package: gst1-mod-kms$' tmp/.packageinfo)"
+          echo "M_KMS_DOTCONFIG=$(cnt '^(# )?CONFIG_PACKAGE_gst1-mod-kms(=| is not set)' .config)"
+          echo "M_GMEDIARENDER_DOTCONFIG=$(cnt '^CONFIG_PACKAGE_gmediarender=y' .config)"
+          echo "M_GSTBAD_KMS_FEEDS=$(cnt 'GstBuildPlugin,kms' feeds/packages/multimedia/gst1-plugins-bad/Makefile)"
+          echo "M_GSTBAD_KMS_PKG=$(cnt 'GstBuildPlugin,kms' package/feeds/packages/gst1-plugins-bad/Makefile)"
+          echo "M_SCANSTAMP_EXISTS=$( [ -f tmp/info/.scan-packageinfo.stamp ] && echo 1 || echo 0 )"
+          } > "$OUT" 2>&1
+          cat "$OUT"
+          SH
+          chmod +x $WORK_DIR/snap.sh
+
+      - name: 4. 加载自定义软件源（= 你的 diy-part1）
+        working-directory: ${{ env.WORK_DIR }}/openwrt
+        run: |
+          [ -e "$GITHUB_WORKSPACE/$FEEDS_CONF" ] && cp -f "$GITHUB_WORKSPACE/$FEEDS_CONF" ./feeds.conf.default
+          chmod +x $GITHUB_WORKSPACE/$DIY_P1_SH
+          $GITHUB_WORKSPACE/$DIY_P1_SH
+
+      - name: 5. feeds update -a
+        working-directory: ${{ env.WORK_DIR }}/openwrt
+        run: ./scripts/feeds update -a
+
+      - name: 6. feeds install -a
+        working-directory: ${{ env.WORK_DIR }}/openwrt
+        run: |
+          ./scripts/feeds install -a > /tmp/feeds_install.log 2>&1; echo "feeds install exit=$?"
+          grep -c "does not exist" /tmp/feeds_install.log || true
+          tail -5 /tmp/feeds_install.log
+
+      - name: 7. 快照 1（feeds install 之后、打补丁之前）
+        run: bash $WORK_DIR/snap.sh 1 $GITHUB_WORKSPACE/diag/snap_1.txt
+
+      - name: 8. 加载自定义配置文件（= 你的 diy-part2，原样执行）
+        working-directory: ${{ env.WORK_DIR }}/openwrt
+        run: |
+          if [ -d files ]; then mkdir -p ./files; cp -r files/* ./files/ 2>/dev/null || true; fi
+          [ -e "$GITHUB_WORKSPACE/$CONFIG_FILE" ] && cp -f "$GITHUB_WORKSPACE/$CONFIG_FILE" .config
+          chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
+          $GITHUB_WORKSPACE/$DIY_P2_SH > /tmp/diy2.log 2>&1; echo "diy-part2 exit=$?"
+          grep -nE "kmssink|GstBuildPlugin,kms|❌|✅" /tmp/diy2.log | head -20
+          tail -3 /tmp/diy2.log
+
+      - name: 9. 快照 2（补丁之后、defconfig 之前）
+        run: bash $WORK_DIR/snap.sh 2 $GITHUB_WORKSPACE/diag/snap_2.txt
+
+      - name: 10. make defconfig（第一次，完全按真实构建的做法，不动 tmp）
+        continue-on-error: true
+        working-directory: ${{ env.WORK_DIR }}/openwrt
+        run: |
+          make defconfig > /tmp/defconfig_1.log 2>&1; echo "defconfig#1 exit=$?"
+          echo "--- 与 kms 相关的告警 ---"
+          grep -nE "does not exist|unmet|unknown symbol|gst1-mod-kms" /tmp/defconfig_1.log | head -20 || echo "（无）"
+          tail -10 /tmp/defconfig_1.log
+
+      - name: 11. 快照 3（第一次 defconfig 之后）
+        run: bash $WORK_DIR/snap.sh 3 $GITHUB_WORKSPACE/diag/snap_3.txt
+
+      - name: 12. 对照实验：清空 tmp 再 defconfig 一次
+        continue-on-error: true
+        working-directory: ${{ env.WORK_DIR }}/openwrt
+        run: |
+          rm -rf tmp
+          make defconfig > /tmp/defconfig_2.log 2>&1; echo "defconfig#2 exit=$?"
+          grep -nE "does not exist|unmet|unknown symbol|gst1-mod-kms" /tmp/defconfig_2.log | head -20 || echo "（无）"
+          tail -10 /tmp/defconfig_2.log
+
+      - name: 13. 快照 4（清空 tmp 重扫之后）
+        run: bash $WORK_DIR/snap.sh 4 $GITHUB_WORKSPACE/diag/snap_4.txt
+
+      - name: 14. 自动结论
+        if: always()
+        run: |
+          D=$GITHUB_WORKSPACE/diag
+          val() { awk -F= -v k="$1" -v f="$2" '$0 ~ "^"k"=" {print $2}' "$f" 2>/dev/null; }
+          c1=$(val M_KMS_CFGPKGIN $D/snap_1.txt); c2=$(val M_KMS_CFGPKGIN $D/snap_2.txt)
+          c3=$(val M_KMS_CFGPKGIN $D/snap_3.txt); c4=$(val M_KMS_CFGPKGIN $D/snap_4.txt)
+          d3=$(val M_KMS_DOTCONFIG $D/snap_3.txt); d4=$(val M_KMS_DOTCONFIG $D/snap_4.txt)
+          printf '%s\n' "-------------------------------------------------------------"
+          printf 'kms 符号: snap1=%s  snap2=%s  snap3=%s  snap4=%s\n' "$c1" "$c2" "$c3" "$c4"
+          printf '.config : snap3=%s  snap4=%s\n' "$d3" "$d4"
+          printf '%s\n' "-------------------------------------------------------------"
+          if [ "$c3" = "0" ] && [ "${c4:-0}" -ge 1 ]; then
+            echo "结论 A：根因=第一次 defconfig 没有重建元数据（扫描缓存/门禁问题）。"
+            echo "        补丁本身是对的；修法是让 defconfig 前强制重建：rm -rf tmp，或把补丁挪到 feeds install 之前，"
+            echo "        或在 defconfig 前 touch 一个参与 scan_unchanged 判断的文件（如 .config）之后再跑 defconfig。"
+          elif [ "${c3:-0}" -ge 1 ] && [ "${d3:-0}" = "0" ]; then
+            echo "结论 B：符号已定义，但 .config 里没有 -> 被 depends on 挡住 或 select 没真正发出。"
+            echo "        看 snap3 的 [4] C3 段与 [5] stanza；对比 audio-support / video-support 的值。"
+          elif [ "${c3:-0}" -ge 1 ] && [ "${d3:-0}" -ge 1 ]; then
+            echo "结论 C：Kconfig 这条链是通的。那你上传的 real_openwrt_final.config 与这次构建的不是同一份，"
+            echo "        问题在编译/打包阶段（看 gst1-plugins-bad 实际编了哪些插件）。"
+          else
+            echo "结论 D：补丁没有进入扫描视野（snap1/snap2/snap3 全 0）。"
+            echo "        看 snap2 的 [3]：inode 是否相同、package/feeds 是软链还是实体副本；"
+            echo "        再看 snap2 的 [1]：tmp/info 片段时间戳是否早于补丁时间。"
+          fi
+          printf '%s\n' "-------------------------------------------------------------"
+          echo "各快照机器可读值："
+          grep -H '^M_' $D/snap_*.txt || true
+
+      - name: 15. 上传证据
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: kms-rootcause-evidence
+          path: |
+            diag/snap_1.txt
+            diag/snap_2.txt
+            diag/snap_3.txt
+            diag/snap_4.txt
+            /tmp/defconfig_1.log
+            /tmp/defconfig_2.log
+            /tmp/diy2.log
+            /tmp/feeds_install.log
+          if-no-files-found: warn
+#（注：内容由AI生成）
