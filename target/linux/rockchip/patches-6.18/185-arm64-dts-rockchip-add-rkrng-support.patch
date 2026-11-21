@@ -1,11 +1,9 @@
-diff -ruN a/drivers/char/hw_random/rockchip-rng.c b/drivers/char/hw_random/rockchip-rng.c
---- a/drivers/char/hw_random/rockchip-rng.c	2026-10-14 23:48:44.011683315 +0800
-+++ b/drivers/char/hw_random/rockchip-rng.c	2026-10-14 23:48:44.011984692 +0800
-@@ -53,6 +53,26 @@
- #define TRNG_RNG_CTL_START		BIT(0)
- #define TRNG_RNG_SAMPLE_CNT		0x0004
- #define TRNG_RNG_DOUT			0x0010
-+/*
+--- a/drivers/char/hw_random/rockchip-rng.c
++++ b/drivers/char/hw_random/rockchip-rng.c
+@@ -55,6 +55,27 @@
+ #define TRNG_RNG_DOUT			0x0410
+ 
+ /*
 + * RKRNG —— RK3528 上用的那套 RNG（内部叫 "SW DRNG"），寄存器与上面的 TRNG_* 完全不同：
 + *   RKRNG_CTRL      0x0010
 + *   RKRNG_STATE     0x0014
@@ -25,10 +23,12 @@ diff -ruN a/drivers/char/hw_random/rockchip-rng.c b/drivers/char/hw_random/rockc
 +
 +/* 高位 16 bit 是写保护掩码（与 lede 的 HIWORD_UPDATE(val, mask, 0) 等价） */
 +#define RKRNG_HIWORD_UPDATE(val, mask) ((u32)(((val) & (mask)) | ((u32)(mask) << 16)))
- 
- /*
++
++/*
   * TRNG V1 register definitions
-@@ -364,6 +384,74 @@
+  * The TRNG V1 IP is a stand-alone TRNG implementation (not part of a crypto IP)
+  * and can be found in the Rockchip RK3588 SoC
+@@ -358,6 +379,75 @@
  	return (ret < 0) ? ret : to_read;
  }
  
@@ -100,11 +100,12 @@ diff -ruN a/drivers/char/hw_random/rockchip-rng.c b/drivers/char/hw_random/rockc
 +
 +	return (ret < 0) ? ret : to_read;
 +}
++
  static const struct rk_rng_soc_data rk3568_soc_data = {
  	.rk_rng_init = rk3568_rng_init,
  	.rk_rng_read = rk3568_rng_read,
-@@ -479,12 +567,24 @@
- 				pm_runtime_force_resume)
+@@ -382,6 +472,18 @@
+ 	.reset_optional = true,
  };
  
 +static const struct rk_rng_soc_data rkrng_soc_data = {
@@ -118,14 +119,15 @@ diff -ruN a/drivers/char/hw_random/rockchip-rng.c b/drivers/char/hw_random/rockc
 +	 */
 +	.reset_optional = true,
 +};
- static const struct of_device_id rk_rng_dt_match[] = {
++
+ static int rk_rng_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -468,6 +570,7 @@
  	{ .compatible = "rockchip,rk3568-rng", .data = (void *)&rk3568_soc_data },
  	{ .compatible = "rockchip,rk3576-rng", .data = (void *)&rk3576_soc_data },
  	{ .compatible = "rockchip,rk3588-rng", .data = (void *)&rk3588_soc_data },
- 	{ .compatible = "rockchip,rv1126-rng", .data = (void *)&rv1126_soc_data },
--	{ /* sentinel */ },
-+		{ .compatible = "rockchip,rkrng", .data = (void *)&rkrng_soc_data },
-+{ /* sentinel */ },
++	{ .compatible = "rockchip,rkrng", .data = (void *)&rkrng_soc_data },
+ 	{ /* sentinel */ },
  };
  
- MODULE_DEVICE_TABLE(of, rk_rng_dt_match);
