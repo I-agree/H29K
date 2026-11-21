@@ -1,7 +1,7 @@
 --- a/drivers/char/hw_random/rockchip-rng.c
 +++ b/drivers/char/hw_random/rockchip-rng.c
-@@ -55,6 +55,27 @@
- #define TRNG_RNG_DOUT			0x0410
+@@ -55,6 +55,30 @@
+ #define TRNG_RNG_DOUT			0x0010
  
  /*
 + * RKRNG —— RK3528 上用的那套 RNG（内部叫 "SW DRNG"），寄存器与上面的 TRNG_* 完全不同：
@@ -9,6 +9,9 @@
 + *   RKRNG_STATE     0x0014
 + *   RKRNG_DRNG_DATA 0x0070 起 8 个 u32
 + * dt compatible 是 "rockchip,rkrng"。
++ *
++ * 注意：下面用的是相对 rng 窗口起点的绝对偏移，不走 soc_data->trng_offset
++ * （那个偏移只服务于 TRNG/TRNG V1 的寄存器族）。
 + *
 + * 访问序列照 coolsnowwolf/lede 那份老版 rockchip-rng.c 里的 rkrng_* 写
 + * （那是真机上跑过的实现）。
@@ -28,7 +31,7 @@
   * TRNG V1 register definitions
   * The TRNG V1 IP is a stand-alone TRNG implementation (not part of a crypto IP)
   * and can be found in the Rockchip RK3588 SoC
-@@ -358,6 +379,75 @@
+@@ -364,6 +388,75 @@
  	return (ret < 0) ? ret : to_read;
  }
  
@@ -104,7 +107,7 @@
  static const struct rk_rng_soc_data rk3568_soc_data = {
  	.rk_rng_init = rk3568_rng_init,
  	.rk_rng_read = rk3568_rng_read,
-@@ -382,6 +472,18 @@
+@@ -397,6 +490,18 @@
  	.reset_optional = true,
  };
  
@@ -123,11 +126,11 @@
  static int rk_rng_probe(struct platform_device *pdev)
  {
  	struct device *dev = &pdev->dev;
-@@ -468,6 +570,7 @@
+@@ -483,6 +588,7 @@
  	{ .compatible = "rockchip,rk3568-rng", .data = (void *)&rk3568_soc_data },
  	{ .compatible = "rockchip,rk3576-rng", .data = (void *)&rk3576_soc_data },
  	{ .compatible = "rockchip,rk3588-rng", .data = (void *)&rk3588_soc_data },
 +	{ .compatible = "rockchip,rkrng", .data = (void *)&rkrng_soc_data },
+ 	{ .compatible = "rockchip,rv1126-rng", .data = (void *)&rv1126_soc_data },
  	{ /* sentinel */ },
  };
- 
