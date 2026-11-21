@@ -1,6 +1,6 @@
 --- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.h
 +++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.h
-@@ -12,6 +12,7 @@
+@@ -13,5 +13,6 @@
  #include <linux/skbuff.h>
  #include <linux/if_ether.h>
  #include <linux/ieee80211.h>
