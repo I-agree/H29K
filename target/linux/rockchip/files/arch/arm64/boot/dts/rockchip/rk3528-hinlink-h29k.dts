@@ -575,11 +575,6 @@
 	status = "okay";
 };
 
-&power {
-	assigned-clocks = <&cru ACLK_GPU_MALI>;
-	assigned-clock-rates = <297000000>;
-};
-
 &display_subsystem {
 	status = "okay";
 };
