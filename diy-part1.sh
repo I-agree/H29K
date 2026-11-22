@@ -132,6 +132,9 @@ download_and_check "${BASE_URL}/package/luci-app-btmanager/root/usr/sbin/btmanag
 download_and_check "${BASE_URL}/package/luci-app-btmanager/root/usr/share/luci/menu.d/luci-app-btmanager.json" "package/luci-app-btmanager/root/usr/share/luci/menu.d/luci-app-btmanager.json"
 download_and_check "${BASE_URL}/package/luci-app-btmanager/root/usr/share/rpcd/acl.d/luci-app-btmanager.json" "package/luci-app-btmanager/root/usr/share/rpcd/acl.d/luci-app-btmanager.json"
 download_and_check "${BASE_URL}/package/luci-app-btmanager/Makefile" "package/luci-app-btmanager/Makefile"
+download_and_check "${BASE_URL}/package/bluez-alsa/Makefile" "package/bluez-alsa/Makefile"
+download_and_check "${BASE_URL}/package/bluez-alsa/files/bluealsa.config" "package/bluez-alsa/files/bluealsa.config"
+download_and_check "${BASE_URL}/package/bluez-alsa/files/bluealsa.init" "package/bluez-alsa/files/bluealsa.init"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
