@@ -239,8 +239,58 @@ print_devices_array() {
 	printf ']'
 }
 
+hci_list() {
+	# 每行一个控制器：hci|bus|addr|state
+	run_lim 8 hciconfig -a 2>/dev/null | awk '
+		function flush() {
+			if (h == "") return
+			printf "%s|%s|%s|%s\n", h, bus, addr, st
+			h = ""
+		}
+		/^hci[0-9]+:/ {
+			flush()
+			h = $1
+			sub(/:$/, "", h)
+			b = $0
+			sub(/.*Bus:[ ]*/, "", b)
+			sub(/[ ].*/, "", b)
+			bus = b
+			next
+		}
+		/BD Address:/ {
+			a = $0
+			sub(/.*BD Address:[ ]*/, "", a)
+			sub(/[ ].*/, "", a)
+			addr = a
+			next
+		}
+		/^[ 	]+(UP|DOWN)([ 	]|$)/ {
+			s = $0
+			gsub(/^[ 	]+/, "", s)
+			sub(/[ 	]+$/, "", s)
+			st = s
+			next
+		}
+		END { flush() }'
+}
+
+controllers_json() {
+	cf="$STATE_DIR/hci.$$"
+	hci_list > "$cf" 2>/dev/null
+	printf '['
+	firstc=1
+	while IFS='|' read -r h bus addr st; do
+		[ -n "$h" ] || continue
+		if [ "$firstc" = 1 ]; then firstc=0; else printf ','; fi
+		printf '{"hci":"%s","bus":"%s","address":"%s","state":"%s"}' \
+			"$(json_esc "$h")" "$(json_esc "$bus")" "$(json_esc "$addr")" "$(json_esc "$st")"
+	done < "$cf"
+	printf ']'
+	rm -f "$cf"
+}
+
 config_json() {
-	printf '{"uart":"%s","baud":"%s","flow":"%s","type":"%s","enabled":"%s","autoconnect":"%s","autodev":"%s","devicename":"%s"}' \
+	printf '{"uart":"%s","baud":"%s","flow":"%s","type":"%s","enabled":"%s","autoconnect":"%s","autodev":"%s","devicename":"%s","transport":"%s"}' \
 		"$(json_esc "$(cfg uart)")" \
 		"$(json_esc "$(cfg baud)")" \
 		"$(json_esc "$(cfg flow)")" \
@@ -248,7 +298,8 @@ config_json() {
 		"$(json_esc "$(cfg enabled)")" \
 		"$(json_esc "$(cfg autoconnect)")" \
 		"$(json_esc "$(autodev_list)")" \
-		"$(json_esc "$(cfg devicename)")"
+		"$(json_esc "$(cfg devicename)")" \
+		"$(json_esc "$(cfg transport)")"
 }
 
 # ------------------------------- commands ----------------------------------
@@ -270,8 +321,9 @@ cmd_summary() {
 	paired_count=$(run_lim 10 "$BTCTL" devices Paired 2>/dev/null | grep -c '^Device ')
 	conn_count=$(run_lim 10 "$BTCTL" devices Connected 2>/dev/null | grep -c '^Device ')
 
-	printf '{"ok":true,"service":{"bluetoothd":%s,"hciattach":%s,"hci0":%s},"controller":{"address":"%s","name":"%s","powered":%s,"discoverable":%s,"pairable":%s},"counts":{"paired":%d,"connected":%d},"config":%s}\n' \
+	printf '{"ok":true,"service":{"bluetoothd":%s,"hciattach":%s,"hci0":%s},"controllers":%s,"controller":{"address":"%s","name":"%s","powered":%s,"discoverable":%s,"pairable":%s},"counts":{"paired":%d,"connected":%d},"config":%s}\n' \
 		"$(bool_json "$bd")" "$(bool_json "$ha")" "$(bool_json "$hci0")" \
+		"$(controllers_json)" \
 		"$(json_esc "$addr")" "$(json_esc "$name")" \
 		"$(bool_json "$powered")" "$(bool_json "$disc")" "$(bool_json "$pair")" \
 		"${paired_count:-0}" "${conn_count:-0}" \
@@ -579,6 +631,9 @@ cmd_set() {
 		type)
 			printf '%s' "$val" | grep -Eq '^[a-z0-9]+$' || fail_json "协议类型无效"
 			;;
+		transport)
+			case "$val" in auto|uart) ;; *) fail_json "传输方式只能是 auto/uart" ;; esac
+			;;
 		enabled|autoconnect)
 			case "$val" in 0|1) ;; *) fail_json "该配置只接受 0 或 1" ;; esac
 			;;
@@ -610,7 +665,7 @@ cmd_autodev() {
 }
 
 cmd_boot() {
-	# Wait for the HCI device created by hciattach
+	# Wait for an HCI controller (vendor SDIO driver or our hciattach)
 	i=0
 	while [ $i -lt 25 ]; do
 		[ -e /sys/class/bluetooth/hci0 ] && break

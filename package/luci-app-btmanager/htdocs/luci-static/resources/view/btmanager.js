@@ -352,11 +352,19 @@ return view.extend({
 			'value': cfg.type || 'any'
 		});
 
+		this.transportInput = E('select', { 'class': 'cbi-input-select' }, [
+			E('option', { 'value': 'auto' }, _('自动（优先用厂商驱动自带的控制器）')),
+			E('option', { 'value': 'uart' }, _('强制用 UART + hciattach'))
+		]);
+		this.transportInput.value = cfg.transport || 'auto';
+
 		this.autoconnectInput = E('input', { 'type': 'checkbox' });
 		this.autoconnectInput.checked = (cfg.autoconnect === '1');
 
 		return E('div', {}, [
-			field(_('串口设备'), this.uartInput, _('板载蓝牙 HCI 所在 UART，默认 /dev/ttyS2（rk3528 uart2）。')),
+			field(_('传输方式'), this.transportInput,
+				_('自动：内核里已有可用 HCI 控制器（如 AIC8800 通过 SDIO 提供的蓝牙）时，不再用 hciattach 挂 UART。')),
+			field(_('串口设备'), this.uartInput, _('仅在“强制用 UART”时生效。板载蓝牙 HCI 所在 UART，默认 /dev/ttyS2（rk3528 uart2）。')),
 			field(_('波特率'), this.baudInput, _('必须与芯片当前串口速率一致，AIC8800 常见 1500000，其次 115200 / 921600。')),
 			field(_('硬件流控'), this.flowInput, _('默认 flow；若 UART 未引出 RTS 且出现丢包，可改 noflow。')),
 			field(_('hciattach 协议'), this.typeInput, _('BlueZ hciattach 的 type，AIC8800 用 any。')),
@@ -372,6 +380,7 @@ return view.extend({
 							[ 'baud', self.baudInput.value.trim() ],
 							[ 'flow', self.flowInput.value ],
 							[ 'type', self.typeInput.value.trim() ],
+							[ 'transport', self.transportInput.value ],
 							[ 'autoconnect', self.autoconnectInput.checked ? '1' : '0' ]
 						].forEach(function(item) {
 							chain = chain.then(function() {
@@ -405,6 +414,7 @@ return view.extend({
 		var svc = s.service || {};
 		var ctl = s.controller || {};
 		var cnt = s.counts || {};
+		var ctrls = s.controllers || [];
 		var enabled = !(this.cfg && this.cfg.enabled === '0');
 
 		function row(label, value) {
@@ -431,7 +441,27 @@ return view.extend({
 			]),
 			row(_('bluetoothd'), mark(svc.bluetoothd, svc.bluetoothd ? _('运行中') : _('未运行'))),
 			row(_('hciattach'), mark(svc.hciattach, svc.hciattach ? _('运行中') : _('未运行'))),
-			row(_('HCI 控制器'), mark(svc.hci0, svc.hci0 ? 'hci0' : _('没有 hci0，检查串口/波特率/固件'))),
+			row(_('传输方式'), [
+				E('div', {}, [
+					E('div', {}, (this.cfg && this.cfg.transport === 'uart')
+						? _('强制 UART + hciattach')
+						: _('自动')),
+					E('div', { 'class': 'btm-sub' },
+						(this.cfg && this.cfg.transport === 'uart')
+							? _('始终用串口挂 HCI')
+							: _('内核已有可用 HCI 控制器时跳过 hciattach'))
+				])
+			]),
+			row(_('控制器'), ctrls.length ? E('div', {}, ctrls.map(function(c) {
+				var up = /^UP/.test(c.state || '');
+				var zero = /^00:00:00:00:00:00$/.test(c.address || '');
+				return E('div', { 'style': 'margin:2px 0' }, [
+					mark(up && !zero, (c.hci || '?') + ' · ' + (c.bus || '?') + ' · '),
+					E('span', { 'class': 'btm-mac' }, c.address || _('无地址')),
+					'　',
+					E('span', { 'class': 'btm-sub' }, c.state || _('状态未知'))
+				]);
+			})) : mark(false, _('未发现任何 HCI 控制器'))),
 			row(_('适配器'), [
 				E('div', {}, [
 					E('div', { 'class': 'btm-name' }, ctl.name || (enabled ? _('（读取中）') : '—')),
@@ -447,9 +477,17 @@ return view.extend({
 			row(_('设备统计'), _('已配对 ') + (cnt.paired || 0) + _(' 台，已连接 ') + (cnt.connected || 0) + _(' 台'))
 		])));
 
-		if (!svc.hci0)
+		var deadUart = ctrls.some(function(c) {
+			return (c.bus === 'UART') && (/^00:00:00:00:00:00$/.test(c.address || '') || /^DOWN/.test(c.state || ''));
+		});
+
+		if (deadUart)
 			this.statusBody.appendChild(E('div', { 'class': 'btm-note' },
-				_('hci0 不存在时先看“诊断”里的 hciconfig / dmesg / rfkill；必要时在服务设置里换 /dev/ttyS1、/dev/ttyS2 或改波特率后重启服务。')));
+				_('检测到一个 UART 控制器未握手（地址全 0 / DOWN，内核常报 command 0x1003 tx timeout）。这说明蓝牙不走串口：把“传输方式”设为自动，重启服务后这个多余控制器就会消失。')));
+
+		if (!ctrls.length)
+			this.statusBody.appendChild(E('div', { 'class': 'btm-note' },
+				_('没有任何 HCI 控制器：先看“诊断”里的 hciconfig / dmesg。厂商驱动走 SDIO 时蓝牙控制器由厂商模块提供，不需要 hciattach。')));
 	},
 
 	paintDevices: function() {

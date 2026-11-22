@@ -38,8 +38,15 @@ rfkill_block() {
 	done
 }
 
+hci_present() {
+	for d in /sys/class/bluetooth/hci*; do
+		[ -e "$d" ] && return 0
+	done
+	return 1
+}
+
 start_service() {
-	local enabled uart baud flow type
+	local enabled uart baud flow type transport
 
 	config_load btmanager
 	config_get_bool enabled main enabled 1
@@ -55,6 +62,7 @@ start_service() {
 	config_get baud main baud 1500000
 	config_get flow main flow flow
 	config_get type main type any
+	config_get transport main transport auto
 
 	mkdir -p /var/run/btmanager
 	rfkill_unblock
@@ -63,13 +71,29 @@ start_service() {
 	/etc/init.d/dbus start 2>/dev/null
 	/etc/init.d/bluetoothd start 2>/dev/null
 
-	# hciattach stays in foreground (-n), procd keeps it alive
-	procd_open_instance hci
-	procd_set_param command /usr/bin/hciattach -n -s "$baud" "$uart" "$type" "$baud" "$flow" nosleep
-	procd_set_param respawn 3600 10 0
-	procd_set_param stdout 1
-	procd_set_param stderr 1
-	procd_close_instance
+	# 传输方式 auto：厂商驱动（AIC8800 SDIO）如果已经自带 HCI 控制器，就不再挂 UART。
+	# 否则会多出一个永远握不上手的 hciN（BD Address 00:00:00:00:00:00、
+	# 内核报 "command 0x1003 tx timeout"），而且白占一个串口。
+	if [ "$transport" = "auto" ]; then
+		i=0
+		while [ "$i" -lt 3 ]; do
+			hci_present && break
+			sleep 1
+			i=$((i + 1))
+		done
+	fi
+
+	if [ "$transport" = "auto" ] && hci_present; then
+		logger -t btmanager "vendor HCI controller present, skip hciattach (transport=auto)" 2>/dev/null
+	else
+		# hciattach stays in foreground (-n), procd keeps it alive
+		procd_open_instance hci
+		procd_set_param command /usr/bin/hciattach -n -s "$baud" "$uart" "$type" "$baud" "$flow" nosleep
+		procd_set_param respawn 3600 10 0
+		procd_set_param stdout 1
+		procd_set_param stderr 1
+		procd_close_instance
+	fi
 
 	# one shot: wait for hci0 then connect the configured devices
 	procd_open_instance boot
