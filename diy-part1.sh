@@ -97,7 +97,6 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/716-phy-rockc
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/717-sound-soc-rockchip-sai-add-rk3528-compatible.patch" "target/linux/rockchip/patches-6.18/717-sound-soc-rockchip-sai-add-rk3528-compatible.patch"
 download_and_check "${BASE_URL}/JPG/0001-uapi-hevc-ext-sps-rps-controls.patch" "toolchain/kernel-headers/patches/0001-uapi-hevc-ext-sps-rps-controls.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/990-clk-rk3528-add-hclk_trng-gate.patch" "target/linux/rockchip/patches-6.18/990-clk-rk3528-add-hclk_trng-gate.patch"
-download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/991-arm64-dts-rockchip-add-rkrng-support.patch" "target/linux/rockchip/patches-6.18/991-arm64-dts-rockchip-add-rkrng-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/992-dwc3-wwan-reset-gpio.patch" "target/linux/rockchip/patches-6.18/992-dwc3-wwan-reset-gpio.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/995-rockchip-iommu-rk3528-mmu-fixes.patch" "target/linux/rockchip/patches-6.18/995-rockchip-iommu-rk3528-mmu-fixes.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch" "target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch"
