@@ -1,0 +1,61 @@
+#!/bin/sh /etc/rc.common
+
+# bluealsad — 蓝牙音频的 ALSA 后端
+#
+# 必须在 bluetoothd 之后启动：端点要通过 BlueZ 的 Media API 注册，
+# bluetoothd 不在时注册失败，之后就算起来了也不会再补注册。
+# btmanager 是 START=96，这里排 98。
+
+START=98
+STOP=12
+USE_PROCD=1
+
+PROG=/usr/bin/bluealsad
+CONFIG_NAME=bluealsa
+
+start_service() {
+	local enabled profiles loglevel syslog extra_args p
+	local n=0
+
+	config_load "$CONFIG_NAME"
+	config_get_bool enabled main enabled 1
+	[ "$enabled" = "1" ] || return 0
+
+	if [ ! -x "$PROG" ]; then
+		logger -t bluealsa "找不到 $PROG，跳过启动"
+		return 1
+	fi
+
+	config_get profiles main profiles 'a2dp-source'
+	config_get loglevel main loglevel 'warning'
+	config_get syslog main syslog '1'
+	config_get extra_args main extra_args ''
+
+	[ -n "$profiles" ] || profiles='a2dp-source'
+
+	# 等 bluetoothd 就绪，最多 10 秒（开机时 btmanager 已经在拉它）
+	while [ "$n" -lt 10 ]; do
+		pidof bluetoothd >/dev/null 2>&1 && break
+		n=$((n + 1))
+		sleep 1
+	done
+
+	set -- "$PROG"
+	[ "$syslog" = "1" ] && set -- "$@" -S
+	[ -n "$loglevel" ] && set -- "$@" "--loglevel=$loglevel"
+	for p in $profiles; do
+		[ -n "$p" ] && set -- "$@" -p "$p"
+	done
+	[ -n "$extra_args" ] && set -- "$@" $extra_args
+
+	procd_open_instance main
+	procd_set_param command "$@"
+	procd_set_param respawn 3600 5 5
+	procd_set_param file "/etc/config/$CONFIG_NAME"
+	procd_set_param stderr 0
+	procd_close_instance
+}
+
+service_triggers() {
+	procd_add_reload_trigger "$CONFIG_NAME"
+}
