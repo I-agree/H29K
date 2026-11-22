@@ -97,6 +97,7 @@ chmod +x files/usr/share/qmodem/led_scripts/misectel_led.sh
 chmod 0755 package/luci-app-btmanager/root/usr/sbin/btmanager
 chmod 0755 package/luci-app-btmanager/root/etc/init.d/btmanager
 chmod 0755 package/luci-app-btmanager/root/etc/uci-defaults/99-btmanager
+chmod 0755 package/bluez-alsa/files/bluealsa.init
 # ==============================================================
 
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
