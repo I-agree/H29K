@@ -601,8 +601,6 @@
 };
 
 &hdmiphy {
-	assigned-clocks = <&cru PCLK_HDMIPHY>;
-	assigned-clock-rates = <297000000>;
 	status = "okay";
 };
 
