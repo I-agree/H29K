@@ -1,6 +1,0 @@
---- a/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.h
-+++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_bsp/aicsdio.h
-@@ -16,2 +16,3 @@
- #include <linux/semaphore.h>
-+#include <linux/vmalloc.h>
- #include "aic_bsp_driver.h"
