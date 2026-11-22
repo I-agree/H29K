@@ -15,11 +15,15 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bluez-alsa
 PKG_VERSION:=5.0.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
+# 上游最新的 tag 就是 v5.0.0（2026-08-27），之后没有新 tag；
+# 这里钉的是 master 上最新的提交（2026-10-26），比 tag 多两个月的修复。
+# 想退回正式的 v5.0.0 版本，把 PKG_SOURCE_VERSION 换成 tag 提交
+# 1935d6dcb8975f2d7a51aaafe61538d157224623 即可，其余不用改。
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/Arkq/bluez-alsa.git
-PKG_SOURCE_VERSION:=1935d6dcb8975f2d7a51aaafe61538d157224623
+PKG_SOURCE_VERSION:=8bac18dbcbe55139d873dc6e8dbaf6ba95de60b8
 PKG_MIRROR_HASH:=skip
 
 PKG_LICENSE:=MIT
