@@ -1,0 +1,38 @@
+--- a/drivers/pmdomain/rockchip/pm-domains.c
++++ b/drivers/pmdomain/rockchip/pm-domains.c
+@@ -820,9 +820,17 @@
+ 		pd->clks[i].clk = of_clk_get(node, i);
+ 		if (IS_ERR(pd->clks[i].clk)) {
+ 			error = PTR_ERR(pd->clks[i].clk);
+-			dev_err(pmu->dev,
+-				"%pOFn: failed to get clk at index %d: %d\n",
+-				node, i, error);
++			/*
++			 * -EPROBE_DEFER is the normal case here: the CRU is a
++			 * platform driver and may probe after the PMU, so the
++			 * clock provider is not registered yet. Stay quiet and
++			 * let deferred probe retry, otherwise every boot logs
++			 * an error for something that resolves itself.
++			 */
++			if (error != -EPROBE_DEFER)
++				dev_err(pmu->dev,
++					"%pOFn: failed to get clk at index %d: %d\n",
++					node, i, error);
+ 			goto err_put_clocks;
+ 		}
+ 	}
+@@ -900,7 +908,13 @@
+ err_unprepare_clocks:
+ 	clk_bulk_unprepare(pd->num_clks, pd->clks);
+ err_put_clocks:
+-	clk_bulk_put(pd->num_clks, pd->clks);
++	/*
++	 * Only drop the clocks that were actually acquired. pd->clks[i].clk is
++	 * an ERR_PTR on the failure path above, and clk_bulk_put() walks the
++	 * whole array, so passing num_clks here hands ERR_PTR to clk_put() and
++	 * trips WARN_ON_ONCE(IS_ERR(clk)) in __clk_put().
++	 */
++	clk_bulk_put(i, pd->clks);
+ 	return error;
+ }
+ 
