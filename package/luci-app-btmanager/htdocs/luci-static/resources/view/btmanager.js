@@ -6,6 +6,24 @@
 
 var API = '/usr/sbin/btmanager';
 
+var STYLE = [
+	'.btm .btm-table { width:100%; border-collapse:collapse; }',
+	'.btm .btm-table th { text-align:left; font-weight:600; padding:10px 14px; white-space:nowrap; border-bottom:1px solid rgba(128,128,128,.35); }',
+	'.btm .btm-table td { padding:12px 14px; vertical-align:middle; border-bottom:1px solid rgba(128,128,128,.16); }',
+	'.btm .btm-table tr:last-child td { border-bottom:none; }',
+	'.btm .btm-name { font-weight:600; line-height:1.45; word-break:break-word; }',
+	'.btm .btm-sub { margin-top:3px; font-size:12px; opacity:.62; line-height:1.5; }',
+	'.btm .btm-mac { font-family:monospace; font-size:12.5px; opacity:.72; letter-spacing:.3px; }',
+	'.btm .btm-btns { display:flex; flex-wrap:wrap; gap:8px; }',
+	'.btm .btm-btns .btn { margin:0; }',
+	'.btm .btm-row { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }',
+	'.btm .btm-card { margin-bottom:18px; }',
+	'.btm .btm-note { margin-top:10px; font-size:12px; opacity:.65; line-height:1.6; }',
+	'.btm .btm-empty { padding:16px 2px; opacity:.6; }',
+	'.btm .btm-input { max-width:300px; }',
+	'.btm .btm-scroll { overflow-x:auto; }'
+].join('\n');
+
 function exec(args) {
 	return fs.exec(API, args).then(function(res) {
 		if (res.code !== 0)
@@ -29,6 +47,24 @@ function api(args) {
 
 		return res;
 	});
+}
+
+function devLabel(dev) {
+	return dev && dev.name ? dev.name : _('未命名设备');
+}
+
+function devNotes(dev) {
+	var notes = [];
+
+	if (!dev.name)
+		notes.push(dev.random ? _('随机地址 · 未广播名称') : _('未广播名称'));
+	else if (dev.random)
+		notes.push(_('随机地址'));
+
+	if (dev.audio)
+		notes.push(_('音频设备'));
+
+	return notes.join(' · ');
 }
 
 function typeLabel(dev) {
@@ -68,12 +104,19 @@ function button(label, cls, onclick) {
 	return E('button', {
 		'class': 'btn cbi-button ' + (cls || 'cbi-button-action'),
 		'type': 'button',
-		'style': 'margin:0 4px 4px 0',
 		'click': function(ev) {
 			ev.preventDefault();
 			onclick();
 		}
 	}, label);
+}
+
+function styleNode() {
+	var el = E('style', { 'type': 'text/css' });
+
+	el.textContent = STYLE;
+
+	return el;
 }
 
 return view.extend({
@@ -90,7 +133,7 @@ return view.extend({
 		this.summary = data[0] || {};
 		this.devices = (data[1] && data[1].devices) || [];
 		this.found = [];
-		this.configFilled = false;
+		this.cfg = (this.summary && this.summary.config) || {};
 
 		this.msgBar = E('div', { 'style': 'display:none' });
 		this.statusBody = E('div', {});
@@ -98,10 +141,17 @@ return view.extend({
 		this.devBody = E('div', {});
 		this.diagBody = E('div', {});
 
+		this.nameInput = E('input', {
+			'type': 'text',
+			'class': 'cbi-input-text btm-input',
+			'placeholder': (this.summary.controller && this.summary.controller.name) || 'BlueZ 5.87',
+			'value': this.cfg.devicename || ''
+		});
+
 		this.setMsg = function(text, isError) {
 			this.msgBar.style.display = text ? '' : 'none';
-			this.msgBar.style.padding = '8px 10px';
-			this.msgBar.style.margin = '0 0 12px 0';
+			this.msgBar.style.padding = '8px 12px';
+			this.msgBar.style.margin = '0 0 14px 0';
 			this.msgBar.style.borderRadius = '4px';
 			this.msgBar.style.background = isError ? '#fdecea' : '#e8f5e9';
 			this.msgBar.style.color = isError ? '#b71c1c' : '#1b5e20';
@@ -112,8 +162,9 @@ return view.extend({
 			return Promise.all([ api([ 'summary' ]), api([ 'devices' ]) ]).then(function(res) {
 				self.summary = res[0] || {};
 				self.devices = (res[1] && res[1].devices) || [];
+				self.cfg = self.summary.config || self.cfg;
 				self.paint();
-			}).catch(function() { /* polling errors are ignored */ });
+			}).catch(function() { /* 轮询失败时不打扰用户 */ });
 		};
 
 		this.act = function(label, args) {
@@ -128,17 +179,42 @@ return view.extend({
 			});
 		};
 
-		var body = E('div', { 'class': 'cbi-map' }, [
+		this.saveName = function() {
+			var val = self.nameInput.value.trim();
+
+			self.setMsg(val ? _('正在应用蓝牙名称 ...') : _('正在恢复默认名称 ...'));
+
+			api([ 'name', val ]).then(function(r) {
+				self.setMsg((r && r.message) || _('名称已更新'), false);
+				if (!val)
+					self.nameInput.value = '';
+				return self.refresh();
+			}).catch(function(e) {
+				self.setMsg(_('修改名称失败：') + (e.message || e), true);
+			});
+		};
+
+		this.toggleBT = function() {
+			var on = !(self.cfg && self.cfg.enabled === '0');
+
+			if (on && !confirm(_('关闭蓝牙会断开所有已连接设备，并停止蓝牙服务。确定关闭？')))
+				return;
+
+			self.act(on ? _('关闭蓝牙') : _('开启蓝牙'), [ 'enable', on ? '0' : '1' ]);
+		};
+
+		var body = E('div', { 'class': 'cbi-map btm' }, [
+			styleNode(),
 			E('h2', {}, _('蓝牙管理')),
 			E('div', { 'class': 'cbi-map-descr' },
-				_('管理 AIC8800 蓝牙控制器：扫描、配对、连接音箱/耳机/麦克风/键鼠，并设置开机自动回连。')),
+				_('管理板载蓝牙控制器：扫描、配对、连接音箱/耳机/麦克风/键鼠，设置开机自动回连。')),
 			this.msgBar,
 
-			E('div', { 'class': 'cbi-section' }, [
+			E('div', { 'class': 'cbi-section btm-card' }, [
 				E('h3', {}, _('控制器状态')),
 				E('div', { 'class': 'cbi-section-node' }, [
 					this.statusBody,
-					E('div', { 'style': 'margin-top:10px' }, [
+					E('div', { 'class': 'btm-row', 'style': 'margin-top:12px' }, [
 						button(_('重启蓝牙服务'), 'cbi-button-apply', function() {
 							self.setMsg(_('正在重启蓝牙服务（约 3 秒）...'));
 							api([ 'restart' ]).then(function() {
@@ -149,11 +225,9 @@ return view.extend({
 								self.setMsg(_('重启失败：') + (e.message || e), true);
 							});
 						}),
-						' ',
 						button(_('适配器上电'), 'cbi-button-action', function() {
 							self.act(_('适配器上电'), [ 'power', 'on' ]);
 						}),
-						' ',
 						button(_('适配器下电'), 'cbi-button-action', function() {
 							self.act(_('适配器下电'), [ 'power', 'off' ]);
 						})
@@ -161,51 +235,70 @@ return view.extend({
 				])
 			]),
 
-			E('div', { 'class': 'cbi-section' }, [
-				E('h3', {}, _('扫描附近设备')),
+			E('div', { 'class': 'cbi-section btm-card' }, [
+				E('h3', {}, _('蓝牙名称')),
 				E('div', { 'class': 'cbi-section-node' }, [
-					E('div', { 'class': 'cbi-value' }, [
-						E('div', { 'class': 'cbi-value-field' }, [
-							button(_('开始扫描（8 秒）'), 'cbi-button-apply', function() {
-								self.setMsg(_('正在扫描，8 秒内保持设备处于可发现状态 ...'));
-								api([ 'scan', '8' ]).then(function(r) {
-									self.found = (r && r.found) || [];
-									self.setMsg((r && r.message) || _('扫描完成'), false);
-									self.paintFound();
-									return self.refresh();
-								}).catch(function(e) {
-									self.setMsg(_('扫描失败：') + (e.message || e), true);
-								});
-							})
-						])
+					E('div', { 'class': 'btm-row' }, [
+						this.nameInput,
+						button(_('保存名称'), 'cbi-button-apply', function() {
+							self.saveName();
+						}),
+						button(_('恢复默认'), 'cbi-button-action', function() {
+							self.nameInput.value = '';
+							self.saveName();
+						})
 					]),
-					this.foundBody
+					E('div', { 'class': 'btm-note' },
+						_('就是手机/电脑搜索蓝牙时看到的名字，最多 64 字节；留空并保存会恢复 BlueZ 默认名称。修改后立即生效，并会在每次开机时重新应用。'))
 				])
 			]),
 
-			E('div', { 'class': 'cbi-section' }, [
-				E('h3', {}, _('已配对设备')),
+			E('div', { 'class': 'cbi-section btm-card' }, [
+				E('h3', {}, _('扫描附近设备')),
+				E('div', { 'class': 'cbi-section-node' }, [
+					E('div', { 'class': 'btm-row' }, [
+						button(_('开始扫描（8 秒）'), 'cbi-button-apply', function() {
+							if (self.cfg && self.cfg.enabled === '0') {
+								self.setMsg(_('蓝牙当前已关闭，请先在上方开启蓝牙'), true);
+								return;
+							}
+							self.setMsg(_('正在扫描，请让设备保持在可被发现状态 ...'));
+							api([ 'scan', '8' ]).then(function(r) {
+								self.found = (r && r.found) || [];
+								self.setMsg((r && r.message) || _('扫描完成'), false);
+								self.paintFound();
+								return self.refresh();
+							}).catch(function(e) {
+								self.setMsg(_('扫描失败：') + (e.message || e), true);
+							});
+						})
+					]),
+					this.foundBody,
+					E('div', { 'class': 'btm-note' },
+						_('配对前请先让设备进入配对模式（音箱/耳机通常长按电源键）。手机、手表等设备多用随机地址且不广播名称，会显示为“未命名设备”，一般无法配对，属正常现象。'))
+				])
+			]),
+
+			E('div', { 'class': 'cbi-section btm-card' }, [
+				E('h3', {}, _('设备列表')),
 				E('div', { 'class': 'cbi-section-node' }, [ this.devBody ])
 			]),
 
-			E('div', { 'class': 'cbi-section' }, [
+			E('div', { 'class': 'cbi-section btm-card' }, [
 				E('h3', {}, _('服务设置')),
 				E('div', { 'class': 'cbi-section-node' }, [ this.buildConfigForm() ])
 			]),
 
-			E('div', { 'class': 'cbi-section' }, [
+			E('div', { 'class': 'cbi-section btm-card' }, [
 				E('h3', {}, _('诊断')),
 				E('div', { 'class': 'cbi-section-node' }, [
-					E('div', { 'class': 'cbi-value' }, [
-						E('div', { 'class': 'cbi-value-field' }, [
-							button(_('刷新诊断信息'), 'cbi-button-action', function() {
-								self.loadDiag();
-							}),
-							' ',
-							button(_('查看蓝牙日志'), 'cbi-button-action', function() {
-								self.loadLog();
-							})
-						])
+					E('div', { 'class': 'btm-row' }, [
+						button(_('刷新诊断信息'), 'cbi-button-action', function() {
+							self.loadDiag();
+						}),
+						button(_('查看蓝牙日志'), 'cbi-button-action', function() {
+							self.loadLog();
+						})
 					]),
 					this.diagBody
 				])
@@ -224,7 +317,7 @@ return view.extend({
 
 	buildConfigForm: function() {
 		var self = this;
-		var cfg = (this.summary && this.summary.config) || {};
+		var cfg = this.cfg || {};
 
 		function field(label, node, desc) {
 			return E('div', { 'class': 'cbi-value' }, [
@@ -237,11 +330,11 @@ return view.extend({
 		}
 
 		this.uartInput = E('input', {
-			'type': 'text', 'class': 'cbi-input-text',
+			'type': 'text', 'class': 'cbi-input-text btm-input',
 			'value': cfg.uart || '/dev/ttyS2'
 		});
 		this.baudInput = E('input', {
-			'type': 'text', 'class': 'cbi-input-text',
+			'type': 'text', 'class': 'cbi-input-text btm-input',
 			'value': cfg.baud || '1500000'
 		});
 		this.flowInput = E('select', { 'class': 'cbi-input-select' }, [
@@ -251,7 +344,7 @@ return view.extend({
 		this.flowInput.value = cfg.flow || 'flow';
 
 		this.typeInput = E('input', {
-			'type': 'text', 'class': 'cbi-input-text',
+			'type': 'text', 'class': 'cbi-input-text btm-input',
 			'value': cfg.type || 'any'
 		});
 
@@ -259,8 +352,8 @@ return view.extend({
 		this.autoconnectInput.checked = (cfg.autoconnect === '1');
 
 		return E('div', {}, [
-			field(_('串口设备'), this.uartInput, _('AIC8800 蓝牙 HCI 所在 UART，默认 /dev/ttyS2（rk3528 uart2）。')),
-			field(_('波特率'), this.baudInput, _('参考 AIC8800 方案：1500000。')),
+			field(_('串口设备'), this.uartInput, _('板载蓝牙 HCI 所在 UART，默认 /dev/ttyS2（rk3528 uart2）。')),
+			field(_('波特率'), this.baudInput, _('必须与芯片当前串口速率一致，AIC8800 常见 1500000，其次 115200 / 921600。')),
 			field(_('硬件流控'), this.flowInput, _('默认 flow；若 UART 未引出 RTS 且出现丢包，可改 noflow。')),
 			field(_('hciattach 协议'), this.typeInput, _('BlueZ hciattach 的 type，AIC8800 用 any。')),
 			field(_('开机自动连接'), this.autoconnectInput, _('开启后，启动时自动连接下表勾选了“自动连接”的设备。')),
@@ -269,6 +362,7 @@ return view.extend({
 				E('div', { 'class': 'cbi-value-field' }, [
 					button(_('保存设置并重启服务'), 'cbi-button-apply', function() {
 						var chain = Promise.resolve();
+
 						[
 							[ 'uart', self.uartInput.value.trim() ],
 							[ 'baud', self.baudInput.value.trim() ],
@@ -280,6 +374,7 @@ return view.extend({
 								return api([ 'set', item[0], item[1] ]);
 							});
 						});
+
 						chain.then(function() {
 							self.setMsg(_('配置已保存，正在重启蓝牙服务 ...'));
 							return api([ 'restart' ]);
@@ -301,14 +396,16 @@ return view.extend({
 	},
 
 	paintStatus: function() {
+		var self = this;
 		var s = this.summary || {};
 		var svc = s.service || {};
 		var ctl = s.controller || {};
 		var cnt = s.counts || {};
+		var enabled = !(this.cfg && this.cfg.enabled === '0');
 
 		function row(label, value) {
-			return E('tr', { 'class': 'cbi-section-table-row' }, [
-				E('td', { 'class': 'cbi-value-title', 'style': 'width:140px' }, label),
+			return E('tr', {}, [
+				E('th', { 'style': 'width:150px;font-weight:500;opacity:.75' }, label),
 				E('td', {}, value)
 			]);
 		}
@@ -320,23 +417,35 @@ return view.extend({
 		while (this.statusBody.firstChild)
 			this.statusBody.removeChild(this.statusBody.firstChild);
 
-		this.statusBody.appendChild(E('table', { 'class': 'cbi-section-table' }, [
+		this.statusBody.appendChild(E('div', { 'class': 'btm-scroll' }, E('table', { 'class': 'btm-table' }, [
+			row(_('蓝牙开关'), [
+				mark(enabled, enabled ? _('已开启') : _('已关闭')),
+				'　',
+				button(enabled ? _('关闭蓝牙') : _('开启蓝牙'),
+					enabled ? 'cbi-button-action' : 'cbi-button-apply',
+					function() { self.toggleBT(); })
+			]),
 			row(_('bluetoothd'), mark(svc.bluetoothd, svc.bluetoothd ? _('运行中') : _('未运行'))),
 			row(_('hciattach'), mark(svc.hciattach, svc.hciattach ? _('运行中') : _('未运行'))),
-			row(_('HCI 控制器'), mark(svc.hci0, svc.hci0 ? 'hci0' : _('没有 hci0，检查 UART/波特率/固件'))),
+			row(_('HCI 控制器'), mark(svc.hci0, svc.hci0 ? 'hci0' : _('没有 hci0，检查串口/波特率/固件'))),
 			row(_('适配器'), [
-				ctl.address ? (ctl.address + '　') : '',
-				ctl.name ? ('“' + ctl.name + '”　') : '',
-				mark(ctl.powered, ctl.powered ? _('已上电') : _('未上电')),
-				'　',
-				ctl.discoverable ? _('可被发现') : _('不可发现')
+				E('div', {}, [
+					E('div', { 'class': 'btm-name' }, ctl.name || (enabled ? _('（读取中）') : '—')),
+					E('div', { 'class': 'btm-sub' }, [
+						ctl.address ? E('span', { 'class': 'btm-mac' }, ctl.address) : '',
+						ctl.address ? '　' : '',
+						ctl.powered ? _('已上电') : _('未上电'),
+						'　',
+						ctl.discoverable ? _('可被发现') : _('不可发现')
+					])
+				])
 			]),
 			row(_('设备统计'), _('已配对 ') + (cnt.paired || 0) + _(' 台，已连接 ') + (cnt.connected || 0) + _(' 台'))
-		]));
+		])));
 
 		if (!svc.hci0)
-			this.statusBody.appendChild(E('div', { 'class': 'cbi-value-description' },
-				_('提示：hci0 不存在时先看“诊断”里的 hciconfig / dmesg / rfkill；必要时在服务设置里换 /dev/ttyS1、/dev/ttyS2 或改波特率后重启服务。')));
+			this.statusBody.appendChild(E('div', { 'class': 'btm-note' },
+				_('hci0 不存在时先看“诊断”里的 hciconfig / dmesg / rfkill；必要时在服务设置里换 /dev/ttyS1、/dev/ttyS2 或改波特率后重启服务。')));
 	},
 
 	paintDevices: function() {
@@ -344,15 +453,19 @@ return view.extend({
 		var list = (this.devices || []).slice().sort(function(a, b) {
 			if (a.connected !== b.connected)
 				return a.connected ? -1 : 1;
-			return (a.name || '').localeCompare(b.name || '');
+			if (a.paired !== b.paired)
+				return a.paired ? -1 : 1;
+			return devLabel(a).localeCompare(devLabel(b));
 		});
 
 		while (this.devBody.firstChild)
 			this.devBody.removeChild(this.devBody.firstChild);
 
 		if (!list.length) {
-			this.devBody.appendChild(E('div', { 'class': 'cbi-value-description' },
-				_('暂无设备。先扫描并配对，之后会出现在这里。')));
+			this.devBody.appendChild(E('div', { 'class': 'btm-empty' },
+				(this.cfg && this.cfg.enabled === '0')
+					? _('蓝牙已关闭。开启后这里会显示已配对和扫描到的设备。')
+					: _('暂无设备。先扫描并配对，之后会出现在这里。')));
 			return;
 		}
 
@@ -367,44 +480,48 @@ return view.extend({
 				});
 			});
 
-			var actions = [];
+			var btns = [];
 
 			if (dev.connected) {
-				actions.push(button(_('断开'), 'cbi-button-action', function() {
-					self.act(_('断开 ') + dev.name, [ 'disconnect', dev.address ]);
+				btns.push(button(_('断开'), 'cbi-button-action', function() {
+					self.act(_('断开 ') + devLabel(dev), [ 'disconnect', dev.address ]);
 				}));
 			} else if (dev.paired) {
-				actions.push(button(_('连接'), 'cbi-button-apply', function() {
-					self.act(_('连接 ') + dev.name, [ 'connect', dev.address ]);
+				btns.push(button(_('连接'), 'cbi-button-apply', function() {
+					self.act(_('连接 ') + devLabel(dev), [ 'connect', dev.address ]);
 				}));
 			} else {
-				actions.push(button(_('配对并连接'), 'cbi-button-apply', function() {
-					self.act(_('配对 ') + dev.name, [ 'pair', dev.address ]);
+				btns.push(button(_('配对并连接'), 'cbi-button-apply', function() {
+					self.act(_('配对 ') + devLabel(dev), [ 'pair', dev.address ]);
 				}));
 			}
 
-			actions.push(button(dev.trusted ? _('取消信任') : _('设为信任'), 'cbi-button-action', function() {
+			btns.push(button(dev.trusted ? _('取消信任') : _('设为信任'), 'cbi-button-action', function() {
 				self.act(_('修改信任状态'), [ 'trust', dev.address, dev.trusted ? '0' : '1' ]);
 			}));
 
-			actions.push(button(_('删除'), 'cbi-button-remove', function() {
-				if (confirm(_('确定删除 ') + dev.name + _(' 的配对信息吗？')))
-					self.act(_('删除 ') + dev.name, [ 'remove', dev.address ]);
+			btns.push(button(_('删除'), 'cbi-button-remove', function() {
+				if (confirm(_('确定删除 ') + devLabel(dev) + _(' 的配对信息吗？')))
+					self.act(_('删除 ') + devLabel(dev), [ 'remove', dev.address ]);
 			}));
 
-			return E('tr', { 'class': 'cbi-section-table-row' }, [
-				E('td', {}, [ E('strong', {}, dev.name || dev.address),
-					dev.audio ? E('span', { 'class': 'cbi-value-description' }, ' ' + _('音频')) : '' ]),
-				E('td', {}, typeLabel(dev)),
-				E('td', {}, E('code', {}, dev.address)),
-				E('td', {}, stateText(dev)),
+			var notes = devNotes(dev);
+
+			return E('tr', {}, [
+				E('td', {}, [
+					E('div', { 'class': 'btm-name' }, devLabel(dev)),
+					notes ? E('div', { 'class': 'btm-sub' }, notes) : ''
+				]),
+				E('td', { 'style': 'white-space:nowrap' }, typeLabel(dev)),
+				E('td', {}, E('span', { 'class': 'btm-mac' }, dev.address)),
+				E('td', { 'style': 'white-space:nowrap' }, stateText(dev)),
 				E('td', {}, auto),
-				E('td', { 'style': 'white-space:nowrap' }, actions)
+				E('td', {}, E('div', { 'class': 'btm-btns' }, btns))
 			]);
 		});
 
-		this.devBody.appendChild(E('table', { 'class': 'cbi-section-table' }, [
-			E('tr', { 'class': 'cbi-section-table-titles' }, [
+		this.devBody.appendChild(E('div', { 'class': 'btm-scroll' }, E('table', { 'class': 'btm-table' }, [
+			E('tr', {}, [
 				E('th', {}, _('名称')),
 				E('th', {}, _('类型')),
 				E('th', {}, _('地址')),
@@ -412,7 +529,7 @@ return view.extend({
 				E('th', {}, _('自动连接')),
 				E('th', {}, _('操作'))
 			])
-		].concat(rows)));
+		].concat(rows))));
 	},
 
 	paintFound: function() {
@@ -422,7 +539,7 @@ return view.extend({
 			this.foundBody.removeChild(this.foundBody.firstChild);
 
 		if (!this.found.length) {
-			this.foundBody.appendChild(E('div', { 'class': 'cbi-value-description' },
+			this.foundBody.appendChild(E('div', { 'class': 'btm-note' },
 				_('尚未扫描，或本次没有发现新设备。')));
 			return;
 		}
@@ -432,34 +549,43 @@ return view.extend({
 
 			var action;
 			if (known && known.connected)
-				action = E('span', {}, _('已连接'));
+				action = E('span', { 'class': 'btm-sub' }, _('已连接'));
 			else if (known && known.paired)
 				action = button(_('连接'), 'cbi-button-apply', function() {
-					self.act(_('连接 ') + item.name, [ 'connect', item.address ]);
+					self.act(_('连接 ') + devLabel(item), [ 'connect', item.address ]);
 				});
 			else
 				action = button(_('配对并连接'), 'cbi-button-apply', function() {
-					self.act(_('配对 ') + item.name, [ 'pair', item.address ]);
+					self.act(_('配对 ') + devLabel(item), [ 'pair', item.address ]);
 				});
 
-			return E('tr', { 'class': 'cbi-section-table-row' }, [
-				E('td', {}, item.name || _('未知设备')),
-				E('td', {}, E('code', {}, item.address)),
+			var notes = devNotes(item);
+
+			return E('tr', {}, [
+				E('td', {}, [
+					E('div', { 'class': 'btm-name' }, devLabel(item)),
+					notes ? E('div', { 'class': 'btm-sub' }, notes) : ''
+				]),
+				E('td', {}, E('span', { 'class': 'btm-mac' }, item.address)),
 				E('td', {}, action)
 			]);
 		});
 
-		this.foundBody.appendChild(E('table', { 'class': 'cbi-section-table' }, [
-			E('tr', { 'class': 'cbi-section-table-titles' }, [
-				E('th', {}, _('发现的设备')),
+		var table = E('table', { 'class': 'btm-table' }, [
+			E('tr', {}, [
+				E('th', {}, _('设备')),
 				E('th', {}, _('地址')),
 				E('th', {}, _('操作'))
 			])
-		].concat(rows)));
+		].concat(rows));
+
+		this.foundBody.appendChild(
+			E('div', { 'class': 'btm-scroll', 'style': 'margin-top:12px' }, table));
 	},
 
 	loadDiag: function() {
 		var self = this;
+
 		this.setMsg(_('正在收集诊断信息 ...'));
 		exec([ 'diag' ]).then(function(text) {
 			self.showText(text);
@@ -471,6 +597,7 @@ return view.extend({
 
 	loadLog: function() {
 		var self = this;
+
 		this.setMsg(_('正在读取日志 ...'));
 		exec([ 'log' ]).then(function(text) {
 			self.showText(text || _('（没有相关日志）'));
@@ -485,7 +612,8 @@ return view.extend({
 			this.diagBody.removeChild(this.diagBody.firstChild);
 
 		this.diagBody.appendChild(E('pre', {
-			'style': 'white-space:pre-wrap;max-height:360px;overflow:auto;font-family:monospace;font-size:12px;padding:8px;border:1px solid rgba(128,128,128,.35);border-radius:4px'
+			'style': 'white-space:pre-wrap;max-height:380px;overflow:auto;font-family:monospace;font-size:12px;line-height:1.55;padding:12px;margin-top:12px;border:1px solid rgba(128,128,128,.3);border-radius:4px'
 		}, text));
 	}
 });
+//（注：内容由AI生成）
