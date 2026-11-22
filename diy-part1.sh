@@ -46,6 +46,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/luci-app-btmanager/root/usr/sbin \
          package/luci-app-btmanager/root/usr/share/luci/menu.d \
          package/luci-app-btmanager/root/usr/share/rpcd/acl.d \
+         package/bluez-alsa/files \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
