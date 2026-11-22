@@ -616,4 +616,3 @@ return view.extend({
 		}, text));
 	}
 });
-//（注：内容由AI生成）

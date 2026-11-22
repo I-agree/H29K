@@ -26,12 +26,30 @@ rfkill_unblock() {
 	done
 }
 
+rfkill_block() {
+	if command -v rfkill >/dev/null 2>&1; then
+		rfkill block bluetooth 2>/dev/null
+		return 0
+	fi
+	for d in /sys/class/rfkill/rfkill*; do
+		[ -r "$d/type" ] || continue
+		[ "$(cat "$d/type" 2>/dev/null)" = "bluetooth" ] || continue
+		echo 1 > "$d/soft" 2>/dev/null
+	done
+}
+
 start_service() {
 	local enabled uart baud flow type
 
 	config_load btmanager
 	config_get_bool enabled main enabled 1
-	[ "$enabled" = "1" ] || return 0
+
+	if [ "$enabled" != "1" ]; then
+		# 总开关关闭：不挂 HCI，也不留 bluetoothd 占内存
+		/etc/init.d/bluetoothd stop 2>/dev/null
+		rfkill_block
+		return 0
+	fi
 
 	config_get uart main uart /dev/ttyS2
 	config_get baud main baud 1500000
