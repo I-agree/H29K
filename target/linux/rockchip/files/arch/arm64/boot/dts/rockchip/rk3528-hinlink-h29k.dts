@@ -288,6 +288,16 @@
 };
 
 &pinctrl {
+	hdmi_idle {
+		hdmi_pins_idle: hdmi-pins-idle {
+			rockchip,pins =
+				<0 RK_PA3 1 &pcfg_pull_none>,
+				<0 RK_PA2 1 &pcfg_pull_none>,
+				<0 RK_PA4 0 &pcfg_output_low>,
+				<0 RK_PA5 0 &pcfg_output_low>;
+		};
+	};
+
 	modem {
 		wwan_rst_pin: wwan-rst-pin {
 			rockchip,pins = <4 RK_PB4 RK_FUNC_GPIO &pcfg_pull_none>;
@@ -589,8 +599,9 @@
 
 &hdmi {
 	status = "okay";
-	pinctrl-names = "default";
+	pinctrl-names = "default", "idle";
 	pinctrl-0 = <&hdmi_pins>;
+	pinctrl-1 = <&hdmi_pins_idle>;
 	avdd-0v9-supply = <&vdd_0v9>;
 	avdd-1v8-supply = <&vcc_1v8>;
 };
