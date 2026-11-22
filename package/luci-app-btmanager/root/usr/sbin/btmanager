@@ -1,0 +1,739 @@
+#!/bin/sh
+# ---------------------------------------------------------------------------
+# btmanager - backend helper for luci-app-btmanager
+#
+# Invoked by rpcd "file.exec" (root). Every sub-command is whitelisted here,
+# the LuCI frontend never passes raw shell code.
+#
+# Sub-commands:
+#   summary                     controller / daemon status
+#   devices                     paired + discovered device list (JSON)
+#   scan [seconds]              start discovery, return found devices (JSON)
+#   pair <mac>                  btmgmt pair (BR/EDR then LE) + trust + connect
+#   connect <mac>               connect
+#   disconnect <mac>            disconnect
+#   trust <mac> | untrust <mac> manage Trusted flag
+#   remove <mac>                remove bonding
+#   name <text>                 set adapter (bluetooth) name
+#   alias <mac> <text>          set device display name (best effort via BlueZ + local cache)
+#   enable on|off               turn the whole bluetooth stack on/off
+#   power on|off                adapter power
+#   restart                     restart bluetooth service stack
+#
+#   config                      current UCI settings (JSON)
+#   set <key> <value>           change UCI setting
+#   autodev <mac> <0|1>         add/remove device from auto-connect list
+#   boot                        one-shot boot helper (wait hci0, autoconnect)
+#   diag                        plain text diagnostics
+#   log                         plain text recent bluetooth log
+# ---------------------------------------------------------------------------
+
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+
+BTCTL=/usr/bin/bluetoothctl
+BTMGMT=/usr/bin/btmgmt
+STATE_DIR=/var/run/btmanager
+mkdir -p "$STATE_DIR" 2>/dev/null || STATE_DIR=/tmp
+LOG_FILE=$STATE_DIR/btmanager.log
+# 本地设备名称缓存：BlueZ 对不广播名称的设备（常见于 TWS 耳机/LE 设备）
+# 只给一个横线地址形式的 Alias，靠这里记住曾经出现过的名字
+NAMES_FILE=${BTM_NAMES_FILE:-/etc/btmanager.names}
+
+# ------------------------------- helpers -----------------------------------
+
+json_esc() {
+	printf '%s' "$1" | tr -d '\r' | tr '\n\t' '  ' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g'
+}
+
+bool_json() {
+	[ "$1" = "yes" ] && printf 'true' || printf 'false'
+}
+
+name_cache_get() {
+	[ -r "$NAMES_FILE" ] || return 1
+	_ng=$(awk -F'\t' -v m="$1" '$1 == m { print $2; exit }' "$NAMES_FILE" 2>/dev/null)
+	[ -n "$_ng" ] || return 1
+	printf '%s' "$_ng"
+}
+
+name_cache_set() {
+	_nm=$(norm_mac "$1")
+	_nn=$2
+	[ -n "$_nm" ] && [ -n "$_nn" ] || return 1
+	case "$_nn" in *:*:*) return 1 ;; esac
+	_nt="$STATE_DIR/names.$$"
+	awk -F'\t' -v m="$_nm" '$1 != m' "$NAMES_FILE" 2>/dev/null > "$_nt"
+	printf '%s\t%s\n' "$_nm" "$_nn" >> "$_nt"
+	mv "$_nt" "$NAMES_FILE" 2>/dev/null || { cat "$_nt" > "$NAMES_FILE" 2>/dev/null; rm -f "$_nt"; }
+	chmod 0644 "$NAMES_FILE" 2>/dev/null
+	return 0
+}
+
+name_cache_del() {
+	_nm=$(norm_mac "$1")
+	[ -r "$NAMES_FILE" ] || return 0
+	_nt="$STATE_DIR/names.$$"
+	awk -F'\t' -v m="$_nm" '$1 != m' "$NAMES_FILE" 2>/dev/null > "$_nt"
+	mv "$_nt" "$NAMES_FILE" 2>/dev/null || { cat "$_nt" > "$NAMES_FILE" 2>/dev/null; rm -f "$_nt"; }
+	return 0
+}
+
+# 从 bluetoothctl info 输出里提取可信名字并写入缓存
+name_cache_learn() {
+	_lm=$(norm_mac "$1")
+	_li=$2
+	_ln=$(printf '%s\n' "$_li" | sed -n 's/^[[:space:]]*Name:[[:space:]]*//p' | head -n 1)
+	[ -z "$_ln" ] && _ln=$(printf '%s\n' "$_li" | sed -n 's/^[[:space:]]*Alias:[[:space:]]*//p' | head -n 1)
+	_ld=$(printf '%s' "$_lm" | tr ':' '-')
+	[ "$_ln" = "$_ld" ] && _ln=""
+	[ -z "$_ln" ] && return 0
+	_cached=$(name_cache_get "$_lm" 2>/dev/null)
+	[ "$_cached" = "$_ln" ] && return 0
+	name_cache_set "$_lm" "$_ln"
+}
+
+norm_mac() {
+	printf '%s' "$1" | tr 'a-f' 'A-F'
+}
+
+valid_mac() {
+	printf '%s' "$1" | grep -Eq '^([0-9A-F]{2}:){5}[0-9A-F]{2}$'
+}
+
+cfg() {
+	uci -q get "btmanager.main.$1" 2>/dev/null
+}
+
+bt_show_field() {
+	run_lim 8 "$BTCTL" show 2>/dev/null | sed -n "s/^[[:space:]]*$1:[[:space:]]*//p" | head -n 1
+}
+
+bt_field() {
+	# $1 = mac, $2 = field name of "bluetoothctl info"
+	run_lim 6 "$BTCTL" info "$1" 2>/dev/null | sed -n "s/^[[:space:]]*$2:[[:space:]]*//p" | head -n 1
+}
+
+wait_field() {
+	# $1 mac, $2 field, $3 expected value, $4 timeout seconds
+	wf_i=0
+	while [ $wf_i -lt "$4" ]; do
+		[ "$(bt_field "$1" "$2")" = "$3" ] && return 0
+		sleep 1
+		wf_i=$((wf_i + 1))
+	done
+	return 1
+}
+
+run_lim() {
+	# $1 = timeout seconds, rest = command
+	t=$1; shift
+	if command -v timeout >/dev/null 2>&1; then
+		timeout "$t" "$@"
+	else
+		"$@"
+	fi
+}
+
+rfkill_set() {
+	# $1 = unblock | block
+	if command -v rfkill >/dev/null 2>&1; then
+		rfkill "$1" bluetooth 2>/dev/null
+		return 0
+	fi
+	case "$1" in
+		block) val=1 ;;
+		*)     val=0 ;;
+	esac
+	for d in /sys/class/rfkill/rfkill*; do
+		[ -r "$d/type" ] || continue
+		[ "$(cat "$d/type" 2>/dev/null)" = "bluetooth" ] || continue
+		echo "$val" > "$d/soft" 2>/dev/null
+	done
+}
+
+autodev_list() {
+	cfg autodev
+}
+
+is_autodev() {
+	for a in $(autodev_list); do
+		[ "$(norm_mac "$a")" = "$1" ] && return 0
+	done
+	return 1
+}
+
+fail_json() {
+	printf '{"ok":false,"message":"%s"}\n' "$(json_esc "$1")"
+	exit 0
+}
+
+# ---------------------------- JSON builders --------------------------------
+
+device_json() {
+	mac=$1
+	info=$(run_lim 6 "$BTCTL" info "$mac" 2>/dev/null)
+
+	name=$(printf '%s\n' "$info"   | sed -n 's/^[[:space:]]*Name:[[:space:]]*//p'    | head -n 1)
+	alias=$(printf '%s\n' "$info"  | sed -n 's/^[[:space:]]*Alias:[[:space:]]*//p'   | head -n 1)
+	icon=$(printf '%s\n' "$info"   | sed -n 's/^[[:space:]]*Icon:[[:space:]]*//p'    | head -n 1)
+	klass=$(printf '%s\n' "$info"  | sed -n 's/^[[:space:]]*Class:[[:space:]]*//p'   | head -n 1)
+	paired=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*Paired:[[:space:]]*//p'  | head -n 1)
+	trusted=$(printf '%s\n' "$info"| sed -n 's/^[[:space:]]*Trusted:[[:space:]]*//p' | head -n 1)
+	conn=$(printf '%s\n' "$info"   | sed -n 's/^[[:space:]]*Connected:[[:space:]]*//p' | head -n 1)
+	rssi=$(printf '%s\n' "$info"   | sed -n 's/^[[:space:]]*RSSI:[[:space:]]*//p'    | head -n 1)
+
+	# BlueZ 会把没有广播名称的设备把 Alias 填成 "55-C3-05-1D-AE-2B" 这种地址形式
+	dash=$(printf '%s' "$mac" | tr ':' '-')
+	[ "$alias" = "$dash" ] && alias=""
+	[ -z "$name" ] && name="$alias"
+	# 防止 "AA:BB:CC:..." 形式也被当成名字
+	case "$name" in *:*:*) name="" ;; esac
+
+	cached=no
+	if [ -n "$name" ]; then
+		name_cache_learn "$mac" "$info"
+	else
+		cname=$(name_cache_get "$mac" 2>/dev/null)
+		if [ -n "$cname" ]; then
+			name="$cname"
+			cached=yes
+		fi
+	fi
+
+	random=no
+	printf '%s\n' "$info" | head -n 1 | grep -q '(random)' && random=yes
+
+	audio=no
+	printf '%s\n' "$info" | grep -qE 'Audio (Sink|Source)|Handsfree|Headset|A/V Remote' && audio=yes
+
+	auto=no
+	is_autodev "$mac" && auto=yes
+
+	printf '{"address":"%s","name":"%s","alias":"%s","icon":"%s","class":"%s","paired":%s,"trusted":%s,"connected":%s,"rssi":"%s","audio":%s,"autoconnect":%s,"named":%s,"random":%s,"cached":%s}' \
+		"$mac" \
+		"$(json_esc "$name")" \
+		"$(json_esc "$alias")" \
+		"$(json_esc "$icon")" \
+		"$(json_esc "$klass")" \
+		"$(bool_json "$paired")" \
+		"$(bool_json "$trusted")" \
+		"$(bool_json "$conn")" \
+		"$(json_esc "$rssi")" \
+		"$(bool_json "$audio")" \
+		"$(bool_json "$auto")" \
+		"$(bool_json "$([ -n "$name" ] && echo yes)")" \
+		"$(bool_json "$random")" \
+		"$(bool_json "$cached")"
+}
+
+print_devices_array() {
+	printf '['
+	first=1
+	run_lim 10 "$BTCTL" devices 2>/dev/null | while IFS= read -r line; do
+		mac=$(printf '%s' "$line" | sed -n 's/^Device \([0-9A-Fa-f:]\{17\}\).*/\1/p')
+		[ -n "$mac" ] || continue
+		if [ "$first" = 1 ]; then first=0; else printf ','; fi
+		device_json "$(norm_mac "$mac")"
+	done
+	printf ']'
+}
+
+hci_list() {
+	# 每行一个控制器：hci|bus|addr|state
+	run_lim 8 hciconfig -a 2>/dev/null | awk '
+		function flush() {
+			if (h == "") return
+			printf "%s|%s|%s|%s\n", h, bus, addr, st
+			h = ""
+		}
+		/^hci[0-9]+:/ {
+			flush()
+			h = $1
+			sub(/:$/, "", h)
+			b = $0
+			sub(/.*Bus:[ ]*/, "", b)
+			sub(/[ ].*/, "", b)
+			bus = b
+			next
+		}
+		/BD Address:/ {
+			a = $0
+			sub(/.*BD Address:[ ]*/, "", a)
+			sub(/[ ].*/, "", a)
+			addr = a
+			next
+		}
+		/^[ 	]+(UP|DOWN)([ 	]|$)/ {
+			s = $0
+			gsub(/^[ 	]+/, "", s)
+			sub(/[ 	]+$/, "", s)
+			st = s
+			next
+		}
+		END { flush() }'
+}
+
+controllers_json() {
+	cf="$STATE_DIR/hci.$$"
+	hci_list > "$cf" 2>/dev/null
+	printf '['
+	firstc=1
+	while IFS='|' read -r h bus addr st; do
+		[ -n "$h" ] || continue
+		if [ "$firstc" = 1 ]; then firstc=0; else printf ','; fi
+		printf '{"hci":"%s","bus":"%s","address":"%s","state":"%s"}' \
+			"$(json_esc "$h")" "$(json_esc "$bus")" "$(json_esc "$addr")" "$(json_esc "$st")"
+	done < "$cf"
+	printf ']'
+	rm -f "$cf"
+}
+
+config_json() {
+	printf '{"enabled":"%s","autoconnect":"%s","autodev":"%s","devicename":"%s"}' \
+		"$(json_esc "$(cfg enabled)")" \
+		"$(json_esc "$(cfg autoconnect)")" \
+		"$(json_esc "$(autodev_list)")" \
+		"$(json_esc "$(cfg devicename)")"
+}
+
+# ------------------------------- commands ----------------------------------
+
+cmd_summary() {
+	show=$(run_lim 8 "$BTCTL" show 2>&1)
+	addr=$(printf '%s\n' "$show" | sed -n 's/^Controller \([0-9A-Fa-f:]\{17\}\).*/\1/p' | head -n 1)
+	[ -z "$addr" ] && addr=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Address:[[:space:]]*//p' | head -n 1)
+	name=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Alias:[[:space:]]*//p'     | head -n 1)
+	[ -z "$name" ] && name=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Name:[[:space:]]*//p' | head -n 1)
+	powered=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Powered:[[:space:]]*//p' | head -n 1)
+	disc=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Discoverable:[[:space:]]*//p' | head -n 1)
+	pair=$(printf '%s\n' "$show" | sed -n 's/^[[:space:]]*Pairable:[[:space:]]*//p' | head -n 1)
+
+	bd=no; pidof bluetoothd >/dev/null 2>&1 && bd=yes
+	hci0=no; [ -e /sys/class/bluetooth/hci0 ] && hci0=yes
+
+	paired_count=$(run_lim 10 "$BTCTL" devices Paired 2>/dev/null | grep -c '^Device ')
+	conn_count=$(run_lim 10 "$BTCTL" devices Connected 2>/dev/null | grep -c '^Device ')
+
+	printf '{"ok":true,"service":{"bluetoothd":%s,"hci0":%s},"controllers":%s,"controller":{"address":"%s","name":"%s","powered":%s,"discoverable":%s,"pairable":%s},"counts":{"paired":%d,"connected":%d},"config":%s}\n' \
+		"$(bool_json "$bd")" "$(bool_json "$hci0")" \
+		"$(controllers_json)" \
+		"$(json_esc "$addr")" "$(json_esc "$name")" \
+		"$(bool_json "$powered")" "$(bool_json "$disc")" "$(bool_json "$pair")" \
+		"${paired_count:-0}" "${conn_count:-0}" \
+		"$(config_json)"
+}
+
+cmd_devices() {
+	printf '{"ok":true,"devices":'
+	print_devices_array
+	printf '}\n'
+}
+
+cmd_scan() {
+	dur=${1:-8}
+	case "$dur" in ''|*[!0-9]*) dur=8 ;; esac
+	[ "$dur" -lt 4 ]  && dur=4
+	[ "$dur" -gt 20 ] && dur=20
+
+	"$BTCTL" power on >/dev/null 2>&1
+
+	scan_out=$( { printf 'scan on\n'; sleep "$dur"; printf 'scan off\nquit\n'; } | run_lim $((dur + 10)) "$BTCTL" 2>&1 )
+
+	# 先从发现事件里取广播名（"[NEW] Device AA:BB:.. 名字"），
+	# 这比事后 bluetoothctl info 更全，也保住了只在广播里出现的名字
+	scan_tmp="$STATE_DIR/scan.$$"
+	scan_chg="$STATE_DIR/chg.$$"
+	printf '%s\n' "$scan_out" | sed -n 's/^\[NEW\] Device \([0-9A-Fa-f:]\{17\}\)[[:space:]]*\(.*\)$/\1|\2/p' > "$scan_tmp"
+	# 名字经常是后到的：BlueZ 先报 [NEW] Device <mac>，再补一条
+	# [CHG] Device <mac> Name: Xiaomi Buds 3 Pro —— 只认 NEW 会永远拿不到名字
+	printf '%s\n' "$scan_out" | sed -n 's/^\[CHG\] Device \([0-9A-Fa-f:]\{17\}\)[[:space:]]*Name:[[:space:]]*\(.*\)$/\1|\2/p' \
+		| awk -F'|' '{ k = toupper($1); v[k] = $2 } END { for (k in v) print k "|" v[k] }' > "$scan_chg"
+
+	macs=$(cut -d'|' -f1 "$scan_tmp" | tr 'a-f' 'A-F' | grep -v '^$' | sort -u)
+	total=$(printf '%s\n' "$macs" | grep -c '[0-9A-F]')
+
+	printf '{"ok":true,"message":"%s","found":[' "$(json_esc "扫描完成，发现 ${total:-0} 个设备")"
+	first=1
+	for mac in $macs; do
+		raw=$(grep -i "^$mac|" "$scan_tmp" 2>/dev/null | head -n 1 | cut -d'|' -f2)
+
+		info=$(run_lim 6 "$BTCTL" info "$mac" 2>/dev/null)
+		iname=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*Name:[[:space:]]*//p'  | head -n 1)
+		ialias=$(printf '%s\n' "$info" | sed -n 's/^[[:space:]]*Alias:[[:space:]]*//p' | head -n 1)
+
+		dash=$(printf '%s' "$mac" | tr ':' '-')
+		[ "$ialias" = "$dash" ] && ialias=""
+		[ -z "$iname" ] && iname="$ialias"
+		[ -z "$iname" ] && iname="$raw"
+		[ "$iname" = "$dash" ] && iname=""
+		case "$iname" in *:*:*) iname="" ;; esac
+		if [ -z "$iname" ]; then
+			iname=$(grep -i "^$mac|" "$scan_chg" 2>/dev/null | head -n 1 | cut -d'|' -f2)
+		fi
+		if [ -z "$iname" ]; then
+			iname=$(name_cache_get "$mac" 2>/dev/null)
+		else
+			name_cache_set "$mac" "$iname" >/dev/null 2>&1
+		fi
+
+		random=no
+		printf '%s\n' "$info" | head -n 1 | grep -q '(random)' && random=yes
+
+		if [ "$first" = 1 ]; then first=0; else printf ','; fi
+		printf '{"address":"%s","name":"%s","named":%s,"random":%s}' \
+			"$mac" "$(json_esc "$iname")" \
+			"$(bool_json "$([ -n "$iname" ] && echo yes)")" "$(bool_json "$random")"
+	done
+	printf ']}\n'
+	rm -f "$scan_tmp" "$scan_chg"
+}
+
+cmd_pair() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+
+	"$BTCTL" power on >/dev/null 2>&1
+
+	out1=""
+	out2=""
+	out1=$(run_lim 25 "$BTMGMT" pair -c 3 -t 0 "$mac" 2>&1)
+	if ! wait_field "$mac" Paired yes 4; then
+		out2=$(run_lim 25 "$BTMGMT" pair -c 3 -t 2 "$mac" 2>&1)
+		wait_field "$mac" Paired yes 4
+	fi
+
+	# btmgmt may return before bluetoothd has synced the device, so also
+	# accept the "Pairing successful" marker from the mgmt output
+	if [ "$(bt_field "$mac" Paired)" != "yes" ] && \
+	   printf '%s\n%s\n' "$out1" "$out2" | grep -qiE 'Pairing successful|Paired: yes'; then
+		paired_hint=yes
+	else
+		paired_hint=$(bt_field "$mac" Paired)
+	fi
+
+	"$BTCTL" trust "$mac" >/dev/null 2>&1
+	"$BTCTL" connect "$mac" >/dev/null 2>&1
+
+	wait_field "$mac" Connected yes 10
+
+	paired=$(bt_field "$mac" Paired)
+	[ "$paired" != "yes" ] && paired=$paired_hint
+	conn=$(bt_field "$mac" Connected)
+	out=$(printf '%s\n%s\n' "$out1" "$out2" | grep -v '^$' | tail -n 6)
+
+	if [ "$paired" = "yes" ] && [ "$conn" = "yes" ]; then
+		msg="已配对并连接"
+	elif [ "$paired" = "yes" ]; then
+		msg="已配对，但连接未建立（可稍后点“连接”重试）"
+	else
+		msg="配对失败：请确认设备处于配对模式；需要 PIN 的键盘请改用 SSH 手动配对"
+	fi
+
+	printf '{"ok":true,"paired":%s,"connected":%s,"message":"%s","output":"%s"}\n' \
+		"$(bool_json "$paired")" "$(bool_json "$conn")" "$(json_esc "$msg")" "$(json_esc "$out")"
+}
+
+cmd_connect() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+
+	"$BTCTL" power on >/dev/null 2>&1
+	out=$("$BTCTL" connect "$mac" 2>&1)
+
+	i=0
+	while [ $i -lt 10 ]; do
+		[ "$(bt_field "$mac" Connected)" = "yes" ] && break
+		sleep 1
+		i=$((i + 1))
+	done
+
+	conn=$(bt_field "$mac" Connected)
+	if [ "$conn" = "yes" ]; then msg="连接成功"; else msg="连接失败：$(printf '%s\n' "$out" | tail -n 1)"; fi
+
+	printf '{"ok":true,"connected":%s,"message":"%s","output":"%s"}\n' \
+		"$(bool_json "$conn")" "$(json_esc "$msg")" "$(json_esc "$out")"
+}
+
+cmd_disconnect() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+
+	out=$("$BTCTL" disconnect "$mac" 2>&1)
+	i=0
+	while [ $i -lt 6 ]; do
+		[ "$(bt_field "$mac" Connected)" != "yes" ] && break
+		sleep 1
+		i=$((i + 1))
+	done
+
+	printf '{"ok":true,"message":"%s","output":"%s"}\n' \
+		"$(json_esc "已断开连接")" "$(json_esc "$out")"
+}
+
+cmd_trust() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+	if [ "$2" = "0" ]; then
+		"$BTCTL" untrust "$mac" >/dev/null 2>&1
+		msg="已取消信任"
+	else
+		"$BTCTL" trust "$mac" >/dev/null 2>&1
+		msg="已设为信任设备"
+	fi
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "$msg")"
+}
+
+cmd_alias() {
+	# 给设备起一个本地显示名：先尝试写进 BlueZ 的 Alias（配对过的设备会持久化），
+	# 再落到本地缓存，保证界面永远有名字可显示
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+	an=$2
+	[ -z "$an" ] && fail_json "设备名称不能为空"
+	if printf '%s' "$an" | grep -q '[[:cntrl:]]'; then
+		fail_json "设备名称不能包含换行或控制字符"
+	fi
+	alen=$(printf '%s' "$an" | wc -c | tr -d ' ')
+	[ "$alen" -gt 64 ] && fail_json "设备名称最长 64 字节"
+
+	# bluetoothctl 是空格分词，带空格的名字会被截断，这种情况只写本地缓存
+	bluez=no
+	case "$an" in
+		*\ *|*'	'*) ;;
+		*)
+			out=$( { printf 'info %s\n' "$mac"; printf 'set-alias %s\n' "$an"; printf 'quit\n'; } | run_lim 12 "$BTCTL" 2>&1 )
+			printf '%s\n' "$out" | grep -q 'Failed\|Invalid\|No device' || bluez=yes
+			;;
+	esac
+
+	name_cache_set "$mac" "$an" >/dev/null 2>&1
+	if [ "$bluez" = yes ]; then
+		printf '{"ok":true,"message":"%s"}\n' "$(json_esc "设备名称已保存为 $an")"
+	else
+		printf '{"ok":true,"message":"%s"}\n' "$(json_esc "已在本机记录为 $an（该设备不广播名称，其他设备看不到这个命名）")"
+	fi
+}
+
+cmd_remove() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+	"$BTCTL" remove "$mac" >/dev/null 2>&1
+	cmd_autodev "$mac" 0 >/dev/null 2>&1
+	name_cache_del "$mac"
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "已删除配对信息")"
+}
+
+cmd_enable() {
+	case "$1" in
+		1|on|yes)  want=1 ;;
+		0|off|no)  want=0 ;;
+		*) fail_json "参数必须是 on 或 off" ;;
+	esac
+
+	uci -q set "btmanager.main.enabled=$want" || fail_json "写入配置失败"
+	uci -q commit btmanager || fail_json "提交配置失败"
+
+	if [ "$want" = "1" ]; then
+		rfkill_set unblock
+		/etc/init.d/dbus start 2>/dev/null
+		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd enable 2>/dev/null
+		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd start 2>/dev/null
+		/etc/init.d/btmanager start 2>/dev/null
+		sleep 3
+		printf '{"ok":true,"enabled":true,"message":"%s"}\n' "$(json_esc "蓝牙已开启")"
+	else
+		/etc/init.d/btmanager stop 2>/dev/null
+		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd stop 2>/dev/null
+		# 同时移除开机自启，避免下次启动又拉起来
+		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd disable 2>/dev/null
+		rfkill_set block
+		printf '{"ok":true,"enabled":false,"message":"%s"}\n' "$(json_esc "蓝牙已关闭")"
+	fi
+}
+
+cmd_name() {
+	new=$1
+
+	# 空值 = 恢复 BlueZ 默认别名
+	if [ -z "$new" ]; then
+		run_lim 8 "$BTCTL" reset-alias >/dev/null 2>&1
+		uci -q delete btmanager.main.devicename 2>/dev/null
+		uci -q commit btmanager 2>/dev/null
+		printf '{"ok":true,"message":"%s"}\n' "$(json_esc "已恢复默认名称")"
+		return 0
+	fi
+
+	if printf '%s' "$new" | grep -q '[[:cntrl:]]'; then
+		fail_json "名称不能包含换行或控制字符"
+	fi
+
+	case "$new" in
+		*\'*|*\"*)
+			fail_json "名称不能包含单引号或双引号"
+			;;
+	esac
+
+	len=$(printf '%s' "$new" | wc -c)
+	if [ "$len" -gt 64 ]; then
+		fail_json "名称太长，最多 64 字节"
+	fi
+
+	# 用单引号包住值，让 uci 正确保存带空格的名称
+	uci -q set "btmanager.main.devicename='$new'" || fail_json "写入配置失败"
+	uci -q commit btmanager || fail_json "提交配置失败"
+
+	out=$(run_lim 8 "$BTCTL" system-alias "$new" 2>&1)
+
+	printf '{"ok":true,"message":"%s","output":"%s"}\n' \
+		"$(json_esc "蓝牙名称已改为“$new”")" "$(json_esc "$out")"
+}
+
+cmd_power() {
+	case "$1" in
+		on|off) ;;
+		*) fail_json "参数必须是 on 或 off" ;;
+	esac
+	"$BTCTL" power "$1" >/dev/null 2>&1
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "适配器已$([ "$1" = on ] && echo 上电 || echo 下电)")"
+}
+
+cmd_restart() {
+	/etc/init.d/btmanager restart >/dev/null 2>&1
+	sleep 3
+	cmd_summary
+}
+
+cmd_config() {
+	printf '{"ok":true,"config":%s}\n' "$(config_json)"
+}
+
+cmd_set() {
+	key=$1
+	val=$2
+	case "$key" in
+		enabled|autoconnect)
+			case "$val" in 0|1) ;; *) fail_json "该配置只接受 0 或 1" ;; esac
+			;;
+		*)
+			fail_json "未知配置项"
+			;;
+	esac
+
+	uci -q set "btmanager.main.$key=$val" || fail_json "写入配置失败"
+	uci -q commit btmanager || fail_json "提交配置失败"
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "配置已保存")"
+}
+
+cmd_autodev() {
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+	enable=$2
+
+	new=""
+	for a in $(autodev_list); do
+		[ "$(norm_mac "$a")" = "$mac" ] && continue
+		new="$new $a"
+	done
+	[ "$enable" = "1" ] && new="$new $mac"
+
+	uci -q set "btmanager.main.autodev=$new" || fail_json "写入配置失败"
+	uci -q commit btmanager || fail_json "提交配置失败"
+	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "自动连接列表已更新")"
+}
+
+cmd_boot() {
+	# Wait for the HCI controller provided by the vendor SDIO driver
+	i=0
+	while [ $i -lt 25 ]; do
+		[ -e /sys/class/bluetooth/hci0 ] && break
+		sleep 1
+		i=$((i + 1))
+	done
+	sleep 2
+	"$BTCTL" power on >/dev/null 2>&1
+
+	dn=$(cfg devicename)
+	[ -n "$dn" ] && "$BTCTL" system-alias "$dn" >/dev/null 2>&1
+
+	[ "$(cfg autoconnect)" = "1" ] || exit 0
+
+	for mac in $(autodev_list); do
+		mac=$(norm_mac "$mac")
+		valid_mac "$mac" || continue
+		[ "$(bt_field "$mac" Paired)" = "yes" ] || continue
+		t=1
+		while [ $t -le 3 ]; do
+			"$BTCTL" connect "$mac" >/dev/null 2>&1
+			sleep 3
+			[ "$(bt_field "$mac" Connected)" = "yes" ] && break
+			t=$((t + 1))
+		done
+	done
+	exit 0
+}
+
+cmd_diag() {
+	echo "== date"
+	date
+	echo
+	echo "== hciconfig -a"
+	hciconfig -a 2>&1
+	echo
+	echo "== bluetoothctl show"
+	"$BTCTL" show 2>&1
+	echo
+	echo "== btmgmt info"
+	run_lim 10 "$BTMGMT" info 2>&1 | head -n 40
+	echo
+	echo "== processes"
+	ps w 2>/dev/null | grep -E 'bluetoothd|dbus-daemon' | grep -v grep
+	echo
+	echo "== tty devices"
+	ls -l /dev/ttyS* /dev/ttyAS* 2>/dev/null
+	echo
+	echo "== rfkill"
+	for f in /sys/class/rfkill/rfkill*; do
+		[ -d "$f" ] || continue
+		echo "$f name=$(cat "$f/name" 2>/dev/null) type=$(cat "$f/type" 2>/dev/null) soft=$(cat "$f/soft" 2>/dev/null) hard=$(cat "$f/hard" 2>/dev/null)"
+	done
+	echo
+	echo "== kernel log (bluetooth / hci / aic)"
+	dmesg 2>/dev/null | grep -iE 'bluetooth|hci|aic|bt_' | tail -n 40
+}
+
+cmd_log() {
+	if command -v logread >/dev/null 2>&1; then
+		logread 2>/dev/null | grep -iE 'bluetooth|bt_|bluez|aicbt|aicbsp' | tail -n 50
+	fi
+	[ -s "$LOG_FILE" ] && { echo; echo "== $LOG_FILE"; tail -n 30 "$LOG_FILE"; }
+	exit 0
+}
+
+# -------------------------------- dispatch ---------------------------------
+
+case "$1" in
+	summary)    cmd_summary ;;
+	devices)    cmd_devices ;;
+	scan)       cmd_scan "$2" ;;
+	pair)       cmd_pair "$2" ;;
+	connect)    cmd_connect "$2" ;;
+	disconnect) cmd_disconnect "$2" ;;
+	trust)      cmd_trust "$2" "$3" ;;
+	remove)     cmd_remove "$2" ;;
+	name)       cmd_name "$2" ;;
+	alias)      cmd_alias "$2" "$3" ;;
+	enable)     cmd_enable "$2" ;;
+	power)      cmd_power "$2" ;;
+	restart)    cmd_restart ;;
+	config)     cmd_config ;;
+	set)        cmd_set "$2" "$3" ;;
+	autodev)    cmd_autodev "$2" "$3" ;;
+	boot)       cmd_boot ;;
+	diag)       cmd_diag ;;
+	log)        cmd_log ;;
+	*)
+		echo "unknown command: $1" >&2
+		exit 2
+		;;
+esac

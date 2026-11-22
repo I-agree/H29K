@@ -1,0 +1,51 @@
+--- a/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
++++ b/src/SDIO/driver_fw/driver/aic8800/aic8800_fdrv/rwnx_rx.c
+@@ -1161,7 +1161,7 @@
+ {
+ 	struct ieee80211_radiotap_header *rtap;
+ 	u8 *pos, rate_idx;
+-	__le32 *it_present;
++	u8 *it_present;
+ 	u32 it_present_val = 0;
+ 	bool fec_coding = false;
+ 	bool short_gi = false;
+@@ -1175,7 +1175,14 @@
+ 	rtap->it_pad = 0;
+ 	rtap->it_len = cpu_to_le16(rtap_len + vend_rtap_len);
+ 
+-	it_present = &rtap->it_present;
++	/*
++	 * Walk the presence bitmap as a byte stream. Taking the address of
++	 * rtap->it_present makes the compiler treat the 4-byte field as the
++	 * destination object, which makes fortify flag the memcpy() of the
++	 * HE/VHT payload below even though skb_push() reserved rtap_len bytes.
++	 */
++	it_present = (u8 *)rtap +
++		      offsetof(struct ieee80211_radiotap_header, it_present);
+ 
+ 	// Check for multiple antennas
+ 	if (hweight32(rxvect->antenna_set) > 1) {
+@@ -1187,7 +1194,7 @@
+ 				BIT(IEEE80211_RADIOTAP_EXT) |
+ 				BIT(IEEE80211_RADIOTAP_RADIOTAP_NAMESPACE);
+ 			put_unaligned_le32(it_present_val, it_present);
+-			it_present++;
++			it_present += 4;
+ 			it_present_val = BIT(IEEE80211_RADIOTAP_ANTENNA) |
+ 							 BIT(IEEE80211_RADIOTAP_DBM_ANTSIGNAL);
+ 		}
+@@ -1198,12 +1205,12 @@
+ 		it_present_val |= BIT(IEEE80211_RADIOTAP_VENDOR_NAMESPACE) |
+ 						  BIT(IEEE80211_RADIOTAP_EXT);
+ 		put_unaligned_le32(it_present_val, it_present);
+-		it_present++;
++		it_present += 4;
+ 		it_present_val = vend_it_present;
+ 	}
+ 
+ 	put_unaligned_le32(it_present_val, it_present);
+-	pos = (void *)(it_present + 1);
++	pos = it_present + 4;
+ 
+ 	// IEEE80211_RADIOTAP_TSFT
+ 	if (hwvect) {

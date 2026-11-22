@@ -1,0 +1,85 @@
+#!/bin/sh /etc/rc.common
+# ---------------------------------------------------------------------------
+# Bluetooth service for luci-app-btmanager
+#
+#   H29K 的 AIC8800 蓝牙由厂商驱动通过 SDIO 提供（hci0，Bus: SDIO），
+#   板载 UART 上没有可用的 HCI 通道，所以这里不再跑 hciattach：
+#
+#   1. 等厂商驱动注册出 HCI 控制器
+#   2. 交给 bluetoothd（99-btmanager uci-defaults 已 enable）
+#   3. 按 LuCI 里勾选的设备自动回连
+# ---------------------------------------------------------------------------
+
+START=96
+STOP=15
+USE_PROCD=1
+
+. /lib/functions.sh
+
+rfkill_unblock() {
+	if command -v rfkill >/dev/null 2>&1; then
+		rfkill unblock bluetooth 2>/dev/null
+		return 0
+	fi
+	for d in /sys/class/rfkill/rfkill*; do
+		[ -r "$d/type" ] || continue
+		[ "$(cat "$d/type" 2>/dev/null)" = "bluetooth" ] || continue
+		echo 0 > "$d/soft" 2>/dev/null
+	done
+}
+
+rfkill_block() {
+	if command -v rfkill >/dev/null 2>&1; then
+		rfkill block bluetooth 2>/dev/null
+		return 0
+	fi
+	for d in /sys/class/rfkill/rfkill*; do
+		[ -r "$d/type" ] || continue
+		[ "$(cat "$d/type" 2>/dev/null)" = "bluetooth" ] || continue
+		echo 1 > "$d/soft" 2>/dev/null
+	done
+}
+
+hci_present() {
+	for d in /sys/class/bluetooth/hci*; do
+		[ -e "$d" ] && return 0
+	done
+	return 1
+}
+
+start_service() {
+	local enabled
+
+	config_load btmanager
+	config_get_bool enabled main enabled 1
+
+	if [ "$enabled" != "1" ]; then
+		# 总开关关闭：不启动 bluetoothd
+		/etc/init.d/bluetoothd stop 2>/dev/null
+		rfkill_block
+		return 0
+	fi
+
+	mkdir -p /var/run/btmanager
+	rfkill_unblock
+
+	# 等厂商驱动把 HCI 控制器注册出来（正常开机 9~10 秒就完成）
+	i=0
+	while [ "$i" -lt 20 ]; do
+		hci_present && break
+		sleep 1
+		i=$((i + 1))
+	done
+	[ "$i" -ge 20 ] && logger -t btmanager "no HCI controller after 20s (check kmod-aic8800-sdio / dmesg)" 2>/dev/null
+
+	# dbus must be up before bluetoothd (bluetoothd START=62)
+	/etc/init.d/dbus start 2>/dev/null
+	/etc/init.d/bluetoothd start 2>/dev/null
+
+	# one shot: wait for hci0 then connect the configured devices
+	procd_open_instance boot
+	procd_set_param command /usr/sbin/btmanager boot
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}

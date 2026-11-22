@@ -1,0 +1,7 @@
+config btmanager 'main'
+	option enabled '1'
+	# 开机自动连接下面 autodev 列表里的已配对设备
+	option autoconnect '1'
+	option autodev ''
+	# 蓝牙名称（手机搜索时显示的名字），留空用 BlueZ 默认
+	option devicename ''
