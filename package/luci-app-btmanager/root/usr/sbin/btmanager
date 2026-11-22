@@ -241,6 +241,21 @@ print_devices_array() {
 
 hci_list() {
 	# 每行一个控制器：hci|bus|addr|state
+	# hciconfig 属于 bluez-utils，万一没装就退回 btmgmt info（bluez-utils-extra）
+	if ! command -v hciconfig >/dev/null 2>&1; then
+		run_lim 8 "$BTMGMT" info 2>/dev/null | awk '
+			function flush() {
+				if (h == "") return
+				printf "%s|%s|%s|%s\n", h, bus, addr, st
+				h = ""
+			}
+			/^hci[0-9]+:/ { flush(); h = $1; sub(/:$/, "", h); bus = "?"; addr = ""; st = ""; next }
+			/addr / { a = $0; sub(/.*addr /, "", a); sub(/[ ].*/, "", a); addr = a; next }
+			/current settings:/ { st = ($0 ~ /powered/) ? "UP" : "DOWN"; next }
+			END { flush() }'
+		return 0
+	fi
+
 	run_lim 8 hciconfig -a 2>/dev/null | awk '
 		function flush() {
 			if (h == "") return
@@ -311,17 +326,79 @@ cmd_summary() {
 
 	bd=no; pidof bluetoothd >/dev/null 2>&1 && bd=yes
 	hci0=no; [ -e /sys/class/bluetooth/hci0 ] && hci0=yes
+	ba=no; pidof bluealsad >/dev/null 2>&1 && ba=yes
 
 	paired_count=$(run_lim 10 "$BTCTL" devices Paired 2>/dev/null | grep -c '^Device ')
 	conn_count=$(run_lim 10 "$BTCTL" devices Connected 2>/dev/null | grep -c '^Device ')
 
-	printf '{"ok":true,"service":{"bluetoothd":%s,"hci0":%s},"controllers":%s,"controller":{"address":"%s","name":"%s","powered":%s,"discoverable":%s,"pairable":%s},"counts":{"paired":%d,"connected":%d},"config":%s}\n' \
-		"$(bool_json "$bd")" "$(bool_json "$hci0")" \
+	# DLNA 声音走哪：读 gmediarender 的 audiodevice
+	audio_dev=$(uci -q get gmediarender.main.audiodevice 2>/dev/null)
+	[ -n "$audio_dev" ] || audio_dev="plughw:0,0"
+	case "$audio_dev" in
+	bluealsa*) audio_tgt=bt ;;
+	*)         audio_tgt=hdmi ;;
+	esac
+
+	printf '{"ok":true,"service":{"bluetoothd":%s,"hci0":%s,"bluealsad":%s},"controllers":%s,"controller":{"address":"%s","name":"%s","powered":%s,"discoverable":%s,"pairable":%s},"counts":{"paired":%d,"connected":%d},"audio":{"target":"%s","device":"%s"},"config":%s}\n' \
+		"$(bool_json "$bd")" "$(bool_json "$hci0")" "$(bool_json "$ba")" \
 		"$(controllers_json)" \
 		"$(json_esc "$addr")" "$(json_esc "$name")" \
 		"$(bool_json "$powered")" "$(bool_json "$disc")" "$(bool_json "$pair")" \
 		"${paired_count:-0}" "${conn_count:-0}" \
+		"$audio_tgt" "$(json_esc "$audio_dev")" \
 		"$(config_json)"
+}
+
+# DLNA 声音输出：hdmi（电视/HDMI）| bt（当前连接的蓝牙音频设备）
+cmd_audio() {
+	want=$1
+	dev=$(uci -q get gmediarender.main.audiodevice 2>/dev/null)
+	[ -n "$dev" ] || dev="plughw:0,0"
+
+	if [ -z "$want" ]; then
+		case "$dev" in
+		bluealsa*) tgt=bt ;;
+		*)         tgt=hdmi ;;
+		esac
+		printf '{"ok":true,"audio":{"target":"%s","device":"%s"}}\n' "$tgt" "$(json_esc "$dev")"
+		return 0
+	fi
+
+	[ -x /etc/init.d/gmediarender ] || fail_json "没有安装 gmediarender，不需要切换"
+
+	case "$want" in
+	hdmi)
+		newdev="plughw:0,0"
+		msg="DLNA 声音已切回 HDMI"
+		;;
+	bt|bluetooth)
+		[ -x /etc/init.d/bluealsa ] || fail_json "没装 bluez-alsa，蓝牙音频后端不可用"
+		conn=$(run_lim 10 "$BTCTL" devices Connected 2>/dev/null | grep -c '^Device ')
+		[ "${conn:-0}" -gt 0 ] || fail_json "还没有已连接的蓝牙音频设备：先在设备列表里配对并连接，再切蓝牙输出（否则 alsasink 打不开，带音轨的视频会一起失败）"
+		if ! pidof bluealsad >/dev/null 2>&1; then
+			/etc/init.d/bluealsa start 2>/dev/null
+			sleep 1
+		fi
+		pidof bluealsad >/dev/null 2>&1 || fail_json "bluealsad 没起来，先看 logread -t bluealsa"
+		newdev="bluealsa"
+		msg="DLNA 声音已切到蓝牙（发给当前最近连接的 A2DP 设备）"
+		;;
+	*)
+		fail_json "参数必须是 hdmi 或 bt"
+		;;
+	esac
+
+	uci -q set "gmediarender.main.audiodevice=$newdev" || fail_json "写入 gmediarender 配置失败"
+	uci -q commit gmediarender || fail_json "提交 gmediarender 配置失败"
+	/etc/init.d/gmediarender restart 2>/dev/null
+
+	case "$want" in
+	hdmi) tgt=hdmi ;;
+	*)    tgt=bt ;;
+	esac
+
+	printf '{"ok":true,"audio":{"target":"%s","device":"%s"},"message":"%s"}\n' \
+		"$tgt" "$(json_esc "$newdev")" "$(json_esc "$msg")"
 }
 
 cmd_devices() {
@@ -534,21 +611,42 @@ cmd_enable() {
 	uci -q set "btmanager.main.enabled=$want" || fail_json "写入配置失败"
 	uci -q commit btmanager || fail_json "提交配置失败"
 
+	# 读回验证：写没写进去必须能看见，否则界面会一直显示旧状态
+	stored=$(uci -q get btmanager.main.enabled 2>/dev/null)
+	[ "$stored" = "$want" ] || fail_json "配置没写进去（读回值：$stored），检查 /etc/config/btmanager 是否可写"
+
 	if [ "$want" = "1" ]; then
 		rfkill_set unblock
 		/etc/init.d/dbus start 2>/dev/null
 		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd enable 2>/dev/null
 		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd start 2>/dev/null
 		/etc/init.d/btmanager start 2>/dev/null
+		# 音频后端（bluez-alsa）跟着一起起来，否则 A2DP 流没人消费，耳机几秒就断
+		[ -x /etc/init.d/bluealsa ] && /etc/init.d/bluealsa start 2>/dev/null
 		sleep 3
-		printf '{"ok":true,"enabled":true,"message":"%s"}\n' "$(json_esc "蓝牙已开启")"
+		printf '{"ok":true,"enabled":true,"stored":"%s","message":"%s"}\n' "$stored" "$(json_esc "蓝牙已开启")"
 	else
+		[ -x /etc/init.d/bluealsa ] && /etc/init.d/bluealsa stop 2>/dev/null
 		/etc/init.d/btmanager stop 2>/dev/null
 		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd stop 2>/dev/null
 		# 同时移除开机自启，避免下次启动又拉起来
 		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd disable 2>/dev/null
 		rfkill_set block
-		printf '{"ok":true,"enabled":false,"message":"%s"}\n' "$(json_esc "蓝牙已关闭")"
+
+		# 声音还指着 bluealsa 的话，关蓝牙后 alsasink 打不开（连带音轨的视频都会失败），
+		# 这里自动切回 HDMI，避免关个蓝牙把投屏也弄坏
+		adev=$(uci -q get gmediarender.main.audiodevice 2>/dev/null)
+		note=""
+		case "$adev" in
+		bluealsa*)
+			uci -q set gmediarender.main.audiodevice=plughw:0,0 2>/dev/null &&
+				uci -q commit gmediarender 2>/dev/null
+			[ -x /etc/init.d/gmediarender ] && /etc/init.d/gmediarender restart 2>/dev/null
+			note="（DLNA 声音已自动切回 HDMI）"
+			;;
+		esac
+
+		printf '{"ok":true,"enabled":false,"stored":"%s","message":"%s"}\n' "$stored" "$(json_esc "蓝牙已关闭$note")"
 	fi
 }
 
@@ -729,6 +827,7 @@ case "$1" in
 	config)     cmd_config ;;
 	set)        cmd_set "$2" "$3" ;;
 	autodev)    cmd_autodev "$2" "$3" ;;
+	audio)      cmd_audio "$2" ;;
 	boot)       cmd_boot ;;
 	diag)       cmd_diag ;;
 	log)        cmd_log ;;

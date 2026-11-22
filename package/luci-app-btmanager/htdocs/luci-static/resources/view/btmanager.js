@@ -199,12 +199,29 @@ return view.extend({
 		this.editing = null;
 
 		this.toggleBT = function() {
-			var on = !(self.cfg && self.cfg.enabled === '0');
+			var on = (self.cfg && self.cfg.enabled !== '0') &&
+				(self.summary && self.summary.service && self.summary.service.bluetoothd);
 
 			if (on && !confirm(_('关闭蓝牙会断开所有已连接设备，并停止蓝牙服务。确定关闭？')))
 				return;
 
 			self.act(on ? _('关闭蓝牙') : _('开启蓝牙'), [ 'enable', on ? '0' : '1' ]);
+		};
+
+		// 切换 DLNA 声音去向：hdmi = 电视/HDMI（默认），bt = 当前连接的蓝牙设备
+		this.setAudio = function(target) {
+			var conn = (self.summary && self.summary.counts && self.summary.counts.connected) || 0;
+
+			if (target === 'bt') {
+				if (!conn) {
+					self.setMsg(_('还没有已连接的蓝牙音频设备，先在下面的设备列表里配对并连接'), true);
+					return;
+				}
+				if (!confirm(_('切到蓝牙后，DLNA 播放的声音会送到当前连接的耳机/音箱，画面仍然走 HDMI。继续进行吗？')))
+					return;
+			}
+
+			self.act(_('切换 DLNA 声音输出'), [ 'audio', target ]);
 		};
 
 		var body = E('div', { 'class': 'cbi-map btm' }, [
@@ -379,7 +396,14 @@ return view.extend({
 		var ctl = s.controller || {};
 		var cnt = s.counts || {};
 		var ctrls = s.controllers || [];
-		var enabled = !(this.cfg && this.cfg.enabled === '0');
+		var audio = s.audio || {};
+		var audioHdmi = !(audio.target === 'bt');
+		var cfgOff = (this.cfg && this.cfg.enabled === '0');
+		var running = !!svc.bluetoothd;
+		/* 开关状态以实际运行情况为准：bluetoothd 没跑就是关着的，
+		   避免“配置是开启、服务已停”时把开关画成已开启 */
+		var enabled = !cfgOff && running;
+		var mismatch = !cfgOff && !running;
 
 		function row(label, value) {
 			return E('tr', {}, [
@@ -397,11 +421,17 @@ return view.extend({
 
 		this.statusBody.appendChild(E('div', { 'class': 'btm-scroll' }, E('table', { 'class': 'btm-table' }, [
 			row(_('蓝牙开关'), [
-				mark(enabled, enabled ? _('已开启') : _('已关闭')),
-				'　',
-				button(enabled ? _('关闭蓝牙') : _('开启蓝牙'),
-					enabled ? 'cbi-button-action' : 'cbi-button-apply',
-					function() { self.toggleBT(); })
+				E('div', {}, [
+					E('div', {}, [
+						mark(enabled, enabled ? _('已开启') : _('已关闭')),
+						'　',
+						button(enabled ? _('关闭蓝牙') : _('开启蓝牙'),
+							enabled ? 'cbi-button-action' : 'cbi-button-apply',
+							function() { self.toggleBT(); })
+					]),
+					mismatch ? E('div', { 'class': 'btm-sub' },
+						_('配置里是“开启”，但 bluetoothd 未运行 —— 点“开启蓝牙”重新拉起服务')) : ''
+				])
 			]),
 			row(_('bluetoothd'), mark(svc.bluetoothd, svc.bluetoothd ? _('运行中') : _('未运行'))),
 			row(_('控制器'), ctrls.length ? E('div', {}, ctrls.map(function(c) {
@@ -415,14 +445,45 @@ return view.extend({
 				]);
 			})) : mark(false, _('未发现任何 HCI 控制器'))),
 			row(_('适配器'), [
-				E('div', {}, [
-					E('div', { 'class': 'btm-name' }, ctl.name || (enabled ? _('（读取中）') : '—')),
+				E('div', {}, enabled ? [
+					E('div', { 'class': 'btm-name' }, ctl.name || _('（读取中）')),
 					E('div', { 'class': 'btm-sub' }, [
 						ctl.address ? E('span', { 'class': 'btm-mac' }, ctl.address) : '',
 						ctl.address ? '　' : '',
 						ctl.powered ? _('已上电') : _('未上电'),
 						'　',
 						ctl.discoverable ? _('可被发现') : _('不可发现')
+					])
+				] : [
+					E('div', { 'class': 'btm-name' }, _('（关闭中）')),
+					E('div', { 'class': 'btm-sub' }, _('蓝牙已关闭，没有可用适配器'))
+				])
+			]),
+			row(_('音频后端'), [
+				E('div', {}, [
+					mark(svc.bluealsad, svc.bluealsad ? _('bluealsad 运行中') : _('bluealsad 未运行')),
+					E('div', { 'class': 'btm-sub' }, svc.bluealsad
+						? _('DLNA 推流可输出到 ALSA 设备 “bluealsa”，自动选择最近连接的 A2DP 设备')
+						: _('未安装或未启动 bluez-alsa：A2DP 音频流没人消费，耳机连上后常被对端断开'))
+				])
+			]),
+			row(_('DLNA 声音'), [
+				E('div', {}, [
+					E('div', { 'class': 'btm-name' }, audioHdmi
+						? _('走 HDMI —— 画面和声音都在电视上（默认）')
+						: _('走蓝牙 —— 画面还在 HDMI，声音送到耳机/音箱')),
+					E('div', { 'class': 'btm-sub' }, audioHdmi
+						? _('只有点了“走蓝牙”之后，DLNA 的声音才改从蓝牙输出；视频/图片的分辨率、解码路径都不变')
+						: _('当前 ALSA 设备：') + (audio.device || 'bluealsa') + _('，自动跟随最近连接的那台 A2DP 设备')),
+					E('div', { 'class': 'btm-row', 'style': 'margin-top:8px' }, [
+						button(_('走 HDMI'), audioHdmi ? 'cbi-button-action' : 'cbi-button-apply', function() {
+							if (!audioHdmi)
+								self.setAudio('hdmi');
+						}),
+						button(_('走蓝牙'), audioHdmi ? 'cbi-button-apply' : 'cbi-button-action', function() {
+							if (audioHdmi)
+								self.setAudio('bt');
+						})
 					])
 				])
 			]),
@@ -437,7 +498,11 @@ return view.extend({
 			this.statusBody.appendChild(E('div', { 'class': 'btm-note' },
 				_('控制器地址为全 0 或处于 DOWN：HCI 还没初始化完。等几秒刷新；一直这样就看“诊断”里的内核日志（厂商驱动 aicbsp/aicbt 是否加载成功）。')));
 
-		if (!ctrls.length)
+		if (!ctrls.length && !running)
+			this.statusBody.appendChild(E('div', { 'class': 'btm-note' },
+				_('蓝牙服务没在运行，所以看不到控制器。点上面“开启蓝牙”重新拉起，几秒后刷新。')));
+
+		if (!ctrls.length && running)
 			this.statusBody.appendChild(E('div', { 'class': 'btm-note' },
 				_('没有任何 HCI 控制器：H29K 的蓝牙由 aic8800 厂商驱动通过 SDIO 提供，检查 kmod-aic8800-sdio 是否加载、dmesg 里 aicbsp 的初始化是否通过。')));
 	},

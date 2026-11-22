@@ -5,7 +5,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-btmanager
-PKG_VERSION:=1.4
+PKG_VERSION:=1.6
 PKG_RELEASE:=1
 PKG_LICENSE:=MIT
 PKG_MAINTAINER:=H29K <h29k@local>
