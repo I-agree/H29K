@@ -480,7 +480,7 @@ CONFIG_BOOTPARAM_SOFTLOCKUP_PANIC=y
 CONFIG_BOOTPARAM_HARDLOCKUP_PANIC=y
 
 # =================================================================
-# 🔄 蓝牙（BlueZ 5.x + AIC8800 SDIO BT，HCI 走 UART）
+# 🔄 蓝牙（BlueZ 5.x，HCI 由 aic8800 厂商驱动经 SDIO 提供）
 # =================================================================
 CONFIG_BT=m
 CONFIG_BT_BREDR=y
@@ -490,21 +490,7 @@ CONFIG_BT_RFCOMM=m
 CONFIG_BT_RFCOMM_TTY=y
 CONFIG_BT_BNEP=m
 CONFIG_BT_HIDP=m
-CONFIG_RFKILL=y
 CONFIG_RFKILL_INPUT=y
-
-# --- UART HCI：板载 AIC8800 蓝牙 ---
-CONFIG_BT_HCIUART=m
-CONFIG_BT_HCIUART_H4=y
-CONFIG_BT_HCIUART_BCM=n
-CONFIG_BT_HCIUART_INTEL=n
-CONFIG_BT_HCIUART_NOKIA=n
-CONFIG_BT_HCIUART_ATH3K=n
-CONFIG_BT_HCIUART_3WIRE=n
-
-# --- USB 蓝牙适配器（可选，插 USB dongle 也能直接用）---
-# 子选项交给 kmod-btusb 的 KCONFIG 决定（RTL/MTK 需要开启），这里不要写成 n
-CONFIG_BT_HCIBTUSB=m
 
 EOF
 echo "✅ H29K 内核参数注入完成"
