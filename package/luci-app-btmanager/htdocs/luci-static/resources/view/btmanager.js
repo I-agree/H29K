@@ -58,6 +58,8 @@ function devNotes(dev) {
 
 	if (!dev.name)
 		notes.push(dev.random ? _('随机地址 · 未广播名称') : _('未广播名称'));
+	else if (dev.cached)
+		notes.push(_('本机命名'));
 	else if (dev.random)
 		notes.push(_('随机地址'));
 
@@ -193,6 +195,8 @@ return view.extend({
 				self.setMsg(_('修改名称失败：') + (e.message || e), true);
 			});
 		};
+
+		this.editing = null;
 
 		this.toggleBT = function() {
 			var on = !(self.cfg && self.cfg.enabled === '0');
@@ -496,6 +500,11 @@ return view.extend({
 				}));
 			}
 
+			btns.push(button(_('命名'), 'cbi-button-action', function() {
+				self.editing = (self.editing === dev.address) ? null : dev.address;
+				self.paintDevices();
+			}));
+
 			btns.push(button(dev.trusted ? _('取消信任') : _('设为信任'), 'cbi-button-action', function() {
 				self.act(_('修改信任状态'), [ 'trust', dev.address, dev.trusted ? '0' : '1' ]);
 			}));
@@ -506,9 +515,35 @@ return view.extend({
 			}));
 
 			var notes = devNotes(dev);
+			var editing = (self.editing === dev.address);
+			var inp = null;
+
+			if (editing) {
+				inp = E('input', {
+					'type': 'text',
+					'placeholder': dev.address,
+					'style': 'width:100%; max-width:220px',
+					'value': dev.name || ''
+				});
+				inp.value = dev.name || '';
+				btns.length = 0;
+				btns.push(button(_('保存名称'), 'cbi-button-apply', function() {
+					var v = (inp.value || '').replace(/^\s+|\s+$/g, '');
+					if (!v) {
+						self.setMsg(_('设备名称不能为空'), true);
+						return;
+					}
+					self.editing = null;
+					self.act(_('保存名称'), [ 'alias', dev.address, v ]);
+				}));
+				btns.push(button(_('取消'), 'cbi-button-reset', function() {
+					self.editing = null;
+					self.paintDevices();
+				}));
+			}
 
 			return E('tr', {}, [
-				E('td', {}, [
+				E('td', {}, editing ? inp : [
 					E('div', { 'class': 'btm-name' }, devLabel(dev)),
 					notes ? E('div', { 'class': 'btm-sub' }, notes) : ''
 				]),

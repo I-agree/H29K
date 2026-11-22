@@ -15,6 +15,7 @@
 #   trust <mac> | untrust <mac> manage Trusted flag
 #   remove <mac>                remove bonding
 #   name <text>                 set adapter (bluetooth) name
+#   alias <mac> <text>          set device display name (best effort via BlueZ + local cache)
 #   enable on|off               turn the whole bluetooth stack on/off
 #   power on|off                adapter power
 #   restart                     restart bluetooth service stack
@@ -35,6 +36,9 @@ BTMGMT=/usr/bin/btmgmt
 STATE_DIR=/var/run/btmanager
 mkdir -p "$STATE_DIR" 2>/dev/null || STATE_DIR=/tmp
 LOG_FILE=$STATE_DIR/btmanager.log
+# 本地设备名称缓存：BlueZ 对不广播名称的设备（常见于 TWS 耳机/LE 设备）
+# 只给一个横线地址形式的 Alias，靠这里记住曾经出现过的名字
+NAMES_FILE=${BTM_NAMES_FILE:-/etc/btmanager.names}
 
 # ------------------------------- helpers -----------------------------------
 
@@ -44,6 +48,49 @@ json_esc() {
 
 bool_json() {
 	[ "$1" = "yes" ] && printf 'true' || printf 'false'
+}
+
+name_cache_get() {
+	[ -r "$NAMES_FILE" ] || return 1
+	_ng=$(awk -F'\t' -v m="$1" '$1 == m { print $2; exit }' "$NAMES_FILE" 2>/dev/null)
+	[ -n "$_ng" ] || return 1
+	printf '%s' "$_ng"
+}
+
+name_cache_set() {
+	_nm=$(norm_mac "$1")
+	_nn=$2
+	[ -n "$_nm" ] && [ -n "$_nn" ] || return 1
+	case "$_nn" in *:*:*) return 1 ;; esac
+	_nt="$STATE_DIR/names.$$"
+	awk -F'\t' -v m="$_nm" '$1 != m' "$NAMES_FILE" 2>/dev/null > "$_nt"
+	printf '%s\t%s\n' "$_nm" "$_nn" >> "$_nt"
+	mv "$_nt" "$NAMES_FILE" 2>/dev/null || { cat "$_nt" > "$NAMES_FILE" 2>/dev/null; rm -f "$_nt"; }
+	chmod 0644 "$NAMES_FILE" 2>/dev/null
+	return 0
+}
+
+name_cache_del() {
+	_nm=$(norm_mac "$1")
+	[ -r "$NAMES_FILE" ] || return 0
+	_nt="$STATE_DIR/names.$$"
+	awk -F'\t' -v m="$_nm" '$1 != m' "$NAMES_FILE" 2>/dev/null > "$_nt"
+	mv "$_nt" "$NAMES_FILE" 2>/dev/null || { cat "$_nt" > "$NAMES_FILE" 2>/dev/null; rm -f "$_nt"; }
+	return 0
+}
+
+# 从 bluetoothctl info 输出里提取可信名字并写入缓存
+name_cache_learn() {
+	_lm=$(norm_mac "$1")
+	_li=$2
+	_ln=$(printf '%s\n' "$_li" | sed -n 's/^[[:space:]]*Name:[[:space:]]*//p' | head -n 1)
+	[ -z "$_ln" ] && _ln=$(printf '%s\n' "$_li" | sed -n 's/^[[:space:]]*Alias:[[:space:]]*//p' | head -n 1)
+	_ld=$(printf '%s' "$_lm" | tr ':' '-')
+	[ "$_ln" = "$_ld" ] && _ln=""
+	[ -z "$_ln" ] && return 0
+	_cached=$(name_cache_get "$_lm" 2>/dev/null)
+	[ "$_cached" = "$_ln" ] && return 0
+	name_cache_set "$_lm" "$_ln"
 }
 
 norm_mac() {
@@ -140,6 +187,19 @@ device_json() {
 	dash=$(printf '%s' "$mac" | tr ':' '-')
 	[ "$alias" = "$dash" ] && alias=""
 	[ -z "$name" ] && name="$alias"
+	# 防止 "AA:BB:CC:..." 形式也被当成名字
+	case "$name" in *:*:*) name="" ;; esac
+
+	cached=no
+	if [ -n "$name" ]; then
+		name_cache_learn "$mac" "$info"
+	else
+		cname=$(name_cache_get "$mac" 2>/dev/null)
+		if [ -n "$cname" ]; then
+			name="$cname"
+			cached=yes
+		fi
+	fi
 
 	random=no
 	printf '%s\n' "$info" | head -n 1 | grep -q '(random)' && random=yes
@@ -150,7 +210,7 @@ device_json() {
 	auto=no
 	is_autodev "$mac" && auto=yes
 
-	printf '{"address":"%s","name":"%s","alias":"%s","icon":"%s","class":"%s","paired":%s,"trusted":%s,"connected":%s,"rssi":"%s","audio":%s,"autoconnect":%s,"named":%s,"random":%s}' \
+	printf '{"address":"%s","name":"%s","alias":"%s","icon":"%s","class":"%s","paired":%s,"trusted":%s,"connected":%s,"rssi":"%s","audio":%s,"autoconnect":%s,"named":%s,"random":%s,"cached":%s}' \
 		"$mac" \
 		"$(json_esc "$name")" \
 		"$(json_esc "$alias")" \
@@ -163,7 +223,8 @@ device_json() {
 		"$(bool_json "$audio")" \
 		"$(bool_json "$auto")" \
 		"$(bool_json "$([ -n "$name" ] && echo yes)")" \
-		"$(bool_json "$random")"
+		"$(bool_json "$random")" \
+		"$(bool_json "$cached")"
 }
 
 print_devices_array() {
@@ -236,7 +297,12 @@ cmd_scan() {
 	# 先从发现事件里取广播名（"[NEW] Device AA:BB:.. 名字"），
 	# 这比事后 bluetoothctl info 更全，也保住了只在广播里出现的名字
 	scan_tmp="$STATE_DIR/scan.$$"
+	scan_chg="$STATE_DIR/chg.$$"
 	printf '%s\n' "$scan_out" | sed -n 's/^\[NEW\] Device \([0-9A-Fa-f:]\{17\}\)[[:space:]]*\(.*\)$/\1|\2/p' > "$scan_tmp"
+	# 名字经常是后到的：BlueZ 先报 [NEW] Device <mac>，再补一条
+	# [CHG] Device <mac> Name: Xiaomi Buds 3 Pro —— 只认 NEW 会永远拿不到名字
+	printf '%s\n' "$scan_out" | sed -n 's/^\[CHG\] Device \([0-9A-Fa-f:]\{17\}\)[[:space:]]*Name:[[:space:]]*\(.*\)$/\1|\2/p' \
+		| awk -F'|' '{ k = toupper($1); v[k] = $2 } END { for (k in v) print k "|" v[k] }' > "$scan_chg"
 
 	macs=$(cut -d'|' -f1 "$scan_tmp" | tr 'a-f' 'A-F' | grep -v '^$' | sort -u)
 	total=$(printf '%s\n' "$macs" | grep -c '[0-9A-F]')
@@ -255,6 +321,15 @@ cmd_scan() {
 		[ -z "$iname" ] && iname="$ialias"
 		[ -z "$iname" ] && iname="$raw"
 		[ "$iname" = "$dash" ] && iname=""
+		case "$iname" in *:*:*) iname="" ;; esac
+		if [ -z "$iname" ]; then
+			iname=$(grep -i "^$mac|" "$scan_chg" 2>/dev/null | head -n 1 | cut -d'|' -f2)
+		fi
+		if [ -z "$iname" ]; then
+			iname=$(name_cache_get "$mac" 2>/dev/null)
+		else
+			name_cache_set "$mac" "$iname" >/dev/null 2>&1
+		fi
 
 		random=no
 		printf '%s\n' "$info" | head -n 1 | grep -q '(random)' && random=yes
@@ -265,7 +340,7 @@ cmd_scan() {
 			"$(bool_json "$([ -n "$iname" ] && echo yes)")" "$(bool_json "$random")"
 	done
 	printf ']}\n'
-	rm -f "$scan_tmp"
+	rm -f "$scan_tmp" "$scan_chg"
 }
 
 cmd_pair() {
@@ -363,11 +438,43 @@ cmd_trust() {
 	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "$msg")"
 }
 
+cmd_alias() {
+	# 给设备起一个本地显示名：先尝试写进 BlueZ 的 Alias（配对过的设备会持久化），
+	# 再落到本地缓存，保证界面永远有名字可显示
+	mac=$(norm_mac "$1")
+	valid_mac "$mac" || fail_json "MAC 地址无效"
+	an=$2
+	[ -z "$an" ] && fail_json "设备名称不能为空"
+	if printf '%s' "$an" | grep -q '[[:cntrl:]]'; then
+		fail_json "设备名称不能包含换行或控制字符"
+	fi
+	alen=$(printf '%s' "$an" | wc -c | tr -d ' ')
+	[ "$alen" -gt 64 ] && fail_json "设备名称最长 64 字节"
+
+	# bluetoothctl 是空格分词，带空格的名字会被截断，这种情况只写本地缓存
+	bluez=no
+	case "$an" in
+		*\ *|*'	'*) ;;
+		*)
+			out=$( { printf 'info %s\n' "$mac"; printf 'set-alias %s\n' "$an"; printf 'quit\n'; } | run_lim 12 "$BTCTL" 2>&1 )
+			printf '%s\n' "$out" | grep -q 'Failed\|Invalid\|No device' || bluez=yes
+			;;
+	esac
+
+	name_cache_set "$mac" "$an" >/dev/null 2>&1
+	if [ "$bluez" = yes ]; then
+		printf '{"ok":true,"message":"%s"}\n' "$(json_esc "设备名称已保存为 $an")"
+	else
+		printf '{"ok":true,"message":"%s"}\n' "$(json_esc "已在本机记录为 $an（该设备不广播名称，其他设备看不到这个命名）")"
+	fi
+}
+
 cmd_remove() {
 	mac=$(norm_mac "$1")
 	valid_mac "$mac" || fail_json "MAC 地址无效"
 	"$BTCTL" remove "$mac" >/dev/null 2>&1
 	cmd_autodev "$mac" 0 >/dev/null 2>&1
+	name_cache_del "$mac"
 	printf '{"ok":true,"message":"%s"}\n' "$(json_esc "已删除配对信息")"
 }
 
@@ -582,6 +689,7 @@ case "$1" in
 	trust)      cmd_trust "$2" "$3" ;;
 	remove)     cmd_remove "$2" ;;
 	name)       cmd_name "$2" ;;
+	alias)      cmd_alias "$2" "$3" ;;
 	enable)     cmd_enable "$2" ;;
 	power)      cmd_power "$2" ;;
 	restart)    cmd_restart ;;
