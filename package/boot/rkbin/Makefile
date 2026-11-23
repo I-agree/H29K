@@ -9,9 +9,8 @@ PKG_RELEASE:=1
 
 PKG_SOURCE_PROTO:=git
 PKG_SOURCE_URL:=https://github.com/rockchip-linux/rkbin.git
-PKG_SOURCE_DATE:=2025-06-13
-PKG_SOURCE_VERSION:=74213af1e952c4683d2e35952507133b61394862
-PKG_MIRROR_HASH:=4b801b1301ae297f660340617b5f398b23a3f0b43bc7f0ef42c21f0f43eb8990
+PKG_SOURCE_DATE:=2026-06-26
+PKG_SOURCE_VERSION:=3e288fe814e059dd06833495f845cab04ac20a5c
 
 PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=Tianling Shen <cnsztl@immortalwrt.org>
@@ -39,8 +38,8 @@ endef
 
 define Trusted-Firmware-A/rk3528
   BUILD_SUBTARGET:=armv8
-  ATF:=rk35/rk3528_bl31_v1.20.elf
-  TPL:=rk35/rk3528_ddr_1056MHz_v1.11.bin
+  ATF:=rk35/rk3528_bl31_v1.21.elf
+  TPL:=rk35/rk3528_ddr_1056MHz_v1.14.bin
 endef
 
 define Trusted-Firmware-A/rk3566
