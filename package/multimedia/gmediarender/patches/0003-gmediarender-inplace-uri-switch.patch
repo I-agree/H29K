@@ -1,0 +1,86 @@
+diff --git a/src/output_gstreamer.c b/src/output_gstreamer.c
+index 7a3a0c4..fd105b2 100644
+--- a/src/output_gstreamer.c
++++ b/src/output_gstreamer.c
+@@ -137,6 +137,12 @@ struct track_time_info {
+ };
+ static struct track_time_info last_known_time_ = {0, 0};
+ 
++/* 换流状态跟踪：
++ * at_eos_     当前流已经播完，playbin 必须回 READY 才能重新开始；
++ * uri_dirty_  set_uri 更新了 uri 但还没告诉 playbin（例如暂停中换曲）。 */
++static gboolean at_eos_ = FALSE;
++static gboolean uri_dirty_ = FALSE;
++
+ static GstState get_current_player_state() {
+ 	GstState state = GST_STATE_PLAYING;
+ 	GstState pending = GST_STATE_NULL;
+@@ -146,14 +152,34 @@ static GstState get_current_player_state() {
+ 
+ static int output_gstreamer_play(output_transition_cb_t callback) {
+ 	play_trans_callback_ = callback;
+-	if (get_current_player_state() != GST_STATE_PAUSED) {
++	const GstState cur = get_current_player_state();
++	if (cur == GST_STATE_PLAYING && !at_eos_ &&
++	    uri_dirty_ && gsuri_ != NULL) {
++		/* 正在播放、流未播完，只是换了 uri：原地换流。
++		 * 不能把 pipeline 打回 READY —— READY 会关闭 alsasink，
++		 * bluealsa 随之释放 A2DP transport，耳机固件重放提示音，
++		 * 这就是换曲时听到的"叮"。 */
++		Log_info("gstreamer", "In-place uri switch, sink kept open: %s",
++			 gsuri_);
++		g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
++		uri_dirty_ = FALSE;
++		return 0;
++	}
++	if (cur != GST_STATE_PAUSED) {
+ 		if (gst_element_set_state(player_, GST_STATE_READY) ==
+ 		    GST_STATE_CHANGE_FAILURE) {
+ 			Log_error("gstreamer", "setting play state failed (1)");
+ 			// Error, but continue; can't get worse :)
+ 		}
+ 		g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
++	} else if (uri_dirty_ && gsuri_ != NULL) {
++		/* 暂停中换了曲：sink 停在 PAUSED 不会关设备，
++		 * 但必须把新 uri 交给 playbin，否则继续播的是上一首。 */
++		Log_info("gstreamer", "Uri switch while paused: %s", gsuri_);
++		g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
+ 	}
++	uri_dirty_ = FALSE;
++	at_eos_ = FALSE;
+ 	if (gst_element_set_state(player_, GST_STATE_PLAYING) ==
+ 	    GST_STATE_CHANGE_FAILURE) {
+ 		Log_error("gstreamer", "setting play state failed (2)");
+@@ -163,6 +189,8 @@ static int output_gstreamer_play(output_transition_cb_t callback) {
+ }
+ 
+ static int output_gstreamer_stop(void) {
++	uri_dirty_ = FALSE;
++	at_eos_ = FALSE;
+ 	if (gst_element_set_state(player_, GST_STATE_READY) ==
+ 	    GST_STATE_CHANGE_FAILURE) {
+ 		return -1;
+@@ -202,6 +230,7 @@ static void output_gstreamer_set_uri(const char *uri,
+ 	gsuri_ = (uri && *uri) ? strdup(uri) : NULL;
+ 	meta_update_callback_ = meta_cb;
+ 	SongMetaData_clear(&song_meta_);
++	uri_dirty_ = TRUE;
+ 
+ 	// If already playing, update the playbin's URI
+ 	if (get_current_player_state() == GST_STATE_PLAYING)
+@@ -319,6 +348,7 @@ static gboolean my_bus_callback(GstBus * bus, GstMessage * msg,
+ 	switch (msgType) {
+ 	case GST_MESSAGE_EOS:
+ 		Log_info("gstreamer", "%s: End-of-stream", msgSrcName);
++		at_eos_ = TRUE;
+ 		if (gs_next_uri_ != NULL) {
+ 			// If playbin does not support gapless (old
+ 			// versions didn't), this will trigger.
+@@ -328,6 +358,7 @@ static gboolean my_bus_callback(GstBus * bus, GstMessage * msg,
+ 			gst_element_set_state(player_, GST_STATE_READY);
+ 			g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
+ 			gst_element_set_state(player_, GST_STATE_PLAYING);
++			at_eos_ = FALSE;
+ 			if (play_trans_callback_) {
+ 				play_trans_callback_(PLAY_STARTED_NEXT_STREAM);
+ 			}
