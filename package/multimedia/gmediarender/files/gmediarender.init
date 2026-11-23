@@ -113,7 +113,7 @@ start_instance() {
 	esac
 	config_get videosink "$section" videosink ""
 	config_get videopipe "$section" videopipe ""
-	config_get volume_db "$section" initial_volume_db "-10"
+	config_get volume_db "$section" initial_volume_db "-40"
 	config_get mime_filter "$section" mime_filter ""
 	config_get sink_whitelist "$section" sink_whitelist ""
 	config_get logfile "$section" logfile ""
