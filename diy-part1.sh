@@ -126,6 +126,7 @@ download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/gmediarend
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/files/rkvdec-bind.init" "package/multimedia/gmediarender/files/rkvdec-bind.init"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/patches/0001-gmediarender-sink-whitelist.patch" "package/multimedia/gmediarender/patches/0001-gmediarender-sink-whitelist.patch"
 download_and_check "${BASE_URL}/package/multimedia/gmediarender/patches/0002-upnp-volume-element.patch" "package/multimedia/gmediarender/patches/0002-upnp-volume-element.patch"
+download_and_check "${BASE_URL}/package/multimedia/gmediarender/patches/0003-gmediarender-inplace-uri-switch.patch" "package/multimedia/gmediarender/patches/0003-gmediarender-inplace-uri-switch.patch"
 download_and_check "${BASE_URL}/package/luci-app-btmanager/htdocs/luci-static/resources/view/btmanager.js" "package/luci-app-btmanager/htdocs/luci-static/resources/view/btmanager.js"
 download_and_check "${BASE_URL}/package/luci-app-btmanager/root/etc/config/btmanager" "package/luci-app-btmanager/root/etc/config/btmanager"
 download_and_check "${BASE_URL}/package/luci-app-btmanager/root/etc/init.d/btmanager" "package/luci-app-btmanager/root/etc/init.d/btmanager"
