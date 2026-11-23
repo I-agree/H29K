@@ -25,8 +25,15 @@ uci -q commit gmediarender
 	uci -q commit upmpdcli
 }
 
-# 包安装默认会 enable，这里兜底，避免现场曾手动 disable 过
-[ -x /etc/init.d/mpd ]      && /etc/init.d/mpd enable 2>/dev/null
-[ -x /etc/init.d/upmpdcli ] && /etc/init.d/upmpdcli enable 2>/dev/null
+# 包安装时是按「官方 init 的 START」建 rc.d 链接的：mpd=93、upmpdcli=95。
+# 但覆盖后的 init 是 mpd=98、upmpdcli=99，必须排在 bluealsa(95) 之后，
+# 否则：mpd 抢在 bluealsa 前面起（永远打不开 PCM）、upmpdcli 抢在 mpd 前面起（连不上 6600 直接退出）。
+# 重新 enable 一次，让链接按新 START 重排成 S98mpd / S99upmpdcli。
+# 本脚本在 S00boot 阶段执行，早于所有服务，所以本次开机就生效。
+for svc in mpd upmpdcli; do
+	[ -x "/etc/init.d/$svc" ] || continue
+	"/etc/init.d/$svc" disable 2>/dev/null
+	"/etc/init.d/$svc" enable 2>/dev/null
+done
 
 exit 0
