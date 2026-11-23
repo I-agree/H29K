@@ -1,0 +1,28 @@
+#!/bin/sh
+#
+# H29K 双渲染器：刷机后强制执行一次设备分工
+#
+# 背景：sysupgrade 默认保留 /etc/config，所以现场把 gmediarender 的
+# audiodevice 调成 bluealsa 做蓝牙听歌的那些设置会被带过来。
+# 在双渲染器方案下 bluealsa 必须只归 MPD 独占，否则 gmediarender 一起来
+# 就会把 A2DP 抢走，MPD 的 always_on 也就失去意义。
+#
+# 只跑一次（uci-defaults 脚本执行完会自动删除）。
+
+[ -f /etc/config/gmediarender ] || exit 0
+
+uci -q set gmediarender.main.audiodevice='plughw:0,0'
+uci -q set gmediarender.main.audiosink='alsasink'
+# 现场遗留的 --gstout-buffer-duration 1 会和 config 里的 buffer_duration 重复传参
+uci -q set gmediarender.main.extra_args=''
+uci -q commit gmediarender
+
+[ -f /etc/config/upmpdcli ] && {
+	uci -q set upmpdcli.lan.friendly_name='H29K 音乐'
+	uci -q set upmpdcli.lan.interface='br-lan'
+	uci -q set upmpdcli.lan.mpd_host='127.0.0.1'
+	uci -q set upmpdcli.lan.mpd_port='6600'
+	uci -q commit upmpdcli
+}
+
+exit 0

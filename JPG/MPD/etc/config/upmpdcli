@@ -1,0 +1,10 @@
+config upmpdcli 'lan'
+	# 绑定的网卡，与 gmediarender 一致
+	option interface 'br-lan'
+
+	# 手机端列表里显示的名字，要和 gmediarender 的 "H29K 投屏" 区分开
+	option friendly_name 'H29K 音乐'
+
+	# 后端 MPD，本机回环
+	option mpd_host '127.0.0.1'
+	option mpd_port '6600'
