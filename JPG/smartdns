@@ -49,3 +49,12 @@ config server
 	option name 'Google DNS'
 	option ip '8.8.8.8'
 
+config server
+	option enabled '1'
+	option name '阿里DNS IPv6'
+	option ip '2400:3200::1'
+
+config server
+	option enabled '1'
+	option name '腾讯DNS IPv6'
+	option ip '2402:4e00::'
