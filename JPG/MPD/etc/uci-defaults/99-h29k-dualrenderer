@@ -18,11 +18,15 @@ uci -q set gmediarender.main.extra_args=''
 uci -q commit gmediarender
 
 [ -f /etc/config/upmpdcli ] && {
-	uci -q set upmpdcli.lan.friendly_name='H29K 音乐'
+	uci -q set upmpdcli.lan.friendly_name='H29K 投音'
 	uci -q set upmpdcli.lan.interface='br-lan'
 	uci -q set upmpdcli.lan.mpd_host='127.0.0.1'
 	uci -q set upmpdcli.lan.mpd_port='6600'
 	uci -q commit upmpdcli
 }
+
+# 包安装默认会 enable，这里兜底，避免现场曾手动 disable 过
+[ -x /etc/init.d/mpd ]      && /etc/init.d/mpd enable 2>/dev/null
+[ -x /etc/init.d/upmpdcli ] && /etc/init.d/upmpdcli enable 2>/dev/null
 
 exit 0
