@@ -44,7 +44,7 @@ derive_uuid() {
 # kmssink 必须有「connected 且带 modes」的 connector 才起得来，否则会以
 # "driver does not provide mode settings configuration" 失败，并让整个 UPnP
 # 会话直接 704（画面和声音一起没）。所以无屏场景一律退到 fakesink：
-# 视频帧丢弃，音频照常走 audiodevice（纯听歌场景靠这个才不会被打断）。
+# 视频帧丢弃，投送不会因为 kmssink 起不来而整体 704。
 hdmi_ready() {
         local st modes m
 
@@ -97,18 +97,16 @@ start_instance() {
 	config_get iface "$section" interface ""
 	config_get port "$section" port "49494"
 	config_get audiosink "$section" audiosink "alsasink"
-	config_get audiodevice "$section" audiodevice ""
-	# bluealsa 设备由 bluez-alsa 提供。两种情况下 alsasink 都打不开 PCM，投送必然
-	# 失败，这里提前记日志，省得到手机端只看到一个 704：
-	#   1) bluealsad 没在跑
-	#   2) bluealsad 在跑，但没有任何 A2DP 设备连着（PCM 是连接后才创建的）
+	config_get audiodevice "$section" audiodevice "plughw:0,0"
+	# 双渲染器：音频只归 MPD（bluealsa 常开给蓝牙耳机/音箱），本渲染器只做 HDMI 投屏。
+	# 现场遗留或手工改的 bluealsa 一律纠正回 HDMI 声卡，否则两个渲染器会抢同一个独占 PCM。
 	case "$audiodevice" in
 	bluealsa*)
-		if ! pidof bluealsad >/dev/null 2>&1; then
-			logger -t gmediarender "audiodevice=$audiodevice 但 bluealsad 未运行：投送会因打不开 PCM 而失败"
-		elif [ -x /usr/bin/bluealsactl ] && [ -z "$(/usr/bin/bluealsactl list-pcms 2>/dev/null)" ]; then
-			logger -t gmediarender "bluealsad 已在运行，但当前没有已连接 A2DP 设备：先连上蓝牙耳机/音箱再投送"
-		fi
+		logger -t gmediarender "audiodevice=$audiodevice 已废弃（蓝牙音频请投“H29K 投音”），强制改为 plughw:0,0"
+		audiodevice="plughw:0,0"
+		;;
+	"")
+		audiodevice="plughw:0,0"
 		;;
 	esac
 	config_get videosink "$section" videosink ""
