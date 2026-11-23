@@ -15,7 +15,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bluez-alsa
 PKG_VERSION:=5.0.0
-PKG_RELEASE:=2
+PKG_RELEASE:=3
 
 # 上游最新的 tag 就是 v5.0.0（2026-08-27），之后没有新 tag；
 # 这里钉的是 master 上最新的提交（2026-10-26），比 tag 多两个月的修复。
@@ -57,7 +57,12 @@ endef
 
 # 只保留 A2DP source 需要的东西：SBC 是强制的，其余可选编解码全部关掉；
 # HFP/HSP 走 oFono，本机没有，也关掉；man/tcl 界面/工具一律不装。
+# 插件的安装目录与 D-Bus 策略目录都钉死：默认值靠 pkg-config 的 libdir/datadir
+# 变量推导，跨编译环境下不稳定（本次就出现插件没落到 /usr/lib/alsa-lib）。
+# 同时 OpenWrt 的 dbus 只读 /etc/dbus-1/system.d，不可能用上游默认的 /usr/share。
 CONFIGURE_ARGS += \
+	--with-alsaplugindir=/usr/lib/alsa-lib \
+	--with-dbusconfdir=/etc/dbus-1/system.d \
 	--disable-aac \
 	--disable-aptx \
 	--disable-aptx-hd \
@@ -91,17 +96,44 @@ define Package/bluez-alsa/install
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bluealsad $(1)/usr/bin/
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bluealsactl $(1)/usr/bin/
 
+	# ALSA 插件：先用 install 出来的，没有再退回 build 目录。
+	# 不同 pkg-config 布局下 make install 的落点不一定是 /usr/lib/alsa-lib，
+	# 所以这里不写死单一来源，最后统一断言两个 .so 都在。
 	$(INSTALL_DIR) $(1)/usr/lib/alsa-lib
-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so $(1)/usr/lib/alsa-lib/
-	$(CP) $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so $(1)/usr/lib/alsa-lib/
+	for f in \
+		$(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so \
+		$(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so \
+		$(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_pcm_bluealsa.so \
+		$(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_ctl_bluealsa.so; do \
+		[ -f "$$f" ] && $(CP) "$$f" $(1)/usr/lib/alsa-lib/; \
+	done; \
+	for m in pcm ctl; do \
+		[ -f $(1)/usr/lib/alsa-lib/libasound_module_$${m}_bluealsa.so ] || { \
+			echo "bluez-alsa: 缺少 libasound_module_$${m}_bluealsa.so"; exit 1; }; \
+	done
 
-	# pcm.bluealsa / ctl.bluealsa 的 ALSA 配置，alsa-lib 会自动读取 conf.d
-	$(INSTALL_DIR) $(1)/usr/share/alsa/alsa.conf.d
-	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/share/alsa/alsa.conf.d/20-bluealsa.conf $(1)/usr/share/alsa/alsa.conf.d/
+	# pcm.bluealsa / ctl.bluealsa 定义。OpenWrt 的 alsa-lib 是上游原版 alsa.conf，
+	# 只加载 /etc/alsa/conf.d（不读 /usr/share/alsa/alsa.conf.d，那是 Debian 的补丁）。
+	$(INSTALL_DIR) $(1)/etc/alsa/conf.d
+	for f in \
+		$(PKG_INSTALL_DIR)/etc/alsa/conf.d/20-bluealsa.conf \
+		$(PKG_INSTALL_DIR)/usr/share/alsa/alsa.conf.d/20-bluealsa.conf \
+		$(PKG_BUILD_DIR)/src/asound/20-bluealsa.conf; do \
+		[ -f "$$f" ] && { $(INSTALL_DATA) "$$f" $(1)/etc/alsa/conf.d/20-bluealsa.conf; break; }; \
+	done; \
+	[ -f $(1)/etc/alsa/conf.d/20-bluealsa.conf ] || { \
+		echo "bluez-alsa: 缺少 20-bluealsa.conf"; exit 1; }
 
-	# 允许 bluealsa 在系统 D-Bus 上注册 org.bluealsa 服务
-	$(INSTALL_DIR) $(1)/usr/share/dbus-1/system.d
-	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/usr/share/dbus-1/system.d/org.bluealsa.conf $(1)/usr/share/dbus-1/system.d/
+	# D-Bus 策略：允许 bluealsad 注册 org.bluealsa（OpenWrt 的 dbus 读 /etc/dbus-1/system.d）
+	$(INSTALL_DIR) $(1)/etc/dbus-1/system.d
+	for f in \
+		$(PKG_INSTALL_DIR)/etc/dbus-1/system.d/org.bluealsa.conf \
+		$(PKG_INSTALL_DIR)/usr/share/dbus-1/system.d/org.bluealsa.conf \
+		$(PKG_BUILD_DIR)/src/org.bluealsa.conf; do \
+		[ -f "$$f" ] && { $(INSTALL_DATA) "$$f" $(1)/etc/dbus-1/system.d/org.bluealsa.conf; break; }; \
+	done; \
+	[ -f $(1)/etc/dbus-1/system.d/org.bluealsa.conf ] || { \
+		echo "bluez-alsa: 缺少 org.bluealsa.conf"; exit 1; }
 
 	$(INSTALL_DIR) $(1)/etc/config $(1)/etc/init.d
 	$(INSTALL_CONF) ./files/bluealsa.config $(1)/etc/config/bluealsa
