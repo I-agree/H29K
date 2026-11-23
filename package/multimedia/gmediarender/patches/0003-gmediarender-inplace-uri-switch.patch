@@ -1,66 +1,87 @@
 diff --git a/src/output_gstreamer.c b/src/output_gstreamer.c
-index 7a3a0c4..fd105b2 100644
+index 74babff..590f369 100644
 --- a/src/output_gstreamer.c
 +++ b/src/output_gstreamer.c
-@@ -137,6 +137,12 @@ struct track_time_info {
+@@ -137,6 +137,13 @@ struct track_time_info {
  };
  static struct track_time_info last_known_time_ = {0, 0};
  
 +/* 换流状态跟踪：
 + * at_eos_     当前流已经播完，playbin 必须回 READY 才能重新开始；
-+ * uri_dirty_  set_uri 更新了 uri 但还没告诉 playbin（例如暂停中换曲）。 */
++ * uri_dirty_  set_uri 更新了 uri 但还没交给 playbin。 */
 +static gboolean at_eos_ = FALSE;
 +static gboolean uri_dirty_ = FALSE;
++static gboolean gapless_switch_pending_ = FALSE;
 +
  static GstState get_current_player_state() {
  	GstState state = GST_STATE_PLAYING;
  	GstState pending = GST_STATE_NULL;
-@@ -146,14 +152,34 @@ static GstState get_current_player_state() {
+@@ -146,7 +153,44 @@ static GstState get_current_player_state() {
  
  static int output_gstreamer_play(output_transition_cb_t callback) {
  	play_trans_callback_ = callback;
 -	if (get_current_player_state() != GST_STATE_PAUSED) {
 +	const GstState cur = get_current_player_state();
-+	if (cur == GST_STATE_PLAYING && !at_eos_ &&
-+	    uri_dirty_ && gsuri_ != NULL) {
-+		/* 正在播放、流未播完，只是换了 uri：原地换流。
-+		 * 不能把 pipeline 打回 READY —— READY 会关闭 alsasink，
-+		 * bluealsa 随之释放 A2DP transport，耳机固件重放提示音，
-+		 * 这就是换曲时听到的"叮"。 */
-+		Log_info("gstreamer", "In-place uri switch, sink kept open: %s",
++
++	/* 正在播放、流还没播完，只是换了曲目：
++	 * playbin 的 set_uri 只把 uri 排进 next_group，要等当前流 drained
++	 * 才会激活它（gstplaybin2.c 的 drained_cb）。所以把新 uri 排进去后
++	 * 再 seek 到当前曲末尾，主动触发 drained，让 playbin 自己无缝切组。
++	 * 全程不把 pipeline 打回 READY —— READY 会关闭 alsasink，
++	 * bluealsa 随之释放 A2DP transport，耳机固件重放提示音。 */
++	if (cur == GST_STATE_PLAYING && !at_eos_ && uri_dirty_ && gsuri_ != NULL) {
++		gint64 dur = 0;
++		gboolean seeked = FALSE;
++		Log_info("gstreamer", "Gapless switch via next-group + end seek: %s",
 +			 gsuri_);
 +		g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
 +		uri_dirty_ = FALSE;
-+		return 0;
++		gapless_switch_pending_ = TRUE;
++		if (gst_element_query_duration(player_, GST_FORMAT_TIME, &dur) &&
++		    dur > 0) {
++			// 停在末尾前 300ms，避免 seek 越界被拒
++			gint64 target = (dur > 300 * GST_MSECOND)
++					? dur - 300 * GST_MSECOND : 0;
++			seeked = gst_element_seek(player_, 1.0, GST_FORMAT_TIME,
++				GST_SEEK_FLAG_FLUSH, GST_SEEK_TYPE_SET, target,
++				GST_SEEK_TYPE_NONE, 0);
++		}
++		if (seeked) {
++			return 0;
++		}
++		/* 查不到 duration 或流不支持 seek（HTTP 没有 Range）：
++		 * 退回老做法，这一首会有提示音，但至少切得过去。 */
++		Log_info("gstreamer",
++			 "End seek unavailable, fall back to READY restart");
++		gapless_switch_pending_ = FALSE;
 +	}
-+	if (cur != GST_STATE_PAUSED) {
++
++	if (cur == GST_STATE_PAUSED && !uri_dirty_) {
++		// 普通 resume：pipeline 还停在暂停位置，直接继续
++	} else if (cur != GST_STATE_PAUSED || uri_dirty_) {
  		if (gst_element_set_state(player_, GST_STATE_READY) ==
  		    GST_STATE_CHANGE_FAILURE) {
  			Log_error("gstreamer", "setting play state failed (1)");
- 			// Error, but continue; can't get worse :)
+@@ -154,6 +198,8 @@ static int output_gstreamer_play(output_transition_cb_t callback) {
  		}
  		g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
-+	} else if (uri_dirty_ && gsuri_ != NULL) {
-+		/* 暂停中换了曲：sink 停在 PAUSED 不会关设备，
-+		 * 但必须把新 uri 交给 playbin，否则继续播的是上一首。 */
-+		Log_info("gstreamer", "Uri switch while paused: %s", gsuri_);
-+		g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
  	}
 +	uri_dirty_ = FALSE;
 +	at_eos_ = FALSE;
  	if (gst_element_set_state(player_, GST_STATE_PLAYING) ==
  	    GST_STATE_CHANGE_FAILURE) {
  		Log_error("gstreamer", "setting play state failed (2)");
-@@ -163,6 +189,8 @@ static int output_gstreamer_play(output_transition_cb_t callback) {
+@@ -163,6 +209,9 @@ static int output_gstreamer_play(output_transition_cb_t callback) {
  }
  
  static int output_gstreamer_stop(void) {
 +	uri_dirty_ = FALSE;
 +	at_eos_ = FALSE;
++	gapless_switch_pending_ = FALSE;
  	if (gst_element_set_state(player_, GST_STATE_READY) ==
  	    GST_STATE_CHANGE_FAILURE) {
  		return -1;
-@@ -202,6 +230,7 @@ static void output_gstreamer_set_uri(const char *uri,
+@@ -202,6 +251,7 @@ static void output_gstreamer_set_uri(const char *uri,
  	gsuri_ = (uri && *uri) ? strdup(uri) : NULL;
  	meta_update_callback_ = meta_cb;
  	SongMetaData_clear(&song_meta_);
@@ -68,7 +89,7 @@ index 7a3a0c4..fd105b2 100644
  
  	// If already playing, update the playbin's URI
  	if (get_current_player_state() == GST_STATE_PLAYING)
-@@ -319,6 +348,7 @@ static gboolean my_bus_callback(GstBus * bus, GstMessage * msg,
+@@ -319,6 +369,7 @@ static gboolean my_bus_callback(GstBus * bus, GstMessage * msg,
  	switch (msgType) {
  	case GST_MESSAGE_EOS:
  		Log_info("gstreamer", "%s: End-of-stream", msgSrcName);
@@ -76,11 +97,56 @@ index 7a3a0c4..fd105b2 100644
  		if (gs_next_uri_ != NULL) {
  			// If playbin does not support gapless (old
  			// versions didn't), this will trigger.
-@@ -328,6 +358,7 @@ static gboolean my_bus_callback(GstBus * bus, GstMessage * msg,
+@@ -328,6 +379,18 @@ static gboolean my_bus_callback(GstBus * bus, GstMessage * msg,
  			gst_element_set_state(player_, GST_STATE_READY);
  			g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
  			gst_element_set_state(player_, GST_STATE_PLAYING);
 +			at_eos_ = FALSE;
++		} else if (gapless_switch_pending_ && gsuri_ != NULL) {
++			/* end-seek 没能逼出 drained，而是直接走到了 EOS：
++			 * 无缝切换失败，退回 READY 重开，至少把新曲播起来。
++			 * 这一首还会有提示音。 */
++			gapless_switch_pending_ = FALSE;
++			at_eos_ = FALSE;
++			Log_info("gstreamer",
++				 "Gapless switch failed (EOS), restart via READY");
++			gst_element_set_state(player_, GST_STATE_READY);
++			g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
++			gst_element_set_state(player_, GST_STATE_PLAYING);
  			if (play_trans_callback_) {
  				play_trans_callback_(PLAY_STARTED_NEXT_STREAM);
  			}
+@@ -536,20 +599,24 @@ static void prepare_next_stream(GstElement *obj, gpointer userdata) {
+ 	(void)obj;
+ 	(void)userdata;
+ 
+-	Log_info("gstreamer", "about-to-finish cb: setting uri %s",
+-		 gs_next_uri_);
+-	free(gsuri_);
+-	gsuri_ = gs_next_uri_;
+-	gs_next_uri_ = NULL;
+-	if (gsuri_ != NULL) {
++	/* drained 每次流结束都会触发。只有在控制端真的给了 next uri 时
++	 * 才替换 gsuri_；否则保留当前 uri —— 否则会把我们刚排进 next_group
++	 * 的新曲 uri 抹掉，后续兜底重开就无 uri 可用了。 */
++	if (gs_next_uri_ != NULL) {
++		Log_info("gstreamer", "about-to-finish cb: setting uri %s",
++			 gs_next_uri_);
++		free(gsuri_);
++		gsuri_ = gs_next_uri_;
++		gs_next_uri_ = NULL;
+ 		g_object_set(G_OBJECT(player_), "uri", gsuri_, NULL);
+ 		if (play_trans_callback_) {
+-			// TODO(hzeller): can we figure out when we _actually_
+-			// start playing this ? there are probably a couple
+-			// of seconds between now and actual start.
+ 			play_trans_callback_(PLAY_STARTED_NEXT_STREAM);
+ 		}
++		return;
+ 	}
++	/* 无显式 next uri：如果这次 drained 是我们 end-seek 逼出来的，
++	 * playbin 已经用 next_group 里的新曲无缝接上了。 */
++	gapless_switch_pending_ = FALSE;
+ }
+ 
+ static int output_gstreamer_init(void)
