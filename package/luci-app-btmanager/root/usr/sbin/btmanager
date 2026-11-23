@@ -331,13 +331,11 @@ cmd_summary() {
 	paired_count=$(run_lim 10 "$BTCTL" devices Paired 2>/dev/null | grep -c '^Device ')
 	conn_count=$(run_lim 10 "$BTCTL" devices Connected 2>/dev/null | grep -c '^Device ')
 
-	# DLNA 声音走哪：读 gmediarender 的 audiodevice
-	audio_dev=$(uci -q get gmediarender.main.audiodevice 2>/dev/null)
-	[ -n "$audio_dev" ] || audio_dev="plughw:0,0"
-	case "$audio_dev" in
-	bluealsa*) audio_tgt=bt ;;
-	*)         audio_tgt=hdmi ;;
-	esac
+	# 双渲染器是固定分工，面板不再提供切换：
+	#   音频 → MPD 独占 bluealsa 常开（投送列表里叫“H29K 投音”）
+	#   视频 → gmediarender 走 HDMI（投送列表里叫“H29K 投屏”）
+	audio_tgt=mpd
+	audio_dev="bluealsa（MPD 常开）"
 
 	printf '{"ok":true,"service":{"bluetoothd":%s,"hci0":%s,"bluealsad":%s},"controllers":%s,"controller":{"address":"%s","name":"%s","powered":%s,"discoverable":%s,"pairable":%s},"counts":{"paired":%d,"connected":%d},"audio":{"target":"%s","device":"%s"},"config":%s}\n' \
 		"$(bool_json "$bd")" "$(bool_json "$hci0")" "$(bool_json "$ba")" \
@@ -347,58 +345,6 @@ cmd_summary() {
 		"${paired_count:-0}" "${conn_count:-0}" \
 		"$audio_tgt" "$(json_esc "$audio_dev")" \
 		"$(config_json)"
-}
-
-# DLNA 声音输出：hdmi（电视/HDMI）| bt（当前连接的蓝牙音频设备）
-cmd_audio() {
-	want=$1
-	dev=$(uci -q get gmediarender.main.audiodevice 2>/dev/null)
-	[ -n "$dev" ] || dev="plughw:0,0"
-
-	if [ -z "$want" ]; then
-		case "$dev" in
-		bluealsa*) tgt=bt ;;
-		*)         tgt=hdmi ;;
-		esac
-		printf '{"ok":true,"audio":{"target":"%s","device":"%s"}}\n' "$tgt" "$(json_esc "$dev")"
-		return 0
-	fi
-
-	[ -x /etc/init.d/gmediarender ] || fail_json "没有安装 gmediarender，不需要切换"
-
-	case "$want" in
-	hdmi)
-		newdev="plughw:0,0"
-		msg="DLNA 声音已切回 HDMI"
-		;;
-	bt|bluetooth)
-		[ -x /etc/init.d/bluealsa ] || fail_json "没装 bluez-alsa，蓝牙音频后端不可用"
-		conn=$(run_lim 10 "$BTCTL" devices Connected 2>/dev/null | grep -c '^Device ')
-		[ "${conn:-0}" -gt 0 ] || fail_json "还没有已连接的蓝牙音频设备：先在设备列表里配对并连接，再切蓝牙输出（否则 alsasink 打不开，带音轨的视频会一起失败）"
-		if ! pidof bluealsad >/dev/null 2>&1; then
-			/etc/init.d/bluealsa start 2>/dev/null
-			sleep 1
-		fi
-		pidof bluealsad >/dev/null 2>&1 || fail_json "bluealsad 没起来，先看 logread -t bluealsa"
-		newdev="bluealsa"
-		msg="DLNA 声音已切到蓝牙（发给当前最近连接的 A2DP 设备）"
-		;;
-	*)
-		fail_json "参数必须是 hdmi 或 bt"
-		;;
-	esac
-
-	uci -q set "gmediarender.main.audiodevice=$newdev" || fail_json "写入 gmediarender 配置失败"
-	uci -q commit gmediarender || fail_json "提交 gmediarender 配置失败"
-	/etc/init.d/gmediarender restart 2>/dev/null
-
-	case "$want" in
-	hdmi) tgt=hdmi ;;
-	*)    tgt=bt ;;
-	esac
-
-	printf '{"ok":true,"audio":{"target":"%s","device":"%s"},"message":"%s"}\n' \
-		"$tgt" "$(json_esc "$newdev")" "$(json_esc "$msg")"
 }
 
 cmd_devices() {
@@ -646,9 +592,15 @@ cmd_enable() {
 		/etc/init.d/btmanager start 2>/dev/null
 		# 音频后端（bluez-alsa）跟着一起起来，否则 A2DP 流没人消费，耳机几秒就断
 		[ -x /etc/init.d/bluealsa ] && /etc/init.d/bluealsa start 2>/dev/null
+		# 音频只有 MPD 这一路：蓝牙一开就把 MPD 那套拉起来，耳机才有常开的消费端
+		[ -x /etc/init.d/mpd ]      && /etc/init.d/mpd start 2>/dev/null
+		[ -x /etc/init.d/upmpdcli ] && /etc/init.d/upmpdcli start 2>/dev/null
 		sleep 3
 		printf '{"ok":true,"enabled":true,"stored":"%s","message":"%s"}\n' "$stored" "$(json_esc "蓝牙已开启")"
 	else
+		# 先停消费端，再停 bluealsa，避免 PCM 被占着时后端退出报错
+		[ -x /etc/init.d/upmpdcli ] && /etc/init.d/upmpdcli stop 2>/dev/null
+		[ -x /etc/init.d/mpd ]      && /etc/init.d/mpd stop 2>/dev/null
 		[ -x /etc/init.d/bluealsa ] && /etc/init.d/bluealsa stop 2>/dev/null
 		/etc/init.d/btmanager stop 2>/dev/null
 		[ -x /etc/init.d/bluetoothd ] && /etc/init.d/bluetoothd stop 2>/dev/null
@@ -850,7 +802,7 @@ case "$1" in
 	config)     cmd_config ;;
 	set)        cmd_set "$2" "$3" ;;
 	autodev)    cmd_autodev "$2" "$3" ;;
-	audio)      cmd_audio "$2" ;;
+	audio)      fail_json "音频固定走 MPD（投送列表里的 “H29K 投音”）；本渲染器只做 HDMI 投屏，不支持切换" ;;
 	boot)       cmd_boot ;;
 	diag)       cmd_diag ;;
 	log)        cmd_log ;;

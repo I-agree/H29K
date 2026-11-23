@@ -208,27 +208,12 @@ return view.extend({
 			self.act(on ? _('关闭蓝牙') : _('开启蓝牙'), [ 'enable', on ? '0' : '1' ]);
 		};
 
-		// 切换 DLNA 声音去向：hdmi = 电视/HDMI（默认），bt = 当前连接的蓝牙设备
-		this.setAudio = function(target) {
-			var conn = (self.summary && self.summary.counts && self.summary.counts.connected) || 0;
-
-			if (target === 'bt') {
-				if (!conn) {
-					self.setMsg(_('还没有已连接的蓝牙音频设备，先在下面的设备列表里配对并连接'), true);
-					return;
-				}
-				if (!confirm(_('切到蓝牙后，DLNA 播放的声音会送到当前连接的耳机/音箱，画面仍然走 HDMI。继续进行吗？')))
-					return;
-			}
-
-			self.act(_('切换 DLNA 声音输出'), [ 'audio', target ]);
-		};
-
+		// 双渲染器固定分工：音频走 MPD（常开 bluealsa），画面走 gmediarender（HDMI），面板不提供切换
 		var body = E('div', { 'class': 'cbi-map btm' }, [
 			styleNode(),
 			E('h2', {}, _('蓝牙管理')),
 			E('div', { 'class': 'cbi-map-descr' },
-				_('管理板载蓝牙控制器：扫描、配对、连接音箱/耳机/麦克风/键鼠，设置开机自动回连。')),
+				_('管理板载蓝牙控制器：扫描、配对、连接音箱/耳机/麦克风/键鼠，设置开机自动回连。音频固定走 MPD（投送选 “H29K 投音”），画面投屏走 HDMI（“H29K 投屏”）。')),
 			this.msgBar,
 
 			E('div', { 'class': 'cbi-section btm-card' }, [
@@ -396,8 +381,6 @@ return view.extend({
 		var ctl = s.controller || {};
 		var cnt = s.counts || {};
 		var ctrls = s.controllers || [];
-		var audio = s.audio || {};
-		var audioHdmi = !(audio.target === 'bt');
 		var cfgOff = (this.cfg && this.cfg.enabled === '0');
 		var running = !!svc.bluetoothd;
 		/* 开关状态以实际运行情况为准：bluetoothd 没跑就是关着的，
@@ -463,28 +446,18 @@ return view.extend({
 				E('div', {}, [
 					mark(svc.bluealsad, svc.bluealsad ? _('bluealsad 运行中') : _('bluealsad 未运行')),
 					E('div', { 'class': 'btm-sub' }, svc.bluealsad
-						? _('DLNA 推流可输出到 ALSA 设备 “bluealsa”，自动选择最近连接的 A2DP 设备')
+						? _('蓝牙听歌由 MPD 独占 bluealsa 并常开输出：换曲时耳机不会再响提示音')
 						: _('未安装或未启动 bluez-alsa：A2DP 音频流没人消费，耳机连上后常被对端断开'))
 				])
 			]),
-			row(_('DLNA 声音'), [
+			row(_('输出分工'), [
 				E('div', {}, [
-					E('div', { 'class': 'btm-name' }, audioHdmi
-						? _('走 HDMI —— 画面和声音都在电视上（默认）')
-						: _('走蓝牙 —— 画面还在 HDMI，声音送到耳机/音箱')),
-					E('div', { 'class': 'btm-sub' }, audioHdmi
-						? _('只有点了“走蓝牙”之后，DLNA 的声音才改从蓝牙输出；视频/图片的分辨率、解码路径都不变')
-						: _('当前 ALSA 设备：') + (audio.device || 'bluealsa') + _('，自动跟随最近连接的那台 A2DP 设备')),
-					E('div', { 'class': 'btm-row', 'style': 'margin-top:8px' }, [
-						button(_('走 HDMI'), audioHdmi ? 'cbi-button-action' : 'cbi-button-apply', function() {
-							if (!audioHdmi)
-								self.setAudio('hdmi');
-						}),
-						button(_('走蓝牙'), audioHdmi ? 'cbi-button-apply' : 'cbi-button-action', function() {
-							if (audioHdmi)
-								self.setAudio('bt');
-						})
-					])
+					E('div', { 'class': 'btm-name' }, _('音频 —— MPD 常开 → 蓝牙耳机/音箱')),
+					E('div', { 'class': 'btm-sub' },
+						_('投送列表里选 “H29K 投音”。bluealsa 由 MPD 独占并保持常开，换曲时耳机不会响提示音')),
+					E('div', { 'class': 'btm-name', 'style': 'margin-top:6px' }, _('画面 —— gmediarender → HDMI')),
+					E('div', { 'class': 'btm-sub' },
+						_('投送列表里选 “H29K 投屏”。这一路只出画面和 HDMI 声音，不支持蓝牙音频'))
 				])
 			]),
 			row(_('设备统计'), _('已配对 ') + (cnt.paired || 0) + _(' 台，已连接 ') + (cnt.connected || 0) + _(' 台'))
