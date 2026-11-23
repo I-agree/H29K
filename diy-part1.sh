@@ -136,6 +136,7 @@ download_and_check "${BASE_URL}/package/luci-app-btmanager/Makefile" "package/lu
 download_and_check "${BASE_URL}/package/bluez-alsa/Makefile" "package/bluez-alsa/Makefile"
 download_and_check "${BASE_URL}/package/bluez-alsa/files/bluealsa.config" "package/bluez-alsa/files/bluealsa.config"
 download_and_check "${BASE_URL}/package/bluez-alsa/files/bluealsa.init" "package/bluez-alsa/files/bluealsa.init"
+download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
