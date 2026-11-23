@@ -47,6 +47,8 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/luci-app-btmanager/root/usr/share/luci/menu.d \
          package/luci-app-btmanager/root/usr/share/rpcd/acl.d \
          package/bluez-alsa/files \
+         files/var/lib/mpd/music \
+         files/var/lib/mpd/playlists \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
@@ -139,6 +141,13 @@ download_and_check "${BASE_URL}/package/bluez-alsa/Makefile" "package/bluez-alsa
 download_and_check "${BASE_URL}/package/bluez-alsa/files/bluealsa.config" "package/bluez-alsa/files/bluealsa.config"
 download_and_check "${BASE_URL}/package/bluez-alsa/files/bluealsa.init" "package/bluez-alsa/files/bluealsa.init"
 download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
+download_and_check "${BASE_URL}/JPG/MPD/etc/mpd.conf" "files/etc/mpd.conf"
+download_and_check "${BASE_URL}/JPG/MPD/etc/config/upmpdcli" "files/etc/config/upmpdcli"
+download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/mpd" "files/etc/init.d/mpd"
+download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/upmpdcli" "files/etc/init.d/upmpdcli"
+download_and_check "${BASE_URL}/JPG/MPD/etc/uci-defaults/99-h29k-dualrenderer" "files/etc/uci-defaults/99-h29k-dualrenderer"
+
+
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
