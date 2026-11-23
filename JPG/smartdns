@@ -45,11 +45,6 @@ config server
 
 config server
 	option enabled '1'
-	option name '114 DNS'
-	option ip '114.114.114.114'
-
-config server
-	option enabled '1'
 	option name 'CloudFlare DNS'
 	option ip '1.1.1.1'
 
@@ -57,19 +52,4 @@ config server
 	option enabled '1'
 	option name 'Google DNS'
 	option ip '8.8.8.8'
-
-config server
-	option enabled '1'
-	option name '中国互联网络信息中心DNS'
-	option ip '1.2.4.8'
-
-config server
-	option enabled '1'
-	option name '阿里DNS IPv6'
-	option ip '2400:3200::1'
-
-config server
-	option enabled '1'
-	option name '腾讯DNS IPv6'
-	option ip '2402:4e00::'
 
