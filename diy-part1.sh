@@ -34,7 +34,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          files/lib/firmware \
          package/boot/uboot-rockchip/patches \
          package/kernel/aic8800/patches \
-         package/python-charset-normalizer/patches \
+         package/python-charset-normalizer \
          package/multimedia/gmediarender/extras \
          package/multimedia/gmediarender/files \
          package/multimedia/gmediarender/patches \
