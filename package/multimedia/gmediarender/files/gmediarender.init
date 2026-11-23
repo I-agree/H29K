@@ -114,6 +114,7 @@ start_instance() {
 	config_get videosink "$section" videosink ""
 	config_get videopipe "$section" videopipe ""
 	config_get volume_db "$section" initial_volume_db "-40"
+	config_get buffer_duration "$section" buffer_duration "0.5"
 	config_get mime_filter "$section" mime_filter ""
 	config_get sink_whitelist "$section" sink_whitelist ""
 	config_get logfile "$section" logfile ""
@@ -136,6 +137,9 @@ start_instance() {
 		set -- "$@" --gstout-videosink "$videosink"
 	fi
 	[ -n "$volume_db" ] && set -- "$@" --gstout-initial-volume-db "$volume_db"
+	# 缓冲（秒）：0 表示关闭。投送端是手机 WiFi 供流，给 1 秒能压掉短时抖动
+	[ -n "$buffer_duration" ] && [ "$buffer_duration" != "0" ] && \
+		set -- "$@" --gstout-buffer-duration "$buffer_duration"
 	[ -n "$mime_filter" ] && set -- "$@" --mime-filter "$mime_filter"
 	[ -n "$logfile" ] && set -- "$@" --logfile "$logfile"
 	# extra_args 允许追加原生参数，按空格切分（值里不要带引号）
