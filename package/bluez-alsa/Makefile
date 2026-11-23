@@ -15,7 +15,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=bluez-alsa
 PKG_VERSION:=5.0.0
-PKG_RELEASE:=3
+PKG_RELEASE:=5
 
 # 上游最新的 tag 就是 v5.0.0（2026-08-27），之后没有新 tag；
 # 这里钉的是 master 上最新的提交（2026-10-26），比 tag 多两个月的修复。
@@ -61,6 +61,7 @@ endef
 # 变量推导，跨编译环境下不稳定（本次就出现插件没落到 /usr/lib/alsa-lib）。
 # 同时 OpenWrt 的 dbus 只读 /etc/dbus-1/system.d，不可能用上游默认的 /usr/share。
 CONFIGURE_ARGS += \
+	--enable-shared --disable-static \
 	--with-alsaplugindir=/usr/lib/alsa-lib \
 	--with-dbusconfdir=/etc/dbus-1/system.d \
 	--disable-aac \
@@ -91,47 +92,58 @@ define Package/bluez-alsa/conffiles
 /etc/config/bluealsa
 endef
 
+# 上游的 all 里 src/asound 属于 SUBDIRS，理论上一定会编；但 CI 上实际出现过
+# bluealsad/bluealsactl 都在、src/asound/.libs 里连 .so 都没有的情况，
+# 结果一路拖到打包阶段才报一句 cp: cannot stat，完全看不出原因。
+# 这里在编译阶段先把 shared 和 asound 各 make 一次（已是最新时空转），
+# 然后把产物查一遍：缺了就在 compile 阶段报错，并列出目录内容。
+define Build/Compile
+	$(call Build/Compile/Default)
+	$(MAKE) -C $(PKG_BUILD_DIR)/src/shared $(MAKE_FLAGS)
+	$(MAKE) -C $(PKG_BUILD_DIR)/src/asound $(MAKE_FLAGS)
+	@[ -f $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_pcm_bluealsa.so ] || { \
+		echo "bluez-alsa: src/asound 没能生成 libasound_module_pcm_bluealsa.so"; \
+		echo "  src/asound/:"; ls -la $(PKG_BUILD_DIR)/src/asound/ 2>/dev/null | head -20; \
+		echo "  src/asound/.libs/:"; ls -la $(PKG_BUILD_DIR)/src/asound/.libs/ 2>/dev/null | head -20; \
+		echo "  全树匹配 asound_module 的文件:"; find $(PKG_BUILD_DIR) -name '*asound_module*' 2>/dev/null | head -20; \
+		exit 1; }
+endef
+
 define Package/bluez-alsa/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bluealsad $(1)/usr/bin/
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bluealsactl $(1)/usr/bin/
 
-	# ALSA 插件：先用 install 出来的，没有再退回 build 目录。
-	# 不同 pkg-config 布局下 make install 的落点不一定是 /usr/lib/alsa-lib，
-	# 所以这里不写死单一来源，最后统一断言两个 .so 都在。
+	# ALSA 插件：源文件用 make 层的 $(wildcard) 选，优先取构建目录里的共享模块，
+	# 其次取 make install 落地的副本。整段 recipe 里不出现 shell 变量，
+	# 免得 $$ 在多级展开中被吃掉、命令变成空字符串。
 	$(INSTALL_DIR) $(1)/usr/lib/alsa-lib
-	for f in \
-		$(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so \
-		$(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so \
-		$(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_pcm_bluealsa.so \
-		$(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_ctl_bluealsa.so; do \
-		[ -f "$$f" ] && $(CP) "$$f" $(1)/usr/lib/alsa-lib/; \
-	done; \
-	for m in pcm ctl; do \
-		[ -f $(1)/usr/lib/alsa-lib/libasound_module_$${m}_bluealsa.so ] || { \
-			echo "bluez-alsa: 缺少 libasound_module_$${m}_bluealsa.so"; exit 1; }; \
-	done
+	$(if $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_pcm_bluealsa.so $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so)), \
+		$(CP) $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_pcm_bluealsa.so $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so)) $(1)/usr/lib/alsa-lib/,)
+	$(if $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_ctl_bluealsa.so $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so)), \
+		$(CP) $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_ctl_bluealsa.so $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so)) $(1)/usr/lib/alsa-lib/,)
+	[ -f $(1)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so ] || { \
+		echo "bluez-alsa: 缺少 libasound_module_pcm_bluealsa.so"; \
+		echo "  构建目录 src/asound/.libs:"; ls -la $(PKG_BUILD_DIR)/src/asound/.libs 2>/dev/null; \
+		echo "  安装目录 usr/lib/alsa-lib:"; ls -la $(PKG_INSTALL_DIR)/usr/lib/alsa-lib 2>/dev/null; \
+		exit 1; }
+	[ -f $(1)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so ] || { \
+		echo "bluez-alsa: 缺少 libasound_module_ctl_bluealsa.so"; exit 1; }
 
 	# pcm.bluealsa / ctl.bluealsa 定义。OpenWrt 的 alsa-lib 是上游原版 alsa.conf，
 	# 只加载 /etc/alsa/conf.d（不读 /usr/share/alsa/alsa.conf.d，那是 Debian 的补丁）。
+	# 注意上游 install 会在 /etc/alsa/conf.d 建一条指向 /usr/share 的符号链接，
+	# 在 $${DESTDIR} 下是断链，所以这里只取真实文件再装成普通文件。
 	$(INSTALL_DIR) $(1)/etc/alsa/conf.d
-	for f in \
-		$(PKG_INSTALL_DIR)/etc/alsa/conf.d/20-bluealsa.conf \
-		$(PKG_INSTALL_DIR)/usr/share/alsa/alsa.conf.d/20-bluealsa.conf \
-		$(PKG_BUILD_DIR)/src/asound/20-bluealsa.conf; do \
-		[ -f "$$f" ] && { $(INSTALL_DATA) "$$f" $(1)/etc/alsa/conf.d/20-bluealsa.conf; break; }; \
-	done; \
+	$(if $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/20-bluealsa.conf $(PKG_INSTALL_DIR)/usr/share/alsa/alsa.conf.d/20-bluealsa.conf)), \
+		$(INSTALL_DATA) $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/20-bluealsa.conf $(PKG_INSTALL_DIR)/usr/share/alsa/alsa.conf.d/20-bluealsa.conf)) $(1)/etc/alsa/conf.d/20-bluealsa.conf,)
 	[ -f $(1)/etc/alsa/conf.d/20-bluealsa.conf ] || { \
 		echo "bluez-alsa: 缺少 20-bluealsa.conf"; exit 1; }
 
 	# D-Bus 策略：允许 bluealsad 注册 org.bluealsa（OpenWrt 的 dbus 读 /etc/dbus-1/system.d）
 	$(INSTALL_DIR) $(1)/etc/dbus-1/system.d
-	for f in \
-		$(PKG_INSTALL_DIR)/etc/dbus-1/system.d/org.bluealsa.conf \
-		$(PKG_INSTALL_DIR)/usr/share/dbus-1/system.d/org.bluealsa.conf \
-		$(PKG_BUILD_DIR)/src/org.bluealsa.conf; do \
-		[ -f "$$f" ] && { $(INSTALL_DATA) "$$f" $(1)/etc/dbus-1/system.d/org.bluealsa.conf; break; }; \
-	done; \
+	$(if $(firstword $(wildcard $(PKG_INSTALL_DIR)/etc/dbus-1/system.d/org.bluealsa.conf $(PKG_BUILD_DIR)/src/org.bluealsa.conf)), \
+		$(INSTALL_DATA) $(firstword $(wildcard $(PKG_INSTALL_DIR)/etc/dbus-1/system.d/org.bluealsa.conf $(PKG_BUILD_DIR)/src/org.bluealsa.conf)) $(1)/etc/dbus-1/system.d/org.bluealsa.conf,)
 	[ -f $(1)/etc/dbus-1/system.d/org.bluealsa.conf ] || { \
 		echo "bluez-alsa: 缺少 org.bluealsa.conf"; exit 1; }
 
