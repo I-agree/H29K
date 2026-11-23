@@ -39,6 +39,46 @@ derive_uuid() {
 	printf '%s' "$mac" | md5sum | awk '{print $1}'
 }
 
+# ── 输出能力探测 ───────────────────────────────────────────────────────────
+# 本机 HDMI 是 card0-HDMI-A-1，card2-SPI-1 只是那块 320x172 的 SPI 小屏。
+# kmssink 必须有「connected 且带 modes」的 connector 才起得来，否则会以
+# "driver does not provide mode settings configuration" 失败，并让整个 UPnP
+# 会话直接 704（画面和声音一起没）。所以无屏场景一律退到 fakesink：
+# 视频帧丢弃，音频照常走 audiodevice（纯听歌场景靠这个才不会被打断）。
+hdmi_ready() {
+        local st modes m
+
+        for st in /sys/class/drm/*HDMI*/status; do
+                [ -e "$st" ] || continue
+                [ "$(cat "$st" 2>/dev/null)" = "connected" ] || continue
+                modes="${st%/status}/modes"
+                [ -s "$modes" ] && return 0
+        done
+        return 1
+}
+
+resolve_videosink() {
+        case "$1" in
+        auto|"")
+                if hdmi_ready; then
+                        printf '%s' kmssink
+                else
+                        printf '%s' fakesink
+                fi
+                ;;
+        kmssink)
+                # 显式写 kmssink 但当前没屏时也降级，避免每次投送都 704
+                if hdmi_ready; then
+                        printf '%s' kmssink
+                else
+                        logger -t gmediarender "HDMI 无 connected connector/modes，videosink kmssink → fakesink（只听歌不插屏）"
+                        printf '%s' fakesink
+                fi
+                ;;
+        *) printf '%s' "$1" ;;
+        esac
+}
+
 start_instance() {
 	local section="$1"
 	local enabled friendly_name uuid iface port audiosink audiodevice
@@ -58,6 +98,19 @@ start_instance() {
 	config_get port "$section" port "49494"
 	config_get audiosink "$section" audiosink "alsasink"
 	config_get audiodevice "$section" audiodevice ""
+	# bluealsa 设备由 bluez-alsa 提供。两种情况下 alsasink 都打不开 PCM，投送必然
+	# 失败，这里提前记日志，省得到手机端只看到一个 704：
+	#   1) bluealsad 没在跑
+	#   2) bluealsad 在跑，但没有任何 A2DP 设备连着（PCM 是连接后才创建的）
+	case "$audiodevice" in
+	bluealsa*)
+		if ! pidof bluealsad >/dev/null 2>&1; then
+			logger -t gmediarender "audiodevice=$audiodevice 但 bluealsad 未运行：投送会因打不开 PCM 而失败"
+		elif [ -x /usr/bin/bluealsactl ] && [ -z "$(/usr/bin/bluealsactl list-pcms 2>/dev/null)" ]; then
+			logger -t gmediarender "bluealsad 已在运行，但当前没有已连接 A2DP 设备：先连上蓝牙耳机/音箱再投送"
+		fi
+		;;
+	esac
 	config_get videosink "$section" videosink ""
 	config_get videopipe "$section" videopipe ""
 	config_get volume_db "$section" initial_volume_db "-10"
@@ -74,7 +127,9 @@ start_instance() {
 	[ -n "$audiosink" ] && set -- "$@" --gstout-audiosink "$audiosink"
 	[ -n "$audiodevice" ] && set -- "$@" --gstout-audiodevice "$audiodevice"
 	# videosink 与 videopipe 二选一：videopipe 非空时优先生效（用于需要
-	# videoconvert 兜底的场景），避免两个参数同时传给 gmediarender
+	# videoconvert 兜底的场景），避免两个参数同时传给 gmediarender。
+	# videosink 支持 auto：按 HDMI 是否真的连着决定 kmssink / fakesink。
+	videosink="$(resolve_videosink "$videosink")"
 	if [ -n "$videopipe" ]; then
 		set -- "$@" --gstout-videopipe "$videopipe"
 	elif [ -n "$videosink" ]; then

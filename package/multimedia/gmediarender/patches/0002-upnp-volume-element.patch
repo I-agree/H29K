@@ -1,0 +1,81 @@
+diff --git a/src/output_gstreamer.c b/src/output_gstreamer.c
+index 7a3a0c4..74babff 100644
+--- a/src/output_gstreamer.c
++++ b/src/output_gstreamer.c
+@@ -415,6 +415,7 @@ static gchar *audio_pipe = NULL;
+ static gchar *video_sink = NULL;
+ static gchar *video_pipe = NULL;
+ static double initial_db = 0.0;
++static GstElement *volume_elem_ = NULL;
+ 
+ /* Options specific to output_gstreamer */
+ static GOptionEntry option_entries[] = {
+@@ -493,25 +494,41 @@ static int output_gstreamer_get_position(gint64 *track_duration,
+ 
+ static int output_gstreamer_get_volume(float *v) {
+ 	double volume;
+-	g_object_get(player_, "volume", &volume, NULL);
++	if (volume_elem_ != NULL) {
++		g_object_get(volume_elem_, "volume", &volume, NULL);
++	} else {
++		g_object_get(player_, "volume", &volume, NULL);
++	}
+ 	Log_info("gstreamer", "Query volume fraction: %f", volume);
+ 	*v = volume;
+ 	return 0;
+ }
+ static int output_gstreamer_set_volume(float value) {
+ 	Log_info("gstreamer", "Set volume fraction to %f", value);
+-	g_object_set(player_, "volume", (double) value, NULL);
++	if (volume_elem_ != NULL) {
++		g_object_set(volume_elem_, "volume", (double) value, NULL);
++	} else {
++		g_object_set(player_, "volume", (double) value, NULL);
++	}
+ 	return 0;
+ }
+ static int output_gstreamer_get_mute(int *m) {
+ 	gboolean val;
+-	g_object_get(player_, "mute", &val, NULL);
++	if (volume_elem_ != NULL) {
++		g_object_get(volume_elem_, "mute", &val, NULL);
++	} else {
++		g_object_get(player_, "mute", &val, NULL);
++	}
+ 	*m = val;
+ 	return 0;
+ }
+ static int output_gstreamer_set_mute(int m) {
+ 	Log_info("gstreamer", "Set mute to %s", m ? "on" : "off");
+-	g_object_set(player_, "mute", (gboolean) m, NULL);
++	if (volume_elem_ != NULL) {
++		g_object_set(volume_elem_, "mute", (gboolean) m, NULL);
++	} else {
++		g_object_set(player_, "mute", (gboolean) m, NULL);
++	}
+ 	return 0;
+ }
+ 
+@@ -628,6 +645,22 @@ static int output_gstreamer_init(void)
+ 		}
+ 	}
+ 
++	// UPnP 音量：playbin 的 "volume" 只会转发给 audio sink，而 alsasink 从
++	// GstAudioBaseSink 继承的 volume 在 ALSA ringbuffer 上不生效（Android/DLNA
++	// 投送端拉音量条没反应的典型原因）。这里在音频链路上显式插一个 volume
++	// 元素，后续 SetVolume/Mute 直接作用在它上面。
++	if (audio_pipe == NULL) {
++		volume_elem_ = gst_element_factory_make("volume", "upnp-volume");
++		if (volume_elem_ != NULL) {
++			g_object_set(G_OBJECT(player_), "audio-filter",
++				     volume_elem_, NULL);
++			Log_info("gstreamer", "UPnP volume bound to 'volume' element");
++		} else {
++			Log_info("gstreamer", "No 'volume' element available; "
++				 "UPnP volume/mute will not affect the audio sink");
++		}
++	}
++
+ 	if (gst_element_set_state(player_, GST_STATE_READY) ==
+ 	    GST_STATE_CHANGE_FAILURE) {
+ 		Log_error("gstreamer", "Error: pipeline doesn't become ready.");
