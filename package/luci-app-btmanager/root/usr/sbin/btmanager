@@ -472,6 +472,22 @@ cmd_pair() {
 
 	"$BTCTL" power on >/dev/null 2>&1
 
+	# adapter 处于不可配对状态（Pairable: no）时，bluetoothd 会拒绝对端发起的
+	# 配对请求，结果是设备停在 "Paired: yes / Bonded: no"、info 里始终没有
+	# [LinkKey]，一重启就退回未配对，得手动再点一次配对。这里临时开配对窗口，
+	# 结束后恢复原状态。
+	orig_pairable=$(run_lim 4 "$BTCTL" show 2>/dev/null \
+		| sed -n 's/^[[:space:]]*Pairable:[[:space:]]*//p' | head -n 1)
+	"$BTCTL" pairable on >/dev/null 2>&1
+
+	# 假配对（有 Paired 标记但没有 link key）必须先清掉：否则 btmgmt 直接返回
+	# AlreadyExists，配对流程根本不会跑，LinkKey 永远写不出来。
+	if [ "$(bt_field "$mac" Paired)" = "yes" ] && \
+	   [ "$(bt_field "$mac" Bonded)" != "yes" ]; then
+		"$BTCTL" remove "$mac" >/dev/null 2>&1
+		sleep 1
+	fi
+
 	out1=""
 	out2=""
 	out1=$(run_lim 25 "$BTMGMT" pair -c 3 -t 0 "$mac" 2>&1)
@@ -499,16 +515,23 @@ cmd_pair() {
 	conn=$(bt_field "$mac" Connected)
 	out=$(printf '%s\n%s\n' "$out1" "$out2" | grep -v '^$' | tail -n 6)
 
-	if [ "$paired" = "yes" ] && [ "$conn" = "yes" ]; then
+	bonded=$(bt_field "$mac" Bonded)
+
+	if [ "$paired" = "yes" ] && [ "$conn" = "yes" ] && [ "$bonded" = "yes" ]; then
 		msg="已配对并连接"
+	elif [ "$paired" = "yes" ] && [ "$conn" = "yes" ]; then
+		msg="已连接，但配对没有落盘（无 LinkKey，重启后会丢）：让设备进入配对模式后再点一次"
 	elif [ "$paired" = "yes" ]; then
 		msg="已配对，但连接未建立（可稍后点“连接”重试）"
 	else
 		msg="配对失败：请确认设备处于配对模式；需要 PIN 的键盘请改用 SSH 手动配对"
 	fi
 
-	printf '{"ok":true,"paired":%s,"connected":%s,"message":"%s","output":"%s"}\n' \
-		"$(bool_json "$paired")" "$(bool_json "$conn")" "$(json_esc "$msg")" "$(json_esc "$out")"
+	# 恢复配对窗口：原本不可配对就关回去，避免长期开着被别的设备挤进来
+	[ "$orig_pairable" = "yes" ] || "$BTCTL" pairable off >/dev/null 2>&1
+
+	printf '{"ok":true,"paired":%s,"bonded":%s,"connected":%s,"message":"%s","output":"%s"}\n' \
+		"$(bool_json "$paired")" "$(bool_json "$bonded")" "$(bool_json "$conn")" "$(json_esc "$msg")" "$(json_esc "$out")"
 }
 
 cmd_connect() {

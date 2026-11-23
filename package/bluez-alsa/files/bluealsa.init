@@ -4,9 +4,11 @@
 #
 # 必须在 bluetoothd 之后启动：端点要通过 BlueZ 的 Media API 注册，
 # bluetoothd 不在时注册失败，之后就算起来了也不会再补注册。
-# btmanager 是 START=96，这里排 98。
+# 排 95：bluetoothd 是 S62，gmediarender 是 S97，bluealsad 落在两者之间，
+# 保证开机后第一次投送时 A2DP 端点已经注册好（端点只在启动时注册一次，
+# 晚于投送就会一直协商不出 PCM）。
 
-START=98
+START=95
 STOP=12
 USE_PROCD=1
 
