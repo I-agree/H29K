@@ -10,11 +10,7 @@ config smartdns
 	option cache_persist '1'
 	option resolve_local_hostnames '1'
 	option force_https_soa '1'
-	option seconddns_tcp_server '1'
 	option port '6053'
-	option old_port '6053'
-	option old_enabled '1'
-	option old_auto_set_dnsmasq '1'
 
 config domain-rule
 
