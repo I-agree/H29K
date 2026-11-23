@@ -2,21 +2,33 @@
 #
 # H29K 双渲染器：刷机后强制执行一次设备分工
 #
-# 背景：sysupgrade 默认保留 /etc/config，所以现场把 gmediarender 的
-# audiodevice 调成 bluealsa 做蓝牙听歌的那些设置会被带过来。
-# 在双渲染器方案下 bluealsa 必须只归 MPD 独占，否则 gmediarender 一起来
-# 就会把 A2DP 抢走，MPD 的 always_on 也就失去意义。
+# 背景：sysupgrade 默认保留 /etc/config，现场把 gmediarender 的 audiodevice
+# 调成 bluealsa 做蓝牙听歌的那些设置会被带过来。双渲染器下 bluealsa 必须只归
+# MPD 独占，否则 gmediarender 一起来就把 A2DP 抢走，MPD 的 always_on 失去意义。
 #
+# 本脚本在 S00boot 阶段执行，早于所有服务，所以重排和改配置都在本次开机生效。
 # 只跑一次（uci-defaults 脚本执行完会自动删除）。
 
-[ -f /etc/config/gmediarender ] || exit 0
+# 1) rc.d 启动顺序 —— 最先做，不依赖任何配置是否存在
+# 包安装时是按「官方 init 的 START」建链接的：mpd=93、upmpdcli=95；
+# 覆盖后的 init 是 mpd=98、upmpdcli=99，必须都排在 bluealsa(95) 之后。
+# 不重排的话：mpd 抢在 bluealsa 前起（打不开 PCM）、upmpdcli 抢在 mpd 前起（连不上 6600 直接退出）。
+for svc in mpd upmpdcli; do
+	[ -x "/etc/init.d/$svc" ] || continue
+	"/etc/init.d/$svc" disable 2>/dev/null
+	"/etc/init.d/$svc" enable 2>/dev/null
+done
 
-uci -q set gmediarender.main.audiodevice='plughw:0,0'
-uci -q set gmediarender.main.audiosink='alsasink'
-# 现场遗留的 --gstout-buffer-duration 1 会和 config 里的 buffer_duration 重复传参
-uci -q set gmediarender.main.extra_args=''
-uci -q commit gmediarender
+# 2) gmediarender 固定走 HDMI 声卡
+if [ -f /etc/config/gmediarender ]; then
+	uci -q set gmediarender.main.audiodevice='plughw:0,0'
+	uci -q set gmediarender.main.audiosink='alsasink'
+	# 现场遗留的 --gstout-buffer-duration 1 会和 config 里的 buffer_duration 重复传参
+	uci -q set gmediarender.main.extra_args=''
+	uci -q commit gmediarender
+fi
 
+# 3) upmpdcli 的对外名字与后端
 [ -f /etc/config/upmpdcli ] && {
 	uci -q set upmpdcli.lan.friendly_name='H29K 投音'
 	uci -q set upmpdcli.lan.interface='br-lan'
@@ -24,16 +36,5 @@ uci -q commit gmediarender
 	uci -q set upmpdcli.lan.mpd_port='6600'
 	uci -q commit upmpdcli
 }
-
-# 包安装时是按「官方 init 的 START」建 rc.d 链接的：mpd=93、upmpdcli=95。
-# 但覆盖后的 init 是 mpd=98、upmpdcli=99，必须排在 bluealsa(95) 之后，
-# 否则：mpd 抢在 bluealsa 前面起（永远打不开 PCM）、upmpdcli 抢在 mpd 前面起（连不上 6600 直接退出）。
-# 重新 enable 一次，让链接按新 START 重排成 S98mpd / S99upmpdcli。
-# 本脚本在 S00boot 阶段执行，早于所有服务，所以本次开机就生效。
-for svc in mpd upmpdcli; do
-	[ -x "/etc/init.d/$svc" ] || continue
-	"/etc/init.d/$svc" disable 2>/dev/null
-	"/etc/init.d/$svc" enable 2>/dev/null
-done
 
 exit 0
