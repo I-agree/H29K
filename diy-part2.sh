@@ -103,4 +103,7 @@ chmod 0755 files/etc/init.d/upmpdcli
 chmod 0755 files/etc/uci-defaults/99-h29k-dualrenderer
 # ==============================================================
 
+# ===================== 临时测试 =====================
+sed -i 's|rw rootwait"|rw rootwait=30"|' target/linux/rockchip/image/default.bootscript
+
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
