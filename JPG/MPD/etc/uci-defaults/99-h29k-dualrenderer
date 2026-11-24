@@ -19,7 +19,18 @@ for svc in mpd upmpdcli; do
 	"/etc/init.d/$svc" enable 2>/dev/null
 done
 
-# 2) gmediarender 固定走 HDMI 声卡
+# 2) 关掉被依赖带进来的 pulseaudio
+# mpd-full 的依赖里有 +PACKAGE_audio-support:pulseaudio，audio-support=y 就会把
+# pulseaudio-daemon 拉进镜像。它带 /etc/init.d/pulseaudio：START=90、--system，
+# 比 mpd(98) 先起，起来后会占住 /dev/snd 并 chown /dev/snd/*，
+# gmediarender 的 plughw:0,0 会直接 busy。包删不掉（删了 mpd 没 ALSA 输出），
+# 所以只停掉、禁掉，保持它只作为依赖库存在。
+if [ -x /etc/init.d/pulseaudio ]; then
+	/etc/init.d/pulseaudio stop 2>/dev/null
+	/etc/init.d/pulseaudio disable 2>/dev/null
+fi
+
+# 3) gmediarender 固定走 HDMI 声卡
 if [ -f /etc/config/gmediarender ]; then
 	uci -q set gmediarender.main.audiodevice='plughw:0,0'
 	uci -q set gmediarender.main.audiosink='alsasink'
@@ -28,7 +39,7 @@ if [ -f /etc/config/gmediarender ]; then
 	uci -q commit gmediarender
 fi
 
-# 3) upmpdcli 的对外名字与后端
+# 4) upmpdcli 的对外名字与后端
 [ -f /etc/config/upmpdcli ] && {
 	uci -q set upmpdcli.lan.friendly_name='H29K 投音'
 	uci -q set upmpdcli.lan.interface='br-lan'
