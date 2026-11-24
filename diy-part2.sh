@@ -106,4 +106,20 @@ chmod 0755 files/etc/uci-defaults/99-h29k-dualrenderer
 # ===================== 临时测试 =====================
 sed -i 's|rw rootwait"|rw rootwait=30"|' target/linux/rockchip/image/default.bootscript
 
+# ===================== 实验前置校验 =====================
+DTS=target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts
+if ! grep -q 'status = "disabled"' "$DTS"; then
+    echo "❌ 构建用的 dts 里 &gmac1 不是 disabled（raw CDN 缓存未刷新，下到的是旧文件）"
+    echo "   实际内容：$(grep -n 'status = ' "$DTS" | tail -3)"
+    exit 1
+fi
+echo "✅ dts 校验通过：$(grep -n 'status = ' "$DTS" | tail -1)"
+
+BOOT=target/linux/rockchip/image/default.bootscript
+grep -q 'rootwait=30' "$BOOT" || {
+    echo "❌ rootwait=30 未写入 default.bootscript"
+    exit 1
+}
+echo "✅ bootscript 校验通过：$(grep -o 'rw rootwait[^;]*' "$BOOT")"
+
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
