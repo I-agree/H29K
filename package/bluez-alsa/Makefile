@@ -31,10 +31,10 @@ PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=H29K
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
-# 上游是手写 Makefile（不是 automake 递归），src/asound 的插件要链 src/shared 的
-# libbluealsa，-j 下两边的先后没有保证：CI 上就是这样「bluealsad/bluealsactl 都有了、
-# src/asound/.libs 里连 .so 都没有」，world 并行那轮直接失败，隔 40 分钟 -j1 重跑又能过。
-# 这里关掉包内并行，连带 world 里的这一包也变成串行，代价几秒钟，换确定性。
+# 上游是 automake 递归（src/Makefile.am：SUBDIRS = shared，然后 asound/bluealsactl/...），
+# 生成的 src/Makefile 里 all 只递归一条链，子目录先后本身是有保证的；但 CI 上同一棵树
+# world -j 编本包失败、隔 40 分钟 -j1 重跑又能过，且历史上出现过「bluealsad/bluealsactl
+# 都有了、src/asound/.libs 里连 .so 都没有」。关掉包内并行去掉这层不确定性，代价几秒。
 PKG_BUILD_PARALLEL:=0
 PKG_INSTALL:=1
 PKG_FIXUP:=autoreconf
@@ -99,8 +99,10 @@ endef
 # 上游的 all 里 src/asound 属于 SUBDIRS，理论上一定会编；但 CI 上实际出现过
 # bluealsad/bluealsactl 都在、src/asound/.libs 里连 .so 都没有的情况，
 # 结果一路拖到打包阶段才报一句 cp: cannot stat，完全看不出原因。
-# 这里在编译阶段先把 shared 和 asound 各 make 一次（已是最新时空转），
-# 然后把产物查一遍：缺了就在 compile 阶段报错，并列出目录内容。
+# 本机实测：src/shared 缺失时单独编 src/asound 会立刻报
+#   No rule to make target '../shared/libshared.la'
+# 所以这里在编译阶段先把 shared 编出来（已是最新时空转几毫秒），让失败点落在编译
+# 阶段并带上确切原因；asound 再补一次 make，最后把产物查一遍，缺了直接 exit 1。
 define Build/Compile
 	# 先把 src/shared 单独编出来：bluealsad / bluealsactl / asound 插件都链它
 	$(MAKE) -C $(PKG_BUILD_DIR)/src/shared $(MAKE_FLAGS)
