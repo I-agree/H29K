@@ -1,10 +1,11 @@
 name: H29K bluez-alsa 专项诊断
 
-# v5：只做 bluez-alsa 诊断，不出固件、不提 Kconfig。
+# v6：只做 bluez-alsa 诊断，不出固件、不提 Kconfig。
 #     依赖链上还有两个前置条件，被前两轮分别踩中：
 #       1) 裸树缺 staging_dir/host/bin/sed → 先 make toolchain/install（v4 起就有，本轮 exit=0 已验证）
-#       2) 内核树没 prepare → 编包时 kmod 包（gpio-button-hotplug）报
-#          No rule to make target .../linux-6.18.64/.config → 本版补 make target/linux/prepare
+#       2) 内核树没编 → 编包时 kmod 包（gpio-button-hotplug）报
+#          No rule to make target .../linux-6.18.64/.config。target/linux/prepare 只解包+打补丁
+#          （实测 7.65s，touch .prepared_xxx，不生 .config）；本版改为 kernel_oldconfig + target/linux/compile
 #
 # 顺序：环境 → ⓿ Makefile 来源核对 → Ⓐ 工具链 → Ⓑ 前置校验 → Ⓒ 内核树 prepare
 #       → ① 依赖预热(首轮 -j) → ② 串行 -j1 V=s → ③ 缺 shared 因果基线
@@ -191,18 +192,26 @@ jobs:
         fi
         exit 0
 
-    - name: Ⓒ 准备内核树（target/linux/prepare，生成 linux-*/.config，否则 kmod 包必挂）
+    - name: Ⓒ 编译内核树（kernel_oldconfig 生成 .config + target/linux/compile）
       run: |
         cd ${{ env.WORK_DIR }}/openwrt
-        set -o pipefail
         set +e
         start=$(date +%s)
-        make -j$(nproc) target/linux/prepare V=s 2>&1 | tee "$DIAG_DIR/0C-kernel-prepare.log"
-        rc=${PIPESTATUS[0]}
-        echo "$rc" > "$DIAG_DIR/0C-kernel-prepare.exit"
-        echo "target/linux/prepare exit=$rc 用时=$(( $(date +%s) - start ))s"
-        echo "--- linux 树的 .config ---"
-        ls -l build_dir/target-*/linux-rockchip_armv8*/linux-*/.config 2>/dev/null || echo "❌ .config 未生成（kmod 包会继续报 No rule to make target .../.config）"
+        # prepare 只解包+打补丁（实测 7.65s，不生 .config），先显式 oldconfig 再编内核
+        make -j$(nproc) target/linux/prepare > "$DIAG_DIR/0C-kernel-build.log" 2>&1
+        echo "target/linux/prepare exit=$?" | tee -a "$DIAG_DIR/0C-kernel-build.log"
+        make kernel_oldconfig >> "$DIAG_DIR/0C-kernel-build.log" 2>&1
+        echo "kernel_oldconfig exit=$?" | tee -a "$DIAG_DIR/0C-kernel-build.log"
+        echo "--- oldconfig 之后 .config 是否落地 ---" | tee -a "$DIAG_DIR/0C-kernel-build.log"
+        ls -l build_dir/target-*/linux-rockchip_armv8*/linux-*/.config 2>/dev/null | tee -a "$DIAG_DIR/0C-kernel-build.log" || echo "❌ .config 仍未生成" | tee -a "$DIAG_DIR/0C-kernel-build.log"
+
+        echo "===== make -j$(nproc) target/linux/compile =====" | tee -a "$DIAG_DIR/0C-kernel-build.log"
+        make -j$(nproc) target/linux/compile >> "$DIAG_DIR/0C-kernel-build.log" 2>&1
+        rc=$?
+        echo "$rc" > "$DIAG_DIR/0C-kernel-build.exit"
+        echo "target/linux/compile exit=$rc 用时=$(( $(date +%s) - start ))s"
+        grep -E "ERROR:.*failed|Error [0-9]" "$DIAG_DIR/0C-kernel-build.log" | tail -5
+        ls -l build_dir/target-*/linux-rockchip_armv8*/linux-*/.config 2>/dev/null || echo "❌ 编完仍无 .config"
         exit 0
 
     - name: ① 依赖预热 + 首轮 -j$(nproc) 包编译（真实并行场景，含依赖库）
@@ -387,7 +396,7 @@ jobs:
           echo "|---|---|"
           echo "| ⓿ Makefile 来源（raw vs 仓库） | $(grep -q '两版一致' $DIAG_DIR/00-makefile-source.txt 2>/dev/null && echo '一致' || echo '不一致 / 见 00-makefile-source.txt') |"
           echo "| Ⓐ toolchain/install | exit=$(cat $DIAG_DIR/0A-toolchain.exit 2>/dev/null) |"
-          echo "| Ⓒ target/linux/prepare | exit=$(cat $DIAG_DIR/0C-kernel-prepare.exit 2>/dev/null) |"
+          echo "| Ⓒ target/linux/compile（含 oldconfig） | exit=$(cat $DIAG_DIR/0C-kernel-build.exit 2>/dev/null) |"
           echo "| ① 首轮 -j$(nproc) | exit=$(cat $DIAG_DIR/01-warmup.exit 2>/dev/null) |"
           echo "| ② 串行 -j1 V=s | exit=$(cat $DIAG_DIR/02-serial.exit 2>/dev/null) |"
           echo "| ③ 缺 shared 单编 asound | 见 03-causal.log |"
