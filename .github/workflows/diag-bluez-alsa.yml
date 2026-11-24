@@ -1,0 +1,521 @@
+name: H29K bluez-alsa 专项诊断编译
+
+# 目的：一次运行把 package/bluez-alsa 的所有可能失败面全部暴露出来。
+# 顺序：串行完整编译(V=s) → 缺 shared 的因果基线 → 5 轮 -j$(nproc) 压测 → 深度取证 → 完整 world
+# 所有诊断步骤都 set +e 且 exit 0，任何一步失败都不会挡住后面的步骤。
+# 诊断轮不发布 Release（UPLOAD_RELEASE=false），避免 -j1 补救出来的脏镜像上网。
+
+on:
+  repository_dispatch:
+  workflow_dispatch:
+
+env:
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: main
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: rk3528-hinlink-h29k.config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  UPLOAD_BIN_DIR: false
+  UPLOAD_FIRMWARE: true
+  UPLOAD_RELEASE: false
+  TZ: Asia/Shanghai
+  WORK_DIR: /workdir
+  DIAG_DIR: /tmp/h29k-diag
+
+jobs:
+  build:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 350
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+    - name: 检出源码
+      uses: actions/checkout@v7.0.1
+
+    - name: 调整磁盘空间
+      run: |
+        sudo mkdir -p $WORK_DIR
+        sudo chown -R $USER:$USER $WORK_DIR
+
+        echo "⚙️ 正在物理重构编译机 Swap 交换分区技术栈..."
+        sudo swapoff -a || true
+        sudo dd if=/dev/zero of=/swapfile bs=1M count=5120
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        sudo sysctl vm.swappiness=10
+        echo "✅ Swap 扩容至 5GB 且 swappiness=10 校准完毕！"
+
+        echo "📊 扩容系统全局 /tmp 至 10G"
+        sudo umount /tmp || true
+        sudo mount -t tmpfs tmpfs /tmp -o size=10G,nr_inodes=0
+        echo "✅ /tmp 扩容至 10GB 完成"
+
+        echo "📊 检查当前磁盘空间分布："
+        df -h
+        df -i /tmp
+        echo "WORK_DIR=$WORK_DIR" >> $GITHUB_ENV
+        mkdir -p "$DIAG_DIR"
+
+    - name: 初始化构建环境
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo apt update
+        sudo apt install bzip2 g++ gawk gcc git glibc-source libncurses-dev python3-dev python3-setuptools python3-pyelftools make
+        sudo timedatectl set-timezone "$TZ"
+
+    - name: 查看编译环境硬件规格 (CPU/内存)
+      run: |
+        echo "==================== CPU 核心数 ===================="
+        echo "逻辑核心数: $(nproc)"
+        grep name /proc/cpuinfo | cut -f2 -d: | uniq -c
+        echo -e "\n==================== 内存大小 ===================="
+        free -h
+        echo -e "\n==================== 构建工具版本 ===================="
+        {
+          echo "--- gcc ---";        gcc --version | head -1
+          echo "--- make ---";       make --version | head -1
+          echo "--- autoconf ---";   autoconf --version | head -1
+          echo "--- automake ---";   automake --version | head -1
+          echo "--- libtoolize ---"; libtoolize --version | head -1
+          echo "--- pkg-config ---"; pkg-config --version
+        } | tee "$DIAG_DIR/00-tools.txt"
+
+    - name: 克隆 OpenWrt 源码到磁盘
+      run: |
+        cd $WORK_DIR
+        df -hT $PWD
+        git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        ln -sf $WORK_DIR/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 加载自定义软件源
+      run: |
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF ${{ env.WORK_DIR }}/openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: ⓿ 核对 CI 实际使用的 bluez-alsa Makefile（raw 下载 vs 仓库 checkout）
+      run: |
+        set +e
+        R="$GITHUB_WORKSPACE/package/bluez-alsa/Makefile"
+        D="$WORK_DIR/openwrt/package/bluez-alsa/Makefile"
+        OUT="$DIAG_DIR/00-makefile-source.txt"
+        {
+          echo "===== bluez-alsa Makefile 来源核对 ====="
+          echo "仓库 checkout 版: $R"
+          sha256sum "$R" 2>/dev/null
+          ls -l "$R" 2>/dev/null
+          echo
+          echo "diy-part1 用 raw 下载覆盖后的实际版本（CI 真正编的）: $D"
+          sha256sum "$D" 2>/dev/null
+          ls -l "$D" 2>/dev/null
+          echo
+          if diff -q "$R" "$D" >/dev/null 2>&1; then
+            echo "✅ 两版一致：CI 编的就是仓库里这一版"
+          else
+            echo "❌ 不一致：CI 编的是 raw.githubusercontent 上的版本（很可能是 CDN 缓存里的旧版）"
+            echo "--- diff（仓库版 -> 实际使用版）---"
+            diff -u "$R" "$D" | head -80
+          fi
+          echo
+          echo "--- 实际生效版本里的关键行 ---"
+          grep -nE "PKG_BUILD_PARALLEL|PKG_SOURCE_VERSION|PKG_RELEASE|PKG_FIXUP" "$D" 2>/dev/null
+        } 2>&1 | tee "$OUT"
+        exit 0
+
+    - name: 更新软件源索引
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds update -a
+
+    - name: 安装软件源组件
+      run: cd ${{ env.WORK_DIR }}/openwrt && ./scripts/feeds install -a
+
+    - name: 加载自定义配置文件
+      run: |
+        if [ -d files ]; then
+          mkdir -p ${{ env.WORK_DIR }}/openwrt/files
+          cp -r files/* ${{ env.WORK_DIR }}/openwrt/files/
+        fi
+        [ -e $CONFIG_FILE ] && cp -f $CONFIG_FILE ${{ env.WORK_DIR }}/openwrt/.config
+        chmod +x $DIY_P2_SH
+        cd ${{ env.WORK_DIR }}/openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
+
+    - name: 下载依赖软件
+      id: package
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        make defconfig
+        for i in {1..3}; do make download -j8 && break || sleep 5; done
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    # ==================== bluez-alsa 专项诊断开始 ====================
+
+    - name: ① bluez-alsa 单包串行完整编译（-j1 V=s，每条命令可见）
+      run: |
+        set +e
+        cd $WORK_DIR/openwrt
+        make package/bluez-alsa/clean > "$DIAG_DIR/01-clean.log" 2>&1
+
+        echo "===== make -j1 package/bluez-alsa/compile V=s =====" | tee "$DIAG_DIR/01-serial.log"
+        start=$(date +%s)
+        /usr/bin/time -f "⏱ 耗时 %E  峰值内存 %M KB" \
+          make -j1 package/bluez-alsa/compile V=s 2>&1 | tee -a "$DIAG_DIR/01-serial.log"
+        rc=${PIPESTATUS[0]}
+        dur=$(( $(date +%s) - start ))
+        echo "$rc" > "$DIAG_DIR/01-serial.exit"
+        echo "===== EXIT=$rc  用时=${dur}s =====" | tee -a "$DIAG_DIR/01-serial.log"
+
+        so=$(ls build_dir/target-*/bluez-alsa-*/src/asound/.libs/*.so 2>/dev/null | wc -l)
+        echo "src/asound/.libs 里的 .so 数量: $so" | tee -a "$DIAG_DIR/01-serial.log"
+        exit 0
+
+    - name: ② 因果基线：删掉 shared 产物后单编 src/asound（验证「缺 shared 会不会静默」）
+      run: |
+        set +e
+        cd $WORK_DIR/openwrt
+        PKGDIR=$(ls -d build_dir/target-*/bluez-alsa-*/ 2>/dev/null | head -1)
+        echo "构建目录: $PKGDIR"
+        if [ -n "$PKGDIR" ] && [ -f "$PKGDIR/src/asound/Makefile" ]; then
+          cp -a "$PKGDIR/src/shared/libshared.la" "$DIAG_DIR/02-libshared.la.bak" 2>/dev/null
+          rm -f "$PKGDIR/src/shared/libshared.la" "$PKGDIR/src/shared/.libs/libshared.la"
+          echo "已删除 src/shared 的 libshared.la，现在单独编 src/asound：" | tee "$DIAG_DIR/02-causal.log"
+          make -C "$PKGDIR/src/asound" V=1 2>&1 | tee -a "$DIAG_DIR/02-causal.log"
+          rc2=${PIPESTATUS[0]}
+          echo "EXIT(asound-only)=$rc2  （预期 2，且报 No rule to make target '../shared/libshared.la'）" | tee -a "$DIAG_DIR/02-causal.log"
+          cp -a "$DIAG_DIR/02-libshared.la.bak" "$PKGDIR/src/shared/libshared.la" 2>/dev/null
+        else
+          echo "src/asound/Makefile 不存在（① 里 configure 未成功），跳过因果基线" | tee "$DIAG_DIR/02-causal.log"
+        fi
+        exit 0
+
+    - name: ③ -j$(nproc) 并行压测 5 轮（逐轮记录 exit / 耗时 / .so 数量）
+      run: |
+        set +e
+        cd $WORK_DIR/openwrt
+        : > "$DIAG_DIR/03-matrix.txt"
+        echo "| 轮次 | exit | 用时 | asound .so | 首个报错 |" >> "$DIAG_DIR/03-matrix.txt"
+        echo "|---|---|---|---|---|" >> "$DIAG_DIR/03-matrix.txt"
+        for i in 1 2 3 4 5; do
+          make package/bluez-alsa/clean > /dev/null 2>&1
+          start=$(date +%s)
+          make -j$(nproc) package/bluez-alsa/compile V=s > "$DIAG_DIR/03-round$i.log" 2>&1
+          rc=$?
+          dur=$(( $(date +%s) - start ))
+          so=$(ls build_dir/target-*/bluez-alsa-*/src/asound/.libs/*.so 2>/dev/null | wc -l)
+          first=$(grep -iE "error:|No rule to make target|cannot stat|cannot find" "$DIAG_DIR/03-round$i.log" | head -1 | tr '|' ' ')
+          echo "| $i | $rc | ${dur}s | $so | ${first:-无} |" >> "$DIAG_DIR/03-matrix.txt"
+          echo "round $i: exit=$rc 用时=${dur}s asound_so=$so 首个报错=${first:-无}"
+          # 失败时把该轮的尾巴单独拎出来
+          if [ $rc -ne 0 ]; then
+            grep -nE -B2 -A6 "error:|Error [0-9]|No rule to make target" "$DIAG_DIR/03-round$i.log" | tail -60 >> "$DIAG_DIR/03-matrix.txt"
+          fi
+        done
+        exit 0
+
+    - name: ④ 深度取证（源码树 / configure 产物 / staging / 头文件 / 日志）
+      if: always()
+      run: |
+        set +e
+        cd $WORK_DIR/openwrt
+        PKGDIR=$(ls -d build_dir/target-*/bluez-alsa-*/ 2>/dev/null | head -1)
+        STAGING=$(ls -d staging_dir/target-*/ | head -1)
+        TOOLCHAIN=$(ls -d staging_dir/toolchain-*/ | head -1)
+        OUT="$DIAG_DIR/04-evidence.log"
+        : > "$OUT"
+
+        section() { echo -e "\n===== $* ====="; }
+
+        section "A. 包元信息与源码版本"
+        {
+          echo "PKGDIR=$PKGDIR"
+          echo "STAGING=$STAGING"
+          echo "TOOLCHAIN=$TOOLCHAIN"
+          echo "--- Makefile 关键行（并行/修复/版本） ---"
+          grep -nE "PKG_BUILD_PARALLEL|PKG_FIXUP|PKG_SOURCE_VERSION|PKG_BUILD_DEPENDS|PKG_RELEASE" package/bluez-alsa/Makefile
+          if [ -d "$PKGDIR/.git" ]; then
+            echo "--- 源码树 git ---"
+            git -C "$PKGDIR" rev-parse HEAD 2>/dev/null
+            git -C "$PKGDIR" status --short 2>/dev/null | head -5
+          fi
+        } 2>&1 | tee -a "$OUT"
+
+        section "B. configure 阶段证据（config.log）"
+        if [ -f "$PKGDIR/config.log" ]; then
+          echo "--- config.log 里的 unrecognized / warning ---"
+          grep -nE "unrecognized|warning: unrecognized|invalid|not supported" "$PKGDIR/config.log" | head -30
+          echo "--- 关键依赖探测结论 ---"
+          grep -E "checking for (alsa|bluez|sbc|glib|dbus|libgio)" "$PKGDIR/config.log" | tail -20
+          echo "--- configure 结束状态 ---"
+          tail -40 "$PKGDIR/config.log"
+        else
+          echo "（config.log 不存在：说明 ① 连 configure 都没跑到，重点检查这里）"
+        fi 2>&1 | tee -a "$OUT"
+
+        section "C. 生成出来的构建图（automake 的 all / SUBDIRS）"
+        if [ -f "$PKGDIR/src/Makefile" ]; then
+          grep -nE "^all:|^all-am:|^SUBDIRS|^am__recursive" "$PKGDIR/src/Makefile" | head -20
+          echo "--- libbluealsad 对 shared 的依赖 ---"
+          grep -nE "libbluealsad_la_DEPENDENCIES|libbluealsad_la_LIBADD|shared/libshared.la" "$PKGDIR/src/Makefile" | head -10
+          echo "--- asound 插件单元 ---"
+          grep -nE "asound_module_(pcm|ctl)_LTLIBRARIES|AM_LDFLAGS|LIBADD" "$PKGDIR/src/asound/Makefile" | head -10
+        else
+          echo "（src/Makefile 不存在，configure 未完成或未执行 autoreconf）"
+        fi 2>&1 | tee -a "$OUT"
+
+        section "D. 构建目录实际状态"
+        for d in src src/shared src/asound src/dbus src/bluealsactl src/dumper; do
+          echo "--- $PKGDIR/$d ---"
+          ls -la "$PKGDIR/$d" 2>/dev/null | head -12
+          if [ -d "$PKGDIR/$d/.libs" ]; then
+            echo "  .libs:"; ls -la "$PKGDIR/$d/.libs" 2>/dev/null | head -20
+          fi
+        done 2>&1 | tee -a "$OUT"
+
+        section "E. 全树产物搜索"
+        echo "--- asound_module ---"; find "$PKGDIR" -name '*asound_module*' 2>/dev/null | head -20
+        echo "--- bluealsad / bluealsactl 可执行 ---"; find "$PKGDIR" \( -name 'bluealsad' -o -name 'bluealsactl' \) -type f 2>/dev/null | head
+        echo "--- 20-bluealsa.conf ---"; find "$PKGDIR" -name '20-bluealsa.conf' 2>/dev/null | head
+        echo "--- org.bluealsa.conf ---"; find "$PKGDIR" -name 'org.bluealsa.conf' 2>/dev/null | head
+        echo "--- 目标架构校验（应为 aarch64）---"
+        find "$PKGDIR" -type f \( -name '*.so' -o -name 'bluealsad' -o -name 'bluealsactl' \) 2>/dev/null | head -3 | while read f; do
+          file "$f" 2>/dev/null
+        done 2>&1 | tee -a "$OUT"
+
+        section "F. staging 里依赖库与头文件是否齐"
+        {
+          echo "--- pkgconfig ---"
+          ls "$STAGING/usr/lib/pkgconfig" 2>/dev/null | grep -iE "^(alsa|bluez|sbc|glib|dbus|gio)" 
+          echo "--- 库文件 ---"
+          ls -la "$STAGING"/usr/lib/libasound* "$STAGING"/usr/lib/libsbc* "$STAGING"/usr/lib/libbluetooth* "$STAGING"/usr/lib/libdbus* 2>/dev/null | head -20
+          echo "--- 头文件目录 ---"
+          ls -d "$STAGING"/usr/include/alsa "$STAGING"/usr/include/glib-2.0 "$STAGING"/usr/include/bluetooth "$STAGING"/usr/include/sbc 2>/dev/null
+          echo "--- 交叉工具链 ---"
+          ls "$TOOLCHAIN"/bin 2>/dev/null | head -5
+          "$TOOLCHAIN"/bin/*-gcc --version 2>/dev/null | head -1
+        } 2>&1 | tee -a "$OUT"
+
+        section "G. 包内并行度验证（PKG_BUILD_PARALLEL 是否真的生效）"
+        echo "--- 串行日志里内层 make 的 -j 参数（应为 -j1） ---"
+        grep -oE "make -C .*bluez-alsa[^ ]* .*-j[0-9]+" "$DIAG_DIR/01-serial.log" 2>/dev/null | head -6
+        echo "--- 并行轮日志里内层 make 的 -j 参数（应为 -j$(nproc)） ---"
+        grep -oE "make -C .*bluez-alsa[^ ]* .*-j[0-9]+" "$DIAG_DIR/03-round5.log" 2>/dev/null | head -6
+        echo "--- 实际编译区间的并发线索（同秒内启动的 cc 数量只作参考） ---"
+        grep -c "CC      " "$DIAG_DIR/01-serial.log" 2>/dev/null
+
+        section "H. 编译日志尾部（串行那轮 + 最后一轮并行）"
+        echo "--- 01-serial.log 尾 60 行 ---"
+        tail -60 "$DIAG_DIR/01-serial.log" 2>/dev/null
+        echo "--- 03-round5.log 尾 60 行 ---"
+        tail -60 "$DIAG_DIR/03-round5.log" 2>/dev/null
+        echo "--- 压测矩阵 ---"
+        cat "$DIAG_DIR/03-matrix.txt" 2>/dev/null
+        exit 0
+
+    - name: ⑤ 诊断汇总（写入 Step Summary）
+      if: always()
+      run: |
+        set +e
+        {
+          echo "## bluez-alsa 诊断汇总"
+          echo
+          echo "| 项目 | 值 |"
+          echo "|---|---|"
+          echo "| ⓿ Makefile 来源（raw vs 仓库） | $(grep -q '两版一致' $DIAG_DIR/00-makefile-source.txt 2>/dev/null && echo '一致' || echo '不一致 / 见 00-makefile-source.txt') |"
+          echo "| ① 串行 -j1 V=s | exit=$(cat $DIAG_DIR/01-serial.exit 2>/dev/null) |"
+          echo "| ② 缺 shared 单编 asound | 见 02-causal.log（预期报 No rule to make target） |"
+          echo
+          echo "### ③ 并行压测矩阵（-j$(nproc)）"
+          echo
+          cat "$DIAG_DIR/03-matrix.txt" 2>/dev/null || echo "(无)"
+          echo
+          echo "### ① 串行编译尾部 30 行"
+          echo '```'
+          tail -30 "$DIAG_DIR/01-serial.log" 2>/dev/null
+          echo '```'
+          echo
+          echo "### 证据文件"
+          echo "artifact 内：00-tools.txt / 01-serial.log / 01-clean.log / 02-causal.log / 03-matrix.txt / 03-round*.log / 04-evidence.log"
+        } >> $GITHUB_STEP_SUMMARY
+        echo "=========================================="
+        echo "① 串行编译 exit: $(cat $DIAG_DIR/01-serial.exit 2>/dev/null)"
+        echo "③ 压测矩阵:"; cat "$DIAG_DIR/03-matrix.txt" 2>/dev/null
+        exit 0
+
+    - name: 上传诊断证据包
+      if: always()
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: bluez-alsa-diag-${{ github.run_id }}
+        path: |
+          ${{ env.DIAG_DIR }}/
+        retention-days: 7
+
+    # ==================== bluez-alsa 专项诊断结束 ====================
+
+    - name: 编译固件镜像（world，先 -j 后 -j1 补救）
+      id: compile
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo -e "$(nproc) thread compile"
+        set -o pipefail
+        set +e
+        make -j$(nproc) 2>&1 | tee "$DIAG_DIR/05-world-j.log"
+        rc=${PIPESTATUS[0]}
+        echo "$rc" > "$DIAG_DIR/05-world-j.exit"
+        if [ $rc -ne 0 ]; then
+          echo "❌ world -j 失败（exit=$rc），转 -j1 增量补救（只补失败包）"
+          make -j1 V=s 2>&1 | tee -a "$DIAG_DIR/05-world-j.log"
+          rc2=${PIPESTATUS[0]}
+          echo "$rc2" > "$DIAG_DIR/05-world-j1.exit"
+          echo "world -j1 补救 exit=$rc2"
+          [ $rc2 -eq 0 ] || { echo "status=failed" >> $GITHUB_OUTPUT; exit 1; }
+          echo "status=degraded" >> $GITHUB_OUTPUT
+        else
+          echo "status=success" >> $GITHUB_OUTPUT
+        fi
+        grep '^CONFIG_TARGET.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+        [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+        echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+    - name: 提取真实 OpenWrt/Kernel/U-Boot Kconfig 配置 (真理之源)
+      if: always()
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt
+        echo "🔍 正在编译产物中搜寻最终生效的真实 Kconfig ..."
+
+        if [ -f ".config" ]; then
+            cp -f .config real_openwrt_final.config
+            sha256sum real_openwrt_final.config | tee real_openwrt_final.config.sha256
+            echo "✅ 成功捕获真实 OpenWrt 主配置"
+            echo "================ OpenWrt 插件与核心组件真实生效统计 ================"
+            echo "📦 已选中 PACKAGE 总数: $(grep -c '^CONFIG_PACKAGE_.*=y' real_openwrt_final.config || echo 0)"
+            echo "🔌 LuCI 插件生效数: $(grep -c '^CONFIG_PACKAGE_luci-.*=y' real_openwrt_final.config || echo 0)"
+            echo "🐳 Docker 相关生效数: $(grep -c '^CONFIG_PACKAGE_docker\|^CONFIG_PACKAGE_luci-app-dockerman' real_openwrt_final.config || echo 0)"
+            echo "🌐 网络工具生效数: $(grep -c '^CONFIG_PACKAGE_curl\|^CONFIG_PACKAGE_wget\|^CONFIG_PACKAGE_iperf3' real_openwrt_final.config || echo 0)"
+            echo "⚙️ 内核模块(kmod)生效数: $(grep -c '^CONFIG_PACKAGE_kmod-.*=y' real_openwrt_final.config || echo 0)"
+            echo "=================================================="
+        else
+            echo "⚠️ 警告：未找到 OpenWrt 主 .config（make defconfig 可能未执行）"
+            echo "OpenWrt make defconfig did not complete." > real_openwrt_final.config
+        fi
+
+        KERNEL_CONFIG=$(find build_dir/target-*/linux-rockchip_armv8*/ \
+          -maxdepth 2 \
+          -name ".config" \
+          -path "*/linux-[0-9]*.*/.config" \
+          ! -path "*backports*" \
+          ! -path "*mac80211*" \
+          ! -path "*hostapd*" \
+          2>/dev/null | head -n 1)
+
+        if [ -n "$KERNEL_CONFIG" ] && [ -f "$KERNEL_CONFIG" ]; then
+            cp -f "$KERNEL_CONFIG" real_kernel_final.config
+            sha256sum real_kernel_final.config | tee real_kernel_final.config.sha256
+            echo "✅ 成功捕获真实内核配置: $KERNEL_CONFIG"
+            if grep -q '^CONFIG_ARM64=y' real_kernel_final.config; then
+                echo "🔬 验证通过：确认为 Linux 内核主配置"
+                echo "📺 DRM 显示驱动生效数: $(grep -c '^CONFIG_DRM.*=y' real_kernel_final.config || echo 0)"
+                echo "📡 蓝牙协议栈生效数: $(grep -c '^CONFIG_BT.*=y' real_kernel_final.config || echo 0)"
+            else
+                echo "❌ 严重警告：提取的文件不是有效的 Linux 内核配置！"
+                head -5 real_kernel_final.config
+            fi
+        else
+            echo "⚠️ 警告：未找到最终内核配置（可能在内核编译阶段前就失败了）"
+            echo "Kernel compile did not reach final config stage." > real_kernel_final.config
+        fi
+
+        UBOOT_CONFIG=$(find build_dir/target-*/ -maxdepth 4 -name ".config" -path "*/u-boot-*/.config" 2>/dev/null | head -n 1)
+        if [ -n "$UBOOT_CONFIG" ] && [ -f "$UBOOT_CONFIG" ]; then
+            cp -f "$UBOOT_CONFIG" real_uboot_final.config
+            sha256sum real_uboot_final.config | tee real_uboot_final.config.sha256
+            echo "✅ 成功捕获真实 U-Boot 配置: $UBOOT_CONFIG"
+        else
+            echo "⚠️ 警告：未找到最终 U-Boot 配置"
+            echo "U-Boot compile did not reach final config stage." > real_uboot_final.config
+        fi
+
+    - name: 上传真实 Kconfig 配置文件 (真理日志)
+      if: always()
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: Real-Kconfig-Truth-Logs-${{ github.run_id }}
+        path: |
+          ${{ env.WORK_DIR }}/openwrt/real_openwrt_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_openwrt_final.config.sha256
+          ${{ env.WORK_DIR }}/openwrt/real_kernel_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_kernel_final.config.sha256
+          ${{ env.WORK_DIR }}/openwrt/real_uboot_final.config
+          ${{ env.WORK_DIR }}/openwrt/real_uboot_final.config.sha256
+        retention-days: 7
+
+    - name: 上传 world 构建日志（含 -j 失败与 -j1 补救两段）
+      if: always()
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: world-build-log-${{ github.run_id }}
+        if-no-files-found: warn
+        path: |
+          ${{ env.DIAG_DIR }}/05-world-j.log
+          ${{ env.DIAG_DIR }}/05-world-j.exit
+          ${{ env.DIAG_DIR }}/05-world-j1.exit
+        retention-days: 7
+
+    - name: 检查磁盘空间使用情况
+      if: (!cancelled())
+      run: df -hT
+
+    - name: 上传 bin 目录（使用绝对路径，防止软连接失效导致空包）
+      uses: actions/upload-artifact@v7.0.2
+      if: steps.compile.outputs.status != 'failed' && env.UPLOAD_BIN_DIR == 'true'
+      with:
+        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.WORK_DIR }}/openwrt/bin
+
+    - name: 整理固件输出目录
+      id: organize
+      if: env.UPLOAD_FIRMWARE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
+      run: |
+        cd ${{ env.WORK_DIR }}/openwrt/bin/targets/*/*
+        rm -rf packages
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 上传固件输出目录
+      uses: actions/upload-artifact@v7.0.2
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      with:
+        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}
+
+    - name: 生成发布版本标签
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        touch release.txt
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: 上传固件至 GitHub Release
+      uses: softprops/action-gh-release@v3.0.4
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: ${{ env.FIRMWARE }}/*
+
+    - name: 清理历史工作流运行记录
+      uses: Mattraks/delete-workflow-runs@v2.1.0
+      if: always()
+      with:
+        retain_days: 0
+        keep_minimum_runs: 2
+#（注：内容由AI生成）
