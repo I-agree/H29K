@@ -121,12 +121,12 @@ define Package/bluez-alsa/install
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bluealsad $(1)/usr/bin/
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bluealsactl $(1)/usr/bin/
 
-	# ALSA 插件（pcm + ctl）。这里只能用写死的静态路径，不能写 $(wildcard)/$(if)。
-	# 原因：include/package-pack.mk 里 .pkgdir 规则中的 $(call Package/$(1)/install,…)
-	# 在 $(eval $(call BuildPackage,…)) 解析 Makefile 阶段就被展开成字面命令，那时
-	# build_dir 还不存在，wildcard 必然是空 —— 整条 COPY 被吃成空行，只剩后面的
-	# [ -f ] 守卫，于是必然报「缺少 .so」。源一律取 make install 落地到
-	# $(PKG_INSTALL_DIR) 的副本；编译阶段已由 Build/Compile 末尾的检查保证产物存在。
+	# ALSA 插件（pcm + ctl）：只能用写死的静态路径，不写通配符或条件判断。
+	# 原因：package-pack.mk 里 .pkgdir 那条规则中的 call Package/<name>/install，
+	# 在 eval BuildPackage 阶段就被展开成字面命令；那时 build_dir 还不存在，
+	# 通配符必然是空 —— 整条拷贝命令被吃成空行，只剩后面的 [ -f ] 守卫，
+	# 于是必然报「缺少 .so」。源一律取 make install 落地到安装暂存目录的副本，
+	# 编译阶段已由 Build/Compile 末尾的检查保证产物存在。
 	$(INSTALL_DIR) $(1)/usr/lib/alsa-lib
 	[ -f $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so ] || { \
 		echo "bluez-alsa: 缺少 libasound_module_pcm_bluealsa.so"; \
