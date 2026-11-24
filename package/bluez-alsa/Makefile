@@ -31,7 +31,11 @@ PKG_LICENSE_FILES:=LICENSE
 PKG_MAINTAINER:=H29K
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
-PKG_BUILD_PARALLEL:=1
+# 上游是手写 Makefile（不是 automake 递归），src/asound 的插件要链 src/shared 的
+# libbluealsa，-j 下两边的先后没有保证：CI 上就是这样「bluealsad/bluealsactl 都有了、
+# src/asound/.libs 里连 .so 都没有」，world 并行那轮直接失败，隔 40 分钟 -j1 重跑又能过。
+# 这里关掉包内并行，连带 world 里的这一包也变成串行，代价几秒钟，换确定性。
+PKG_BUILD_PARALLEL:=0
 PKG_INSTALL:=1
 PKG_FIXUP:=autoreconf
 
@@ -98,8 +102,9 @@ endef
 # 这里在编译阶段先把 shared 和 asound 各 make 一次（已是最新时空转），
 # 然后把产物查一遍：缺了就在 compile 阶段报错，并列出目录内容。
 define Build/Compile
-	$(call Build/Compile/Default)
+	# 先把 src/shared 单独编出来：bluealsad / bluealsactl / asound 插件都链它
 	$(MAKE) -C $(PKG_BUILD_DIR)/src/shared $(MAKE_FLAGS)
+	$(call Build/Compile/Default)
 	$(MAKE) -C $(PKG_BUILD_DIR)/src/asound $(MAKE_FLAGS)
 	@[ -f $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_pcm_bluealsa.so ] || { \
 		echo "bluez-alsa: src/asound 没能生成 libasound_module_pcm_bluealsa.so"; \
