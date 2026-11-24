@@ -121,38 +121,37 @@ define Package/bluez-alsa/install
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bluealsad $(1)/usr/bin/
 	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/bin/bluealsactl $(1)/usr/bin/
 
-	# ALSA 插件：源文件用 make 层的 $(wildcard) 选，优先取构建目录里的共享模块，
-	# 其次取 make install 落地的副本。整段 recipe 里不出现 shell 变量，
-	# 免得 $$ 在多级展开中被吃掉、命令变成空字符串。
+	# ALSA 插件（pcm + ctl）。这里只能用写死的静态路径，不能写 $(wildcard)/$(if)。
+	# 原因：include/package-pack.mk 里 .pkgdir 规则中的 $(call Package/$(1)/install,…)
+	# 在 $(eval $(call BuildPackage,…)) 解析 Makefile 阶段就被展开成字面命令，那时
+	# build_dir 还不存在，wildcard 必然是空 —— 整条 COPY 被吃成空行，只剩后面的
+	# [ -f ] 守卫，于是必然报「缺少 .so」。源一律取 make install 落地到
+	# $(PKG_INSTALL_DIR) 的副本；编译阶段已由 Build/Compile 末尾的检查保证产物存在。
 	$(INSTALL_DIR) $(1)/usr/lib/alsa-lib
-	$(if $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_pcm_bluealsa.so $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so)), \
-		$(CP) $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_pcm_bluealsa.so $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so)) $(1)/usr/lib/alsa-lib/,)
-	$(if $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_ctl_bluealsa.so $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so)), \
-		$(CP) $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/.libs/libasound_module_ctl_bluealsa.so $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so)) $(1)/usr/lib/alsa-lib/,)
-	[ -f $(1)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so ] || { \
+	[ -f $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so ] || { \
 		echo "bluez-alsa: 缺少 libasound_module_pcm_bluealsa.so"; \
-		echo "  构建目录 src/asound/.libs:"; ls -la $(PKG_BUILD_DIR)/src/asound/.libs 2>/dev/null; \
-		echo "  安装目录 usr/lib/alsa-lib:"; ls -la $(PKG_INSTALL_DIR)/usr/lib/alsa-lib 2>/dev/null; \
+		echo "  src/asound/.libs:"; ls -la $(PKG_BUILD_DIR)/src/asound/.libs 2>/dev/null; \
+		echo "  ipkg-install/usr/lib/alsa-lib:"; ls -la $(PKG_INSTALL_DIR)/usr/lib/alsa-lib 2>/dev/null; \
 		exit 1; }
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_pcm_bluealsa.so $(1)/usr/lib/alsa-lib/
+	$(INSTALL_BIN) $(PKG_INSTALL_DIR)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so $(1)/usr/lib/alsa-lib/
 	[ -f $(1)/usr/lib/alsa-lib/libasound_module_ctl_bluealsa.so ] || { \
 		echo "bluez-alsa: 缺少 libasound_module_ctl_bluealsa.so"; exit 1; }
 
 	# pcm.bluealsa / ctl.bluealsa 定义。OpenWrt 的 alsa-lib 是上游原版 alsa.conf，
 	# 只加载 /etc/alsa/conf.d（不读 /usr/share/alsa/alsa.conf.d，那是 Debian 的补丁）。
-	# 注意上游 install 会在 /etc/alsa/conf.d 建一条指向 /usr/share 的符号链接，
-	# 在 $${DESTDIR} 下是断链，所以这里只取真实文件再装成普通文件。
+	# 上游 install 会在 /etc/alsa/conf.d 建一条指向 /usr/share 的符号链接，在 DESTDIR
+	# 下是断链，所以只取源码树里那份真实文件，装成普通文件。
 	$(INSTALL_DIR) $(1)/etc/alsa/conf.d
-	$(if $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/20-bluealsa.conf $(PKG_INSTALL_DIR)/usr/share/alsa/alsa.conf.d/20-bluealsa.conf)), \
-		$(INSTALL_DATA) $(firstword $(wildcard $(PKG_BUILD_DIR)/src/asound/20-bluealsa.conf $(PKG_INSTALL_DIR)/usr/share/alsa/alsa.conf.d/20-bluealsa.conf)) $(1)/etc/alsa/conf.d/20-bluealsa.conf,)
-	[ -f $(1)/etc/alsa/conf.d/20-bluealsa.conf ] || { \
+	[ -f $(PKG_BUILD_DIR)/src/asound/20-bluealsa.conf ] || { \
 		echo "bluez-alsa: 缺少 20-bluealsa.conf"; exit 1; }
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/src/asound/20-bluealsa.conf $(1)/etc/alsa/conf.d/20-bluealsa.conf
 
 	# D-Bus 策略：允许 bluealsad 注册 org.bluealsa（OpenWrt 的 dbus 读 /etc/dbus-1/system.d）
 	$(INSTALL_DIR) $(1)/etc/dbus-1/system.d
-	$(if $(firstword $(wildcard $(PKG_INSTALL_DIR)/etc/dbus-1/system.d/org.bluealsa.conf $(PKG_BUILD_DIR)/src/org.bluealsa.conf)), \
-		$(INSTALL_DATA) $(firstword $(wildcard $(PKG_INSTALL_DIR)/etc/dbus-1/system.d/org.bluealsa.conf $(PKG_BUILD_DIR)/src/org.bluealsa.conf)) $(1)/etc/dbus-1/system.d/org.bluealsa.conf,)
-	[ -f $(1)/etc/dbus-1/system.d/org.bluealsa.conf ] || { \
+	[ -f $(PKG_INSTALL_DIR)/etc/dbus-1/system.d/org.bluealsa.conf ] || { \
 		echo "bluez-alsa: 缺少 org.bluealsa.conf"; exit 1; }
+	$(INSTALL_DATA) $(PKG_INSTALL_DIR)/etc/dbus-1/system.d/org.bluealsa.conf $(1)/etc/dbus-1/system.d/org.bluealsa.conf
 
 	$(INSTALL_DIR) $(1)/etc/config $(1)/etc/init.d
 	$(INSTALL_CONF) ./files/bluealsa.config $(1)/etc/config/bluealsa
