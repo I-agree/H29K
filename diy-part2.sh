@@ -113,21 +113,20 @@ grep -q 'initcall_debug' "$BOOT" || { echo "FATAL: bootscript 未注入 initcall
 grep -q 'rootwait=30'    "$BOOT" || { echo "FATAL: bootscript 未注入 rootwait=30"; exit 1; }
 echo "✅ bootargs: $(grep -o 'rw rootwait[^;]*' "$BOOT")"
 
-# ===================== 实验前置校验 =====================
+# ===================== 实验前置校验：gmac1 恢复 okay + 720 探针补丁在位 =====================
 DTS=target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts
-if ! grep -q 'status = "disabled"' "$DTS"; then
-    echo "❌ 构建用的 dts 里 &gmac1 不是 disabled（raw CDN 缓存未刷新，下到的是旧文件）"
-    echo "   实际内容：$(grep -n 'status = ' "$DTS" | tail -3)"
+if ! awk '/^&gmac1 {/,/^};/' "$DTS" | grep -q 'status = "okay"'; then
+    echo "❌ 构建用的 dts 里 &gmac1 不是 okay（raw CDN 缓存未刷新，下到的是旧文件）"
+    echo "   实际内容：$(awk '/^&gmac1 {/,/^};/' "$DTS" | grep 'status = ')"
     exit 1
 fi
-echo "✅ dts 校验通过：$(grep -n 'status = ' "$DTS" | tail -1)"
+echo "✅ dts 校验通过：$(awk '/^&gmac1 {/,/^};/' "$DTS" | grep 'status = ' | tr -d '\t')"
 
-BOOT=target/linux/rockchip/image/default.bootscript
-grep -q 'rootwait=30' "$BOOT" || {
-    echo "❌ rootwait=30 未写入 default.bootscript"
-    exit 1
-}
-echo "✅ bootscript 校验通过：$(grep -o 'rw rootwait[^;]*' "$BOOT")"
+[ -f "$PATCH_DIR/720-h29k-alive-probe.patch" ] \
+    || { echo "FATAL: 缺少 720-h29k-alive-probe.patch"; exit 1; }
+grep -q 'H29K_ALIVE_SECS' "$PATCH_DIR/720-h29k-alive-probe.patch" \
+    || { echo "FATAL: 720 补丁内容不对"; exit 1; }
+echo "✅ 720 存活探针补丁在位"
 
 # ===================== U 盘取证：每次开机把启动证据写到 U 盘 =====================
 [ -f files/usr/sbin/h29k-ulog ] || { echo "FATAL: 缺少 files/usr/sbin/h29k-ulog"; exit 1; }
