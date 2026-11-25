@@ -128,13 +128,15 @@ grep -q 'H29K_ALIVE_SECS' "$PATCH_DIR/720-h29k-alive-probe.patch" \
     || { echo "FATAL: 720 补丁内容不对"; exit 1; }
 echo "✅ 720 存活探针补丁在位"
 
-# ===================== U 盘取证：每次开机把启动证据写到 U 盘 =====================
-[ -f files/usr/sbin/h29k-ulog ] || { echo "FATAL: 缺少 files/usr/sbin/h29k-ulog"; exit 1; }
-[ -f files/etc/rc.local ]       || { echo "FATAL: 缺少 files/etc/rc.local"; exit 1; }
-chmod 0755 files/usr/sbin/h29k-ulog
-chmod 0755 files/etc/rc.local
+# ===================== 取证：LED 灯语 + U 盘日志（每次开机） =====================
+for f in files/usr/sbin/h29k-ulog files/etc/init.d/h29k-ulog files/etc/rc.local; do
+    [ -f "$f" ] || { echo "FATAL: 缺少 $f"; exit 1; }
+done
+chmod 0755 files/usr/sbin/h29k-ulog files/etc/init.d/h29k-ulog files/etc/rc.local
+grep -q 'blink 6' files/usr/sbin/h29k-ulog || { echo "FATAL: ulog 里没有『用户态活着』灯语"; exit 1; }
 grep -q 'h29k-ulog' files/etc/rc.local        || { echo "FATAL: rc.local 没挂上 h29k-ulog"; exit 1; }
-grep -q 'h29k-log'  files/usr/sbin/h29k-ulog  || { echo "FATAL: h29k-ulog 内容不对"; exit 1; }
-echo "✅ U 盘取证脚本已就位"
+grep -q '^#!/bin/sh /etc/rc.common' files/etc/init.d/h29k-ulog \
+    || { echo "FATAL: init 包装的 rc.common 头不对，rootfs.mk 不会自动 enable"; exit 1; }
+echo "✅ 取证脚本已就位（蓝灯 6 闪 = 用户态活着）"
 
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
