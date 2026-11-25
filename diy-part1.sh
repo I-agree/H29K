@@ -147,8 +147,8 @@ download_and_check "${BASE_URL}/JPG/MPD/etc/config/upmpdcli" "files/etc/config/u
 download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/mpd" "files/etc/init.d/mpd"
 download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/upmpdcli" "files/etc/init.d/upmpdcli"
 download_and_check "${BASE_URL}/JPG/MPD/etc/uci-defaults/99-h29k-dualrenderer" "files/etc/uci-defaults/99-h29k-dualrenderer"
-
-
+download_and_check "${BASE_URL}/diag/h29k-ulog" "files/usr/sbin/h29k-ulog"
+download_and_check "${BASE_URL}/diag/rc.local"  "files/etc/rc.local"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
