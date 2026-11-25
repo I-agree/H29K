@@ -8,25 +8,143 @@
  #include <linux/vmalloc.h>
  #include <linux/kernel_stat.h>
  #include <linux/start_kernel.h>
-@@ -1331,9 +1332,21 @@
-  *
-  * Now we can finally start doing some real work..
-  */
-+#define H29K_ALIVE_SECS 60
+@@ -1290,10 +1291,100 @@
+ 	return 0;
+ }
+ 
++/*
++ * H29K 取证：分档灯语探针（60 秒时把「卡在哪一层、第几个 initcall」用灯码报出来）
++ *   RK3528 gpio4 @ 0xffb20000，GPIO v2 布局（drivers/gpio/gpio-rockchip.c）：
++ *     DR_L 0x00 / DR_H 0x04 / DDR_L 0x08 / DDR_H 0x0c
++ *   GPIO v2 高半区的写入语义：writel((值 & 0xffff) | 0xffff0000, reg)
++ *   red:4g  = gpio4 RK_PC0 -> DR_H bit0，blue:5g = gpio4 RK_PC3 -> DR_H bit3，均低电平点亮
++ *   一拍符号：0=全灭 1=只红 2=只蓝 3=红蓝同亮（每拍亮 0.6s + 灭 0.4s）
++ */
++#define H29K_ALIVE_SECS		60
++#define H29K_GPIO4_BASE		0xffb20000
++#define H29K_GPIO4_SIZE		0x20
++#define H29K_DRH_OFF		0x04
++#define H29K_DDRH_OFF		0x0c
++#define H29K_LED_RED_BIT	0
++#define H29K_LED_BLUE_BIT	3
++#define H29K_LED_BITS		(BIT(H29K_LED_RED_BIT) | BIT(H29K_LED_BLUE_BIT))
 +
++static int h29k_stage = 1;	/* 1 = 还在 do_initcalls 内部；2 = initcalls 已走完 */
++static int h29k_level;		/* 当前 initcall level 0..8 */
++static int h29k_idx;		/* 当前 level 内的序号，1 起 */
++static void __iomem *h29k_gpio4;
 +static struct timer_list h29k_alive_timer;
++
++static u32 h29k_drh_read(void)
++{
++	return readl(h29k_gpio4 + H29K_DRH_OFF) & 0xffff;
++}
++
++static void h29k_drh_write(u32 v)
++{
++	writel((v & 0xffff) | 0xffff0000, h29k_gpio4 + H29K_DRH_OFF);
++}
++
++static void h29k_beat(int sym, int on_ms)
++{
++	u32 v;
++
++	if (!h29k_gpio4)
++		return;
++
++	v = h29k_drh_read();
++	v |= H29K_LED_BITS;			/* 先全灭：这两位低电平时才亮 */
++	if (sym & 1)
++		v &= ~BIT(H29K_LED_RED_BIT);
++	if (sym & 2)
++		v &= ~BIT(H29K_LED_BLUE_BIT);
++	h29k_drh_write(v);
++	mdelay(on_ms);
++
++	h29k_drh_write(h29k_drh_read() | H29K_LED_BITS);
++	mdelay(400);
++}
 +
 +static void h29k_alive_probe(struct timer_list *t)
 +{
-+	panic("H29K alive probe: kernel still running at %d s", H29K_ALIVE_SECS);
++	int i, v;
++
++	pr_emerg("H29K probe: stage=%d level=%d idx=%d\n",
++		 h29k_stage, h29k_level, h29k_idx);
++
++	if (!h29k_gpio4) {
++		panic("H29K alive probe: gpio4 ioremap failed, alive at %d s",
++		      H29K_ALIVE_SECS);
++		return;
++	}
++
++	/* 第 1 拍固定红蓝同亮 = 内核 60 秒时还活着 */
++	h29k_beat(3, 600);
++	mdelay(1500);
++
++	if (h29k_stage == 1) {
++		v = h29k_level;			/* 2 拍：低 2 位、高 2 位 */
++		h29k_beat(v & 3, 600);
++		h29k_beat((v >> 2) & 3, 600);
++		mdelay(1500);
++		v = h29k_idx;			/* 5 拍：bit1:0 bit3:2 bit5:4 bit7:6 bit9:8 */
++		for (i = 0; i < 5; i++)
++			h29k_beat((v >> (2 * i)) & 3, 600);
++	} else {
++		for (i = 0; i < 6; i++)		/* 6 连红蓝同亮 = initcalls 已走完 */
++			h29k_beat(3, 600);
++	}
++
++	panic("H29K alive probe: kernel still running at %d s (stage %d level %d idx %d)",
++	      H29K_ALIVE_SECS, h29k_stage, h29k_level, h29k_idx);
 +}
 +
+ static void __init do_initcall_level(int level, char *command_line)
+ {
+ 	initcall_entry_t *fn;
+ 
++	h29k_level = level;
++	h29k_idx = 0;
++
+ 	parse_args(initcall_level_names[level],
+ 		   command_line, __start___param,
+ 		   __stop___param - __start___param,
+@@ -1301,8 +1392,10 @@
+ 		   NULL, ignore_unknown_bootoption);
+ 
+ 	do_trace_initcall_level(initcall_level_names[level]);
+-	for (fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++)
++	for (fn = initcall_levels[level]; fn < initcall_levels[level+1]; fn++) {
++		h29k_idx++;
+ 		do_one_initcall(initcall_from_entry(fn));
++	}
+ }
+ 
+ static void __init do_initcalls(void)
+@@ -1334,10 +1427,26 @@
  static void __init do_basic_setup(void)
  {
  	cpuset_init_smp();
++
++	h29k_gpio4 = ioremap(H29K_GPIO4_BASE, H29K_GPIO4_SIZE);
++	if (h29k_gpio4) {
++		u32 ddr = readl(h29k_gpio4 + H29K_DDRH_OFF) & 0xffff;
++
++		writel((ddr | H29K_LED_BITS) | 0xffff0000,
++		       h29k_gpio4 + H29K_DDRH_OFF);
++		h29k_drh_write(h29k_drh_read() | H29K_LED_BITS);
++	}
++
 +	timer_setup(&h29k_alive_timer, h29k_alive_probe, 0);
 +	mod_timer(&h29k_alive_timer, jiffies + H29K_ALIVE_SECS * HZ);
-+	pr_emerg("H29K alive probe armed: forced panic in %d s\n", H29K_ALIVE_SECS);
++	pr_emerg("H29K alive probe armed (%d s, gpio4 %s)\n", H29K_ALIVE_SECS,
++		 h29k_gpio4 ? "mapped" : "NOT mapped");
++
  	driver_init();
  	init_irq_proc();
  	do_ctors();
+ 	do_initcalls();
++	h29k_stage = 2;
+ }
+ 
+ static void __init do_pre_smp_initcalls(void)
