@@ -1,0 +1,32 @@
+--- a/init/main.c
++++ b/init/main.c
+@@ -36,6 +36,7 @@
+ #include <linux/kmod.h>
+ #include <linux/kprobes.h>
+ #include <linux/kmsan.h>
++#include <linux/timer.h>
+ #include <linux/vmalloc.h>
+ #include <linux/kernel_stat.h>
+ #include <linux/start_kernel.h>
+@@ -1331,9 +1332,21 @@
+  *
+  * Now we can finally start doing some real work..
+  */
++#define H29K_ALIVE_SECS 60
++
++static struct timer_list h29k_alive_timer;
++
++static void h29k_alive_probe(struct timer_list *t)
++{
++	panic("H29K alive probe: kernel still running at %d s", H29K_ALIVE_SECS);
++}
++
+ static void __init do_basic_setup(void)
+ {
+ 	cpuset_init_smp();
++	timer_setup(&h29k_alive_timer, h29k_alive_probe, 0);
++	mod_timer(&h29k_alive_timer, jiffies + H29K_ALIVE_SECS * HZ);
++	pr_emerg("H29K alive probe armed: forced panic in %d s\n", H29K_ALIVE_SECS);
+ 	driver_init();
+ 	init_irq_proc();
+ 	do_ctors();
