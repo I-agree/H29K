@@ -1,0 +1,8 @@
+#!/bin/sh /etc/rc.common
+# /usr/sbin/h29k-ulog 的 init 包装：OpenWrt 的 prepare_rootfs 会自动 enable
+# 带 "#!/bin/sh /etc/rc.common" 头、且 START>=1 的 init.d 脚本 → 这里必须保留该头
+START=99
+
+start() {
+	[ -x /usr/sbin/h29k-ulog ] && /usr/sbin/h29k-ulog >/dev/null 2>&1 &
+}
