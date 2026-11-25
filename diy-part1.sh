@@ -99,6 +99,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/715-rockchip_
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/716-phy-rockchip-add-inno-hdmi-phy-rk3528-support.patch" "target/linux/rockchip/patches-6.18/716-phy-rockchip-add-inno-hdmi-phy-rk3528-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/717-sound-soc-rockchip-sai-add-rk3528-compatible.patch" "target/linux/rockchip/patches-6.18/717-sound-soc-rockchip-sai-add-rk3528-compatible.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/718-pmdomain-rockchip-quiet-defer-and-fix-clock-cleanup.patch" "target/linux/rockchip/patches-6.18/718-pmdomain-rockchip-quiet-defer-and-fix-clock-cleanup.patch"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/719-mmc-core-retry-nonremovable-init.patch" "target/linux/rockchip/patches-6.18/719-mmc-core-retry-nonremovable-init.patch"
 download_and_check "${BASE_URL}/JPG/0001-uapi-hevc-ext-sps-rps-controls.patch" "toolchain/kernel-headers/patches/0001-uapi-hevc-ext-sps-rps-controls.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/990-clk-rk3528-add-hclk_trng-gate.patch" "target/linux/rockchip/patches-6.18/990-clk-rk3528-add-hclk_trng-gate.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/992-dwc3-wwan-reset-gpio.patch" "target/linux/rockchip/patches-6.18/992-dwc3-wwan-reset-gpio.patch"
