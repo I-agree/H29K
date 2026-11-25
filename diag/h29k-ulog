@@ -1,0 +1,101 @@
+#!/bin/sh
+# H29K 冷启动取证：把「这一次到底启动了没有」写到插在板子上的 U 盘里
+#
+# 由 /etc/rc.local 后台调用（rc.local 在 rcS 最后执行，此时 USB 早已枚举完）
+# 设计原则：
+#   - 永不阻塞启动（调用方加 & 后台跑）
+#   - 挂不上 U 盘也不影响开机，只靠灯语告诉你"用户态已经起来了"
+#
+# 灯语（U 盘心跳灯）：
+#   3 次             = 内核把 USB 主机控制器拉起来了（枚举）
+#   之后 5 次慢闪    = 用户态活着，且 dmesg/pstore 已经写进 U 盘（成功）
+#   之后 12 次慢闪   = 用户态活着，但 U 盘没挂上（挂载/文件系统问题）
+#   什么都不再闪     = 用户态没起来
+
+LOGROOT=/mnt/h29klog
+DST=$LOGROOT/h29k-log
+
+# ---------- 1. 先把 pstore 捞到 tmpfs：上一次 panic 的 console-ramoops 就在这里 ----------
+mkdir -p /tmp/pstore
+mount -t pstore pstore /sys/fs/pstore 2>/dev/null
+cp -a /sys/fs/pstore/* /tmp/pstore/ 2>/dev/null
+
+# ---------- 2. 等 U 盘出现（CONFIG_USB_STORAGE=y 内建，正常 1.5s 内枚举完） ----------
+dev=
+for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
+	for d in /dev/sda1 /dev/sdb1 /dev/sda /dev/sdb; do
+		if [ -b "$d" ]; then dev=$d; break; fi
+	done
+	[ -n "$dev" ] && break
+	sleep 1
+done
+
+# ---------- 3. 挂载：FAT 优先（Windows 直接能看），其次 ext4 ----------
+mnt_ok=0
+if [ -n "$dev" ]; then
+	modprobe fat 2>/dev/null
+	modprobe vfat 2>/dev/null
+	modprobe nls_cp437 2>/dev/null
+	modprobe nls_iso8859_1 2>/dev/null
+	mkdir -p $LOGROOT
+	for t in vfat ext4 auto; do
+		if mount -t $t -o rw,utf8,umask=000 "$dev" $LOGROOT 2>/dev/null; then
+			mnt_ok=1
+			break
+		fi
+	done
+fi
+
+if [ $mnt_ok -eq 1 ]; then
+	mkdir -p $DST
+	n=1
+	[ -f $DST/bootcount ] && n=$(( $(cat $DST/bootcount) + 1 ))
+	echo $n > $DST/bootcount
+	O=$DST/boot$n
+	mkdir -p $O
+
+	{
+		echo "boot_no=$n"
+		echo "uptime=$(cat /proc/uptime)"
+		echo "date=$(date)"
+		echo "dev=$dev"
+		echo "--- /proc/cmdline ---"
+		cat /proc/cmdline
+		echo "--- /proc/mounts ---"
+		cat /proc/mounts
+	} > $O/00-summary.txt 2>&1
+
+	dmesg > $O/dmesg.txt 2>&1
+	cat /proc/partitions > $O/partitions.txt 2>&1
+	ls -l /dev/mmcblk* /dev/sd* > $O/devices.txt 2>&1
+	ls /sys/class/mmc_host/ > $O/mmc_hosts.txt 2>&1
+
+	{
+		for f in /sys/kernel/debug/mmc0/ios \
+		         /sys/kernel/debug/mmc0/err_state \
+		         /sys/kernel/debug/mmc0/mmc0:0001/state \
+		         /sys/kernel/debug/mmc0/mmc0:0001/clock; do
+			[ -f "$f" ] && { echo "### $f"; cat "$f"; echo; }
+		done
+	} > $O/mmc0.txt 2>&1
+
+	[ -d /tmp/pstore ] && cp -a /tmp/pstore $O/pstore 2>/dev/null
+	echo "done uptime=$(cat /proc/uptime)" > $O/99-done.txt
+	sync
+	umount $LOGROOT 2>/dev/null
+
+	# 灯语 A：5 次慢闪 = 日志已写盘
+	for k in 1 2 3 4 5; do
+		dd if="$dev" of=/dev/null bs=4096 count=1 2>/dev/null
+		sleep 1
+	done
+else
+	# 灯语 B：12 次慢闪 = 用户态起来了但 U 盘没挂上
+	if [ -n "$dev" ]; then
+		umount $LOGROOT 2>/dev/null
+		for k in 1 2 3 4 5 6 7 8 9 10 11 12; do
+			dd if="$dev" of=/dev/null bs=4096 count=1 2>/dev/null
+			sleep 1
+		done
+	fi
+fi
