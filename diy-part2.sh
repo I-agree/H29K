@@ -129,4 +129,13 @@ grep -q 'rootwait=30' "$BOOT" || {
 }
 echo "✅ bootscript 校验通过：$(grep -o 'rw rootwait[^;]*' "$BOOT")"
 
+# ===================== U 盘取证：每次开机把启动证据写到 U 盘 =====================
+[ -f files/usr/sbin/h29k-ulog ] || { echo "FATAL: 缺少 files/usr/sbin/h29k-ulog"; exit 1; }
+[ -f files/etc/rc.local ]       || { echo "FATAL: 缺少 files/etc/rc.local"; exit 1; }
+chmod 0755 files/usr/sbin/h29k-ulog
+chmod 0755 files/etc/rc.local
+grep -q 'h29k-ulog' files/etc/rc.local        || { echo "FATAL: rc.local 没挂上 h29k-ulog"; exit 1; }
+grep -q 'h29k-log'  files/usr/sbin/h29k-ulog  || { echo "FATAL: h29k-ulog 内容不对"; exit 1; }
+echo "✅ U 盘取证脚本已就位"
+
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
