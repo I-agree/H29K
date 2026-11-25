@@ -104,7 +104,13 @@ chmod 0755 files/etc/uci-defaults/99-h29k-dualrenderer
 # ==============================================================
 
 # ===================== 临时测试 =====================
-sed -i 's|rw rootwait"|rw rootwait=30"|' target/linux/rockchip/image/default.bootscript
+sed -i 's|rw rootwait=30"|rw rootwait=30 initcall_debug ignore_loglevel"|' \
+  target/linux/rockchip/image/default.bootscript
+# 断言：改没改上，改不上就直接炸掉构建
+grep -q 'initcall_debug' target/linux/rockchip/image/default.bootscript \
+  || { echo "FATAL: bootscript 未注入 initcall_debug"; exit 1; }
+grep -q 'rootwait=30' target/linux/rockchip/image/default.bootscript \
+  || { echo "FATAL: bootscript 未注入 rootwait=30"; exit 1; }
 
 # ===================== 实验前置校验 =====================
 DTS=target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts
