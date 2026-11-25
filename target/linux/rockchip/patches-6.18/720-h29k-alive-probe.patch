@@ -8,19 +8,18 @@
  #include <linux/vmalloc.h>
  #include <linux/kernel_stat.h>
  #include <linux/start_kernel.h>
-@@ -1290,10 +1291,100 @@
+@@ -1290,10 +1291,123 @@
  	return 0;
  }
  
 +/*
-+ * H29K 取证：分档灯语探针（60 秒时把「卡在哪一层、第几个 initcall」用灯码报出来）
-+ *   RK3528 gpio4 @ 0xffb20000，GPIO v2 布局（drivers/gpio/gpio-rockchip.c）：
++ * H29K 取证块 A：阶段记录 + 灯码原语（init/main.c）
++ *   RK3528 gpio4 @ 0xffb20000，GPIO v2（drivers/gpio/gpio-rockchip.c）：
 + *     DR_L 0x00 / DR_H 0x04 / DDR_L 0x08 / DDR_H 0x0c
-+ *   GPIO v2 高半区的写入语义：writel((值 & 0xffff) | 0xffff0000, reg)
-+ *   red:4g  = gpio4 RK_PC0 -> DR_H bit0，blue:5g = gpio4 RK_PC3 -> DR_H bit3，均低电平点亮
-+ *   一拍符号：0=全灭 1=只红 2=只蓝 3=红蓝同亮（每拍亮 0.6s + 灭 0.4s）
++ *   高半区写入语义：writel((值 & 0xffff) | 0xffff0000, reg)
++ *   red:4g  = gpio4 RK_PC0 -> DR_H bit0，blue:5g = gpio4 RK_PC3 -> DR_H bit3，低电平点亮
 + */
-+#define H29K_ALIVE_SECS		60
++#define H29K_ALIVE_SECS		120
 +#define H29K_GPIO4_BASE		0xffb20000
 +#define H29K_GPIO4_SIZE		0x20
 +#define H29K_DRH_OFF		0x04
@@ -30,7 +29,7 @@
 +#define H29K_LED_BITS		(BIT(H29K_LED_RED_BIT) | BIT(H29K_LED_BLUE_BIT))
 +
 +static int h29k_stage = 1;	/* 1 = 还在 do_initcalls 内部；2 = initcalls 已走完 */
-+static int h29k_level;		/* 当前 initcall level 0..8 */
++static int h29k_level;		/* 当前 initcall level 0..7 */
 +static int h29k_idx;		/* 当前 level 内的序号，1 起 */
 +static void __iomem *h29k_gpio4;
 +static struct timer_list h29k_alive_timer;
@@ -45,6 +44,7 @@
 +	writel((v & 0xffff) | 0xffff0000, h29k_gpio4 + H29K_DRH_OFF);
 +}
 +
++/* 软中断上下文用（mdelay）；两灯同亮/全灭交替一拍 */
 +static void h29k_beat(int sym, int on_ms)
 +{
 +	u32 v;
@@ -53,16 +53,38 @@
 +		return;
 +
 +	v = h29k_drh_read();
-+	v |= H29K_LED_BITS;			/* 先全灭：这两位低电平时才亮 */
++	v |= H29K_LED_BITS;
 +	if (sym & 1)
 +		v &= ~BIT(H29K_LED_RED_BIT);
 +	if (sym & 2)
 +		v &= ~BIT(H29K_LED_BLUE_BIT);
 +	h29k_drh_write(v);
 +	mdelay(on_ms);
-+
 +	h29k_drh_write(h29k_drh_read() | H29K_LED_BITS);
 +	mdelay(400);
++}
++
++/* 进程上下文用（msleep）：报"第一组 a 拍、停一下、第二组 b 拍" */
++void h29k_blink_code(int a, int b)
++{
++	int i;
++
++	if (!h29k_gpio4)
++		return;
++
++	for (i = 0; i < a; i++) {
++		h29k_drh_write(h29k_drh_read() & ~H29K_LED_BITS);
++		msleep(500);
++		h29k_drh_write(h29k_drh_read() | H29K_LED_BITS);
++		msleep(400);
++	}
++	msleep(1500);
++	for (i = 0; i < b; i++) {
++		h29k_drh_write(h29k_drh_read() & ~H29K_LED_BITS);
++		msleep(500);
++		h29k_drh_write(h29k_drh_read() | H29K_LED_BITS);
++		msleep(400);
++	}
 +}
 +
 +static void h29k_alive_probe(struct timer_list *t)
@@ -78,25 +100,26 @@
 +		return;
 +	}
 +
-+	/* 第 1 拍固定红蓝同亮 = 内核 60 秒时还活着 */
-+	h29k_beat(3, 600);
-+	mdelay(1500);
-+
-+	if (h29k_stage == 1) {
-+		v = h29k_level;			/* 2 拍：低 2 位、高 2 位 */
-+		h29k_beat(v & 3, 600);
-+		h29k_beat((v >> 2) & 3, 600);
-+		mdelay(1500);
-+		v = h29k_idx;			/* 5 拍：bit1:0 bit3:2 bit5:4 bit7:6 bit9:8 */
-+		for (i = 0; i < 5; i++)
-+			h29k_beat((v >> (2 * i)) & 3, 600);
-+	} else {
-+		for (i = 0; i < 6; i++)		/* 6 连红蓝同亮 = initcalls 已走完 */
-+			h29k_beat(3, 600);
++	if (h29k_stage != 1) {
++		/* 已过 initcalls：卡点在别处，由 drivers/base/dd.c 的灯码报 */
++		panic("H29K alive probe: still alive at %d s (stage %d)",
++		      H29K_ALIVE_SECS, h29k_stage);
++		return;
 +	}
 +
-+	panic("H29K alive probe: kernel still running at %d s (stage %d level %d idx %d)",
-+	      H29K_ALIVE_SECS, h29k_stage, h29k_level, h29k_idx);
++	/* 第 1 拍固定红蓝同亮 = 内核还活着 */
++	h29k_beat(3, 600);
++	mdelay(1500);
++	v = h29k_level;			/* 2 拍：低 2 位、高 2 位 */
++	h29k_beat(v & 3, 600);
++	h29k_beat((v >> 2) & 3, 600);
++	mdelay(1500);
++	v = h29k_idx;			/* 5 拍：bit1:0 ... bit9:8 */
++	for (i = 0; i < 5; i++)
++		h29k_beat((v >> (2 * i)) & 3, 600);
++
++	panic("H29K alive probe: still alive at %d s (stage 1 level %d idx %d)",
++	      H29K_ALIVE_SECS, h29k_level, h29k_idx);
 +}
 +
  static void __init do_initcall_level(int level, char *command_line)
@@ -109,7 +132,7 @@
  	parse_args(initcall_level_names[level],
  		   command_line, __start___param,
  		   __stop___param - __start___param,
-@@ -1301,8 +1392,10 @@
+@@ -1301,8 +1415,10 @@
  		   NULL, ignore_unknown_bootoption);
  
  	do_trace_initcall_level(initcall_level_names[level]);
@@ -121,7 +144,7 @@
  }
  
  static void __init do_initcalls(void)
-@@ -1334,10 +1427,26 @@
+@@ -1334,10 +1450,26 @@
  static void __init do_basic_setup(void)
  {
  	cpuset_init_smp();
@@ -148,3 +171,124 @@
  }
  
  static void __init do_pre_smp_initcalls(void)
+--- a/drivers/base/dd.c
++++ b/drivers/base/dd.c
+@@ -18,6 +18,8 @@
+ 
+ #include <linux/debugfs.h>
+ #include <linux/device.h>
++#include <linux/string.h>
++#include <linux/workqueue.h>
+ #include <linux/delay.h>
+ #include <linux/dma-map-ops.h>
+ #include <linux/init.h>
+@@ -571,6 +573,49 @@
+ static atomic_t probe_count = ATOMIC_INIT(0);
+ static DECLARE_WAIT_QUEUE_HEAD(probe_waitqueue);
+ 
++/*
++ * H29K 取证块 B：记录"正在 probe 的设备/驱动"
++ * 目的：wait_for_device_probe() 里的 probe_count 若永不归零，要能说出是谁把 probe 挂住了。
++ * 灯码由 init/main.c 的 h29k_blink_code(a, b) 输出：
++ *   第一组 = 卡在哪个等待（1 = deferred_probe_work，2 = probe_count）
++ *   第二组 = 设备类别（1 = 网口，2 = eMMC/SD，3 = USB，4 = 显示/视频，5 = 其他）
++ */
++static char h29k_cur_dev[64] = "none";
++static char h29k_cur_drv[64] = "none";
++static atomic_t h29k_probe_seq = ATOMIC_INIT(0);
++
++extern void h29k_blink_code(int a, int b);
++
++static void h29k_record_probe(const struct device *dev,
++			      const struct device_driver *drv)
++{
++	strscpy(h29k_cur_dev, dev_name(dev), sizeof(h29k_cur_dev));
++	if (drv && drv->name)
++		strscpy(h29k_cur_drv, drv->name, sizeof(h29k_cur_drv));
++	else if (dev->bus)
++		strscpy(h29k_cur_drv, dev->bus->name, sizeof(h29k_cur_drv));
++	else
++		strscpy(h29k_cur_drv, "none", sizeof(h29k_cur_drv));
++	atomic_inc(&h29k_probe_seq);
++}
++
++static int h29k_probe_cat(void)
++{
++	if (strstr(h29k_cur_drv, "stmmac") || strstr(h29k_cur_drv, "dwmac") ||
++	    strstr(h29k_cur_dev, "ethernet") || strstr(h29k_cur_dev, "gmac"))
++		return 1;
++	if (strstr(h29k_cur_drv, "sdhci") || strstr(h29k_cur_drv, "dwcmshc") ||
++	    strstr(h29k_cur_drv, "dw_mmc") || strstr(h29k_cur_dev, "mmc"))
++		return 2;
++	if (strstr(h29k_cur_drv, "dwc3") || strstr(h29k_cur_drv, "xhci") ||
++	    strstr(h29k_cur_drv, "usb") || strstr(h29k_cur_dev, "usb"))
++		return 3;
++	if (strstr(h29k_cur_drv, "vop") || strstr(h29k_cur_drv, "drm") ||
++	    strstr(h29k_cur_drv, "vdec") || strstr(h29k_cur_drv, "hdmi"))
++		return 4;
++	return 5;
++}
++
+ static ssize_t state_synced_store(struct device *dev,
+ 				  struct device_attribute *attr,
+ 				  const char *buf, size_t count)
+@@ -635,6 +680,8 @@
+ {
+ 	int ret = 0;
+ 
++	h29k_record_probe(dev, drv);
++
+ 	if (dev->bus->probe)
+ 		ret = dev->bus->probe(dev);
+ 	else if (drv->probe)
+@@ -828,12 +875,45 @@
+  */
+ void wait_for_device_probe(void)
+ {
+-	/* wait for the deferred probe workqueue to finish */
+-	flush_work(&deferred_probe_work);
++	int i, stage = 0;
+ 
+-	/* wait for the known devices to complete their probing */
+-	wait_event(probe_waitqueue, atomic_read(&probe_count) == 0);
+-	async_synchronize_full();
++	/*
++	 * H29K 取证：原版这里是无界等待，任何一个 probe 不返回就永久卡死
++	 * （典型形态：do_initcalls() 全部返回、rootfs 从未被挂载、无用户态、无日志）。
++	 * 这里改成有界，并在超时后用 printk + 灯码把"谁挂住了 probe"报出来，然后放行继续启动。
++	 */
++
++	/* A：deferred_probe_work 是否收尾（有界轮询，最多 15 s） */
++	for (i = 0; i < 300; i++) {
++		if (!work_pending(&deferred_probe_work) &&
++		    !work_busy(&deferred_probe_work))
++			break;
++		msleep(50);
++	}
++	if (i == 300)
++		stage = 1;
++
++	/* B：probe_count 是否归零（有界等待，最多 20 s） */
++	if (!stage &&
++	    !wait_event_timeout(probe_waitqueue,
++				atomic_read(&probe_count) == 0, 20 * HZ))
++		stage = 2;
++
++	if (!stage) {
++		/* 一切正常，保持原语义 */
++		async_synchronize_full();
++		return;
++	}
++
++	pr_emerg("H29K: wait_for_device_probe STUCK stage=%d probe_count=%d last_dev=%s last_drv=%s seq=%d\n",
++		 stage, atomic_read(&probe_count), h29k_cur_dev, h29k_cur_drv,
++		 atomic_read(&h29k_probe_seq));
++
++	/*
++	 * 灯码：先报卡在哪一步，再报设备类别。
++	 * 卡住的若是异步 probe，async_synchronize_full() 必然第二次挂死，这里直接跳过。
++	 */
++	h29k_blink_code(stage, h29k_probe_cat());
+ }
+ EXPORT_SYMBOL_GPL(wait_for_device_probe);
+ 
