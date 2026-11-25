@@ -1,0 +1,47 @@
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -50,6 +50,9 @@
+ #define MMC_ERASE_TIMEOUT_MS	(60 * 1000) /* 60 s */
+ #define SD_DISCARD_TIMEOUT_MS	(250)
+ 
++/* Bounded retries when a non-removable card fails its first init attempt */
++#define MMC_NONREMOVABLE_RESCAN_RETRIES	3
++
+ static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
+ 
+ /*
+@@ -2319,10 +2322,23 @@
+ 	}
+ 
+ 	/* A non-removable card should have been detected by now. */
+-	if (!mmc_card_is_removable(host) && !host->bus_ops)
++	if (!mmc_card_is_removable(host) && !host->bus_ops) {
+ 		pr_info("%s: Failed to initialize a non-removable card",
+ 			mmc_hostname(host));
+ 
++		/*
++		 * A non-removable card may not answer the very first attempt
++		 * after a cold power-on, e.g. an eMMC behind a PHY that still
++		 * has to lock its DLL. mmc_rescan() is never re-entered on its
++		 * own for a non-removable host, so retry a bounded number of
++		 * times before the host becomes unusable for the whole boot.
++		 */
++		if (host->rescan_retries++ < MMC_NONREMOVABLE_RESCAN_RETRIES) {
++			host->rescan_entered = 0;
++			mmc_schedule_delayed_work(&host->detect, HZ);
++		}
++	}
++
+ 	/*
+ 	 * Ignore the command timeout errors observed during
+ 	 * the card init as those are excepted.
+--- a/include/linux/mmc/host.h
++++ b/include/linux/mmc/host.h
+@@ -505,6 +505,7 @@
+ 
+ 	int			rescan_disable;	/* disable card detection */
+ 	int			rescan_entered;	/* used with nonremovable devices */
++	int			rescan_retries;	/* failed nonremovable init attempts */
+ 
+ 	bool			can_retune;	/* re-tuning can be used */
+ 	bool			retune_now;	/* do re-tuning at next req */
