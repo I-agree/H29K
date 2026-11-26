@@ -8,7 +8,7 @@
  #include <linux/vmalloc.h>
  #include <linux/kernel_stat.h>
  #include <linux/start_kernel.h>
-@@ -1290,10 +1291,123 @@
+@@ -1290,10 +1291,129 @@
  	return 0;
  }
  
@@ -33,6 +33,12 @@
 +static int h29k_idx;		/* 当前 level 内的序号，1 起 */
 +static void __iomem *h29k_gpio4;
 +static struct timer_list h29k_alive_timer;
++
++/*
++ * 供 drivers/base/dd.c 调用：那边用 extern 声明，这里必须给一个前置原型，
++ * 否则 -Wmissing-prototypes（内核 -Werror）会直接失败。
++ */
++void h29k_blink_code(int a, int b);
 +
 +static u32 h29k_drh_read(void)
 +{
@@ -132,7 +138,7 @@
  	parse_args(initcall_level_names[level],
  		   command_line, __start___param,
  		   __stop___param - __start___param,
-@@ -1301,8 +1415,10 @@
+@@ -1301,8 +1421,10 @@
  		   NULL, ignore_unknown_bootoption);
  
  	do_trace_initcall_level(initcall_level_names[level]);
@@ -144,7 +150,7 @@
  }
  
  static void __init do_initcalls(void)
-@@ -1334,10 +1450,26 @@
+@@ -1334,10 +1456,26 @@
  static void __init do_basic_setup(void)
  {
  	cpuset_init_smp();
