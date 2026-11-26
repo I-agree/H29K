@@ -391,6 +391,7 @@ CONFIG_USB_DWC3=y
 CONFIG_USB_G_SERIAL=y
 CONFIG_U_SERIAL_CONSOLE=y
 CONFIG_NETCONSOLE=y
+# CONFIG_NETCONSOLE_DYNAMIC is not set
 
 # =================================================================
 # 🔄 内核触摸驱动支持
