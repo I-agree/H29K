@@ -101,6 +101,7 @@ chmod 0755 package/bluez-alsa/files/bluealsa.init
 chmod 0755 files/etc/init.d/mpd
 chmod 0755 files/etc/init.d/upmpdcli
 chmod 0755 files/etc/uci-defaults/99-h29k-dualrenderer
+chmod 0755 files/lib/preinit/05_h29k_trace
 # ==============================================================
 
 # ===================== 临时测试 =====================
