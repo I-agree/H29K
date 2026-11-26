@@ -123,11 +123,22 @@ if ! awk '/^&gmac1 {/,/^};/' "$DTS" | grep -q 'status = "okay"'; then
 fi
 echo "✅ dts 校验通过：$(awk '/^&gmac1 {/,/^};/' "$DTS" | grep 'status = ' | tr -d '\t')"
 
+if ! awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep -q 'dr_mode = "peripheral"'; then
+    echo "❌ 构建用的 dts 里 &usb_host0_xhci 的 dr_mode 不是 peripheral（raw CDN 缓存未刷新或没提交）"
+    echo "   实际内容：$(awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep 'dr_mode')"
+    exit 1
+fi
+echo "✅ dts 校验通过：$(awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep 'dr_mode' | tr -d '\t')"
+
 [ -f "$PATCH_DIR/720-h29k-alive-probe.patch" ] \
     || { echo "FATAL: 缺少 720-h29k-alive-probe.patch"; exit 1; }
-grep -q 'H29K_ALIVE_SECS' "$PATCH_DIR/720-h29k-alive-probe.patch" \
-    || { echo "FATAL: 720 补丁内容不对"; exit 1; }
-echo "✅ 720 存活探针补丁在位"
+grep -q 'h29k_async_dump' "$PATCH_DIR/720-h29k-alive-probe.patch" \
+    || { echo "FATAL: 720 不是 v5（缺 h29k_async_dump，raw CDN 缓存未刷新或没替换）"; exit 1; }
+grep -q 'H29K_ALIVE_SECS.*240' "$PATCH_DIR/720-h29k-alive-probe.patch" \
+    || { echo "FATAL: 720 里 H29K_ALIVE_SECS 不是 240"; exit 1; }
+grep -q 'h29k_netprobe' "$PATCH_DIR/720-h29k-alive-probe.patch" \
+    || { echo "FATAL: 720 缺 h29k_netprobe"; exit 1; }
+echo "✅ 720 存活探针补丁在位（v5：async 有界+函数名、网口探针、240s）"
 
 # ===================== 取证：LED 灯语 + U 盘日志（每次开机） =====================
 for f in files/usr/sbin/h29k-ulog files/etc/init.d/h29k-ulog files/etc/rc.local; do
