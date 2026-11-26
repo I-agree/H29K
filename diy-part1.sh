@@ -151,6 +151,7 @@ download_and_check "${BASE_URL}/diag/h29k-ulog"      "files/usr/sbin/h29k-ulog"
 download_and_check "${BASE_URL}/diag/h29k-ulog.init" "files/etc/init.d/h29k-ulog"
 download_and_check "${BASE_URL}/diag/rc.local"       "files/etc/rc.local"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/720-h29k-alive-probe.patch" "target/linux/rockchip/patches-6.18/720-h29k-alive-probe.patch"
+download_and_check "${BASE_URL}/diag/05_h29k_trace"       "files/lib/preinit/05_h29k_trace"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
