@@ -107,10 +107,11 @@ chmod 0755 files/etc/uci-defaults/99-h29k-dualrenderer
 BOOT=target/linux/rockchip/image/default.bootscript
 # 一次注入 rootwait=30 + initcall_debug；匹配原文的 " rw rootwait"，不依赖有没有 =30
 grep -q 'initcall_debug' "$BOOT" || \
-    sed -i 's| rw rootwait| rw rootwait=30 initcall_debug ignore_loglevel|' "$BOOT"
+    sed -i 's| rw rootwait| rw rootwait=30 console=ttyGS0 initcall_debug ignore_loglevel|' "$BOOT"
 
 grep -q 'initcall_debug' "$BOOT" || { echo "FATAL: bootscript 未注入 initcall_debug"; exit 1; }
 grep -q 'rootwait=30'    "$BOOT" || { echo "FATAL: bootscript 未注入 rootwait=30"; exit 1; }
+grep -q 'console=ttyGS0' "$BOOT" || { echo "FATAL: bootscript 未注入 console=ttyGS0"; exit 1; }
 echo "✅ bootargs: $(grep -o 'rw rootwait[^;]*' "$BOOT")"
 
 # ===================== 实验前置校验：gmac1 恢复 okay + 720 探针补丁在位 =====================
