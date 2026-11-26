@@ -578,7 +578,7 @@
 };
 
 &usb_host0_xhci {
-	dr_mode = "host";
+	dr_mode = "peripheral";
 	pinctrl-names = "default";
 	pinctrl-0 = <&wwan_rst_pin>;
 	reset-gpios = <&gpio4 RK_PB4 GPIO_ACTIVE_LOW>;
