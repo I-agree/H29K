@@ -390,6 +390,8 @@ CONFIG_USB_GADGET=y
 CONFIG_USB_DWC3=y
 CONFIG_USB_G_SERIAL=y
 CONFIG_U_SERIAL_CONSOLE=y
+CONFIG_NETCONSOLE=y
+CONFIG_NET_POLL_CONTROLLER=y
 
 # =================================================================
 # 🔄 内核触摸驱动支持
