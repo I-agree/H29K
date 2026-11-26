@@ -196,11 +196,11 @@ CONFIG_BLK_DEV_RAM=y
 CONFIG_BLK_DEV_RAM_COUNT=16
 CONFIG_BLK_DEV_RAM_SIZE=4096
 CONFIG_BLK_DEV_LOOP=y
+CONFIG_ZRAM=y
 # 其余无关块设备全部关闭
 # CONFIG_BLK_DEV_FD is not set
 # CONFIG_BLK_DEV_NBD is not set
 # CONFIG_BLK_DEV_NULL_BLK is not set
-# CONFIG_ZRAM is not set
 # CONFIG_BLK_DEV_DRBD is not set
 # CONFIG_BLK_DEV_PCIESSD_MTIP32XX is not set
 # CONFIG_XEN_BLKDEV_FRONTEND is not set
@@ -240,11 +240,6 @@ CONFIG_TCP_CONG_ADVANCED=y
 CONFIG_TCP_CONG_BBR=y
 # CONFIG_DEFAULT_CUBIC is not set
 CONFIG_DEFAULT_BBR=y
-
-# =================================================================
-# 🔄 ZRAM 内存压缩
-# =================================================================
-CONFIG_ZRAM=y
 
 # =================================================================
 # 🔄 加密加速 + 硬件随机
@@ -514,7 +509,7 @@ CONFIG_BOOTPARAM_HARDLOCKUP_PANIC=y
 CONFIG_BT=m
 CONFIG_BT_BREDR=y
 CONFIG_BT_LE=y
-CONFIG_BT_DEBUGFS=n
+# CONFIG_BT_DEBUGFS is not set
 CONFIG_BT_RFCOMM=m
 CONFIG_BT_RFCOMM_TTY=y
 CONFIG_BT_BNEP=m
