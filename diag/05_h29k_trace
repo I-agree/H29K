@@ -1,0 +1,58 @@
+#!/bin/sh
+# H29K preinit 追踪 v2：关键步骤 + 进程/挂载快照全部写 /dev/kmsg，netconsole 可见
+# 仓库路径：files/lib/preinit/05_h29k_trace（构建时铺到 rootfs 的 /lib/preinit/）
+
+exec 1>/dev/kmsg 2>&1
+
+T() { echo "<6>H29K-TRACE: $*"; }
+
+T "trace sourced, pid=$$, PREINIT=$PREINIT"
+T "cmdline: $(cat /proc/cmdline 2>/dev/null)"
+
+# ---- 1) 包一层 mount_root：只有 enter 没 exit = 卡在里面 ----
+mount_root() {
+	T "mount_root enter: $*"
+	/sbin/mount_root "$@"
+	rc=$?
+	T "mount_root exit rc=$rc"
+	return $rc
+}
+
+# ---- 2) 阶段钩子 ----
+h29k_tr_essential() { T "hook preinit_essential"; }
+h29k_tr_main()      { T "hook preinit_main start"; }
+boot_hook_add preinit_essential h29k_tr_essential
+boot_hook_add preinit_main h29k_tr_main
+
+# ---- 3) 现场快照：进程表 + 挂载表 + 每个进程的等待点 ----
+snap() {
+	L="$1"
+	T "=== snapshot[$L] ps ==="
+	ps 2>/dev/null | while read -r l; do T "ps $l"; done
+	T "=== snapshot[$L] mounts ==="
+	while read -r l; do T "mt $l"; done < /proc/mounts
+	T "=== snapshot[$L] 每进程 state/wchan ==="
+	for d in /proc/[0-9]*; do
+		p=${d#/proc/}
+		cm=$(cat "$d/comm" 2>/dev/null)
+		st=$(sed -n 's/^State:[[:space:]]*//p' "$d/status" 2>/dev/null)
+		wc=$(cat "$d/wchan" 2>/dev/null)
+		[ -n "$cm" ] && T "pid=$p state=$st wchan=$wc comm=$cm"
+	done
+	T "=== snapshot[$L] end ==="
+}
+
+# ---- 4) 心跳（每 5 秒，共 220 秒；240 秒兜底 panic 之前正好覆盖）----
+(
+	i=0
+	while [ $i -lt 44 ]; do
+		sleep 5
+		i=$((i+1))
+		case $i in
+			1|3|6|12|18|24|36|44) snap "$((i*5))s" ;;
+		esac
+		T "heartbeat $i"
+	done
+) &
+
+T "watchdog started"
