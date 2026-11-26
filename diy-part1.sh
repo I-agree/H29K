@@ -49,6 +49,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/bluez-alsa/files \
          files/var/lib/mpd/music \
          files/var/lib/mpd/playlists \
+         files/lib/preinit/05_h29k_trace \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
