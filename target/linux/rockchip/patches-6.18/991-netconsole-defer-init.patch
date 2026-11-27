@@ -1,0 +1,73 @@
+--- a/drivers/net/netconsole.c
++++ b/drivers/net/netconsole.c
+@@ -29,6 +29,7 @@
+ #include <linux/module.h>
+ #include <linux/slab.h>
+ #include <linux/console.h>
++#include <linux/workqueue.h>
+ #include <linux/moduleparam.h>
+ #include <linux/kernel.h>
+ #include <linux/string.h>
+@@ -1939,7 +1940,7 @@
+ 	.write	= write_msg,
+ };
+ 
+-static int __init init_netconsole(void)
++static void netconsole_start(void)
+ {
+ 	int err;
+ 	struct netconsole_target *nt, *tmp;
+@@ -1978,20 +1979,13 @@
+ 	if (err)
+ 		goto fail;
+ 
+-	err = dynamic_netconsole_init();
+-	if (err)
+-		goto undonotifier;
+-
+ 	if (console_type_needed & CONS_EXTENDED)
+ 		register_console(&netconsole_ext);
+ 	if (console_type_needed & CONS_BASIC)
+ 		register_console(&netconsole);
+ 	pr_info("network logging started\n");
+ 
+-	return err;
+-
+-undonotifier:
+-	unregister_netdevice_notifier(&netconsole_netdev_notifier);
++	return;
+ 
+ fail:
+ 	pr_err("cleaning up\n");
+@@ -2040,5 +2034,31 @@
+  *
+  * late_initcall() and module_init() are identical if built as module.
+  */
++static void netconsole_init_work(struct work_struct *work)
++{
++	netconsole_start();
++}
++
++static DECLARE_WORK(netconsole_init_wq, netconsole_init_work);
++
++/*
++ * H29K: netpoll_setup() 在 PHY 自协商完成前会同步阻塞（实测 4.1 秒，日志里
++ * 就是 "netpoll: netconsole: timeout waiting for carrier"），把整个
++ * late_initcall 序列一起拖住。这里只做非阻塞准备，真正的注册交给
++ * workqueue：内核继续往下初始化，载波一出现 netconsole 自动挂上。
++ */
++static int __init init_netconsole(void)
++{
++	int err;
++
++	err = dynamic_netconsole_init();
++	if (err)
++		return err;
++
++	schedule_work(&netconsole_init_wq);
++
++	return 0;
++}
++
+ late_initcall(init_netconsole);
+ module_exit(cleanup_netconsole);
