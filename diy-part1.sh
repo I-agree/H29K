@@ -97,7 +97,7 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/714-rockchip_
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/715-rockchip_drm_vop2_h-add-rk3528-macros.patch" "target/linux/rockchip/patches-6.18/715-rockchip_drm_vop2_h-add-rk3528-macros.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/716-phy-rockchip-add-inno-hdmi-phy-rk3528-support.patch" "target/linux/rockchip/patches-6.18/716-phy-rockchip-add-inno-hdmi-phy-rk3528-support.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/717-sound-soc-rockchip-sai-add-rk3528-compatible.patch" "target/linux/rockchip/patches-6.18/717-sound-soc-rockchip-sai-add-rk3528-compatible.patch"
-download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/718-pmdomain-rockchip-quiet-defer-and-fix-clock-cleanup.patch" "target/linux/rockchip/patches-6.18/718-pmdomain-rockchip-quiet-defer-and-fix-clock-cleanup.patch"
+# download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/718-pmdomain-rockchip-quiet-defer-and-fix-clock-cleanup.patch" "target/linux/rockchip/patches-6.18/718-pmdomain-rockchip-quiet-defer-and-fix-clock-cleanup.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/719-mmc-core-retry-nonremovable-init.patch" "target/linux/rockchip/patches-6.18/719-mmc-core-retry-nonremovable-init.patch"
 download_and_check "${BASE_URL}/JPG/0001-uapi-hevc-ext-sps-rps-controls.patch" "toolchain/kernel-headers/patches/0001-uapi-hevc-ext-sps-rps-controls.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/990-clk-rk3528-add-hclk_trng-gate.patch" "target/linux/rockchip/patches-6.18/990-clk-rk3528-add-hclk_trng-gate.patch"
@@ -146,6 +146,7 @@ download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/mpd" "files/etc/init.d/mpd"
 download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/upmpdcli" "files/etc/init.d/upmpdcli"
 download_and_check "${BASE_URL}/JPG/MPD/etc/uci-defaults/99-h29k-dualrenderer" "files/etc/uci-defaults/99-h29k-dualrenderer"
 download_and_check "${BASE_URL}/diag/05_h29k_trace" "files/lib/preinit/05_h29k_trace"
+download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/991-netconsole-defer-init.patch" "target/linux/rockchip/patches-6.18/991-netconsole-defer-init.patch"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
