@@ -377,7 +377,7 @@ CONFIG_PPP=y
 CONFIG_TUN=y
 
 # =================================================================
-# 🔌 USB gadget 串口：把 Type-C 变成内核 console=ttyGS0（诊断用）
+# 🔌 USB 主机控制器 + 网口 netconsole（诊断用）
 # =================================================================
 CONFIG_USB_GADGET=y
 CONFIG_USB_DWC3=y
