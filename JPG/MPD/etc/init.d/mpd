@@ -20,11 +20,13 @@ start_service() {
 	mkdir -p /var/lib/mpd/music /var/lib/mpd/playlists /var/run
 
 	# 最多等 10 秒（耳机没连也不阻塞开机，MPD 之后会自己重试打开输出）
+	# 注意：本机 busybox sleep 只认整数秒，不能写 0.5（会报
+	# "sleep: invalid number '0.5'" 并立刻空转跑完循环）。
 	local i=0
-	while [ "$i" -lt 20 ]; do
+	while [ "$i" -lt 10 ]; do
 		"$BLUEALSACTL" list-pcms 2>/dev/null | grep -q "a2dp" && break
 		i=$((i + 1))
-		sleep 0.5
+		sleep 1
 	done
 
 	procd_open_instance

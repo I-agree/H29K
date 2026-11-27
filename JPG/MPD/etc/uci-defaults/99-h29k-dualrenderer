@@ -45,6 +45,9 @@ fi
 	uci -q set upmpdcli.lan.interface='br-lan'
 	uci -q set upmpdcli.lan.mpd_host='127.0.0.1'
 	uci -q set upmpdcli.lan.mpd_port='6600'
+	# 指定覆写配置（avfriendlyname 去 -UPnP/AV 后缀只能走 conf），并关 OpenHome
+	uci -q set upmpdcli.lan.config='/etc/upmpdcli.conf'
+	uci -q set upmpdcli.lan.openhome='0'
 	uci -q commit upmpdcli
 }
 
