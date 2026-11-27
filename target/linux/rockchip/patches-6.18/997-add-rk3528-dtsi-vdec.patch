@@ -1,6 +1,6 @@
 --- a/arch/arm64/boot/dts/rockchip/rk3528.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3528.dtsi
-@@ -476,6 +476,41 @@
+@@ -631,6 +631,41 @@
  			reg = <0x0 0xff360000 0x0 0x10000>;
  		};
  
@@ -42,7 +42,7 @@
  		cru: clock-controller@ff4a0000 {
  			compatible = "rockchip,rk3528-cru";
  			reg = <0x0 0xff4a0000 0x0 0x30000>;
-@@ -547,9 +582,7 @@
+@@ -702,9 +737,7 @@
  				/* These power domains are grouped by VD_LOGIC */
  				power-domain@RK3528_PD_RKVDEC {
  					reg = <RK3528_PD_RKVDEC>;
