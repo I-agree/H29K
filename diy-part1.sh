@@ -146,7 +146,6 @@ download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/mpd" "files/etc/init.d/mpd"
 download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/upmpdcli" "files/etc/init.d/upmpdcli"
 download_and_check "${BASE_URL}/JPG/MPD/etc/uci-defaults/99-h29k-dualrenderer" "files/etc/uci-defaults/99-h29k-dualrenderer"
 download_and_check "${BASE_URL}/diag/05_h29k_trace" "files/lib/preinit/05_h29k_trace"
-# download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/999-rkvdec-gate-probe.patch" "target/linux/rockchip/patches-6.18/999-rkvdec-gate-probe.patch"
 
 # --- 统一拉取应用层开机 LOGO 组 ---
 for i in 1 2 3; do
