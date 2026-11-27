@@ -1,0 +1,19 @@
+--- a/src/input/plugins/CurlInputPlugin.cxx
++++ b/src/input/plugins/CurlInputPlugin.cxx
+@@ -279,7 +279,15 @@
+ 		return;
+ 	}
+ 
+-	if (headers.find("accept-ranges") != headers.end())
++	/* H29K: 部分音频 CDN（如 QQ 音乐流）实际支持 Range 请求（返回 206 +
++	 * Content-Range），但响应头不带 Accept-Ranges。MPD 只凭该头判定
++	 * seekable，导致网络流全部被标成不可 seek，拖进度条直接抛
++	 * "Not seekable"。http/https 流一律按可 seek 处理；真不支持
++	 * Range 的源会在 seek 时由底层报错，不影响普通播放。 */
++	const char *uri = GetURI();
++	if (headers.find("accept-ranges") != headers.end() ||
++	    StringStartsWith(uri, "http://") ||
++	    StringStartsWith(uri, "https://"))
+ 		seekable = true;
+ 
+ 	auto i = headers.find("content-length");
