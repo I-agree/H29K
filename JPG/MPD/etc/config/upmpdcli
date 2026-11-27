@@ -5,6 +5,15 @@ config upmpdcli 'lan'
 	# 手机端列表里显示的名字，要和 gmediarender 的 "H29K 投屏" 区分开
 	option friendly_name 'H29K 投音'
 
+	# 指定配套的 upmpdcli.conf（avfriendlyname 等项没有命令行开关，只能走配置文件）
+	option config '/etc/upmpdcli.conf'
+
 	# 后端 MPD，本机回环
 	option mpd_host '127.0.0.1'
 	option mpd_port '6600'
+
+	# 只挂标准 UPnP/AV MediaRenderer，不开 OpenHome Source。
+	# 否则同一台设备会在网络列表里出现两条：裸名「H29K 投音」（OpenHome，
+	# Windows 归到“其他设备”）和「H29K 投音-UPnP/AV」（标准媒体设备）。
+	# QQ Music 等客户端走 UPnP/AV，OpenHome 那条是冗余的。
+	option openhome '0'
