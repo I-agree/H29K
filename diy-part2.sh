@@ -104,18 +104,6 @@ chmod 0755 files/etc/uci-defaults/99-h29k-dualrenderer
 chmod 0755 files/lib/preinit/05_h29k_trace
 # ==============================================================
 
-# ===================== 临时测试 =====================
-BOOT=target/linux/rockchip/image/default.bootscript
-# 一次注入 rootwait=30 + initcall_debug；匹配原文的 " rw rootwait"，不依赖有没有 =30
-grep -q 'initcall_debug' "$BOOT" || \
-    sed -i 's| rw rootwait| rw rootwait=30 console=ttyGS0 initcall_debug ignore_loglevel netconsole=6666@192.168.1.20/eth0,6666@192.168.1.255/ff:ff:ff:ff:ff:ff|' "$BOOT"
-
-grep -q 'initcall_debug' "$BOOT" || { echo "FATAL: bootscript 未注入 initcall_debug"; exit 1; }
-grep -q 'rootwait=30'    "$BOOT" || { echo "FATAL: bootscript 未注入 rootwait=30"; exit 1; }
-grep -q 'console=ttyGS0' "$BOOT" || { echo "FATAL: bootscript 未注入 console=ttyGS0"; exit 1; }
-grep -q 'netconsole=' "$BOOT" || { echo "FATAL: bootscript 未注入 netconsole"; exit 1; }
-echo "✅ bootargs: $(grep -o 'rw rootwait[^;]*' "$BOOT")"
-
 # ===================== 实验前置校验 =====================
 BOOT=target/linux/rockchip/image/default.bootscript
 # 注入 rootwait=30 + initcall_debug + netconsole；匹配原文 " rw rootwait"，不依赖有没有 =30
