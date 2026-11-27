@@ -1,5 +1,0 @@
-#!/bin/sh
-# H29K：每次开机把启动证据写到 U 盘（后台跑，不阻塞启动）
-[ -x /usr/sbin/h29k-ulog ] && /usr/sbin/h29k-ulog >/dev/null 2>&1 &
-
-exit 0
