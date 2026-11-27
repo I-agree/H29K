@@ -1,9 +1,11 @@
 #!/bin/sh
-# H29K preinit 追踪 v5（纯观测版，不改变任何行为）
+# H29K preinit 追踪 v6（降噪版，纯观测，不改变任何行为）
 # 仓库路径 diag/05_h29k_trace → 由 diy-part1 铺到 files/lib/preinit/05_h29k_trace
-# 做法：在 preinit_essential 阶段（此时 /lib/preinit/* 已全部 source 完）
-#       给 preinit_main 的每个钩子前后插一对标记，精确看出卡在哪个钩子
-# v5：A2/A3 直接确认 console 列表里还有没有 ttyGS0（验证"删 console=ttyGS0"是否生效）
+# 相比 v5：
+#   - 删掉 5 秒心跳 ×30 和 90s/30s 两次全进程扫描（启动问题已定案，它们只会淹没 dmesg）
+#   - 保留 A0~A3（cmdline / console 列表 / ttyGS0 存在性）与钩子进出打点
+#   - 只在 120 秒还没进 run_init 时补一次「卡死现场」：wchan + 内核栈
+# 全部输出走 /dev/kmsg，只出现在内核日志里，不影响 preinit 行为
 
 exec 1>/dev/kmsg 2>&1
 
@@ -32,58 +34,26 @@ h29k_tr_main() { T "C1 hit"; }
 
 h29k_tr_essential() {
 	T "C0 hook preinit_essential"
-	T "C0a hooks(before): $preinit_main_hook"
 	_list=""
 	for _h in $preinit_main_hook; do
 		eval "b4_$_h() { T \"E> $_h 进入\"; }"
-		eval "af_$_h() { T \"E< $_h 返回\"; }"
+		eval "af_$_h() { [ \"$_h\" = run_init ] && touch /tmp/.h29k_runinit; T \"E< $_h 返回\"; }"
 		_list="${_list:+$_list }b4_$_h $_h af_$_h"
 	done
-	preinit_main_hook="$_list"	# 同一 shell 直接赋值即可，不必 export -n
-	T "C0b hooks(after): $preinit_main_hook"
+	preinit_main_hook="$_list"
 }
 
 boot_hook_add preinit_essential h29k_tr_essential
 boot_hook_add preinit_main h29k_tr_main
 
-# ---- 现场扫描：用户态进程 + 内核栈 + 挂载表 ----
-scan() {
-	L="$1"
-	T "=== scan[$L] userspace ==="
-	for d in /proc/[0-9]*; do
-		p=${d#/proc/}
-		cm=$(cat "$d/comm" 2>/dev/null) || continue
-		cl=$(tr -d '\000' < "$d/cmdline" 2>/dev/null)
-		[ -n "$cl" ] || continue
-		cl=$(printf '%.100s' "$cl")
-		st=$(sed -n 's/^State:[[:space:]]*//p' "$d/status" 2>/dev/null)
-		pp=$(sed -n 's/^PPid:[[:space:]]*//p' "$d/status" 2>/dev/null)
-		wc=$(cat "$d/wchan" 2>/dev/null)
-		T "u pid=$p ppid=$pp state=${st%% *} wchan=$wc cmd=$cl"
-	done
-	T "=== scan[$L] stacks ==="
-	for d in /proc/[0-9]*; do
-		p=${d#/proc/}
-		cl=$(tr -d '\000' < "$d/cmdline" 2>/dev/null)
-		[ -n "$cl" ] || continue
-		cat "$d/stack" 2>/dev/null | while read -r s; do T "stk $p $s"; done
-	done
-	T "=== scan[$L] mounts ==="
-	while read -r m; do T "mt $m"; done < /proc/mounts
-	T "=== scan[$L] end ==="
-}
-
-# ---- 心跳（每 5 秒，共 150 秒），中间做两次扫描 ----
+# ---- 唯一的兜底：120 秒还没进 run_init 就把卡死现场打一次 ----
 (
-	i=0
-	while [ $i -lt 30 ]; do
-		sleep 5
-		i=$((i+1))
-		case $i in
-			6|18) scan "$((i*5))s" ;;
-		esac
-		T "heartbeat $i"
-	done
+	sleep 120
+	if [ ! -e /tmp/.h29k_runinit ]; then
+		T "STALL120 wchan=$(cat /proc/$$/wchan 2>/dev/null)"
+		while read -r s; do T "stk $$ $s"; done < /proc/$$/stack 2>/dev/null
+		T "STALL120 end"
+	fi
 ) &
 
-T "watchdog started"
+T "v6 armed"
