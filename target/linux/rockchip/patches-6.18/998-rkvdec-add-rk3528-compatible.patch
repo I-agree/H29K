@@ -1,15 +1,15 @@
 --- a/drivers/media/platform/rockchip/rkvdec/rkvdec.c
 +++ b/drivers/media/platform/rockchip/rkvdec/rkvdec.c
-@@ -1990,6 +1990,10 @@
- 		.data = &rk3399_rkvdec_variant,
+@@ -1994,6 +1994,10 @@
+ 		.data = &vdpu346_variant,
  	},
  	{
 +		.compatible = "rockchip,rk3528-vdec",
 +		.data = &vdpu381_variant,
 +	},
 +	{
- 		.compatible = "rockchip,rk3568-vdec",
- 		.data = &vdpu346_variant,
+ 		.compatible = "rockchip,rk3588-vdec",
+ 		.data = &vdpu381_variant,
  	},
 --- a/Documentation/devicetree/bindings/media/rockchip,vdec.yaml
 +++ b/Documentation/devicetree/bindings/media/rockchip,vdec.yaml

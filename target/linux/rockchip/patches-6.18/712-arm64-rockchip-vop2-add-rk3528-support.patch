@@ -35,12 +35,10 @@
  /*
   * The cluster windows on rk3576 support:
   * RGB: linear mode and afbc
-@@ -345,6 +373,79 @@
- 	[VOP2_WIN_CBCR_VSCL_FILTER_MODE] = { .reg = 0xffffffff },
- 	[VOP2_WIN_VSD_CBCR_GT2] = { .reg = 0xffffffff },
+@@ -347,6 +375,79 @@
  	[VOP2_WIN_VSD_CBCR_GT4] = { .reg = 0xffffffff },
-+};
-+
+ };
+ 
 +static const struct reg_field rk3528_vop_cluster_regs[VOP2_WIN_MAX_REG] = {
 +	[VOP2_WIN_ENABLE] = REG_FIELD(RK3568_CLUSTER_WIN_CTRL0, 0, 0),
 +	[VOP2_WIN_FORMAT] = REG_FIELD(RK3568_CLUSTER_WIN_CTRL0, 1, 6),
@@ -112,9 +110,11 @@
 +	[VOP2_WIN_VSD_CBCR_GT4] = { .reg = 0xffffffff },
 +	[VOP2_WIN_VP_SEL] = { .reg = 0xffffffff },
 +	[VOP2_WIN_DLY_NUM] = { .reg = 0xffffffff },
- };
- 
++};
++
  static const struct reg_field rk3568_vop_smart_regs[VOP2_WIN_MAX_REG] = {
+ 	[VOP2_WIN_ENABLE] = REG_FIELD(RK3568_SMART_REGION0_CTRL, 0, 0),
+ 	[VOP2_WIN_FORMAT] = REG_FIELD(RK3568_SMART_REGION0_CTRL, 1, 5),
 @@ -576,6 +677,22 @@
  	},
  };
@@ -235,7 +235,7 @@
  static const struct vop2_regs_dump rk3568_regs_dump[] = {
  	{
  		.name = "SYS",
-@@ -1969,7 +2177,8 @@
+@@ -1969,7 +2176,8 @@
  	bool bottom_layer_alpha_en = false;
  	u32 dst_global_alpha = DRM_BLEND_ALPHA_OPAQUE;
  
@@ -245,7 +245,7 @@
  		mixer_id = vop2_find_start_mixer_id_for_vp(vp);
  	else
  		mixer_id = 0;
-@@ -2493,6 +2794,12 @@
+@@ -2493,6 +2701,12 @@
  	.setup_overlay = rk3568_vop2_setup_overlay,
  };
  
@@ -258,7 +258,7 @@
  static const struct vop2_ops rk3576_vop_ops = {
  	.setup_intf_mux = rk3576_set_intf_mux,
  	.setup_bg_dly = rk3576_vop2_setup_bg_dly,
-@@ -2543,6 +2850,23 @@
+@@ -2543,6 +2757,23 @@
  	.soc_id = 3568,
  };
  
@@ -282,13 +282,13 @@
  static const struct vop2_data rk3576_vop = {
  	.version = VOP_VERSION_RK3576,
  	.feature = VOP2_FEATURE_HAS_SYS_PMU,
-@@ -2586,6 +2910,9 @@
- 	{
+@@ -2587,6 +2818,9 @@
  		.compatible = "rockchip,rk3566-vop",
  		.data = &rk3566_vop,
-+	}, {
+ 	}, {
 +		.compatible = "rockchip,rk3528-vop",
 +		.data = &rk3528_vop,
- 	}, {
++	}, {
  		.compatible = "rockchip,rk3568-vop",
  		.data = &rk3568_vop,
+ 	}, {
