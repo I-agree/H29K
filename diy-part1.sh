@@ -48,6 +48,7 @@ mkdir -p target/linux/rockchip/files/arch/arm64/boot/dts/rockchip \
          package/luci-app-btmanager/root/usr/share/rpcd/acl.d \
          package/bluez-alsa/files \
          files/lib/preinit \
+         package/mpd/extras \
          files/usr/share/fonts
 
 BASE_URL="https://raw.githubusercontent.com/I-agree/H29K/main"
@@ -146,6 +147,8 @@ download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/mpd" "files/etc/init.d/mpd"
 download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/upmpdcli" "files/etc/init.d/upmpdcli"
 download_and_check "${BASE_URL}/JPG/MPD/etc/uci-defaults/99-h29k-dualrenderer" "files/etc/uci-defaults/99-h29k-dualrenderer"
 download_and_check "${BASE_URL}/JPG/MPD/etc/upmpdcli.conf" "files/etc/upmpdcli.conf"
+download_and_check "${BASE_URL}/JPG/MPD/etc/mpd.state" "files/etc/mpd.state"
+download_and_check "${BASE_URL}/package/mpd/extras/001-curl-http-seekable.patch" "package/mpd/extras/001-curl-http-seekable.patch"
 download_and_check "${BASE_URL}/diag/05_h29k_trace" "files/lib/preinit/05_h29k_trace"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/991-netconsole-defer-init.patch" "target/linux/rockchip/patches-6.18/991-netconsole-defer-init.patch"
 
