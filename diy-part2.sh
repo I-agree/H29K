@@ -116,41 +116,38 @@ grep -q 'console=ttyGS0' "$BOOT" || { echo "FATAL: bootscript 未注入 console=
 grep -q 'netconsole=' "$BOOT" || { echo "FATAL: bootscript 未注入 netconsole"; exit 1; }
 echo "✅ bootargs: $(grep -o 'rw rootwait[^;]*' "$BOOT")"
 
-# ===================== 实验前置校验：gmac1 恢复 okay + 720 探针补丁在位 =====================
+# ===================== 实验前置校验 =====================
+BOOT=target/linux/rockchip/image/default.bootscript
+# 注入 rootwait=30 + initcall_debug + netconsole；匹配原文 " rw rootwait"，不依赖有没有 =30
+grep -q 'initcall_debug' "$BOOT" || \
+    sed -i 's| rw rootwait| rw rootwait=30 initcall_debug ignore_loglevel netconsole=6666@192.168.1.20/eth0,6666@192.168.1.255/ff:ff:ff:ff:ff:ff|' "$BOOT"
+
+grep -q 'initcall_debug' "$BOOT" || { echo "FATAL: bootscript 未注入 initcall_debug"; exit 1; }
+grep -q 'rootwait=30'    "$BOOT" || { echo "FATAL: bootscript 未注入 rootwait=30"; exit 1; }
+! grep -q 'console=ttyGS0' "$BOOT" || { echo "FATAL: bootargs 仍带 console=ttyGS0"; exit 1; }
+grep -q 'netconsole=' "$BOOT" || { echo "FATAL: bootscript 未注入 netconsole"; exit 1; }
+echo "✅ bootargs: $(grep -o 'rw rootwait[^;]*' "$BOOT")"
+
+# 网口必须是 okay
 DTS=target/linux/rockchip/files/arch/arm64/boot/dts/rockchip/rk3528-hinlink-h29k.dts
 if ! awk '/^&gmac1 {/,/^};/' "$DTS" | grep -q 'status = "okay"'; then
     echo "❌ 构建用的 dts 里 &gmac1 不是 okay（raw CDN 缓存未刷新，下到的是旧文件）"
     echo "   实际内容：$(awk '/^&gmac1 {/,/^};/' "$DTS" | grep 'status = ')"
     exit 1
 fi
-echo "✅ dts 校验通过：$(awk '/^&gmac1 {/,/^};/' "$DTS" | grep 'status = ' | tr -d '\t')"
+echo "✅ dts: $(awk '/^&gmac1 {/,/^};/' "$DTS" | grep 'status = ' | tr -d '\t')"
 
-if ! awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep -q 'dr_mode = "peripheral"'; then
-    echo "❌ 构建用的 dts 里 &usb_host0_xhci 的 dr_mode 不是 peripheral（raw CDN 缓存未刷新或没提交）"
+# dwc3 必须回到 host（Type-C gadget 实验已撤，peripheral 会让 USB 口失去主机能力）
+if ! awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep -q 'dr_mode = "host"'; then
+    echo "❌ dts 里 &usb_host0_xhci 的 dr_mode 不是 host"
     echo "   实际内容：$(awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep 'dr_mode')"
     exit 1
 fi
-echo "✅ dts 校验通过：$(awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep 'dr_mode' | tr -d '\t')"
+echo "✅ dts: $(awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep 'dr_mode' | tr -d '\t')"
 
-[ -f "$PATCH_DIR/720-h29k-alive-probe.patch" ] \
-    || { echo "FATAL: 缺少 720-h29k-alive-probe.patch"; exit 1; }
-grep -q 'h29k_async_dump' "$PATCH_DIR/720-h29k-alive-probe.patch" \
-    || { echo "FATAL: 720 不是 v5（缺 h29k_async_dump，raw CDN 缓存未刷新或没替换）"; exit 1; }
-grep -q 'H29K_ALIVE_SECS.*240' "$PATCH_DIR/720-h29k-alive-probe.patch" \
-    || { echo "FATAL: 720 里 H29K_ALIVE_SECS 不是 240"; exit 1; }
-grep -q 'h29k_netprobe' "$PATCH_DIR/720-h29k-alive-probe.patch" \
-    || { echo "FATAL: 720 缺 h29k_netprobe"; exit 1; }
-echo "✅ 720 存活探针补丁在位（v5：async 有界+函数名、网口探针、240s）"
-
-# ===================== 取证：LED 灯语 + U 盘日志（每次开机） =====================
-for f in files/usr/sbin/h29k-ulog files/etc/init.d/h29k-ulog files/etc/rc.local; do
-    [ -f "$f" ] || { echo "FATAL: 缺少 $f"; exit 1; }
-done
-chmod 0755 files/usr/sbin/h29k-ulog files/etc/init.d/h29k-ulog files/etc/rc.local
-grep -q 'blink 6' files/usr/sbin/h29k-ulog || { echo "FATAL: ulog 里没有『用户态活着』灯语"; exit 1; }
-grep -q 'h29k-ulog' files/etc/rc.local        || { echo "FATAL: rc.local 没挂上 h29k-ulog"; exit 1; }
-grep -q '^#!/bin/sh /etc/rc.common' files/etc/init.d/h29k-ulog \
-    || { echo "FATAL: init 包装的 rc.common 头不对，rootfs.mk 不会自动 enable"; exit 1; }
-echo "✅ 取证脚本已就位（蓝灯 6 闪 = 用户态活着）"
+# 已废弃的三种取证必须不在
+[ ! -e "$PATCH_DIR/720-h29k-alive-probe.patch" ] || { echo "FATAL: 720 灯码补丁还在"; exit 1; }
+[ ! -e files/usr/sbin/h29k-ulog ] || { echo "FATAL: h29k-ulog 还在"; exit 1; }
+[ ! -e files/etc/init.d/h29k-ulog ] || { echo "FATAL: h29k-ulog.init 还在"; exit 1; }
 
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
