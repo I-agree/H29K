@@ -80,6 +80,36 @@ echo "   插件开关:   $(grep -n '\-Dkms=' "$GST_BAD/Makefile")"
 
 # =================================================================================
 
+# =================================================================================
+# 3. 🎯 MPD curl 输入插件：http/https 流一律按可 seek 处理
+#    （修手机端拖进度条报 "Not seekable"、播放位置与进度条不符）
+# =================================================================================
+MPD_FEED="feeds/packages/sound/mpd"
+MPD_FEED_COMPILED="package/feeds/packages/mpd"
+MPD_PATCH="$(pwd)/package/mpd/extras/001-curl-http-seekable.patch"
+
+if [ ! -f "$MPD_FEED/Makefile" ]; then
+	echo "❌ 未找到 $MPD_FEED/Makefile，feeds 还没装好"
+	exit 1
+fi
+if [ ! -f "$MPD_PATCH" ]; then
+	echo "❌ 未找到补丁 $MPD_PATCH（diy-part1 的 download_and_check 可能失败了）"
+	exit 1
+fi
+
+mkdir -p "$MPD_FEED/patches"
+cp "$MPD_PATCH" "$MPD_FEED/patches/"
+
+# package/feeds/* 若是实体目录（非软链），补丁目录要再放一份，否则编译用的那份没补丁
+if [ -d "$MPD_FEED_COMPILED" ] && [ ! -L "$MPD_FEED_COMPILED" ]; then
+	mkdir -p "$MPD_FEED_COMPILED/patches"
+	cp "$MPD_PATCH" "$MPD_FEED_COMPILED/patches/"
+fi
+
+echo "✅ MPD curl seek 补丁已注入: $MPD_FEED/patches/"
+
+# =================================================================================
+
 # ===================== 系统防火墙增强版（openwrt-sonic-fullcone） =====================
 # 一键应用所有补丁（适用于6.6、6.12、6.18）
 # 全锥形 NAT（Full Cone NAT），无需额外勾选，fullcone 编译进现有 nft_masq.ko / xt_MASQUERADE.ko 模块
