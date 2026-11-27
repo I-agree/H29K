@@ -1,7 +1,9 @@
 #!/bin/sh
-# H29K preinit 追踪 v3
+# H29K preinit 追踪 v5（纯观测版，不改变任何行为）
 # 仓库路径 diag/05_h29k_trace → 由 diy-part1 铺到 files/lib/preinit/05_h29k_trace
-# 目标：① preinit_main 各钩子跑到哪一步（逐条跟踪） ② 抓出卡住的用户态进程的内核栈
+# 做法：在 preinit_essential 阶段（此时 /lib/preinit/* 已全部 source 完）
+#       给 preinit_main 的每个钩子前后插一对标记，精确看出卡在哪个钩子
+# v5：A2/A3 直接确认 console 列表里还有没有 ttyGS0（验证"删 console=ttyGS0"是否生效）
 
 exec 1>/dev/kmsg 2>&1
 
@@ -9,8 +11,14 @@ T() { echo "<6>H29K-TRACE: $*"; }
 
 T "A0 sourced pid=$$ PREINIT=$PREINIT INITRAMFS=$INITRAMFS"
 T "A1 cmdline: $(cat /proc/cmdline 2>/dev/null)"
+T "A2 consoles(active): $(cat /sys/class/tty/console/active 2>/dev/null)"
+if [ -c /dev/ttyGS0 ]; then
+	T "A3 ttyGS0: 存在（不该存在，会卡住 failsafe）"
+else
+	T "A3 ttyGS0: 不存在（正确）"
+fi
 
-# ---- 1) mount_root 前后打点（fstools 挂 overlay 的入口）----
+# ---- mount_root 前后打点（fstools 挂 overlay 的入口）----
 mount_root() {
 	T "B0 mount_root enter: $*"
 	/sbin/mount_root "$@"
@@ -19,14 +27,26 @@ mount_root() {
 	return $rc
 }
 
-# ---- 2) 阶段钩子：preinit_main 进点后开逐条跟踪 ----
-h29k_tr_essential() { T "C0 hook preinit_essential"; }
-h29k_tr_main()      { T "C1 hook preinit_main 进点，之后逐条跟踪"; PS4='+ '; set -x; }
+# ---- 阶段钩子 ----
+h29k_tr_main() { T "C1 hit"; }
+
+h29k_tr_essential() {
+	T "C0 hook preinit_essential"
+	T "C0a hooks(before): $preinit_main_hook"
+	_list=""
+	for _h in $preinit_main_hook; do
+		eval "b4_$_h() { T \"E> $_h 进入\"; }"
+		eval "af_$_h() { T \"E< $_h 返回\"; }"
+		_list="${_list:+$_list }b4_$_h $_h af_$_h"
+	done
+	preinit_main_hook="$_list"	# 同一 shell 直接赋值即可，不必 export -n
+	T "C0b hooks(after): $preinit_main_hook"
+}
 
 boot_hook_add preinit_essential h29k_tr_essential
 boot_hook_add preinit_main h29k_tr_main
 
-# ---- 3) 现场扫描：用户态进程列表 + 内核栈 + 挂载表 ----
+# ---- 现场扫描：用户态进程 + 内核栈 + 挂载表 ----
 scan() {
 	L="$1"
 	T "=== scan[$L] userspace ==="
@@ -53,15 +73,14 @@ scan() {
 	T "=== scan[$L] end ==="
 }
 
-# ---- 4) 心跳 220 秒（240 秒兜底 panic 之前），中途做三次扫描 ----
+# ---- 心跳（每 5 秒，共 150 秒），中间做两次扫描 ----
 (
-	set +x
 	i=0
-	while [ $i -lt 44 ]; do
+	while [ $i -lt 30 ]; do
 		sleep 5
 		i=$((i+1))
 		case $i in
-			6|18|36) scan "$((i*5))s" ;;
+			6|18) scan "$((i*5))s" ;;
 		esac
 		T "heartbeat $i"
 	done
