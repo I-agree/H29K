@@ -108,7 +108,6 @@ download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/995-rockchip-
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch" "target/linux/rockchip/patches-6.18/996-add-rk3528-dtsi-display-hdmi.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/997-add-rk3528-dtsi-vdec.patch" "target/linux/rockchip/patches-6.18/997-add-rk3528-dtsi-vdec.patch"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/998-rkvdec-add-rk3528-compatible.patch" "target/linux/rockchip/patches-6.18/998-rkvdec-add-rk3528-compatible.patch"
-download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/999-rkvdec-gate-probe.patch" "target/linux/rockchip/patches-6.18/999-rkvdec-gate-probe.patch"
 download_and_check "${BASE_URL}/JPG/99-bootanim" "files/etc/init.d/99-bootanim"
 download_and_check "${BASE_URL}/JPG/drm_play_arm64" "files/usr/sbin/drm_play_arm64"
 download_and_check "${BASE_URL}/fonts/MiSans-Regular.ttf" "files/usr/share/fonts/MiSans-Regular.ttf"
