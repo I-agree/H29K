@@ -145,6 +145,7 @@ download_and_check "${BASE_URL}/JPG/MPD/etc/config/upmpdcli" "files/etc/config/u
 download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/mpd" "files/etc/init.d/mpd"
 download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/upmpdcli" "files/etc/init.d/upmpdcli"
 download_and_check "${BASE_URL}/JPG/MPD/etc/uci-defaults/99-h29k-dualrenderer" "files/etc/uci-defaults/99-h29k-dualrenderer"
+download_and_check "${BASE_URL}/JPG/MPD/etc/upmpdcli.conf" "files/etc/upmpdcli.conf"
 download_and_check "${BASE_URL}/diag/05_h29k_trace" "files/lib/preinit/05_h29k_trace"
 download_and_check "${BASE_URL}/target/linux/rockchip/patches-6.18/991-netconsole-defer-init.patch" "target/linux/rockchip/patches-6.18/991-netconsole-defer-init.patch"
 
