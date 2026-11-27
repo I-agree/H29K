@@ -133,9 +133,4 @@ if ! awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep -q 'dr_mode = "host"'; then
 fi
 echo "✅ dts: $(awk '/^&usb_host0_xhci {/,/^};/' "$DTS" | grep 'dr_mode' | tr -d '\t')"
 
-# 已废弃的三种取证必须不在
-[ ! -e "$PATCH_DIR/720-h29k-alive-probe.patch" ] || { echo "FATAL: 720 灯码补丁还在"; exit 1; }
-[ ! -e files/usr/sbin/h29k-ulog ] || { echo "FATAL: h29k-ulog 还在"; exit 1; }
-[ ! -e files/etc/init.d/h29k-ulog ] || { echo "FATAL: h29k-ulog.init 还在"; exit 1; }
-
 echo "🚀 H29K专用代码已经准备就绪，即将开始正式编译！"
