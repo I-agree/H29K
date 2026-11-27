@@ -1,0 +1,99 @@
+--- /dev/null
++++ b/configs/hinlink-h29k-rk3528_defconfig
+@@ -0,0 +1,57 @@
++# Hinlink H29K (RK3528) U-Boot defconfig
++# OpenWrt 25.12 + Linux 6.18
++# 2026-11-28: 启用 U-Boot netconsole（无串口时也能从 U-Boot 阶段抓日志）
++
++CONFIG_ARM=y
++CONFIG_SKIP_LOWLEVEL_INIT=y
++CONFIG_COUNTER_FREQUENCY=24000000
++CONFIG_ARCH_ROCKCHIP=y
++CONFIG_DEFAULT_DEVICE_TREE="rk3528-generic"
++CONFIG_ROCKCHIP_RK3528=y
++CONFIG_SYS_LOAD_ADDR=0xc00800
++CONFIG_DEBUG_UART_BASE=0xFF9F0000
++CONFIG_DEBUG_UART_CLOCK=24000000
++CONFIG_DEBUG_UART=y
++# CONFIG_BOOTMETH_VBE is not set
++CONFIG_DEFAULT_FDT_FILE="rockchip/rk3528-generic.dtb"
++# CONFIG_DISPLAY_CPUINFO is not set
++CONFIG_SPL_MAX_SIZE=0x40000
++# CONFIG_SPL_RAW_IMAGE_SUPPORT is not set
++CONFIG_CMD_MEMINFO=y
++CONFIG_CMD_MEMINFO_MAP=y
++CONFIG_CMD_GPIO=y
++CONFIG_CMD_GPT=y
++CONFIG_CMD_MISC=y
++CONFIG_CMD_MMC=y
++# CONFIG_CMD_SETEXPR is not set
++CONFIG_CMD_RNG=y
++# CONFIG_SPL_DOS_PARTITION is not set
++# CONFIG_OF_UPSTREAM is not set
++CONFIG_OF_SPL_REMOVE_PROPS="clock-names interrupt-parent assigned-clocks assigned-clock-rates assigned-clock-parents"
++# CONFIG_ADC is not set
++CONFIG_ROCKCHIP_GPIO=y
++CONFIG_SUPPORT_EMMC_RPMB=y
++CONFIG_MMC_DW=y
++CONFIG_MMC_DW_ROCKCHIP=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_SDMA=y
++CONFIG_MMC_SDHCI_ROCKCHIP=y
++CONFIG_BAUDRATE=1500000
++CONFIG_DEBUG_UART_SHIFT=2
++CONFIG_SYS_NS16550_MEM32=y
++CONFIG_ERRNO_STR=y
++CONFIG_BOOTDELAY=0
++# ---- 网络栈 + netconsole（U-Boot 阶段日志走有线口）----
++CONFIG_NET=y
++CONFIG_DM_ETH=y
++CONFIG_DWC_ETH_QOS=y
++CONFIG_DWC_ETH_QOS_ROCKCHIP=y
++CONFIG_DM_MDIO=y
++CONFIG_PHY_REALTEK=y
++CONFIG_NET_RANDOM_ETHADDR=y
++CONFIG_NETCONSOLE=y
++CONFIG_CONSOLE_MUX=y
++CONFIG_SYS_CONSOLE_IS_IN_ENV=y
++CONFIG_CMD_NET=y
++CONFIG_CMD_MII=y
++CONFIG_PREBOOT="setenv ipaddr 192.168.1.20; setenv netmask 255.255.255.0; setenv ncip 255.255.255.255; setenv stdout 'nc,serial'; setenv stderr 'nc,serial'; echo H29K-UBOOT-NC-ARMED"
+--- a/arch/arm/dts/rk3528-generic.dts
++++ b/arch/arm/dts/rk3528-generic.dts
+@@ -14,6 +14,7 @@
+ 		mmc0 = &sdhci;
+ 		mmc1 = &sdmmc;
+ 		serial0 = &uart0;
++		ethernet0 = &gmac1;
+ 	};
+ 
+ 	chosen {
+@@ -45,3 +46,28 @@
+ 	pinctrl-0 = <&uart0m0_xfer>;
+ 	status = "okay";
+ };
++
++/* ---- H29K: RTL8211F RGMII 千兆口，供 U-Boot 阶段 netconsole 使用 ---- */
++&mdio1 {
++	rgmii_phy: ethernet-phy@1 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <1>;
++	};
++};
++
++&gmac1 {
++	status = "okay";
++	phy-mode = "rgmii";
++	clock_in_out = "output";
++	phy-handle = <&rgmii_phy>;
++	/* MAC 侧 RGMII 延迟，与内核 dts 的 tx_delay/rx_delay 一致 */
++	tx_delay = <0x30>;
++	rx_delay = <0x10>;
++	/* RTL8211F 复位脚 = GPIO4_PC2(18)，低有效 */
++	snps,reset-gpio = <&gpio4 18 1>;
++	snps,reset-active-low;
++	snps,reset-delays-us = <0 20000 100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&rgmii_miim &rgmii_tx_bus2 &rgmii_rx_bus2
++		     &rgmii_rgmii_clk &rgmii_rgmii_bus>;
++};
