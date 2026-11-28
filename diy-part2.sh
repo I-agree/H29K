@@ -110,7 +110,9 @@ echo "✅ MPD curl seek 补丁已注入: $MPD_FEED/patches/"
 
 # =================================================================================
 
-# ===================== 系统防火墙增强版（openwrt-sonic-fullcone） =====================
+# =================================================================================
+# 4. 🎯 系统防火墙增强版（openwrt-sonic-fullcone）
+# =================================================================================
 # 一键应用所有补丁（适用于6.6、6.12、6.18）
 # 全锥形 NAT（Full Cone NAT），无需额外勾选，fullcone 编译进现有 nft_masq.ko / xt_MASQUERADE.ko 模块
 curl -sSL https://raw.githubusercontent.com/mufeng05/openwrt-sonic-fullcone/master/add_sonic_fullcone.sh | bash
@@ -118,12 +120,14 @@ curl -sSL https://raw.githubusercontent.com/mufeng05/openwrt-sonic-fullcone/mast
 # =================================================================================
 
 # =================================================================================
-# 4. 🎯 OpenWrt 上游内核压缩 lzma 修改为 gzip
+# 5. 🎯 OpenWrt 上游内核压缩 lzma 修改为 gzip
 # =================================================================================
 IMG_MK=target/linux/rockchip/image/Makefile
 grep -q 'lzma | fit lzma' "$IMG_MK" && \
     sed -i 's@kernel-bin | lzma | fit lzma@kernel-bin | gzip | fit gzip@' "$IMG_MK"
 grep -q 'gzip | fit gzip' "$IMG_MK" || { echo "FATAL: 内核压缩未改成 gzip"; exit 1; }
+
+# =================================================================================
 
 # ===================== 赋权与开机自启 =====================
 # echo "🔧 给可执行脚本添加运行权限"
@@ -140,7 +144,9 @@ chmod 0755 files/etc/init.d/mpd
 chmod 0755 files/etc/init.d/upmpdcli
 chmod 0755 files/etc/uci-defaults/99-h29k-dualrenderer
 chmod 0755 files/lib/preinit/05_h29k_trace
+chmod 0755 files/lib/preinit/31_h29k_failsafe_guard
 # ==============================================================
+grep -q 'failsafe_wait()' files/lib/preinit/31_h29k_failsafe_guard || { echo "FATAL: failsafe 加固文件未落地"; exit 1; }
 
 # ===================== 实验前置校验 =====================
 BOOT=target/linux/rockchip/image/default.bootscript
