@@ -1,0 +1,20 @@
+#!/bin/sh
+# H29K failsafe 加固（覆盖 base-files 里 30_failsafe_wait 的实现）
+#
+# 原版 fs_wait_for_key 会对 /sys/class/tty/console/active 的每个 console
+# 依次 `echo ... > /dev/$console` 再 `read -t $timer < /dev/$console`。
+# 当某个 tty 没完全起来时，echo 会永久停在 n_tty_write -> wait_woken，
+# read 的 -t 也就无从触发（4.pcapng 的 /proc/PID/stack 已证实这一点）。
+# 本文件按 glob 顺序晚于 30_failsafe_wait 被 source，同名函数覆盖生效。
+#
+# 策略：不对任何 tty 做读写。failsafe 只保留两条无阻塞入口：
+#   1) 内核命令行带 failsafe=
+#   2) /tmp/failsafe_button（按键探针写出的标记）
+# 标记与 FAILSAFE 的语义和上游一致，后续 run_failsafe_hook 照旧工作。
+failsafe_wait() {
+	FAILSAFE=
+	grep -q 'failsafe=' /proc/cmdline 2>/dev/null && FAILSAFE=true
+	[ -f /tmp/failsafe_button ] && FAILSAFE=true
+	[ "$FAILSAFE" = "true" ] && export FAILSAFE && touch /tmp/failsafe
+	return 0
+}
