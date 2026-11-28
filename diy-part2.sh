@@ -136,22 +136,19 @@ chmod 0755 files/lib/preinit/05_h29k_trace
 
 # ===================== 实验前置校验 =====================
 BOOT=target/linux/rockchip/image/default.bootscript
+# 注入 rootwait=30 + initcall_debug + printk.devkmsg=on + netconsole；匹配原文 " rw rootwait"，不依赖有没有 =30
 grep -q 'initcall_debug' "$BOOT" || \
     sed -i 's| rw rootwait| rw rootwait=30 initcall_debug printk.devkmsg=on ignore_loglevel netconsole=6666@192.168.1.20/eth0,6666@192.168.1.255/ff:ff:ff:ff:ff:ff|' "$BOOT"
 
-# 老仓已注入过 initcall_debug 的情况，单独补 printk.devkmsg=on
+# bootscript 之前被单独注入过 initcall_debug（没有 printk.devkmsg=on）时，只补这一项
 grep -q 'printk.devkmsg=on' "$BOOT" || \
     sed -i 's|initcall_debug|initcall_debug printk.devkmsg=on|' "$BOOT"
 
-grep -q 'printk.devkmsg=on' "$BOOT" || { echo "FATAL: bootargs 未注入 printk.devkmsg=on"; exit 1; }
-
-grep -q 'initcall_debug' "$BOOT" || \
-    sed -i 's| rw rootwait| rw rootwait=30 initcall_debug ignore_loglevel netconsole=6666@192.168.1.20/eth0,6666@192.168.1.255/ff:ff:ff:ff:ff:ff|' "$BOOT"
-
-grep -q 'initcall_debug' "$BOOT" || { echo "FATAL: bootscript 未注入 initcall_debug"; exit 1; }
-grep -q 'rootwait=30'    "$BOOT" || { echo "FATAL: bootscript 未注入 rootwait=30"; exit 1; }
-! grep -q 'console=ttyGS0' "$BOOT" || { echo "FATAL: bootargs 仍带 console=ttyGS0"; exit 1; }
-grep -q 'netconsole=' "$BOOT" || { echo "FATAL: bootscript 未注入 netconsole"; exit 1; }
+grep -q 'initcall_debug'    "$BOOT" || { echo "FATAL: bootscript 未注入 initcall_debug"; exit 1; }
+grep -q 'printk.devkmsg=on' "$BOOT" || { echo "FATAL: bootscript 未注入 printk.devkmsg=on"; exit 1; }
+grep -q 'rootwait=30'       "$BOOT" || { echo "FATAL: bootscript 未注入 rootwait=30"; exit 1; }
+! grep -q 'console=ttyGS0'  "$BOOT" || { echo "FATAL: bootargs 仍带 console=ttyGS0"; exit 1; }
+grep -q 'netconsole='       "$BOOT" || { echo "FATAL: bootscript 未注入 netconsole"; exit 1; }
 echo "✅ bootargs: $(grep -o 'rw rootwait[^;]*' "$BOOT")"
 
 # 网口必须是 okay
