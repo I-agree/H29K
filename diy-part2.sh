@@ -148,11 +148,13 @@ chmod 0755 files/lib/preinit/31_h29k_failsafe_guard
 # ==============================================================
 
 # failsafe 加固：不做任何 tty 读写，failsafe 只认 cmdline 与 /tmp/failsafe_button
-[ -s files/lib/preinit/31_h29k_failsafe_guard ] || { echo "FATAL: 31_h29k_failsafe_guard 没铺到 files/lib/preinit/（仓库 diag/ 里缺这个文件）"; exit 1; }
-grep -q '^failsafe_wait()' files/lib/preinit/31_h29k_failsafe_guard || { echo "FATAL: 31 里没有 failsafe_wait 覆盖定义"; exit 1; }
-! grep -q '/sys/class/tty/console/active' files/lib/preinit/31_h29k_failsafe_guard || { echo "FATAL: 31 仍读 console/active，覆盖不成立"; exit 1; }
-! grep -q '> *"/dev/' files/lib/preinit/31_h29k_failsafe_guard || { echo "FATAL: 31 仍往 /dev/* 写，会重新引入死等"; exit 1; }
-echo "✅ failsafe guard: $(wc -l < files/lib/preinit/31_h29k_failsafe_guard) 行，已覆盖 30_failsafe_wait"
+G=files/lib/preinit/31_h29k_failsafe_guard
+[ -s "$G" ] || { echo "FATAL: $G 没铺到（下载源是 diy-part1 里的 JPG/31_h29k_failsafe_guard）"; exit 1; }
+grep -q '^failsafe_wait()' "$G" || { echo "FATAL: 31 里没有 failsafe_wait 覆盖定义"; exit 1; }
+awk '/^[[:space:]]*#/{next} /console\/active/ || /\/dev\/[t$]/ {bad=1} END{exit bad?1:0}' "$G" || { echo "FATAL: 31 的代码行仍碰 console/active 或 /dev 下的 tty 节点"; exit 1; }
+chmod 0755 "$G"
+echo "✅ failsafe guard: $(wc -l < "$G") 行，已覆盖 30_failsafe_wait（不做任何 tty 读写）"
+
 
 # ===================== 实验前置校验 =====================
 BOOT=target/linux/rockchip/image/default.bootscript
