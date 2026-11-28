@@ -1,11 +1,16 @@
 #!/bin/sh /etc/rc.common
 # H29K: 覆写 OpenWrt 官方 mpd init
 #
-# 与官方版的两点差别：
+# 与官方版的差别：
 #   1) 以 root 运行（不传 procd_set_param user mpd）。bluealsa 的 D-Bus 策略
 #      只对 root 放行，以 mpd 用户跑会拿不到 bluealsa 的 PCM 控制权。
 #   2) 启动前先等 bluealsa 出现 a2dp PCM（A2DP 协商完成后 PCM 才创建），
 #      避免 always_on 第一次打开输出时设备还不存在。
+#   3) MPD 就绪后主动把种子音量 setvol 一遍，兜底软件音量 filter。
+#      state_file 在输出 mixer/filter 创建之前恢复音量，存在时序漏洞：
+#      若恢复时 mixer 还没挂上，音量只存到未就绪对象，filter 挂接后仍是
+#      默认满增益，表现为“默认音量非常大”。这里等 6600 可连后显式下发一次，
+#      走 LockSetVolume -> volume_filter_set，确保 PCM 真的被衰减。
 #
 # 启动顺序：bluetoothd(62) → bluealsa(95) → mpd(98) → upmpdcli(99)
 
@@ -15,6 +20,35 @@ USE_PROCD=1
 PROG=/usr/bin/mpd
 CONFIGFILE=/etc/mpd.conf
 BLUEALSACTL=/usr/bin/bluealsactl
+STATEFILE=/etc/mpd.state
+# state 文件缺失或解析不出音量时的兜底种子值（0..100）
+DEFAULT_VOL=20
+
+# 从 state 文件解析 sw_volume；解析失败回退 DEFAULT_VOL
+seed_volume() {
+	local v
+	v=$(sed -n 's/^sw_volume:[[:space:]]*//p' "$STATEFILE" 2>/dev/null | head -1)
+	case "$v" in
+		''|*[!0-9]*) v=$DEFAULT_VOL ;;
+	esac
+	[ "$v" -lt 0 ] && v=0
+	[ "$v" -gt 100 ] && v=100
+	echo "$v"
+}
+
+# 后台等 6600 就绪后下发种子音量；不阻塞开机，失败也不影响 MPD 运行
+apply_seed_volume() {
+	local vol i=0
+	vol=$(seed_volume)
+	while [ "$i" -lt 15 ]; do
+		if ( printf 'status\nclose\n' | nc 127.0.0.1 6600 2>/dev/null | grep -q '^OK' ); then
+			( printf "setvol %s\nclose\n" "$vol" ) | nc 127.0.0.1 6600 2>/dev/null
+			return
+		fi
+		i=$((i + 1))
+		sleep 1
+	done
+}
 
 start_service() {
 	mkdir -p /var/lib/mpd/music /var/lib/mpd/playlists /var/run
@@ -35,4 +69,7 @@ start_service() {
 	procd_set_param stderr 1
 	procd_set_param nice -10
 	procd_close_instance
+
+	# 后台兜底下发种子音量（脱离 procd 子进程管理）
+	( apply_seed_volume ) &
 }
