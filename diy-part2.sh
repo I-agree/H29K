@@ -136,7 +136,15 @@ chmod 0755 files/lib/preinit/05_h29k_trace
 
 # ===================== 实验前置校验 =====================
 BOOT=target/linux/rockchip/image/default.bootscript
-# 注入 rootwait=30 + initcall_debug + netconsole；匹配原文 " rw rootwait"，不依赖有没有 =30
+grep -q 'initcall_debug' "$BOOT" || \
+    sed -i 's| rw rootwait| rw rootwait=30 initcall_debug printk.devkmsg=on ignore_loglevel netconsole=6666@192.168.1.20/eth0,6666@192.168.1.255/ff:ff:ff:ff:ff:ff|' "$BOOT"
+
+# 老仓已注入过 initcall_debug 的情况，单独补 printk.devkmsg=on
+grep -q 'printk.devkmsg=on' "$BOOT" || \
+    sed -i 's|initcall_debug|initcall_debug printk.devkmsg=on|' "$BOOT"
+
+grep -q 'printk.devkmsg=on' "$BOOT" || { echo "FATAL: bootargs 未注入 printk.devkmsg=on"; exit 1; }
+
 grep -q 'initcall_debug' "$BOOT" || \
     sed -i 's| rw rootwait| rw rootwait=30 initcall_debug ignore_loglevel netconsole=6666@192.168.1.20/eth0,6666@192.168.1.255/ff:ff:ff:ff:ff:ff|' "$BOOT"
 
