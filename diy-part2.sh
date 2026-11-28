@@ -119,16 +119,6 @@ curl -sSL https://raw.githubusercontent.com/mufeng05/openwrt-sonic-fullcone/mast
 
 # =================================================================================
 
-# =================================================================================
-# 5. 🎯 OpenWrt 上游内核压缩 lzma 修改为 gzip
-# =================================================================================
-IMG_MK=target/linux/rockchip/image/Makefile
-grep -q 'lzma | fit lzma' "$IMG_MK" && \
-    sed -i 's@kernel-bin | lzma | fit lzma@kernel-bin | gzip | fit gzip@' "$IMG_MK"
-grep -q 'gzip | fit gzip' "$IMG_MK" || { echo "FATAL: 内核压缩未改成 gzip"; exit 1; }
-
-# =================================================================================
-
 # ===================== 赋权与开机自启 =====================
 # echo "🔧 给可执行脚本添加运行权限"
 chmod +x files/etc/init.d/99-bootanim
