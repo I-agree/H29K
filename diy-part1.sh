@@ -141,6 +141,7 @@ download_and_check "${BASE_URL}/package/bluez-alsa/Makefile" "package/bluez-alsa
 download_and_check "${BASE_URL}/package/bluez-alsa/files/bluealsa.config" "package/bluez-alsa/files/bluealsa.config"
 download_and_check "${BASE_URL}/package/bluez-alsa/files/bluealsa.init" "package/bluez-alsa/files/bluealsa.init"
 download_and_check "${BASE_URL}/package/boot/rkbin/Makefile" "package/boot/rkbin/Makefile"
+download_and_check "${BASE_URL}/JPG/31_h29k_failsafe_guard" "files/lib/preinit/31_h29k_failsafe_guard"
 download_and_check "${BASE_URL}/JPG/MPD/etc/mpd.conf" "files/etc/mpd.conf"
 download_and_check "${BASE_URL}/JPG/MPD/etc/config/upmpdcli" "files/etc/config/upmpdcli"
 download_and_check "${BASE_URL}/JPG/MPD/etc/init.d/mpd" "files/etc/init.d/mpd"
