@@ -146,7 +146,13 @@ chmod 0755 files/etc/uci-defaults/99-h29k-dualrenderer
 chmod 0755 files/lib/preinit/05_h29k_trace
 chmod 0755 files/lib/preinit/31_h29k_failsafe_guard
 # ==============================================================
-grep -q 'failsafe_wait()' files/lib/preinit/31_h29k_failsafe_guard || { echo "FATAL: failsafe 加固文件未落地"; exit 1; }
+
+# failsafe 加固：不做任何 tty 读写，failsafe 只认 cmdline 与 /tmp/failsafe_button
+[ -s files/lib/preinit/31_h29k_failsafe_guard ] || { echo "FATAL: 31_h29k_failsafe_guard 没铺到 files/lib/preinit/（仓库 diag/ 里缺这个文件）"; exit 1; }
+grep -q '^failsafe_wait()' files/lib/preinit/31_h29k_failsafe_guard || { echo "FATAL: 31 里没有 failsafe_wait 覆盖定义"; exit 1; }
+! grep -q '/sys/class/tty/console/active' files/lib/preinit/31_h29k_failsafe_guard || { echo "FATAL: 31 仍读 console/active，覆盖不成立"; exit 1; }
+! grep -q '> *"/dev/' files/lib/preinit/31_h29k_failsafe_guard || { echo "FATAL: 31 仍往 /dev/* 写，会重新引入死等"; exit 1; }
+echo "✅ failsafe guard: $(wc -l < files/lib/preinit/31_h29k_failsafe_guard) 行，已覆盖 30_failsafe_wait"
 
 # ===================== 实验前置校验 =====================
 BOOT=target/linux/rockchip/image/default.bootscript
