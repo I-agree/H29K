@@ -1,6 +1,6 @@
 --- /dev/null
 +++ b/configs/hinlink-h29k-rk3528_defconfig
-@@ -0,0 +1,57 @@
+@@ -0,0 +1,58 @@
 +# Hinlink H29K (RK3528) U-Boot defconfig
 +# OpenWrt 25.12 + Linux 6.18
 +# 2026-11-28: 启用 U-Boot netconsole（无串口时也能从 U-Boot 阶段抓日志）
@@ -57,6 +57,7 @@
 +CONFIG_SYS_CONSOLE_IS_IN_ENV=y
 +CONFIG_CMD_NET=y
 +CONFIG_CMD_MII=y
++CONFIG_USE_PREBOOT=y
 +CONFIG_PREBOOT="setenv ipaddr 192.168.1.20; setenv netmask 255.255.255.0; setenv ncip 255.255.255.255; setenv stdout 'nc,serial'; setenv stderr 'nc,serial'; echo H29K-UBOOT-NC-ARMED"
 --- a/arch/arm/dts/rk3528-generic.dts
 +++ b/arch/arm/dts/rk3528-generic.dts
