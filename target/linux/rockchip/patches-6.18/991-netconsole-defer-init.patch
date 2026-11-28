@@ -39,6 +39,15 @@
  
  fail:
  	pr_err("cleaning up\n");
+@@ -2006,7 +2000,7 @@
+ 		free_param_target(nt);
+ 	}
+ 
+-	return err;
++	return;
+ }
+ 
+ static void __exit cleanup_netconsole(void)
 @@ -2040,5 +2034,31 @@
   *
   * late_initcall() and module_init() are identical if built as module.
